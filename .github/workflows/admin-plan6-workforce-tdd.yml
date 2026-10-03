@@ -134,6 +134,8 @@ jobs:
         run: node scripts/test-admin-workforce-review-hardening-postgres.mjs
       - name: Workforce tenant-isolation PostgreSQL behavior
         run: node scripts/test-admin-workforce-tenant-isolation-postgres.mjs
+      - name: Cross-plan terminal approval replay behavior
+        run: node scripts/test-admin-workforce-order-approval-terminal-replay-postgres.mjs
 
   employee-pin-security:
     needs: workforce-postgres
