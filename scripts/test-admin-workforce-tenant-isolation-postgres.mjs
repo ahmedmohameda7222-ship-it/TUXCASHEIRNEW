@@ -2,9 +2,9 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const targetMigration = '20261003001500_admin_workforce_review_hardening_followup.sql';
+const targetMigration = '20261003101500_admin_workforce_pin_tenant_isolation.sql';
 if (!existsSync(resolve('supabase/migrations', targetMigration))) {
-  throw new Error('Admin Plan 6 Workforce hardening follow-up migration missing.');
+  throw new Error('Admin Plan 6 Workforce PIN tenant-isolation migration missing.');
 }
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -59,7 +59,7 @@ const migrations = readdirSync(resolve('supabase/migrations'))
   .filter((name) => /^\d+_.+\.sql$/.test(name))
   .sort();
 const targetIndex = migrations.indexOf(targetMigration);
-if (targetIndex < 0) throw new Error('Workforce hardening follow-up migration missing');
+if (targetIndex < 0) throw new Error('Workforce PIN tenant-isolation migration missing');
 for (const migration of migrations.slice(0, targetIndex + 1)) {
   psql(['-f', resolve('supabase/migrations', migration)], migration);
 }
