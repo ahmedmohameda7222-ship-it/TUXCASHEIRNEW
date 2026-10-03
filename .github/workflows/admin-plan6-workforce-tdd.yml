@@ -132,6 +132,8 @@ jobs:
         run: node scripts/test-admin-workforce-postgres.mjs
       - name: Workforce deep-review PostgreSQL regressions
         run: node scripts/test-admin-workforce-review-hardening-postgres.mjs
+      - name: Workforce tenant-isolation PostgreSQL behavior
+        run: node scripts/test-admin-workforce-tenant-isolation-postgres.mjs
 
   employee-pin-security:
     needs: workforce-postgres
