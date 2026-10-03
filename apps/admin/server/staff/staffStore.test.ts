@@ -146,7 +146,7 @@ describe('staffStore', () => {
   });
 
   it('preserves explicit ALLOW and DENY permission overrides in the employee read model', async () => {
-    const select = vi.fn(async (table: string, params: URLSearchParams) => {
+    const select = vi.fn(async (table: string) => {
       if (table === 'business_employees') {
         return [
           {
