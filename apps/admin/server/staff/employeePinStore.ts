@@ -5,6 +5,7 @@ import type {
   StageEmployeeCredentialCommandInput,
   StageEmployeeCredentialCommandResult,
   WorkerCredentialCandidate,
+  WorkerStateFingerprintResult,
 } from './employeePin.js';
 
 type EmployeeCredentialRow = {
@@ -92,7 +93,7 @@ export function createSupabaseEmployeePinStore(client: AdminSupabaseClient): Emp
       return rows.length > 0;
     },
 
-    async listActiveWorkers({ shopIds }) {
+    async listPinCollisionWorkers({ shopIds }) {
       if (shopIds.length === 0) return [];
       const workers = await client.select<WorkerRow[]>(
         'workers',
@@ -123,6 +124,34 @@ export function createSupabaseEmployeePinStore(client: AdminSupabaseClient): Emp
         credentialVersion: safeInteger(worker.credential_version),
         linkedEmployeeId: employeeByWorker.get(worker.id) ?? null,
       }));
+    },
+
+    async loadWorkerStateFingerprint(input): Promise<WorkerStateFingerprintResult> {
+      const result = await client.rpc<Record<string, unknown>>(
+        'get_employee_worker_state_fingerprint_v1',
+        {
+          p_actor_employee_id: input.actorEmployeeId,
+          p_business_id: input.businessId,
+          p_employee_id: input.employeeId,
+          p_target_shop_ids: input.targetShopIds,
+        },
+      );
+      if (result['ok'] !== true) {
+        return {
+          ok: false,
+          code:
+            typeof result['code'] === 'string'
+              ? result['code']
+              : 'worker_state_fingerprint_failed',
+        };
+      }
+      if (
+        typeof result['fingerprint'] !== 'string' ||
+        !/^[0-9a-f]{64}$/.test(result['fingerprint'])
+      ) {
+        throw new Error('staff_pin_backend_contract_invalid');
+      }
+      return { ok: true, fingerprint: result['fingerprint'] };
     },
 
     async stageCredentialCommand(
