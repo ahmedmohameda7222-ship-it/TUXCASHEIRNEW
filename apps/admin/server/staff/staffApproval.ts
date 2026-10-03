@@ -134,7 +134,7 @@ function assertOnlyKeys(
 function assertPinPayloadHasNoSecretMaterial(value: Readonly<Record<string, unknown>>): void {
   const forbidden = /(pin|verifier|lookup|salt|password|passcode|secret|token)/i;
   if (Object.keys(value).some((key) => forbidden.test(key))) {
-    throw new Error('approval_pin_payload_unsafe');
+    throw new ApprovalTerminalCommandError('approval_pin_payload_unsafe');
   }
 }
 
