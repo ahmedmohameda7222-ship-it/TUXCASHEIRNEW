@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-
 import { hashPin, pinLookupHash, verifyPin } from '../pin.js';
 
 export type EmployeeCredentialState = {
@@ -17,6 +15,10 @@ export type WorkerCredentialCandidate = {
   readonly credentialVersion: number;
   readonly linkedEmployeeId: string | null;
 };
+
+export type WorkerStateFingerprintResult =
+  | { readonly ok: true; readonly fingerprint: string }
+  | { readonly ok: false; readonly code: string };
 
 export type StageEmployeeCredentialCommandInput = {
   readonly actorEmployeeId: string;
@@ -53,10 +55,16 @@ export interface EmployeePinStore {
     employeeId: string;
     lookupHash: string;
   }): Promise<boolean>;
-  listActiveWorkers(input: {
+  listPinCollisionWorkers(input: {
     businessId: string;
     shopIds: readonly string[];
   }): Promise<readonly WorkerCredentialCandidate[]>;
+  loadWorkerStateFingerprint(input: {
+    actorEmployeeId: string;
+    businessId: string;
+    employeeId: string;
+    targetShopIds: readonly string[];
+  }): Promise<WorkerStateFingerprintResult>;
   stageCredentialCommand(
     input: StageEmployeeCredentialCommandInput,
   ): Promise<StageEmployeeCredentialCommandResult>;
@@ -84,28 +92,6 @@ export type PreparedEmployeePinChange =
 
 function normalizedShopIds(shopIds: readonly string[]): readonly string[] {
   return [...new Set(shopIds)].sort();
-}
-
-function workerStateFingerprint(workers: readonly WorkerCredentialCandidate[]): string {
-  const material = [...workers]
-    .sort((left, right) =>
-      left.shopId === right.shopId
-        ? left.id.localeCompare(right.id)
-        : left.shopId.localeCompare(right.shopId),
-    )
-    .map((worker) =>
-      [
-        worker.shopId,
-        worker.id,
-        'true',
-        worker.pinHash,
-        worker.pinLookupHash ?? '',
-        String(worker.credentialVersion),
-        worker.linkedEmployeeId ?? '',
-      ].join(':'),
-    )
-    .join('|');
-  return createHash('sha256').update(material, 'utf8').digest('hex');
 }
 
 export async function prepareEmployeePinChange(
@@ -152,7 +138,7 @@ export async function prepareEmployeePinChange(
     return { ok: false, code: 'employee_shop_assignment_required' };
   }
 
-  const workers = await store.listActiveWorkers({
+  const workers = await store.listPinCollisionWorkers({
     businessId: input.businessId,
     shopIds: targetShopIds,
   });
@@ -161,10 +147,21 @@ export async function prepareEmployeePinChange(
   for (const worker of workers) {
     if (worker.linkedEmployeeId === input.employeeId) continue;
     // Salted hashes are never compared for equality. Verify the entered value
-    // against each active worker's canonical Operations verifier format.
+    // against each active competing worker's canonical Operations verifier.
     if (await verifyPin(input.pin, worker.pinHash)) workerCollision = true;
   }
   if (workerCollision) return { ok: false, code: 'pin_already_in_use' };
+
+  // PostgreSQL is the single authority for the credential-topology fence. It
+  // includes active workers plus this employee's linked worker even when that
+  // preserved identity is inactive after suspension/reactivation.
+  const workerState = await store.loadWorkerStateFingerprint({
+    actorEmployeeId: input.actorEmployeeId,
+    businessId: input.businessId,
+    employeeId: input.employeeId,
+    targetShopIds,
+  });
+  if (!workerState.ok) return workerState;
 
   const verifierHash = await hashPin(input.pin);
   const staged = await store.stageCredentialCommand({
@@ -174,7 +171,7 @@ export async function prepareEmployeePinChange(
     verifierHash,
     lookupHash,
     expectedCredentialVersion: state.credentialVersion,
-    workerStateFingerprint: workerStateFingerprint(workers),
+    workerStateFingerprint: workerState.fingerprint,
     expiresAt: input.expiresAt.toISOString(),
     commandId: input.commandId,
   });
@@ -188,5 +185,3 @@ export async function prepareEmployeePinChange(
     replayed: staged.replayed,
   };
 }
-
-export const employeePinInternals = { workerStateFingerprint };
