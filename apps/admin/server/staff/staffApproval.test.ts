@@ -3,6 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AdminApprovalExecutionClaim } from '@tux/admin-contracts';
 
 import {
+  ApprovalTerminalCommandError,
+  createApprovalExecutionRegistry,
+  executeClaimedCommand,
+} from '../approvals/approvalExecutionService';
+import {
   createApprovalCommandRegistry,
   serializeApprovalCommand,
 } from '../approvals/approvalService';
@@ -30,6 +35,21 @@ const claim: AdminApprovalExecutionClaim = {
   attemptCount: 1,
   leaseExpiresAt: '2026-09-27T16:00:00.000Z',
 };
+
+function executionDependencies() {
+  return {
+    applyEmployeePinChange: vi.fn(async () => ({
+      ok: true as const,
+      replayed: false,
+      employeeId: String(claim.commandPayload.employeeId),
+      credentialVersion: 8,
+    })),
+    setEmployeeRole: vi.fn(),
+    setEmployeePermission: vi.fn(),
+    suspendEmployee: vi.fn(),
+    recordStaffPayment: vi.fn(),
+  };
+}
 
 describe('Workforce approval security', () => {
   it('serializes PIN approval using only opaque safe command metadata', () => {
@@ -66,19 +86,8 @@ describe('Workforce approval security', () => {
   });
 
   it('executes approved PIN changes using only the opaque command reference', async () => {
-    const applyEmployeePinChange = vi.fn(async () => ({
-      ok: true as const,
-      replayed: false,
-      employeeId: String(claim.commandPayload.employeeId),
-      credentialVersion: 8,
-    }));
-    const entries = createStaffApprovalExecutionEntries({
-      applyEmployeePinChange,
-      setEmployeeRole: vi.fn(),
-      setEmployeePermission: vi.fn(),
-      suspendEmployee: vi.fn(),
-      recordStaffPayment: vi.fn(),
-    });
+    const deps = executionDependencies();
+    const entries = createStaffApprovalExecutionEntries(deps);
     const entry = entries.find(
       (candidate) => candidate.actionType === EMPLOYEE_PIN_CHANGE_APPROVAL_ACTION,
     );
@@ -90,7 +99,7 @@ describe('Workforce approval security', () => {
       claim,
     });
 
-    expect(applyEmployeePinChange).toHaveBeenCalledWith({
+    expect(deps.applyEmployeePinChange).toHaveBeenCalledWith({
       actorEmployeeId: claim.requesterEmployeeId,
       employeeId: claim.commandPayload.employeeId,
       businessId: claim.businessId,
@@ -99,8 +108,25 @@ describe('Workforce approval security', () => {
       commandRef: claim.commandPayload.commandRef,
       approvalRequestId: claim.approvalRequestId,
     });
-    expect(JSON.stringify(applyEmployeePinChange.mock.calls)).not.toContain('pinVerifierHash');
-    expect(JSON.stringify(applyEmployeePinChange.mock.calls)).not.toContain('pinLookupHash');
+    expect(JSON.stringify(deps.applyEmployeePinChange.mock.calls)).not.toContain('pinVerifierHash');
+    expect(JSON.stringify(deps.applyEmployeePinChange.mock.calls)).not.toContain('pinLookupHash');
     expect(result).toMatchObject({ idempotentReplay: false });
+  });
+
+  it('classifies unsafe stored PIN approval payloads as terminal execution failures', async () => {
+    const registry = createApprovalExecutionRegistry(
+      createStaffApprovalExecutionEntries(executionDependencies()),
+    );
+    const contaminatedClaim: AdminApprovalExecutionClaim = {
+      ...claim,
+      commandPayload: {
+        ...claim.commandPayload,
+        pinLookupHash: 'f'.repeat(64),
+      },
+    };
+
+    const execution = executeClaimedCommand(contaminatedClaim, registry);
+    await expect(execution).rejects.toBeInstanceOf(ApprovalTerminalCommandError);
+    await expect(execution).rejects.toMatchObject({ code: 'approval_pin_payload_unsafe' });
   });
 });
