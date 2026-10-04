@@ -100,7 +100,7 @@ jobs:
             if (!source.includes(finalLog)) throw new Error('Expected final guard log');
             source = source.replace(
               finalLog,
-              `const runtimeAdapterSource = fs.readFileSync(path.join(ROOT, 'server', 'workspaceRuntime.ts'), 'utf8');\nconst runtimeSmoke = path.join(ROOT, 'server', \`.workspaceRuntime-smoke-\${process.pid}.mjs\`);\ntry {\n  fs.writeFileSync(runtimeSmoke, runtimeAdapterSource);\n  await import(\`${pathToFileURL(runtimeSmoke).href}?run=\${Date.now()}\`);\n} finally {\n  fs.rmSync(runtimeSmoke, { force: true });\n}\n\nconsole.log(\n  \`Operations Vercel ESM import guard passed across \${visited.size} reachable TypeScript modules with executable workspace runtime graph.\`,\n);`,
+              `const runtimeAdapterSource = fs.readFileSync(path.join(ROOT, 'server', 'workspaceRuntime.ts'), 'utf8');\nconst runtimeSmoke = path.join(ROOT, 'server', \`.workspaceRuntime-smoke-\${process.pid}.mjs\`);\ntry {\n  fs.writeFileSync(runtimeSmoke, runtimeAdapterSource);\n  await import(\`\${pathToFileURL(runtimeSmoke).href}?run=\${Date.now()}\`);\n} finally {\n  fs.rmSync(runtimeSmoke, { force: true });\n}\n\nconsole.log(\n  \`Operations Vercel ESM import guard passed across \${visited.size} reachable TypeScript modules with executable workspace runtime graph.\`,\n);`,
             );
           }
 
