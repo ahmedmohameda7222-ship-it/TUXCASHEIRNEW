@@ -7,6 +7,7 @@ on:
       - 'apps/operations/api/**'
       - 'apps/operations/vercel.json'
       - 'scripts/test-operations-vercel-hobby-budget.mjs'
+      - 'scripts/test-operations-vercel-route-rewrites.mjs'
 
 permissions:
   contents: read
@@ -21,3 +22,5 @@ jobs:
           node-version: 24
       - name: Operations Vercel Hobby function budget
         run: node scripts/test-operations-vercel-hobby-budget.mjs
+      - name: Operations Vercel consolidated public route rewrites
+        run: node scripts/test-operations-vercel-route-rewrites.mjs
