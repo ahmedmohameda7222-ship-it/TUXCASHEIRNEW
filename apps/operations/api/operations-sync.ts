@@ -1,1 +1,1 @@
-export { default } from '../../../api/operations-sync';
+export { default } from '../../../api/operations-sync.js';

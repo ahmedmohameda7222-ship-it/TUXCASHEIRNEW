@@ -1,8 +1,8 @@
-import deviceBootstrap from '../../../api/device-bootstrap';
-import deviceEnroll from '../../../api/device-enroll';
-import deviceSession from '../../../api/device-session';
-import type { GatewayRequest, GatewayResponse } from '../../../server/supabaseGateway';
-import { sendJson } from '../../../server/supabaseGateway';
+import deviceBootstrap from '../../../api/device-bootstrap.js';
+import deviceEnroll from '../../../api/device-enroll.js';
+import deviceSession from '../../../api/device-session.js';
+import type { GatewayRequest, GatewayResponse } from '../../../server/supabaseGateway.js';
+import { sendJson } from '../../../server/supabaseGateway.js';
 
 const handlers = {
   'device-bootstrap': deviceBootstrap,
