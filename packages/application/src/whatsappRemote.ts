@@ -17,12 +17,13 @@ export type WhatsAppRemoteErrorCode =
   | 'DEVICE_AUTH_INVALID';
 
 export class WhatsAppRemoteError extends Error {
-  constructor(
-    readonly code: WhatsAppRemoteErrorCode,
-    message: string,
-    readonly messageId: string | null = null,
-  ) {
+  readonly code: WhatsAppRemoteErrorCode;
+  readonly messageId: string | null;
+
+  constructor(code: WhatsAppRemoteErrorCode, message: string, messageId: string | null = null) {
     super(message);
+    this.code = code;
+    this.messageId = messageId;
     this.name = 'WhatsAppRemoteError';
   }
 }
@@ -100,7 +101,7 @@ export interface WhatsAppRemoteGateway {
 
   markUnread(conversationId: string): Promise<void>;
   archive(conversationId: string, archived?: boolean): Promise<void>;
-  setFollowUp(conversationId: string, followUp: boolean): Promise<void>;
+  setFollowUp(conversationId: string, followUp?: boolean): Promise<void>;
 
   linkOrder(input: {
     readonly businessDayId: BusinessDayId;
