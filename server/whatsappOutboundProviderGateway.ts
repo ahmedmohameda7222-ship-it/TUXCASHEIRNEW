@@ -4,7 +4,7 @@ import {
   WhatsAppProviderError,
   type SendWhatsAppProviderMessageInput,
   type WhatsAppProviderGateway,
-} from './whatsappProviderGateway';
+} from './whatsappProviderGateway.js';
 
 export type SendWhatsAppExtendedProviderMessageInput =
   | SendWhatsAppProviderMessageInput

@@ -1,23 +1,23 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { normalizeEgyptianPhone, type ShopId } from '@tux/domain';
-import type { WhatsAppChannelResolver } from './whatsappChannelResolver';
+import type { WhatsAppChannelResolver } from './whatsappChannelResolver.js';
 import {
   WHATSAPP_MEDIA_LIMITS,
   WHATSAPP_MEDIA_MIME_TYPES,
   validateWhatsAppMediaContent,
   type WhatsAppMediaKind,
   type WhatsAppMediaValidation,
-} from './whatsappMediaPolicy';
+} from './whatsappMediaPolicy.js';
 import {
   SupabaseWhatsAppOperationsRepository,
   type WhatsAppInboundMediaMaterializationInput,
-} from './whatsappOperationsRepository';
-import type { WhatsAppProviderGateway } from './whatsappProviderGateway';
+} from './whatsappOperationsRepository.js';
+import type { WhatsAppProviderGateway } from './whatsappProviderGateway.js';
 import {
   WHATSAPP_MEDIA_BUCKET,
   WHATSAPP_MEDIA_RETENTION_MS,
   type WhatsAppDataServerConfig,
-} from './whatsappServerConfig';
+} from './whatsappServerConfig.js';
 
 const MEDIA_VALIDATION_PREFIX_BYTES = 1024 * 1024;
 

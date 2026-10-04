@@ -6,7 +6,7 @@ import {
   sendJson,
   type GatewayRequest,
   type GatewayResponse,
-} from './supabaseGateway';
+} from './supabaseGateway.js';
 
 export async function handleOnlineOrderOperationsGateway(
   request: GatewayRequest,

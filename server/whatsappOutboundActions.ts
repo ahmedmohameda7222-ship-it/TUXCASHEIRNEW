@@ -9,20 +9,20 @@ import {
   type WhatsAppMessage,
   type WorkerId,
 } from '@tux/domain';
-import type { WhatsAppChannelResolver } from './whatsappChannelResolver';
+import type { WhatsAppChannelResolver } from './whatsappChannelResolver.js';
 import {
   validateWhatsAppMediaContent,
   WHATSAPP_MEDIA_LIMITS,
   WHATSAPP_MEDIA_MIME_TYPES,
   type WhatsAppMediaKind,
-} from './whatsappMediaPolicy';
-import type { WhatsAppOutboundMediaStorage } from './whatsappOutboundMediaStorage';
-import type { WhatsAppOutboundRepository } from './whatsappOutboundRepository';
-import type { WhatsAppOperationsRepository } from './whatsappOperationsRepository';
-import { WhatsAppOperationsRepositoryError } from './whatsappOperationsRepository';
-import type { WhatsAppExtendedProviderGateway } from './whatsappOutboundProviderGateway';
-import { WhatsAppProviderError } from './whatsappProviderGateway';
-import { sendJson, type GatewayResponse } from './supabaseGateway';
+} from './whatsappMediaPolicy.js';
+import type { WhatsAppOutboundMediaStorage } from './whatsappOutboundMediaStorage.js';
+import type { WhatsAppOutboundRepository } from './whatsappOutboundRepository.js';
+import type { WhatsAppOperationsRepository } from './whatsappOperationsRepository.js';
+import { WhatsAppOperationsRepositoryError } from './whatsappOperationsRepository.js';
+import type { WhatsAppExtendedProviderGateway } from './whatsappOutboundProviderGateway.js';
+import { WhatsAppProviderError } from './whatsappProviderGateway.js';
+import { sendJson, type GatewayResponse } from './supabaseGateway.js';
 
 export interface WhatsAppOutboundActionDependencies {
   createRepository(): WhatsAppOperationsRepository & Partial<WhatsAppOutboundRepository>;

@@ -19,7 +19,7 @@ import {
   type WhatsAppStarterTemplate,
   type WorkerId,
 } from '@tux/domain';
-import type { WhatsAppDataServerConfig } from './whatsappServerConfig';
+import type { WhatsAppDataServerConfig } from './whatsappServerConfig.js';
 
 export type WhatsAppOperationsRepositoryErrorCode =
   | 'OPERATOR_NOT_SYNCHRONIZED'

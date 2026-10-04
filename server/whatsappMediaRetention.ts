@@ -1,4 +1,4 @@
-import type { WhatsAppDataServerConfig } from './whatsappServerConfig';
+import type { WhatsAppDataServerConfig } from './whatsappServerConfig.js';
 
 export interface ExpiredWhatsAppMediaObject {
   readonly mediaKey: string;

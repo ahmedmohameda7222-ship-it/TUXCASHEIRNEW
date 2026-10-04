@@ -3,13 +3,13 @@ import {
   validateWhatsAppMediaContent,
   WHATSAPP_MEDIA_LIMITS,
   type WhatsAppMediaKind,
-} from './whatsappMediaPolicy';
+} from './whatsappMediaPolicy.js';
 import {
   SupabaseWhatsAppMediaStorage,
   WHATSAPP_MEDIA_BUCKET,
   WHATSAPP_MEDIA_RETENTION_MS,
-} from './whatsappMediaStorage';
-import type { WhatsAppDataServerConfig } from './whatsappServerConfig';
+} from './whatsappMediaStorage.js';
+import type { WhatsAppDataServerConfig } from './whatsappServerConfig.js';
 
 const VALIDATION_PREFIX_BYTES = 1024 * 1024;
 

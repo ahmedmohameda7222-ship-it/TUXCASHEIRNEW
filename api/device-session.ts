@@ -1,6 +1,6 @@
-import { normalizeVercelSupabaseEnv } from '../server/vercelSupabaseEnv';
-import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway';
-import { getDeviceSession } from '../server/supabaseGateway';
+import { normalizeVercelSupabaseEnv } from '../server/vercelSupabaseEnv.js';
+import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway.js';
+import { getDeviceSession } from '../server/supabaseGateway.js';
 
 normalizeVercelSupabaseEnv();
 
