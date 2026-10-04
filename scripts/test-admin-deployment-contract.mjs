@@ -119,6 +119,20 @@ const expectedOperations = {
   installCommand: 'cd ../.. && npm ci',
   buildCommand: 'cd ../.. && npm run build -w @tux/operations',
   outputDirectory: 'dist',
+  rewrites: [
+    { source: '/api/device-bootstrap', destination: '/api/device?route=device-bootstrap' },
+    { source: '/api/device-enroll', destination: '/api/device?route=device-enroll' },
+    { source: '/api/device-session', destination: '/api/device?route=device-session' },
+    { source: '/api/worker-auth', destination: '/api/worker?route=worker-auth' },
+    {
+      source: '/api/worker-menu-layout',
+      destination: '/api/worker?route=worker-menu-layout',
+    },
+    {
+      source: '/api/worker-ui-preferences',
+      destination: '/api/worker?route=worker-ui-preferences',
+    },
+  ],
   crons: [
     {
       path: '/api/whatsapp-media-retention',
