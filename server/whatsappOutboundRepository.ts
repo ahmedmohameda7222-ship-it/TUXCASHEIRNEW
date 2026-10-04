@@ -1,4 +1,4 @@
-import { parseWhatsAppMessage } from '@tux/application';
+import { parseWhatsAppMessage } from './workspaceRuntime.js';
 import type {
   BusinessDayId,
   DeviceId,

@@ -1,13 +1,9 @@
+import type { BusinessDayId, DeviceId, OrderId, ShopId, WorkerId } from '@tux/domain';
 import {
   assertWhatsAppMessageInvariant,
   normalizeEgyptianPhone,
   parseEntityId,
-  type BusinessDayId,
-  type DeviceId,
-  type OrderId,
-  type ShopId,
-  type WorkerId,
-} from '@tux/domain';
+} from './workspaceRuntime.js';
 import {
   clearDeviceSession,
   readJsonBody,

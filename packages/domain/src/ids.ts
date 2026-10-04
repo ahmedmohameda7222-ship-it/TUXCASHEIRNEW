@@ -1,5 +1,5 @@
-import type { Brand } from './brand.ts';
-import { DomainInvariantError } from './errors.ts';
+import type { Brand } from './brand.js';
+import { DomainInvariantError } from './errors.js';
 
 export type ShopId = Brand<string, 'ShopId'>;
 export type DeviceId = Brand<string, 'DeviceId'>;
