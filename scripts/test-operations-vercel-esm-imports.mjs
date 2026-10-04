@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 const ROOT = process.cwd();
 const OPERATIONS_API_DIR = path.join(ROOT, 'apps', 'operations', 'api');
 const PACKAGES_DIR = path.join(ROOT, 'packages');
-// Vercel Functions must not resolve source-only workspace exports through node_modules at runtime.
+// Native workspace source is allowed only through explicit relative .ts imports; bare source-only package runtime imports stay forbidden.
 const packageTypeCache = new Map();
 
 function collectTsFiles(directory) {
