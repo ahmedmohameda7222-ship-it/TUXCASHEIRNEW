@@ -243,18 +243,31 @@ class FailingCustomerContactDatabase implements OperationsDatabase {
   }
 }
 
-const temporaryDirectories: string[] = [];
+const fixtures: Array<{
+  directory: string;
+  database: SqliteOperationsDatabase;
+  readModel: SqliteOperatorSessionReadModel;
+  draftStore: SqliteOrderDraftStore;
+}> = [];
+
 afterEach(async () => {
-  await Promise.all(
-    temporaryDirectories
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true })),
-  );
+  for (const fixture of fixtures.splice(0)) {
+    const errors: unknown[] = [];
+    for (const resource of [fixture.draftStore, fixture.readModel, fixture.database]) {
+      try {
+        await resource.close();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length > 0)
+      throw new AggregateError(errors, 'Failed to close SQLite fixture resources');
+    await rm(fixture.directory, { recursive: true, force: true });
+  }
 });
 
 async function fixture(input?: { failContactWrite?: boolean }) {
   const directory = await mkdtemp(join(tmpdir(), 'tux-orders-atomic-'));
-  temporaryDirectories.push(directory);
   const path = join(directory, 'operations.sqlite3');
   const database = new SqliteOperationsDatabase(path);
   await database.initialize();
@@ -262,6 +275,7 @@ async function fixture(input?: { failContactWrite?: boolean }) {
   const readModel = new SqliteOperatorSessionReadModel(path);
   const draftStore = new SqliteOrderDraftStore(path);
   await draftStore.initialize();
+  fixtures.push({ directory, database, readModel, draftStore });
   let sequence = 0;
   const runtime = {
     now: () => createdAt,

@@ -2,9 +2,9 @@
 
 **Program:** TUX Admin control plane  
 **Execution start:** 2026-09-10  
-**Active plan:** Plan 5 — Orders/Customers/Loyalty/Promotions/Delivery  
-**Active branch:** `feat/admin-05-orders-customers-delivery-v2`  
-**Base main commit:** `cfa19b2926c8f9f7448077b7ffe830c9ae7af13e`
+**Active plan:** Plan 6 — Workforce  
+**Active branch:** `feat/admin-06-workforce`  
+**Base main commit:** `46b15bc19b1120289199497e6579b631cf749029`
 
 ## Authority and execution rules
 
@@ -664,4 +664,39 @@ Exact pre-ledger hardened head `80b0583ff3608f3c7c27ad1e64228de2eaa1c257` passed
 - PR #98 remained draft and mergeable; no production Supabase migration, Vercel deployment, or merge was performed.
 
 This ledger commit changes the exact PR head. The resulting ledger-inclusive head must therefore pass the permanent workflow set again and receive the required fresh exact-head review before Plan 5 can be declared technically ready for final review/squash merge. Production promotion remains a separate explicit checkpoint.
+
+## Plan 6 implementation checkpoint — final-review preflight — 2026-09-28
+
+Plan 6 Workforce implementation is on PR #99, branch `feat/admin-06-workforce`, from the Plan 5 squash-merge baseline `46b15bc19b1120289199497e6579b631cf749029`. Exact pre-ledger code head `b35943f5a072dbd41f2dfadc39a3d7a7d71f25e7` is 177 commits ahead and 0 behind `main`, with merge base exactly `46b15bc19b1120289199497e6579b631cf749029`. PR #99 remains draft, is mergeable, and has no unresolved review threads.
+
+### Plan 6 implementation status
+
+- [x] Task 0 — finance core is implemented by repository migration `20260910195000_admin_finance_core.sql` with finance accounts, movements, payment-method account binding, service-role posting, source identity, idempotency, RLS/revokes, and no fabricated balances/accounts. Canonical Supabase records it as runtime migration `20260927084404 admin_finance_core`.
+- [x] Task 1 — Workforce schema is implemented by `20260910200000_admin_workforce.sql`, extending employees and adding worker links, compensation, shifts, attendance facts/corrections, leave, immutable staff-payment records, and immutable `staff_payment_expense_events`. Canonical Supabase records it as runtime migration `20260927161740 admin_workforce`.
+- [x] Staff-payment posting is one PostgreSQL transaction: `record_staff_payment_v1` fences the command, validates the scoped active finance account, posts exactly one `STAFF_PAYMENT` finance movement, inserts exactly one staff-payment record and exactly one salary-expense event, and returns the prior deterministic result on replay.
+- [x] Employee PIN changes use Admin PBKDF2/HMAC compatibility with Operations, collision checks against active linked workers, credential-version fencing, and private one-way command material. Raw PINs remain request-memory-only; approval payloads contain only opaque safe command references and never raw PIN/verifier/lookup/salt material. Suspension revokes Admin sessions and disables linked active Operations workers without deleting history.
+- [x] Sensitive role/permission/suspension/PIN paths reuse Plan 3 approval rules, second-person protection, requester permission checks, recent Admin re-PIN where required, durable execution, safe audit payloads, and exactly-once command semantics.
+- [x] Task 2 — Staff contracts, store/service layer, server-authorized reads/mutations, CSRF/same-origin BFF handling, stable command IDs, approval routing, and trusted RPC delegation are implemented. To preserve the Admin Vercel Hobby limit, `/api/admin/staff` is multiplexed through the existing Orders serverless entrypoint via `__adminResource=staff`; the Workforce handler and tests live under `apps/admin/server/staff`, outside Vercel's filesystem function count.
+- [x] Task 3 — real Staff profile/detail, schedule, attendance, leave, pay, permission, Operations-identity setup, worker-linking, shop-assignment, role/PIN/suspension, and compensation UI are implemented. Payment account choices come only from trusted active scoped finance accounts, with an explicit no-account state. Attendance corrections append audited correction facts rather than rewriting Operations clock facts.
+- [x] Task 4 — deterministic worked/late/early/overtime and hourly/monthly wage calculations use integer minor units and Africa/Cairo business-time handling, including summer/winter conversion and cross-midnight behavior. Staff metrics surface factual worked/overtime/late/absence/activity facts only; no employee score or ranking exists.
+- [x] Workforce browser acceptance is `e2e/admin-workforce.spec.ts` and runs through `playwright.admin.config.ts`, so it renders the Admin app rather than the Operations fallback server. It covers trusted staff payment accounts, explicit no-account state, append-only attendance correction, Operations setup state, and cross-employee form-state isolation.
+- [x] The permanent `Admin Plan 6 Workforce TDD` workflow now contains finance-core static/PostgreSQL, Workforce static/PostgreSQL, employee-PIN security, service/API, calculations, UI, Admin E2E, and a final PostgreSQL-backed full migration/unit/typecheck regression gate. No temporary formatter workflow or write permission remains.
+
+### Exact pre-ledger gate evidence
+
+At exact code head `b35943f5a072dbd41f2dfadc39a3d7a7d71f25e7`:
+
+- `Admin Plan 6 Workforce TDD` run `36426892708` completed SUCCESS across all permanent jobs, including the Admin-rendered Workforce E2E and the final `workforce-regression` job. That regression passed `npm run test:migrations`, full `npm test`, and repository-wide `npm run typecheck`.
+- Root `TUX V2 CI` run `36426892676` completed SUCCESS across `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`. Root quality passed format, lint, unit/integration, Admin security, typecheck, production builds, migration-chain smoke, Supabase function-auth contract, Edge Function typecheck, and rendered browser E2E.
+- Compatibility workflows on the same exact head completed SUCCESS: Foundation `36426892702`, Catalog Settings `36426892691`, Catalog Boundary `36426892663`, Plan 2 rounds 15/16/17 `36426892673` / `36426892722` / `36426892817`, Plan 3 `36426892707`, Plan 4 `36426892743`, and Plan 5 `36426892653`.
+- The Admin deployment-contract blocker discovered during final review is closed: the standalone Workforce function and its test were removed from `apps/admin/api`, and both Foundation and Catalog deployment-contract checks are GREEN with the multiplexed route.
+- No unresolved PR review thread remains at this checkpoint.
+
+### Canonical Supabase readback
+
+Canonical project `awpdcsayuwbsruwvaosg` (`TUX V2`, eu-central-1) contains the Plan 6 prerequisites and Workforce schema under runtime migration identities `20260927084404 admin_finance_core` and `20260927161740 admin_workforce`. The repository Workforce migration blob at this checkpoint is `efff97f434b80bb8de08a9ad900e15092e3ece3c`, unchanged from the reviewed/promoted migration.
+
+Live verification confirmed Workforce public tables are RLS-enabled, trusted Workforce RPC execution is revoked from `anon` and `authenticated` and available to `service_role`, and client roles have no `private` schema usage/table grants for private PIN command material. Supabase's `rls_enabled_no_policy` advisor entries therefore reflect the repository's intentional deny-by-default pattern rather than public client access; existing project-wide informational/performance advisor findings remain separate maintenance scope.
+
+No Plan 7 implementation has started, no Vercel production deployment has been performed for Plan 6, and PR #99 has not been merged. This ledger commit changes the PR head, so the ledger-inclusive exact head must pass the permanent workflow set again before Plan 6 can be declared technically ready for independent final review/squash merge.
 

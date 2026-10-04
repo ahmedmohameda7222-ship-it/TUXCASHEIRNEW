@@ -12,6 +12,7 @@ import { CatalogPage } from '../catalog/CatalogPage';
 import { PublishReviewPage } from '../catalog/PublishReviewPage';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { SettingsPage } from '../settings/SettingsPage';
+import { StaffPage } from '../staff/StaffPage';
 
 export type AdminRouteDefinition = {
   path: string;
@@ -83,6 +84,7 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   if (route.path === '/customers') return <CustomersPage />;
   if (route.path === '/delivery') return <DeliveryPage />;
   if (route.path === '/purchasing') return <PurchasingPage />;
+  if (route.path === '/staff') return <StaffPage />;
 
   if (route.path === '/more') {
     const secondary = ADMIN_ROUTES.filter(

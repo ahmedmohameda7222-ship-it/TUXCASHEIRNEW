@@ -1,0 +1,334 @@
+import { spawnSync } from 'node:child_process';
+import { existsSync, readdirSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
+
+const targetMigration = '20261003101900_admin_workforce_operations_reactivation.sql';
+if (!existsSync(resolve('supabase/migrations', targetMigration)))
+  throw new Error('Workforce reactivation migration missing');
+const databaseUrl = process.env.TEST_DATABASE_URL;
+if (!databaseUrl) {
+  console.log('Workforce reactivation PostgreSQL behavior skipped without TEST_DATABASE_URL.');
+  process.exit(0);
+}
+const url = new URL(databaseUrl);
+if (!new Set(['127.0.0.1', 'localhost', '::1']).has(url.hostname))
+  throw new Error('Workforce reactivation test refuses non-loopback PostgreSQL.');
+function psql(args, label) {
+  const dockerContainer = process.env.TEST_POSTGRES_DOCKER_CONTAINER;
+  const dockerArgs = dockerContainer
+    ? args.map((arg, index) =>
+        index > 0 && args[index - 1] === '-f' && arg.startsWith(resolve('.'))
+          ? `/workspace/${relative(resolve('.'), arg).replaceAll('\\', '/')}`
+          : arg,
+      )
+    : args;
+  const r = spawnSync(
+    dockerContainer ? 'docker' : 'psql',
+    dockerContainer
+      ? [
+          'exec',
+          '-i',
+          dockerContainer,
+          'psql',
+          databaseUrl,
+          '-X',
+          '-v',
+          'ON_ERROR_STOP=1',
+          ...dockerArgs,
+        ]
+      : [databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', ...dockerArgs],
+    {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  if (r.status !== 0) {
+    process.stderr.write(r.stdout ?? '');
+    process.stderr.write(r.stderr ?? '');
+    throw new Error(`${label} failed`);
+  }
+  return r;
+}
+function scalar(sql, label) {
+  return psql(['-At', '-c', sql], label).stdout.trim();
+}
+function rpc(sql, label) {
+  return JSON.parse(scalar(`select (${sql})::text`, label));
+}
+psql(
+  [
+    '-c',
+    `drop schema if exists public cascade; create schema public; drop schema if exists private cascade; create schema private; drop schema if exists auth cascade; create schema auth; drop schema if exists storage cascade; create schema storage; create table storage.buckets(id text primary key,name text not null unique,public boolean not null default false); do $$ begin if not exists(select 1 from pg_roles where rolname='anon') then create role anon noinherit; end if; if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated noinherit; end if; if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role noinherit; end if; end $$; grant usage on schema public to anon,authenticated,service_role; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;`,
+  ],
+  'fixture reset',
+);
+const migrations = readdirSync(resolve('supabase/migrations'))
+  .filter((n) => /^\d+_.+\.sql$/.test(n))
+  .sort();
+for (const migration of migrations.slice(0, migrations.indexOf(targetMigration) + 1))
+  psql(['-f', resolve('supabase/migrations', migration)], migration);
+const B = '71000000-0000-4000-8000-000000000001',
+  S = '72000000-0000-4000-8000-000000000001',
+  OWNER = '73000000-0000-4000-8000-000000000001',
+  STAFF = '73000000-0000-4000-8000-000000000002',
+  UNAUTHORIZED = '73000000-0000-4000-8000-000000000003',
+  ADMIN = '73000000-0000-4000-8000-000000000006',
+  PEER_OWNER = '73000000-0000-4000-8000-000000000004',
+  INACTIVE = '73000000-0000-4000-8000-000000000005',
+  WORKER = '74000000-0000-4000-8000-000000000001',
+  OTHER = '74000000-0000-4000-8000-000000000002',
+  UNLINKED = '74000000-0000-4000-8000-000000000003',
+  S2 = '72000000-0000-4000-8000-000000000002';
+const verifier = (x) => `pbkdf2-sha256$210000$${x.repeat(32)}$${x.repeat(64)}`;
+psql(
+  [
+    '-c',
+    `insert into public.businesses(id,name) values('${B}','Lifecycle'); insert into public.shops(id,name,active) values('${S}','Lifecycle Shop',true),('${S2}','Other Shop',true); insert into public.business_shops(business_id,shop_id) values('${B}','${S}'),('${B}','${S2}'); insert into public.business_employees(id,business_id,display_name,role,pin_lookup_hash,pin_hash,active) values('${OWNER}','${B}','Owner','OWNER',repeat('1',64),'${verifier('1')}',true),('${STAFF}','${B}','Staff','STAFF',repeat('2',64),'${verifier('2')}',true),('${UNAUTHORIZED}','${B}','Unauthorized','STAFF',repeat('4',64),'${verifier('4')}',true),('${PEER_OWNER}','${B}','Peer Owner','OWNER',repeat('5',64),'${verifier('5')}',true),('${INACTIVE}','${B}','Inactive','STAFF',repeat('6',64),'${verifier('6')}',false),('${ADMIN}','${B}','Admin','ADMIN',repeat('8',64),'${verifier('8')}',true); insert into public.admin_role_permissions(business_id,role,permission_key) values('${B}','ADMIN','staff.manage'); insert into public.employee_shop_assignments(business_id,employee_id,shop_id) values('${B}','${OWNER}','${S}'),('${B}','${OWNER}','${S2}'),('${B}','${STAFF}','${S}'),('${B}','${UNAUTHORIZED}','${S}'),('${B}','${PEER_OWNER}','${S}'),('${B}','${INACTIVE}','${S}'),('${B}','${ADMIN}','${S}'); insert into public.workers(id,shop_id,display_name,pin_hash,pin_lookup_hash,active) values('${WORKER}','${S}','Staff Ops','${verifier('2')}',repeat('2',64),true),('${UNLINKED}','${S}','Unlinked','${verifier('7')}',repeat('7',64),false); insert into public.employee_worker_links(business_id,employee_id,shop_id,worker_id,active,linked_by_employee_id,link_command_id) values('${B}','${STAFF}','${S}','${WORKER}',true,'${OWNER}','reactivation-fixture-link');`,
+  ],
+  'fixtures',
+);
+const failures = [];
+const expect = (c, m) => {
+  if (!c) failures.push(m);
+};
+const beforeProfile = Number(
+  scalar(`select profile_version from public.business_employees where id='${STAFF}'`, 'profile'),
+);
+const suspended = rpc(
+  `public.suspend_employee_v1('${OWNER}','${STAFF}',${beforeProfile},'reactivation-suspend')`,
+  'suspend',
+);
+expect(suspended.ok === true, `suspend failed ${JSON.stringify(suspended)}`);
+expect(
+  scalar(`select active::text from public.workers where id='${WORKER}'`, 'worker inactive') ===
+    'false',
+  'suspend did not disable worker',
+);
+expect(
+  scalar(
+    `select active::text from public.employee_worker_links where worker_id='${WORKER}'`,
+    'link',
+  ) === 'true',
+  'suspend destroyed link',
+);
+const reactivateVersion = Number(
+  scalar(
+    `select profile_version from public.business_employees where id='${STAFF}'`,
+    'reactivate profile',
+  ),
+);
+const reactivated = rpc(
+  `public.reactivate_employee_v1('${OWNER}','${STAFF}',${reactivateVersion},'${S}','reactivation-employee')`,
+  'reactivate employee',
+);
+expect(
+  reactivated.ok === true && reactivated.operationsSetupRequired === true,
+  `employee reactivation state false ${JSON.stringify(reactivated)}`,
+);
+expect(
+  scalar(
+    `select active::text from public.workers where id='${WORKER}'`,
+    'worker remains inactive',
+  ) === 'false',
+  'employee reactivation silently enabled worker',
+);
+const inactiveWorkerFingerprint = rpc(
+  `public.get_employee_worker_state_fingerprint_v1('${OWNER}','${B}','${STAFF}',array['${S}'::uuid])`,
+  'inactive worker fingerprint',
+);
+expect(
+  inactiveWorkerFingerprint.ok === true &&
+    typeof inactiveWorkerFingerprint.fingerprint === 'string',
+  'inactive linked worker fingerprint unavailable',
+);
+const pinChangeVersion = Number(
+  scalar(
+    `select credential_version from public.business_employees where id='${STAFF}'`,
+    'PIN change credential version',
+  ),
+);
+const pinChange = rpc(
+  `public.stage_employee_pin_change_v1('${OWNER}','${STAFF}',array['${S}'::uuid],'${verifier('3')}',repeat('3',64),${pinChangeVersion},'${inactiveWorkerFingerprint.fingerprint}',now()+interval '1 hour','75000000-0000-4000-8000-000000000001')`,
+  'stage PIN change with inactive worker',
+);
+expect(
+  pinChange.ok === true,
+  `inactive worker caused false worker_credential_state_changed ${JSON.stringify(pinChange)}`,
+);
+const appliedPinChange = rpc(
+  `public.apply_employee_pin_change_v1('${OWNER}','${pinChange.commandRef}')`,
+  'apply PIN change with inactive worker',
+);
+expect(
+  appliedPinChange.ok === true,
+  `PIN change with inactive worker failed ${JSON.stringify(appliedPinChange)}`,
+);
+expect(
+  scalar(
+    `select credential_version::text from public.business_employees where id='${STAFF}'`,
+    'employee credential changed',
+  ) === String(pinChangeVersion + 1),
+  'employee credential did not change',
+);
+expect(
+  scalar(
+    `select active::text from public.workers where id='${WORKER}'`,
+    'worker remained inactive after PIN change',
+  ) === 'false',
+  'PIN change reactivated preserved worker',
+);
+expect(
+  scalar(
+    `select (w.pin_hash=e.pin_hash and w.pin_lookup_hash=e.pin_lookup_hash)::text from public.workers w join public.business_employees e on e.id='${STAFF}' where w.id='${WORKER}'`,
+    'inactive worker credential sync',
+  ) === 'true',
+  'inactive worker credential did not change with employee PIN',
+);
+expect(
+  scalar(
+    `select count(*) from public.employee_worker_links where employee_id='${STAFF}' and worker_id='${WORKER}' and active`,
+    'preserved link after PIN change',
+  ) === '1',
+  'PIN change altered worker link',
+);
+const employeeCredential = Number(
+  scalar(
+    `select credential_version from public.business_employees where id='${STAFF}'`,
+    'employee credential',
+  ),
+);
+const workerCredential = Number(
+  scalar(`select credential_version from public.workers where id='${WORKER}'`, 'worker credential'),
+);
+const wrongShop = rpc(
+  `public.reactivate_employee_worker_v1('${OWNER}','${STAFF}','${S2}','${WORKER}',${employeeCredential},${workerCredential},'reactivation-wrong-shop')`,
+  'wrong shop',
+);
+expect(
+  wrongShop.ok === false && wrongShop.code === 'employee_shop_assignment_required',
+  `wrong shop accepted ${JSON.stringify(wrongShop)}`,
+);
+const wrongLink = rpc(
+  `public.reactivate_employee_worker_v1('${OWNER}','${STAFF}','${S}','${UNLINKED}',${employeeCredential},1,'reactivation-wrong-link')`,
+  'wrong link',
+);
+expect(
+  wrongLink.ok === false && wrongLink.code === 'worker_link_mismatch',
+  `wrong link accepted ${JSON.stringify(wrongLink)}`,
+);
+const unauthorized = rpc(
+  `public.reactivate_employee_worker_v1('${UNAUTHORIZED}','${STAFF}','${S}','${WORKER}',${employeeCredential},${workerCredential},'reactivation-unauthorized')`,
+  'unauthorized actor',
+);
+expect(
+  unauthorized.ok === false && unauthorized.code === 'permission_denied',
+  `missing staff.manage accepted ${JSON.stringify(unauthorized)}`,
+);
+const hierarchy = rpc(
+  `public.reactivate_employee_worker_v1('${ADMIN}','${PEER_OWNER}','${S}','${WORKER}',1,${workerCredential},'reactivation-hierarchy')`,
+  'target hierarchy',
+);
+expect(
+  hierarchy.ok === false && hierarchy.code === 'role_escalation_forbidden',
+  `target role hierarchy accepted ${JSON.stringify(hierarchy)}`,
+);
+const inactiveEmployee = rpc(
+  `public.reactivate_employee_worker_v1('${OWNER}','${INACTIVE}','${S}','${WORKER}',1,${workerCredential},'reactivation-inactive')`,
+  'inactive target employee',
+);
+expect(
+  inactiveEmployee.ok === false && inactiveEmployee.code === 'employee_inactive',
+  `inactive employee accepted ${JSON.stringify(inactiveEmployee)}`,
+);
+const activated = rpc(
+  `public.reactivate_employee_worker_v1('${OWNER}','${STAFF}','${S}','${WORKER}',${employeeCredential},${workerCredential},'reactivation-worker')`,
+  'worker reactivation',
+);
+expect(
+  activated.ok === true &&
+    activated.workerActive === true &&
+    activated.operationsSetupRequired === false,
+  `worker reactivation failed ${JSON.stringify(activated)}`,
+);
+expect(
+  scalar(`select id::text from public.workers where id='${WORKER}'`, 'same worker') === WORKER,
+  'worker identity changed',
+);
+expect(
+  scalar(
+    `select count(*) from public.employee_worker_links where employee_id='${STAFF}' and worker_id='${WORKER}' and active`,
+    'same link',
+  ) === '1',
+  'historical link changed',
+);
+expect(
+  scalar(
+    `select (w.pin_hash=e.pin_hash and w.pin_lookup_hash=e.pin_lookup_hash)::text from public.workers w join public.business_employees e on e.id='${STAFF}' where w.id='${WORKER}'`,
+    'credential sync',
+  ) === 'true',
+  'worker credential not synchronized',
+);
+const replay = rpc(
+  `public.reactivate_employee_worker_v1('${OWNER}','${STAFF}','${S}','${WORKER}',${employeeCredential},${workerCredential},'reactivation-worker')`,
+  'replay',
+);
+expect(
+  replay.ok === true && replay.replayed === true,
+  `same command did not replay ${JSON.stringify(replay)}`,
+);
+const conflict = rpc(
+  `public.reactivate_employee_worker_v1('${OWNER}','${STAFF}','${S}','${WORKER}',${employeeCredential + 1},${workerCredential},'reactivation-worker')`,
+  'changed payload conflict',
+);
+expect(
+  conflict.ok === false && conflict.code === 'workforce_command_conflict',
+  `changed payload reused command ${JSON.stringify(conflict)}`,
+);
+psql(
+  [
+    '-c',
+    `update public.workers set active=false where id='${WORKER}'; insert into public.workers(id,shop_id,display_name,pin_hash,pin_lookup_hash,active) values('${OTHER}','${S}','Collision','${verifier('3')}',repeat('3',64),true);`,
+  ],
+  'collision fixture',
+);
+const currentWorkerVersion = Number(
+  scalar(`select credential_version from public.workers where id='${WORKER}'`, 'worker version'),
+);
+const collision = rpc(
+  `public.reactivate_employee_worker_v1('${OWNER}','${STAFF}','${S}','${WORKER}',${employeeCredential},${currentWorkerVersion},'reactivation-collision')`,
+  'collision',
+);
+expect(
+  collision.ok === false && collision.code === 'pin_already_in_use',
+  `collision not rejected ${JSON.stringify(collision)}`,
+);
+expect(
+  scalar(`select active::text from public.workers where id='${WORKER}'`, 'collision inactive') ===
+    'false',
+  'collision activated worker',
+);
+const staleWorker = rpc(
+  `public.reactivate_employee_worker_v1('${OWNER}','${STAFF}','${S}','${WORKER}',${employeeCredential},${currentWorkerVersion - 1},'reactivation-stale-worker')`,
+  'stale worker',
+);
+expect(
+  staleWorker.ok === false && staleWorker.code === 'stale_worker_credential',
+  `stale worker accepted ${JSON.stringify(staleWorker)}`,
+);
+const staleEmployee = rpc(
+  `public.reactivate_employee_worker_v1('${OWNER}','${STAFF}','${S}','${WORKER}',${employeeCredential - 1},${currentWorkerVersion},'reactivation-stale-employee')`,
+  'stale employee',
+);
+expect(
+  staleEmployee.ok === false &&
+    ['invalid_employee_worker_reactivate', 'stale_employee_credential'].includes(
+      staleEmployee.code,
+    ),
+  `stale employee accepted ${JSON.stringify(staleEmployee)}`,
+);
+if (failures.length) {
+  console.error('Workforce reactivation RED regressions:');
+  for (const f of failures) console.error(`- ${f}`);
+  process.exit(1);
+}
+console.log('Workforce reactivation PostgreSQL regressions passed.');

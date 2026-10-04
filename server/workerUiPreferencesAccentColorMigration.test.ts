@@ -12,7 +12,7 @@ describe('worker UI preference accent-color migration', () => {
     expect(existsSync(migrationPath)).toBe(true);
     if (!existsSync(migrationPath)) return;
 
-    const sql = readFileSync(migrationPath, 'utf8');
+    const sql = readFileSync(migrationPath, 'utf8').replace(/\r\n/g, '\n');
     expect(sql).toContain('add column if not exists accent_color text');
     expect(sql).toContain('worker_ui_preferences_accent_color_check');
     expect(sql).toContain("accent_color is null or accent_color ~ '^#[0-9A-F]{6}$'");

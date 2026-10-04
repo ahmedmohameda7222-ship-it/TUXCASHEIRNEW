@@ -11,3 +11,5 @@ export * from './customers';
 export * from './loyalty';
 
 export * from './delivery';
+
+export * from './staff';

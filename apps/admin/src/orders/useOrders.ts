@@ -13,7 +13,7 @@ import type {
 
 import { useAdminSession } from '../auth/useAdminSession';
 import { AdminApiError, adminFetch } from '../lib/adminApi';
-import { createRetainedCommandIds } from '../lib/retainedCommandIds';
+import { createRetainedCommandIds, isPendingApprovalResult } from '../lib/retainedCommandIds';
 
 export class OrdersUiError extends Error {
   constructor(readonly code: string) {
@@ -156,7 +156,9 @@ export function useOrders(
         { method: 'POST', body: JSON.stringify(command(commandId)) },
         token,
       );
-      commandIds.complete(scope, retainedIntent);
+      if (!isPendingApprovalResult(result)) {
+        commandIds.complete(scope, retainedIntent);
+      }
       return result;
     } catch (error) {
       if (error instanceof AdminApiError) commandIds.complete(scope, retainedIntent);

@@ -6,6 +6,10 @@ import {
   type ApprovedRefundExecutionInput,
   type ApprovedReturnExecutionInput,
 } from '../orders/orderApproval.js';
+import {
+  createStaffApprovalExecutionEntries,
+  createSupabaseStaffApprovalExecutionDependencies,
+} from '../staff/staffApproval.js';
 import { AdminSupabaseClient } from '../supabaseAdmin.js';
 import {
   createApprovalExecutionRegistry,
@@ -104,9 +108,12 @@ function createOrderApprovalPersistence(client: AdminSupabaseClient) {
 export async function runProductionApprovalExecutionRunner(): Promise<ApprovalExecutionRunResult> {
   const client = new AdminSupabaseClient(getAdminServerEnv());
   const persistence = createSupabaseApprovalExecutionDependencies(client);
-  const registry = createApprovalExecutionRegistry(
-    createOrderApprovalExecutionEntries(createOrderApprovalPersistence(client)),
-  );
+  const registry = createApprovalExecutionRegistry([
+    ...createOrderApprovalExecutionEntries(createOrderApprovalPersistence(client)),
+    ...createStaffApprovalExecutionEntries(
+      createSupabaseStaffApprovalExecutionDependencies(client),
+    ),
+  ]);
   const service = createApprovalExecutionService({
     ...persistence,
     registry,

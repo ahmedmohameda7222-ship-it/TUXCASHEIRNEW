@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 function source(path: string): string {
-  return readFileSync(new URL(path, import.meta.url), 'utf8');
+  return readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 }
 
 function sourceOrEmpty(path: string): string {
@@ -83,8 +83,8 @@ describe('Plan 2 final review round 7 regressions', () => {
     expect(migration).toContain("'scheduled_settings_publish'");
     expect(migration).toContain("'scheduled_online_orders_state'");
     expect(migration).toContain('apply_scheduled_shop_config_change_v1');
-    expect(migration).toContain(
-      "'emergency_operational_state',\n           'scheduled_settings_publish',\n           'scheduled_online_orders_state'",
+    expect(migration).toMatch(
+      /'emergency_operational_state',\s+'scheduled_settings_publish',\s+'scheduled_online_orders_state'/,
     );
     expect(migration).not.toContain("last_error = 'replaced_by_reschedule'");
   });
