@@ -17,32 +17,32 @@ import {
   sendJson,
   type GatewayRequest,
   type GatewayResponse,
-} from './supabaseGateway';
+} from './supabaseGateway.js';
 import {
   SupabaseWhatsAppChannelResolver,
   type WhatsAppChannelResolver,
-} from './whatsappChannelResolver';
+} from './whatsappChannelResolver.js';
 import {
   WhatsAppOperationsRepositoryError,
   type WhatsAppOperationsRepository,
-} from './whatsappOperationsRepository';
-import { SupabaseWhatsAppOutboundRepository } from './whatsappOutboundRepository';
-import { handleWhatsAppOutboundAction } from './whatsappOutboundActions';
+} from './whatsappOperationsRepository.js';
+import { SupabaseWhatsAppOutboundRepository } from './whatsappOutboundRepository.js';
+import { handleWhatsAppOutboundAction } from './whatsappOutboundActions.js';
 import {
   SupabaseWhatsAppOutboundMediaStorage,
   type WhatsAppOutboundMediaStorage,
-} from './whatsappOutboundMediaStorage';
+} from './whatsappOutboundMediaStorage.js';
 import {
   createWhatsAppExtendedProviderGateway,
   type WhatsAppExtendedProviderGateway,
-} from './whatsappOutboundProviderGateway';
-import { WhatsAppProviderError } from './whatsappProviderGateway';
-import { loadWhatsAppDataServerConfig, loadWhatsAppServerConfig } from './whatsappServerConfig';
+} from './whatsappOutboundProviderGateway.js';
+import { WhatsAppProviderError } from './whatsappProviderGateway.js';
+import { loadWhatsAppDataServerConfig, loadWhatsAppServerConfig } from './whatsappServerConfig.js';
 import {
   OperationsDeviceAuthorityError,
   resolveOperationsDeviceAuthority,
   type OperationsDeviceAuthority,
-} from './operationsDeviceAuthority';
+} from './operationsDeviceAuthority.js';
 
 export interface WhatsAppOperationsDependencyFactory {
   createRepository(): WhatsAppOperationsRepository;

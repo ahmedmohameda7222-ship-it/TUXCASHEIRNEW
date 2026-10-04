@@ -11,8 +11,8 @@ import {
   SupabaseWhatsAppOperationsRepository,
   WhatsAppOperationsRepositoryError,
   type ClaimedWhatsAppOutboundIntent,
-} from './whatsappOperationsRepository';
-import type { WhatsAppDataServerConfig } from './whatsappServerConfig';
+} from './whatsappOperationsRepository.js';
+import type { WhatsAppDataServerConfig } from './whatsappServerConfig.js';
 
 export interface WhatsAppOutboundMediaMetadata {
   readonly mediaKey: string;

@@ -6,9 +6,9 @@ import {
   sendJson,
   type GatewayRequest,
   type GatewayResponse,
-} from './supabaseGateway';
+} from './supabaseGateway.js';
 
-export type { GatewayRequest, GatewayResponse } from './supabaseGateway';
+export type { GatewayRequest, GatewayResponse } from './supabaseGateway.js';
 
 function object(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)

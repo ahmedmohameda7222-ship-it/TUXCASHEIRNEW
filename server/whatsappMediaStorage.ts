@@ -1,5 +1,5 @@
-import type { WhatsAppDataServerConfig } from './whatsappServerConfig';
-import { WHATSAPP_MEDIA_BUCKET, WHATSAPP_MEDIA_RETENTION_MS } from './whatsappServerConfig';
+import type { WhatsAppDataServerConfig } from './whatsappServerConfig.js';
+import { WHATSAPP_MEDIA_BUCKET, WHATSAPP_MEDIA_RETENTION_MS } from './whatsappServerConfig.js';
 
 export { WHATSAPP_MEDIA_BUCKET, WHATSAPP_MEDIA_RETENTION_MS };
 

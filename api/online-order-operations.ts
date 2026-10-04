@@ -1,6 +1,6 @@
-import { handleOnlineOrderOperationsGateway } from '../server/onlineOrderOperationsGateway';
-import { normalizeVercelSupabaseEnv } from '../server/vercelSupabaseEnv';
-import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway';
+import { handleOnlineOrderOperationsGateway } from '../server/onlineOrderOperationsGateway.js';
+import { normalizeVercelSupabaseEnv } from '../server/vercelSupabaseEnv.js';
+import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway.js';
 
 normalizeVercelSupabaseEnv();
 
