@@ -17,14 +17,14 @@ import type {
   WhatsAppQuickReplyCategory,
   WorkerId,
 } from '@tux/domain';
-import { parseEntityId } from '../../domain/src/ids.js';
-import { instant } from '../../domain/src/time.js';
-import { assertWhatsAppMessageInvariant } from '../../domain/src/whatsapp.js';
+import { parseEntityId } from '../../domain/src/ids.ts';
+import { instant } from '../../domain/src/time.ts';
+import { assertWhatsAppMessageInvariant } from '../../domain/src/whatsapp.ts';
 import {
   WhatsAppRemoteError,
   type WhatsAppInboxOrderLink,
   type WhatsAppInboxSnapshot,
-} from './whatsappRemote.js';
+} from './whatsappRemote.ts';
 
 function object(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {

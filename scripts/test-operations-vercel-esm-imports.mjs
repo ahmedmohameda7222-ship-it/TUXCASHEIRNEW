@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const ROOT = process.cwd();
 const OPERATIONS_API_DIR = path.join(ROOT, 'apps', 'operations', 'api');
@@ -79,6 +80,15 @@ function packageTypeFor(file) {
 
 function resolveSource(importer, specifier) {
   const resolved = path.resolve(path.dirname(importer), specifier);
+  if (specifier.endsWith('.ts')) {
+    if (!fs.existsSync(resolved)) {
+      throw new Error(
+        `${repositoryPath(importer)} imports ${specifier}, but ${repositoryPath(resolved)} does not exist.`,
+      );
+    }
+    return resolved;
+  }
+
   if (specifier.endsWith('.js')) {
     const tsSource = `${resolved.slice(0, -3)}.ts`;
     if (fs.existsSync(tsSource)) return tsSource;
@@ -139,6 +149,7 @@ while (queue.length > 0) {
     }
 
     const hasExplicitRuntimeExtension =
+      specifier.endsWith('.ts') ||
       specifier.endsWith('.js') ||
       specifier.endsWith('.mjs') ||
       specifier.endsWith('.cjs') ||
@@ -156,7 +167,7 @@ if (relativeViolations.length > 0 || workspaceRuntimeViolations.length > 0) {
   const sections = [];
   if (relativeViolations.length > 0) {
     sections.push(
-      `Node ESM-unsafe relative imports inside type=module packages. Use explicit .js specifiers:\n${relativeViolations
+      `Node ESM-unsafe relative imports inside type=module packages. Use explicit runtime extensions (.js for compiled modules or .ts for native source modules):\n${relativeViolations
         .sort()
         .map((violation) => `- ${violation}`)
         .join('\n')}`,
@@ -170,9 +181,23 @@ if (relativeViolations.length > 0 || workspaceRuntimeViolations.length > 0) {
         .join('\n')}`,
     );
   }
-  throw new Error(`Operations Vercel serverless graph is not runtime-safe:\n${sections.join('\n\n')}`);
+  throw new Error(
+    `Operations Vercel serverless graph is not runtime-safe:\n${sections.join('\n\n')}`,
+  );
+}
+
+const runtimeAdapterSource = fs.readFileSync(
+  path.join(ROOT, 'server', 'workspaceRuntime.ts'),
+  'utf8',
+);
+const runtimeSmoke = path.join(ROOT, 'server', `.workspaceRuntime-smoke-${process.pid}.mjs`);
+try {
+  fs.writeFileSync(runtimeSmoke, runtimeAdapterSource);
+  await import(`${pathToFileURL(runtimeSmoke).href}?run=${Date.now()}`);
+} finally {
+  fs.rmSync(runtimeSmoke, { force: true });
 }
 
 console.log(
-  `Operations Vercel ESM import guard passed across ${visited.size} reachable TypeScript modules.`,
+  `Operations Vercel ESM import guard passed across ${visited.size} reachable TypeScript modules with executable workspace runtime graph.`,
 );
