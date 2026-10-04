@@ -2,7 +2,7 @@ import {
   proxyWorkerAuthentication,
   type GatewayRequest,
   type GatewayResponse,
-} from '../server/workerAuthenticationGateway';
+} from '../server/workerAuthenticationGateway.js';
 
 export default async function handler(
   request: GatewayRequest,

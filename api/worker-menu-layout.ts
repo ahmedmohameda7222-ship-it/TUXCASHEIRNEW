@@ -1,6 +1,6 @@
-import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway';
-import { normalizeVercelSupabaseEnv } from '../server/vercelSupabaseEnv';
-import { handleWorkerMenuLayout } from '../server/workerMenuLayoutGateway';
+import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway.js';
+import { normalizeVercelSupabaseEnv } from '../server/vercelSupabaseEnv.js';
+import { handleWorkerMenuLayout } from '../server/workerMenuLayoutGateway.js';
 
 normalizeVercelSupabaseEnv();
 

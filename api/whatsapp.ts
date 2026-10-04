@@ -1,6 +1,6 @@
-import { handleWhatsAppOperations } from '../server/whatsappOperationsGateway';
-import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway';
-import { normalizeVercelSupabaseEnv } from '../server/vercelSupabaseEnv';
+import { handleWhatsAppOperations } from '../server/whatsappOperationsGateway.js';
+import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway.js';
+import { normalizeVercelSupabaseEnv } from '../server/vercelSupabaseEnv.js';
 
 normalizeVercelSupabaseEnv();
 

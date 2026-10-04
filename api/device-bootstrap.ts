@@ -1,7 +1,7 @@
-import { normalizeVercelSupabaseEnv } from '../server/vercelSupabaseEnv';
-import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway';
-import { sendJson } from '../server/supabaseGateway';
-import { bootstrapDeviceWithWorkerPin } from '../server/workerPinBootstrap';
+import { normalizeVercelSupabaseEnv } from '../server/vercelSupabaseEnv.js';
+import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway.js';
+import { sendJson } from '../server/supabaseGateway.js';
+import { bootstrapDeviceWithWorkerPin } from '../server/workerPinBootstrap.js';
 
 normalizeVercelSupabaseEnv();
 
