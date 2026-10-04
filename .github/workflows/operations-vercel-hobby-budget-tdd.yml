@@ -1,0 +1,23 @@
+name: Operations Vercel Hobby Budget TDD
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/operations-vercel-hobby-budget-tdd.yml'
+      - 'apps/operations/api/**'
+      - 'apps/operations/vercel.json'
+      - 'scripts/test-operations-vercel-hobby-budget.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  hobby-function-budget:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Operations Vercel Hobby function budget
+        run: node scripts/test-operations-vercel-hobby-budget.mjs
