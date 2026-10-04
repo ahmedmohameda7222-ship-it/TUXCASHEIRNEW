@@ -4,10 +4,13 @@ on:
   pull_request:
     paths:
       - '.github/workflows/operations-vercel-hobby-budget-tdd.yml'
+      - 'api/**'
+      - 'server/**'
       - 'apps/operations/api/**'
       - 'apps/operations/vercel.json'
       - 'scripts/test-operations-vercel-hobby-budget.mjs'
       - 'scripts/test-operations-vercel-route-rewrites.mjs'
+      - 'scripts/test-operations-vercel-esm-imports.mjs'
 
 permissions:
   contents: read
@@ -24,3 +27,5 @@ jobs:
         run: node scripts/test-operations-vercel-hobby-budget.mjs
       - name: Operations Vercel consolidated public route rewrites
         run: node scripts/test-operations-vercel-route-rewrites.mjs
+      - name: Operations Vercel Node ESM import graph
+        run: node scripts/test-operations-vercel-esm-imports.mjs
