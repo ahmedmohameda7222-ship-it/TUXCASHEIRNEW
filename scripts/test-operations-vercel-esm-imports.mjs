@@ -4,6 +4,7 @@ import path from 'node:path';
 const ROOT = process.cwd();
 const OPERATIONS_API_DIR = path.join(ROOT, 'apps', 'operations', 'api');
 const PACKAGES_DIR = path.join(ROOT, 'packages');
+// Vercel Functions must not resolve source-only workspace exports through node_modules at runtime.
 const packageTypeCache = new Map();
 
 function collectTsFiles(directory) {
