@@ -1,6 +1,6 @@
-import { DomainInvariantError } from './errors';
-import type { DeviceId, OrderId, ShopId, WorkerId } from './ids';
-import type { Instant } from './time';
+import { DomainInvariantError } from './errors.ts';
+import type { DeviceId, OrderId, ShopId, WorkerId } from './ids.ts';
+import type { Instant } from './time.ts';
 
 export type WhatsAppMessageStatus = 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
 export type WhatsAppMessageDirection = 'INBOUND' | 'OUTBOUND';

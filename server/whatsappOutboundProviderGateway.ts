@@ -1,4 +1,4 @@
-import { normalizeEgyptianPhone } from '@tux/domain';
+import { normalizeEgyptianPhone } from './workspaceRuntime.js';
 import {
   createWhatsAppProviderGateway,
   WhatsAppProviderError,

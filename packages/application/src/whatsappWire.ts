@@ -1,30 +1,30 @@
-import {
-  assertWhatsAppMessageInvariant,
-  instant,
-  parseEntityId,
-  type DeviceId,
-  type OrderId,
-  type ShopId,
-  type WhatsAppConversation,
-  type WhatsAppConversationContext,
-  type WhatsAppMessage,
-  type WhatsAppMessageDirection,
-  type WhatsAppMessageKind,
-  type WhatsAppMessageStatus,
-  type WhatsAppMediaDescriptor,
-  type WhatsAppLocationPayload,
-  type WhatsAppMessagingTarget,
-  type WhatsAppShopMessagingConfig,
-  type WhatsAppStarterTemplate,
-  type WhatsAppQuickReply,
-  type WhatsAppQuickReplyCategory,
-  type WorkerId,
+import type {
+  DeviceId,
+  OrderId,
+  ShopId,
+  WhatsAppConversation,
+  WhatsAppConversationContext,
+  WhatsAppMessage,
+  WhatsAppMessageDirection,
+  WhatsAppMessageKind,
+  WhatsAppMessageStatus,
+  WhatsAppMediaDescriptor,
+  WhatsAppLocationPayload,
+  WhatsAppMessagingTarget,
+  WhatsAppShopMessagingConfig,
+  WhatsAppStarterTemplate,
+  WhatsAppQuickReply,
+  WhatsAppQuickReplyCategory,
+  WorkerId,
 } from '@tux/domain';
+import { parseEntityId } from '../../domain/src/ids.ts';
+import { instant } from '../../domain/src/time.ts';
+import { assertWhatsAppMessageInvariant } from '../../domain/src/whatsapp.ts';
 import {
   WhatsAppRemoteError,
   type WhatsAppInboxOrderLink,
   type WhatsAppInboxSnapshot,
-} from './whatsappRemote';
+} from './whatsappRemote.ts';
 
 function object(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
