@@ -3,6 +3,8 @@ import path from 'node:path';
 
 const ROOT = process.cwd();
 const OPERATIONS_API_DIR = path.join(ROOT, 'apps', 'operations', 'api');
+const PACKAGES_DIR = path.join(ROOT, 'packages');
+// Vercel Functions must not resolve source-only workspace exports through node_modules at runtime.
 const packageTypeCache = new Map();
 
 function collectTsFiles(directory) {
@@ -16,17 +18,41 @@ function collectTsFiles(directory) {
     .sort();
 }
 
-function moduleSpecifiers(source) {
-  const specifiers = [];
-  const staticPattern = /(?:import|export)\s+(?:type\s+)?(?:[^'\"]*?\sfrom\s*)?['\"]([^'\"]+)['\"]/g;
-  const dynamicPattern = /import\(\s*['\"]([^'\"]+)['\"]\s*\)/g;
-
-  for (const pattern of [staticPattern, dynamicPattern]) {
-    for (const match of source.matchAll(pattern)) {
-      if (match[1]) specifiers.push(match[1]);
-    }
+function workspacePackages() {
+  const packages = new Map();
+  for (const entry of fs.readdirSync(PACKAGES_DIR, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const packageJsonPath = path.join(PACKAGES_DIR, entry.name, 'package.json');
+    if (!fs.existsSync(packageJsonPath)) continue;
+    const manifest = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    if (typeof manifest.name !== 'string') continue;
+    const rootExport =
+      typeof manifest.exports === 'string'
+        ? manifest.exports
+        : manifest.exports && typeof manifest.exports['.'] === 'string'
+          ? manifest.exports['.']
+          : null;
+    packages.set(manifest.name, {
+      sourceOnlyRuntimeExport: typeof rootExport === 'string' && rootExport.endsWith('.ts'),
+      rootExport,
+    });
   }
-  return specifiers;
+  return packages;
+}
+
+function moduleReferences(source) {
+  const references = [];
+  const staticPattern = /\b(import|export)\s+(type\s+)?(?:[^;]*?\bfrom\s*)?['\"]([^'\"]+)['\"]/g;
+  const dynamicPattern = /\bimport\(\s*['\"]([^'\"]+)['\"]\s*\)/g;
+
+  for (const match of source.matchAll(staticPattern)) {
+    if (!match[3]) continue;
+    references.push({ specifier: match[3], typeOnly: Boolean(match[2]) });
+  }
+  for (const match of source.matchAll(dynamicPattern)) {
+    if (match[1]) references.push({ specifier: match[1], typeOnly: false });
+  }
+  return references;
 }
 
 function repositoryPath(absolutePath) {
@@ -77,9 +103,20 @@ function resolveSource(importer, specifier) {
   return null;
 }
 
+function workspacePackageForSpecifier(specifier, packages) {
+  for (const [packageName, manifest] of packages) {
+    if (specifier === packageName || specifier.startsWith(`${packageName}/`)) {
+      return { packageName, manifest };
+    }
+  }
+  return null;
+}
+
+const packages = workspacePackages();
 const queue = collectTsFiles(OPERATIONS_API_DIR);
 const visited = new Set();
-const violations = [];
+const relativeViolations = [];
+const workspaceRuntimeViolations = [];
 
 while (queue.length > 0) {
   const file = queue.shift();
@@ -88,8 +125,18 @@ while (queue.length > 0) {
 
   const source = fs.readFileSync(file, 'utf8');
   const isEsmPackage = packageTypeFor(file) === 'module';
-  for (const specifier of moduleSpecifiers(source)) {
-    if (!specifier.startsWith('.')) continue;
+  for (const reference of moduleReferences(source)) {
+    const { specifier, typeOnly } = reference;
+    if (!specifier.startsWith('.')) {
+      if (typeOnly) continue;
+      const workspacePackage = workspacePackageForSpecifier(specifier, packages);
+      if (workspacePackage?.manifest.sourceOnlyRuntimeExport) {
+        workspaceRuntimeViolations.push(
+          `${repositoryPath(file)} -> ${specifier} (${workspacePackage.packageName} exports ${workspacePackage.manifest.rootExport})`,
+        );
+      }
+      continue;
+    }
 
     const hasExplicitRuntimeExtension =
       specifier.endsWith('.js') ||
@@ -97,7 +144,7 @@ while (queue.length > 0) {
       specifier.endsWith('.cjs') ||
       specifier.endsWith('.json');
     if (isEsmPackage && !hasExplicitRuntimeExtension) {
-      violations.push(`${repositoryPath(file)} -> ${specifier}`);
+      relativeViolations.push(`${repositoryPath(file)} -> ${specifier}`);
     }
 
     const resolvedSource = resolveSource(file, specifier);
@@ -105,13 +152,25 @@ while (queue.length > 0) {
   }
 }
 
-if (violations.length > 0) {
-  throw new Error(
-    `Operations Vercel serverless graph contains Node ESM-unsafe relative imports inside type=module packages. Use explicit .js specifiers:\n${violations
-      .sort()
-      .map((violation) => `- ${violation}`)
-      .join('\n')}`,
-  );
+if (relativeViolations.length > 0 || workspaceRuntimeViolations.length > 0) {
+  const sections = [];
+  if (relativeViolations.length > 0) {
+    sections.push(
+      `Node ESM-unsafe relative imports inside type=module packages. Use explicit .js specifiers:\n${relativeViolations
+        .sort()
+        .map((violation) => `- ${violation}`)
+        .join('\n')}`,
+    );
+  }
+  if (workspaceRuntimeViolations.length > 0) {
+    sections.push(
+      `Runtime imports from source-only workspace packages are unsafe in Vercel Functions. Keep package imports type-only and route runtime values through traceable relative modules:\n${workspaceRuntimeViolations
+        .sort()
+        .map((violation) => `- ${violation}`)
+        .join('\n')}`,
+    );
+  }
+  throw new Error(`Operations Vercel serverless graph is not runtime-safe:\n${sections.join('\n\n')}`);
 }
 
 console.log(

@@ -1,0 +1,128 @@
+name: One-shot Vercel TS runtime compatibility
+
+on:
+  push:
+    branches:
+      - fix/vercel-runtime-workspace-package-tracing
+    paths:
+      - '.github/workflows/one-shot-vercel-ts-runtime-compat.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/vercel-runtime-workspace-package-tracing
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.46.3
+      - name: Keep workspace sources native-TypeScript compatible
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          const replacements = new Map([
+            ['packages/domain/src/ids.ts', [
+              ["'./brand.js'", "'./brand.ts'"],
+              ["'./errors.js'", "'./errors.ts'"],
+            ]],
+            ['packages/domain/src/time.ts', [
+              ["'./brand.js'", "'./brand.ts'"],
+              ["'./errors.js'", "'./errors.ts'"],
+            ]],
+            ['packages/domain/src/whatsapp.ts', [
+              ["'./errors.js'", "'./errors.ts'"],
+              ["'./ids.js'", "'./ids.ts'"],
+              ["'./time.js'", "'./time.ts'"],
+            ]],
+            ['packages/application/src/whatsappWire.ts', [
+              ["'../../domain/src/ids.js'", "'../../domain/src/ids.ts'"],
+              ["'../../domain/src/time.js'", "'../../domain/src/time.ts'"],
+              ["'../../domain/src/whatsapp.js'", "'../../domain/src/whatsapp.ts'"],
+              ["'./whatsappRemote.js'", "'./whatsappRemote.ts'"],
+            ]],
+            ['server/workspaceRuntime.ts', [
+              ["'../packages/domain/src/ids.js'", "'../packages/domain/src/ids.ts'"],
+              ["'../packages/domain/src/phone.js'", "'../packages/domain/src/phone.ts'"],
+              ["'../packages/domain/src/time.js'", "'../packages/domain/src/time.ts'"],
+              ["'../packages/domain/src/whatsapp.js'", "'../packages/domain/src/whatsapp.ts'"],
+              ["'../packages/application/src/whatsappWire.js'", "'../packages/application/src/whatsappWire.ts'"],
+            ]],
+          ]);
+
+          for (const [file, pairs] of replacements) {
+            let source = fs.readFileSync(file, 'utf8');
+            for (const [before, after] of pairs) {
+              if (!source.includes(before)) throw new Error(`Expected ${before} in ${file}`);
+              source = source.replaceAll(before, after);
+            }
+            fs.writeFileSync(file, source);
+          }
+
+          const guard = 'scripts/test-operations-vercel-esm-imports.mjs';
+          let source = fs.readFileSync(guard, 'utf8');
+          source = source.replace(
+            "import path from 'node:path';",
+            "import path from 'node:path';\nimport { pathToFileURL } from 'node:url';",
+          );
+          source = source.replace(
+            "  if (specifier.endsWith('.js')) {",
+            "  if (specifier.endsWith('.ts')) {\n    if (!fs.existsSync(resolved)) {\n      throw new Error(`${repositoryPath(importer)} imports ${specifier}, but ${repositoryPath(resolved)} does not exist.`);\n    }\n    return resolved;\n  }\n\n  if (specifier.endsWith('.js')) {",
+          );
+          source = source.replace(
+            "      specifier.endsWith('.js') ||",
+            "      specifier.endsWith('.ts') ||\n      specifier.endsWith('.js') ||",
+          );
+          source = source.replace(
+            '`Node ESM-unsafe relative imports inside type=module packages. Use explicit .js specifiers:\\n${relativeViolations',
+            '`Node ESM-unsafe relative imports inside type=module packages. Use explicit runtime extensions (.js for compiled modules or .ts for native source modules):\\n${relativeViolations',
+          );
+          const finalLog = "console.log(\n  `Operations Vercel ESM import guard passed across ${visited.size} reachable TypeScript modules.`,\n);";
+          if (!source.includes(finalLog)) throw new Error('Expected final guard log');
+          source = source.replace(
+            finalLog,
+            `const runtimeAdapterSource = fs.readFileSync(path.join(ROOT, 'server', 'workspaceRuntime.ts'), 'utf8');\nconst runtimeSmoke = path.join(ROOT, 'server', \`.workspaceRuntime-smoke-\${process.pid}.mjs\`);\ntry {\n  fs.writeFileSync(runtimeSmoke, runtimeAdapterSource);\n  await import(\`${pathToFileURL(runtimeSmoke).href}?run=\${Date.now()}\`);\n} finally {\n  fs.rmSync(runtimeSmoke, { force: true });\n}\n\nconsole.log(\n  \`Operations Vercel ESM import guard passed across \${visited.size} reachable TypeScript modules with executable workspace runtime graph.\`,\n);`,
+          );
+          fs.writeFileSync(guard, source);
+          NODE
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Format touched files
+        run: >-
+          npx prettier --write
+          packages/domain/src/ids.ts
+          packages/domain/src/time.ts
+          packages/domain/src/whatsapp.ts
+          packages/application/src/whatsappWire.ts
+          server/workspaceRuntime.ts
+          scripts/test-operations-vercel-esm-imports.mjs
+      - name: Verify permanent Vercel runtime graph
+        run: node scripts/test-operations-vercel-esm-imports.mjs
+      - name: Verify Deno Edge compatibility
+        run: deno check --config supabase/functions/order-intake/deno.json supabase/functions/order-intake/index.ts
+      - name: Verify API and workspace types
+        run: |
+          npx tsc --noEmit -p tsconfig.api.json
+          npm run typecheck -w @tux/domain
+          npm run typecheck -w @tux/application
+      - name: Verify WhatsApp server behavior
+        run: npx vitest run server/whatsapp*.test.ts server/operationsDeviceAuthority.test.ts packages/application/src/whatsappWire.test.ts
+      - name: Commit verified compatibility correction and remove one-shot workflow
+        shell: bash
+        run: |
+          rm .github/workflows/one-shot-vercel-ts-runtime-compat.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && { echo 'No changes to commit'; exit 1; }
+          git commit -m 'fix(vercel): preserve native TS workspace runtime graph'
+          git push origin HEAD:fix/vercel-runtime-workspace-package-tracing

@@ -1,4 +1,5 @@
-import { parseEntityId, type DeviceId, type ShopId } from '@tux/domain';
+import type { DeviceId, ShopId } from '@tux/domain';
+import { parseEntityId } from './workspaceRuntime.js';
 
 export interface OperationsDeviceAuthority {
   readonly shopId: ShopId;

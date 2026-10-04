@@ -1,14 +1,13 @@
-import { createHash } from 'node:crypto';
-import {
-  assertWhatsAppMessageInvariant,
-  parseEntityId,
-  type BusinessDayId,
-  type DeviceId,
-  type ShopId,
-  type WhatsAppLocationPayload,
-  type WhatsAppMessage,
-  type WorkerId,
+import type {
+  BusinessDayId,
+  DeviceId,
+  ShopId,
+  WhatsAppLocationPayload,
+  WhatsAppMessage,
+  WorkerId,
 } from '@tux/domain';
+import { createHash } from 'node:crypto';
+import { assertWhatsAppMessageInvariant, parseEntityId } from './workspaceRuntime.js';
 import type { WhatsAppChannelResolver } from './whatsappChannelResolver.js';
 import {
   validateWhatsAppMediaContent,

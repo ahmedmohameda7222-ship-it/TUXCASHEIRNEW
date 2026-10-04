@@ -1,24 +1,22 @@
 import type { WhatsAppInboxOrderLink, WhatsAppInboxSnapshot } from '@tux/application';
-import {
-  assertWhatsAppMessageInvariant,
-  instant,
-  parseEntityId,
-  type BusinessDayId,
-  type DeviceId,
-  type OrderId,
-  type ShopId,
-  type WhatsAppConversation,
-  type WhatsAppConversationContext,
-  type WhatsAppMessage,
-  type WhatsAppMessageDirection,
-  type WhatsAppMessageKind,
-  type WhatsAppMessageStatus,
-  type WhatsAppQuickReply,
-  type WhatsAppQuickReplyCategory,
-  type WhatsAppShopMessagingConfig,
-  type WhatsAppStarterTemplate,
-  type WorkerId,
+import type {
+  BusinessDayId,
+  DeviceId,
+  OrderId,
+  ShopId,
+  WhatsAppConversation,
+  WhatsAppConversationContext,
+  WhatsAppMessage,
+  WhatsAppMessageDirection,
+  WhatsAppMessageKind,
+  WhatsAppMessageStatus,
+  WhatsAppQuickReply,
+  WhatsAppQuickReplyCategory,
+  WhatsAppShopMessagingConfig,
+  WhatsAppStarterTemplate,
+  WorkerId,
 } from '@tux/domain';
+import { assertWhatsAppMessageInvariant, instant, parseEntityId } from './workspaceRuntime.js';
 import type { WhatsAppDataServerConfig } from './whatsappServerConfig.js';
 
 export type WhatsAppOperationsRepositoryErrorCode =
