@@ -119,6 +119,20 @@ const expectedOperations = {
   installCommand: 'cd ../.. && npm ci',
   buildCommand: 'cd ../.. && npm run build -w @tux/operations',
   outputDirectory: 'dist',
+  rewrites: [
+    { source: '/api/device-bootstrap', destination: '/api/device?route=device-bootstrap' },
+    { source: '/api/device-enroll', destination: '/api/device?route=device-enroll' },
+    { source: '/api/device-session', destination: '/api/device?route=device-session' },
+    { source: '/api/worker-auth', destination: '/api/worker?route=worker-auth' },
+    {
+      source: '/api/worker-menu-layout',
+      destination: '/api/worker?route=worker-menu-layout',
+    },
+    {
+      source: '/api/worker-ui-preferences',
+      destination: '/api/worker?route=worker-ui-preferences',
+    },
+  ],
   crons: [
     {
       path: '/api/whatsapp-media-retention',
@@ -143,8 +157,6 @@ if (operationsConfig.buildCommand.toLowerCase().includes('admin')) {
   throw new Error('Operations Vercel build command must not build Admin');
 }
 
-// Every live root API function, including nested filesystem routes, must have an
-// app-local Vercel function entrypoint.
 function collectTsFiles(directory, baseDirectory = directory) {
   return fs
     .readdirSync(directory, { withFileTypes: true })
@@ -182,12 +194,31 @@ if (adminCronApiFiles.length > 0) {
 
 const rootApiFiles = collectTsFiles(rootApiDir);
 const operationsApiFiles = collectTsFiles(operationsApiDir);
+const consolidatedOperationsRoutes = {
+  'device.ts': ['device-bootstrap.ts', 'device-enroll.ts', 'device-session.ts'],
+  'worker.ts': ['worker-auth.ts', 'worker-menu-layout.ts', 'worker-ui-preferences.ts'],
+};
+const consolidatedRootApiFiles = new Set(Object.values(consolidatedOperationsRoutes).flat());
+const passthroughRootApiFiles = rootApiFiles.filter(
+  (fileName) => !consolidatedRootApiFiles.has(fileName),
+);
+const expectedOperationsApiFiles = [
+  ...passthroughRootApiFiles,
+  ...Object.keys(consolidatedOperationsRoutes),
+].sort();
+
 assertJsonEqual(
   operationsApiFiles,
-  rootApiFiles,
-  'Operations app-local API entrypoints must mirror every root API function recursively',
+  expectedOperationsApiFiles,
+  'Operations app-local API entrypoints must preserve passthrough routes and approved dispatchers',
 );
-for (const fileName of rootApiFiles) {
+if (operationsApiFiles.length > 12) {
+  throw new Error(
+    `Operations Vercel deployment exceeds the Hobby Serverless Function limit: ${operationsApiFiles.length} > 12`,
+  );
+}
+
+for (const fileName of passthroughRootApiFiles) {
   const wrapperPath = path.join(operationsApiDir, fileName);
   const source = fs.readFileSync(wrapperPath, 'utf8').trim();
   const rootModulePath = path.join(rootApiDir, fileName.slice(0, -3));
@@ -203,6 +234,23 @@ for (const fileName of rootApiFiles) {
     `export { default } from '${relativeImport}';`,
     `Operations API entrypoint ${fileName}`,
   );
+}
+
+for (const [dispatcherFile, routedFiles] of Object.entries(consolidatedOperationsRoutes)) {
+  const source = fs.readFileSync(path.join(operationsApiDir, dispatcherFile), 'utf8');
+  for (const routedFile of routedFiles) {
+    const routeName = routedFile.slice(0, -3);
+    if (!source.includes(`../../../api/${routeName}`)) {
+      throw new Error(
+        `Operations dispatcher ${dispatcherFile} must import root handler ${routeName}`,
+      );
+    }
+    if (!source.includes(`'${routeName}'`)) {
+      throw new Error(
+        `Operations dispatcher ${dispatcherFile} must route key ${routeName}`,
+      );
+    }
+  }
 }
 
 if (!apiTsconfig.include?.includes('apps/operations/api/**/*.ts')) {
