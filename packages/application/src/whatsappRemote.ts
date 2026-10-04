@@ -101,7 +101,7 @@ export interface WhatsAppRemoteGateway {
 
   markUnread(conversationId: string): Promise<void>;
   archive(conversationId: string, archived?: boolean): Promise<void>;
-  setFollowUp(conversationId: string, followUp?: boolean): Promise<void>;
+  setFollowUp(conversationId: string, followUp: boolean): Promise<void>;
 
   linkOrder(input: {
     readonly businessDayId: BusinessDayId;
