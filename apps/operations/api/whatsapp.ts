@@ -1,1 +1,1 @@
-export { default } from '../../../api/whatsapp';
+export { default } from '../../../api/whatsapp.js';

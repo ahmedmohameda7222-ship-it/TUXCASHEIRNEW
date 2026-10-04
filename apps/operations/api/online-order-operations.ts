@@ -1,1 +1,1 @@
-export { default } from '../../../api/online-order-operations';
+export { default } from '../../../api/online-order-operations.js';

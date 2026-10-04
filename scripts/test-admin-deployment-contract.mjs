@@ -231,7 +231,7 @@ for (const fileName of passthroughRootApiFiles) {
   }
   assertEqual(
     source,
-    `export { default } from '${relativeImport}';`,
+    `export { default } from '${relativeImport}.js';`,
     `Operations API entrypoint ${fileName}`,
   );
 }
@@ -240,9 +240,9 @@ for (const [dispatcherFile, routedFiles] of Object.entries(consolidatedOperation
   const source = fs.readFileSync(path.join(operationsApiDir, dispatcherFile), 'utf8');
   for (const routedFile of routedFiles) {
     const routeName = routedFile.slice(0, -3);
-    if (!source.includes(`../../../api/${routeName}`)) {
+    if (!source.includes(`../../../api/${routeName}.js`)) {
       throw new Error(
-        `Operations dispatcher ${dispatcherFile} must import root handler ${routeName}`,
+        `Operations dispatcher ${dispatcherFile} must import root handler ${routeName} with an explicit .js runtime extension`,
       );
     }
     if (!source.includes(`'${routeName}'`)) {

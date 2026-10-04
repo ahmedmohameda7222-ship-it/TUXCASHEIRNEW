@@ -1,1 +1,1 @@
-export { default } from '../../../api/operations-order-lifecycle';
+export { default } from '../../../api/operations-order-lifecycle.js';

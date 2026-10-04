@@ -1,1 +1,1 @@
-export { default } from '../../../api/whatsapp-media-retention';
+export { default } from '../../../api/whatsapp-media-retention.js';

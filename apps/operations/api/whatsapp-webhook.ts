@@ -1,1 +1,1 @@
-export { default } from '../../../api/whatsapp-webhook';
+export { default } from '../../../api/whatsapp-webhook.js';

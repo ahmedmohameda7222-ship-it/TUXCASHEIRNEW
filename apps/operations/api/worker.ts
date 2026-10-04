@@ -1,8 +1,8 @@
-import workerAuth from '../../../api/worker-auth';
-import workerMenuLayout from '../../../api/worker-menu-layout';
-import workerUiPreferences from '../../../api/worker-ui-preferences';
-import type { GatewayRequest, GatewayResponse } from '../../../server/supabaseGateway';
-import { sendJson } from '../../../server/supabaseGateway';
+import workerAuth from '../../../api/worker-auth.js';
+import workerMenuLayout from '../../../api/worker-menu-layout.js';
+import workerUiPreferences from '../../../api/worker-ui-preferences.js';
+import type { GatewayRequest, GatewayResponse } from '../../../server/supabaseGateway.js';
+import { sendJson } from '../../../server/supabaseGateway.js';
 
 const handlers = {
   'worker-auth': workerAuth,
