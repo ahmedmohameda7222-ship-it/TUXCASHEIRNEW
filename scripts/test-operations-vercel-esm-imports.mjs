@@ -3,6 +3,7 @@ import path from 'node:path';
 
 const ROOT = process.cwd();
 const OPERATIONS_API_DIR = path.join(ROOT, 'apps', 'operations', 'api');
+const packageTypeCache = new Map();
 
 function collectTsFiles(directory) {
   return fs
@@ -32,7 +33,25 @@ function repositoryPath(absolutePath) {
   return path.relative(ROOT, absolutePath).split(path.sep).join('/');
 }
 
-function resolveRelativeSource(importer, specifier) {
+function packageTypeFor(file) {
+  let directory = path.dirname(file);
+  while (directory.startsWith(ROOT)) {
+    if (packageTypeCache.has(directory)) return packageTypeCache.get(directory);
+    const packageJson = path.join(directory, 'package.json');
+    if (fs.existsSync(packageJson)) {
+      const parsed = JSON.parse(fs.readFileSync(packageJson, 'utf8'));
+      const packageType = parsed.type === 'module' ? 'module' : 'commonjs';
+      packageTypeCache.set(directory, packageType);
+      return packageType;
+    }
+    const parent = path.dirname(directory);
+    if (parent === directory) break;
+    directory = parent;
+  }
+  return 'commonjs';
+}
+
+function resolveSource(importer, specifier) {
   const resolved = path.resolve(path.dirname(importer), specifier);
   if (specifier.endsWith('.js')) {
     const tsSource = `${resolved.slice(0, -3)}.ts`;
@@ -52,7 +71,10 @@ function resolveRelativeSource(importer, specifier) {
     return null;
   }
 
-  return undefined;
+  for (const candidate of [`${resolved}.ts`, path.join(resolved, 'index.ts')]) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
 }
 
 const queue = collectTsFiles(OPERATIONS_API_DIR);
@@ -65,21 +87,27 @@ while (queue.length > 0) {
   visited.add(file);
 
   const source = fs.readFileSync(file, 'utf8');
+  const isEsmPackage = packageTypeFor(file) === 'module';
   for (const specifier of moduleSpecifiers(source)) {
     if (!specifier.startsWith('.')) continue;
 
-    const resolvedSource = resolveRelativeSource(file, specifier);
-    if (resolvedSource === undefined) {
+    const hasExplicitRuntimeExtension =
+      specifier.endsWith('.js') ||
+      specifier.endsWith('.mjs') ||
+      specifier.endsWith('.cjs') ||
+      specifier.endsWith('.json');
+    if (isEsmPackage && !hasExplicitRuntimeExtension) {
       violations.push(`${repositoryPath(file)} -> ${specifier}`);
-      continue;
     }
+
+    const resolvedSource = resolveSource(file, specifier);
     if (resolvedSource !== null && !visited.has(resolvedSource)) queue.push(resolvedSource);
   }
 }
 
 if (violations.length > 0) {
   throw new Error(
-    `Operations Vercel serverless graph contains Node ESM-unsafe relative imports. Use explicit .js specifiers:\n${violations
+    `Operations Vercel serverless graph contains Node ESM-unsafe relative imports inside type=module packages. Use explicit .js specifiers:\n${violations
       .sort()
       .map((violation) => `- ${violation}`)
       .join('\n')}`,

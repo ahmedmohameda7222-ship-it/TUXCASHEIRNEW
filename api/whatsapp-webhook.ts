@@ -1,15 +1,15 @@
 import type { IncomingMessage } from 'node:http';
-import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway.js';
-import { SupabaseWhatsAppChannelResolver } from '../server/whatsappChannelResolver.js';
-import { createWhatsAppProviderGateway } from '../server/whatsappProviderGateway.js';
-import { loadWhatsAppServerConfig } from '../server/whatsappServerConfig.js';
+import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway';
+import { SupabaseWhatsAppChannelResolver } from '../server/whatsappChannelResolver';
+import { createWhatsAppProviderGateway } from '../server/whatsappProviderGateway';
+import { loadWhatsAppServerConfig } from '../server/whatsappServerConfig';
 import {
   SupabaseWhatsAppInboundMaterializer,
   SupabaseWhatsAppInboundMediaStore,
   handleWhatsAppWebhook,
   type WhatsAppWebhookDiagnostic,
   type WhatsAppWebhookResult,
-} from '../server/whatsappWebhook.js';
+} from '../server/whatsappWebhook';
 
 const MAX_WHATSAPP_WEBHOOK_BODY_BYTES = 1_048_576;
 

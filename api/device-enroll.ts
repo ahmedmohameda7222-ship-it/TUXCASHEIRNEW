@@ -1,6 +1,6 @@
-import { normalizeVercelSupabaseEnv } from '../server/vercelSupabaseEnv.js';
-import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway.js';
-import { enrollDevice, sendJson } from '../server/supabaseGateway.js';
+import { normalizeVercelSupabaseEnv } from '../server/vercelSupabaseEnv';
+import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway';
+import { enrollDevice, sendJson } from '../server/supabaseGateway';
 
 normalizeVercelSupabaseEnv();
 

@@ -1,12 +1,12 @@
-import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway.js';
-import { sendJson } from '../server/supabaseGateway.js';
+import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway';
+import { sendJson } from '../server/supabaseGateway';
 import {
   handleWhatsAppMediaRetentionRequest,
   runWhatsAppMediaRetention,
   SupabaseWhatsAppMediaRetentionRepository,
-} from '../server/whatsappMediaRetention.js';
-import { SupabaseWhatsAppMediaStorage } from '../server/whatsappMediaStorage.js';
-import { loadWhatsAppDataServerConfig } from '../server/whatsappServerConfig.js';
+} from '../server/whatsappMediaRetention';
+import { SupabaseWhatsAppMediaStorage } from '../server/whatsappMediaStorage';
+import { loadWhatsAppDataServerConfig } from '../server/whatsappServerConfig';
 
 function firstHeader(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0];

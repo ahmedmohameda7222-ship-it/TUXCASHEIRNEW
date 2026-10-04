@@ -1,6 +1,6 @@
-import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway.js';
-import { normalizeVercelSupabaseEnv } from '../server/vercelSupabaseEnv.js';
-import { handleWorkerUiPreferences } from '../server/workerUiPreferencesGateway.js';
+import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway';
+import { normalizeVercelSupabaseEnv } from '../server/vercelSupabaseEnv';
+import { handleWorkerUiPreferences } from '../server/workerUiPreferencesGateway';
 
 normalizeVercelSupabaseEnv();
 
