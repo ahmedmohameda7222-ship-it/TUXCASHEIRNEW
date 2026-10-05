@@ -1,7 +1,11 @@
 import type { AdminOrderSource, AdminOrderStatus } from '@tux/admin-contracts';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useLocation } from 'wouter';
 
+import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
 import { PageScaffold } from '../components/layout/PageScaffold';
+import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
+import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { CancelOrderSheet } from './CancelOrderSheet';
 import { OrderDetailPage } from './OrderDetailPage';
@@ -19,21 +23,15 @@ function readableError(error: unknown): string | null {
 export function OrdersPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
+  const [location, navigate] = useLocation();
+  const selectedId = detailIdFromPath(location, '/orders');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<AdminOrderStatus | ''>('');
   const [source, setSource] = useState<AdminOrderSource | ''>('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [action, setAction] = useState<ActionMode>(null);
 
   const filters = useMemo<OrderSearchFilters>(
-    () => ({
-      query,
-      statuses: status ? [status] : [],
-      source: source || null,
-      from: null,
-      to: null,
-      limit: 50,
-    }),
+    () => ({ query, statuses: status ? [status] : [], source: source || null, from: null, to: null, limit: 50 }),
     [query, source, status],
   );
   const ordersApi = useOrders(shopId, selectedId, filters);
@@ -42,30 +40,20 @@ export function OrdersPage() {
     [ordersApi.searchQuery.data],
   );
 
-  useEffect(() => {
-    if (selectedId && rows.some((row) => row.id === selectedId)) return;
-    setSelectedId(rows[0]?.id ?? null);
-    setAction(null);
-  }, [rows, selectedId]);
-
   if (!shopId) {
     return (
       <PageScaffold
         eyebrow="Orders"
         title="Orders"
-        description="Select a concrete shop to supervise canonical order lifecycle and refunds."
+        description="Select a shop to review orders, cancellations, refunds and returns."
       />
     );
   }
 
   const detail = ordersApi.detailQuery.data;
   const reasons = ordersApi.actionReasonsQuery.data?.reasons ?? [];
-  const cancellationReasons = reasons.filter(
-    (reason) => reason.active && reason.family === 'CANCELLATION',
-  );
-  const refundReasons = reasons.filter(
-    (reason) => reason.active && reason.family === 'REFUND_RETURN',
-  );
+  const cancellationReasons = reasons.filter((reason) => reason.active && reason.family === 'CANCELLATION');
+  const refundReasons = reasons.filter((reason) => reason.active && reason.family === 'REFUND_RETURN');
   const canCancel = principal.permissions.includes('orders.cancel');
   const canRefund = principal.permissions.includes('orders.refund');
   const actionError =
@@ -77,7 +65,7 @@ export function OrdersPage() {
     <PageScaffold
       eyebrow="Order supervision"
       title="Orders"
-      description="Search immutable order context, then perform controlled cancellation, refund or return actions."
+      description="Search order history and complete controlled cancellation, refund or return actions."
     >
       <section className="admin-catalog-editor__section is-compact" aria-label="Order filters">
         <label className="admin-field">
@@ -90,83 +78,86 @@ export function OrdersPage() {
         </label>
         <label className="admin-field">
           <span>Status</span>
-          <select
-            value={status}
-            onChange={(event) => setStatus(event.target.value as AdminOrderStatus | '')}
-          >
+          <select value={status} onChange={(event) => setStatus(event.target.value as AdminOrderStatus | '')}>
             <option value="">All statuses</option>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="DONE">DONE</option>
-            <option value="CANCELLED">CANCELLED</option>
-            <option value="RETURNED">RETURNED</option>
+            <option value="ACTIVE">Active</option>
+            <option value="DONE">Done</option>
+            <option value="CANCELLED">Cancelled</option>
+            <option value="RETURNED">Returned</option>
           </select>
         </label>
         <label className="admin-field">
           <span>Source</span>
-          <select
-            value={source}
-            onChange={(event) => setSource(event.target.value as AdminOrderSource | '')}
-          >
+          <select value={source} onChange={(event) => setSource(event.target.value as AdminOrderSource | '')}>
             <option value="">All sources</option>
             <option value="POS">POS</option>
-            <option value="ONLINE">ONLINE</option>
+            <option value="ONLINE">Online</option>
           </select>
         </label>
       </section>
 
       {actionError ? <p role="alert">{actionError}</p> : null}
 
-      <div className="admin-inventory-layout">
-        <section className="admin-inventory-list" aria-label="Orders">
-          {ordersApi.searchQuery.isLoading ? <p>Loading orders…</p> : null}
-          {ordersApi.searchQuery.isError ? <p role="alert">Orders could not be loaded.</p> : null}
-          {rows.length === 0 && !ordersApi.searchQuery.isLoading ? (
-            <div className="admin-empty-state">
-              <strong>No matching orders</strong>
-              <span>Adjust the search or filters for this shop.</span>
-            </div>
-          ) : null}
-          {rows.map((row) => (
-            <button
-              className={
-                row.id === selectedId ? 'admin-inventory-row is-selected' : 'admin-inventory-row'
-              }
-              key={row.id}
-              type="button"
-              onClick={() => {
-                setSelectedId(row.id);
-                setAction(null);
-              }}
-            >
-              <span>
-                <strong>{row.displayOrderLabel ?? `#${row.displayOrderNo}`}</strong>
-                <small>
-                  {row.customerName ?? row.normalizedPhone ?? 'Walk-in'} · {row.orderTypeLabel}
-                </small>
-              </span>
-              <span>
-                {row.status} · {row.source}
-              </span>
-            </button>
-          ))}
-          {ordersApi.searchQuery.hasNextPage ? (
-            <button
-              className="admin-secondary-button"
-              type="button"
-              disabled={ordersApi.searchQuery.isFetchingNextPage}
-              onClick={() => void ordersApi.searchQuery.fetchNextPage()}
-            >
-              {ordersApi.searchQuery.isFetchingNextPage ? 'Loading…' : 'Load more'}
-            </button>
-          ) : null}
-        </section>
-
-        <section className="admin-inventory-inspector">
-          {ordersApi.detailQuery.isLoading ? <p>Loading order detail…</p> : null}
-          {ordersApi.detailQuery.isError ? (
-            <p role="alert">Order detail could not be loaded.</p>
-          ) : null}
-          {detail ? (
+      <ResponsiveMasterDetail
+        listLabel="Orders"
+        detailLabel="Order detail"
+        detailActive={selectedId !== null}
+        backHref="/orders"
+        list={
+          <div className="admin-inventory-list">
+            {ordersApi.searchQuery.isLoading ? <LoadingState title="Loading orders" /> : null}
+            {ordersApi.searchQuery.isError ? (
+              <ErrorState
+                title="Orders could not be loaded"
+                action={
+                  <button className="admin-secondary-button" type="button" onClick={() => void ordersApi.searchQuery.refetch()}>
+                    Retry
+                  </button>
+                }
+              />
+            ) : null}
+            {rows.length === 0 && !ordersApi.searchQuery.isLoading ? (
+              <EmptyState title="No matching orders" description="Adjust the search or filters for this shop." />
+            ) : null}
+            {rows.map((row) => (
+              <button
+                className={row.id === selectedId ? 'admin-inventory-row is-selected' : 'admin-inventory-row'}
+                aria-current={row.id === selectedId ? 'true' : undefined}
+                key={row.id}
+                type="button"
+                onClick={() => {
+                  navigate(detailPath('/orders', row.id));
+                  setAction(null);
+                }}
+              >
+                <span>
+                  <strong>{row.displayOrderLabel ?? `#${row.displayOrderNo}`}</strong>
+                  <small>{row.customerName ?? row.normalizedPhone ?? 'Walk-in'} · {row.orderTypeLabel}</small>
+                </span>
+                <span>{row.status} · {row.source}</span>
+              </button>
+            ))}
+            {ordersApi.searchQuery.hasNextPage ? (
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={ordersApi.searchQuery.isFetchingNextPage}
+                onClick={() => void ordersApi.searchQuery.fetchNextPage()}
+              >
+                {ordersApi.searchQuery.isFetchingNextPage ? 'Loading…' : 'Load more'}
+              </button>
+            ) : null}
+          </div>
+        }
+        detail={
+          ordersApi.detailQuery.isLoading ? (
+            <LoadingState title="Loading order detail" />
+          ) : ordersApi.detailQuery.isError ? (
+            <ErrorState
+              title="Order unavailable"
+              description="This order may not exist or may not be available in your current shop scope."
+            />
+          ) : detail ? (
             <>
               <OrderDetailPage
                 order={detail}
@@ -186,11 +177,7 @@ export function OrdersPage() {
                   onCancel={() => setAction(null)}
                   onSubmit={(input) =>
                     ordersApi.cancelOrder.mutate(
-                      {
-                        orderId: detail.id,
-                        expectedOperationalRevision: detail.operationalRevision,
-                        ...input,
-                      },
+                      { orderId: detail.id, expectedOperationalRevision: detail.operationalRevision, ...input },
                       { onSuccess: () => setAction(null) },
                     )
                   }
@@ -204,30 +191,25 @@ export function OrdersPage() {
                   returning={ordersApi.returnOrderItems.isPending}
                   onCancel={() => setAction(null)}
                   onRefund={(input) =>
-                    ordersApi.refundOrder.mutate(
-                      { orderId: detail.id, ...input },
-                      { onSuccess: () => setAction(null) },
-                    )
+                    ordersApi.refundOrder.mutate({ orderId: detail.id, ...input }, { onSuccess: () => setAction(null) })
                   }
                   onReturn={(input) =>
-                    ordersApi.returnOrderItems.mutate(
-                      { orderId: detail.id, ...input },
-                      { onSuccess: () => setAction(null) },
-                    )
+                    ordersApi.returnOrderItems.mutate({ orderId: detail.id, ...input }, { onSuccess: () => setAction(null) })
                   }
                 />
               ) : null}
             </>
-          ) : !ordersApi.detailQuery.isLoading ? (
-            <div className="admin-empty-state">
-              <strong>Select an order</strong>
-              <span>
-                Review immutable payment, customer, delivery, inventory, status and audit context.
-              </span>
-            </div>
-          ) : null}
-        </section>
-      </div>
+          ) : (
+            <EmptyState title="Order unavailable" description="Choose another order from the list." />
+          )
+        }
+        emptyDetail={
+          <EmptyState
+            title="Select an order"
+            description="Review payment, customer, delivery, inventory status and order history."
+          />
+        }
+      />
     </PageScaffold>
   );
 }
