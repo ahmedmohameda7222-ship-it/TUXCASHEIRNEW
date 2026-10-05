@@ -1,0 +1,40 @@
+name: One-shot Vercel runtime bundle contract patch
+
+on:
+  push:
+    branches:
+      - fix/vercel-runtime-include-workspace-files
+    paths:
+      - '.github/workflows/one-shot-vercel-runtime-bundle-contract.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/vercel-runtime-include-workspace-files
+      - name: Patch legacy exact deployment contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/test-admin-deployment-contract.mjs')
+          text = path.read_text()
+          old = "  outputDirectory: 'dist',\n  rewrites: ["
+          new = "  outputDirectory: 'dist',\n  functions: {\n    'api/**/*.ts': {\n      includeFiles: '../../packages/{domain,application}/src/**',\n    },\n  },\n  rewrites: ["
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'expected exactly one Operations contract insertion point, found {count}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit contract patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/test-admin-deployment-contract.mjs
+          git diff --cached --check
+          git commit -m 'test(vercel): include workspace files in deployment contract'
+          git push origin HEAD:fix/vercel-runtime-include-workspace-files
