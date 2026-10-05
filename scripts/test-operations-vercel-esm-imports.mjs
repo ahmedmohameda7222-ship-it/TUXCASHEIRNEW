@@ -122,11 +122,21 @@ function workspacePackageForSpecifier(specifier, packages) {
   return null;
 }
 
+function isVercelBoundaryFile(file) {
+  const relative = repositoryPath(file);
+  return (
+    relative.startsWith('api/') ||
+    relative.startsWith('server/') ||
+    relative.startsWith('apps/operations/api/')
+  );
+}
+
 const packages = workspacePackages();
 const queue = collectTsFiles(OPERATIONS_API_DIR);
 const visited = new Set();
 const relativeViolations = [];
 const workspaceRuntimeViolations = [];
+const rawTsRuntimeViolations = [];
 
 while (queue.length > 0) {
   const file = queue.shift();
@@ -157,13 +167,20 @@ while (queue.length > 0) {
     if (isEsmPackage && !hasExplicitRuntimeExtension) {
       relativeViolations.push(`${repositoryPath(file)} -> ${specifier}`);
     }
+    if (!typeOnly && isVercelBoundaryFile(file) && specifier.endsWith('.ts')) {
+      rawTsRuntimeViolations.push(`${repositoryPath(file)} -> ${specifier}`);
+    }
 
     const resolvedSource = resolveSource(file, specifier);
     if (resolvedSource !== null && !visited.has(resolvedSource)) queue.push(resolvedSource);
   }
 }
 
-if (relativeViolations.length > 0 || workspaceRuntimeViolations.length > 0) {
+if (
+  relativeViolations.length > 0 ||
+  workspaceRuntimeViolations.length > 0 ||
+  rawTsRuntimeViolations.length > 0
+) {
   const sections = [];
   if (relativeViolations.length > 0) {
     sections.push(
@@ -176,6 +193,14 @@ if (relativeViolations.length > 0 || workspaceRuntimeViolations.length > 0) {
   if (workspaceRuntimeViolations.length > 0) {
     sections.push(
       `Runtime imports from source-only workspace packages are unsafe in Vercel Functions. Keep package imports type-only and route runtime values through traceable relative modules:\n${workspaceRuntimeViolations
+        .sort()
+        .map((violation) => `- ${violation}`)
+        .join('\n')}`,
+    );
+  }
+  if (rawTsRuntimeViolations.length > 0) {
+    sections.push(
+      `Raw .ts runtime imports from Vercel boundary modules are not deployable Lambda paths. Import the TypeScript source through its emitted .js specifier so Vercel traces and compiles it:\n${rawTsRuntimeViolations
         .sort()
         .map((violation) => `- ${violation}`)
         .join('\n')}`,
