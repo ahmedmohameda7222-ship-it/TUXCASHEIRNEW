@@ -1,7 +1,9 @@
 import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
+import { useState } from 'react';
 import { useLocation } from 'wouter';
 
 import { PageScaffold } from '../components/layout/PageScaffold';
+import { ConfirmationDialog } from '../components/overlay/AdminDialog';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { CheckoutPage } from './CheckoutPage';
 import { OrderTypesPage } from './OrderTypesPage';
@@ -24,7 +26,13 @@ import {
 } from './useSettings';
 
 export type SettingsSection =
-  'overview' | 'shop' | 'order-types' | 'payments' | 'checkout' | 'receipts' | 'reason-codes';
+  | 'overview'
+  | 'shop'
+  | 'order-types'
+  | 'payments'
+  | 'checkout'
+  | 'receipts'
+  | 'reason-codes';
 
 export type SettingsWorkspaceViewProps = {
   workspace: AdminSettingsWorkspace;
@@ -96,30 +104,23 @@ function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
         <p className="admin-catalog-editor__eyebrow">Shop</p>
         <h2 id="settings-shop-summary">Shop identity</h2>
         <p className="admin-field__help">
-          {workspace.shop.name} · {workspace.shop.address ?? 'No address configured'} ·{' '}
-          {workspace.shop.timezone}
+          {workspace.shop.name} · {workspace.shop.address ?? 'No address configured'} · {workspace.shop.timezone}
         </p>
       </section>
-      <section
-        className="admin-catalog-editor__section"
-        aria-labelledby="settings-operations-summary"
-      >
+      <section className="admin-catalog-editor__section" aria-labelledby="settings-operations-summary">
         <p className="admin-catalog-editor__eyebrow">Operations</p>
         <h2 id="settings-operations-summary">Published configuration</h2>
         <p className="admin-field__help">
-          {workspace.orderTypes.length} order types · {workspace.paymentMethods.length} payment
-          methods · {workspace.deliveryZones.length} delivery zones
+          {workspace.orderTypes.length} order types · {workspace.paymentMethods.length} payment methods · {workspace.deliveryZones.length} delivery zones
         </p>
       </section>
       <section className="admin-catalog-editor__section" aria-labelledby="settings-live-summary">
         <p className="admin-catalog-editor__eyebrow">Live controls</p>
-        <h2 id="settings-live-summary">Receipt and reason authority</h2>
+        <h2 id="settings-live-summary">Receipt and reason settings</h2>
         <p className="admin-field__help">
           Receipt prefix: {receiptPrefix === null ? 'Not configured' : String(receiptPrefix)}
         </p>
-        <p className="admin-field__help">
-          {firstActiveReason?.label ?? 'No active reason codes configured'}
-        </p>
+        <p className="admin-field__help">{firstActiveReason?.label ?? 'No active reason codes configured'}</p>
       </section>
     </div>
   );
@@ -164,45 +165,15 @@ function SectionContent(
         />
       );
     case 'order-types':
-      return (
-        <OrderTypesPage
-          workspace={workspace}
-          onUpdate={onUpdateOrderType}
-          updating={orderTypeUpdating}
-        />
-      );
+      return <OrderTypesPage workspace={workspace} onUpdate={onUpdateOrderType} updating={orderTypeUpdating} />;
     case 'payments':
-      return (
-        <PaymentsPage
-          workspace={workspace}
-          onUpdate={onUpdatePaymentMethod}
-          updating={paymentMethodUpdating}
-        />
-      );
+      return <PaymentsPage workspace={workspace} onUpdate={onUpdatePaymentMethod} updating={paymentMethodUpdating} />;
     case 'checkout':
-      return (
-        <CheckoutPage
-          workspace={workspace}
-          onUpdate={onUpdateSettingOverride}
-          updating={settingOverrideUpdating}
-        />
-      );
+      return <CheckoutPage workspace={workspace} onUpdate={onUpdateSettingOverride} updating={settingOverrideUpdating} />;
     case 'receipts':
-      return (
-        <ReceiptsPage
-          workspace={workspace}
-          onUpdate={onUpdateSettingOverride}
-          updating={settingOverrideUpdating}
-        />
-      );
+      return <ReceiptsPage workspace={workspace} onUpdate={onUpdateSettingOverride} updating={settingOverrideUpdating} />;
     case 'reason-codes':
-      return (
-        <ReasonCodesPage
-          workspace={workspace}
-          onUpsert={onUpsertReasonCode}
-          updating={reasonCodeUpdating}
-        />
-      );
+      return <ReasonCodesPage workspace={workspace} onUpsert={onUpsertReasonCode} updating={reasonCodeUpdating} />;
   }
 }
 
@@ -220,15 +191,10 @@ export function SettingsWorkspaceView({
         <div>
           <p className="admin-catalog-editor__eyebrow">Settings</p>
           <h1>{workspace.shop.name}</h1>
-          <p className="admin-field__help">Live settings version {workspace.settingsVersion}</p>
+          <p className="admin-field__help">Shop settings and operational controls</p>
         </div>
         <div className="admin-settings-workspace__publish">
-          <button
-            className="admin-primary-button"
-            type="button"
-            disabled={publishing}
-            onClick={() => void onPublish()}
-          >
+          <button className="admin-primary-button" type="button" disabled={publishing} onClick={() => void onPublish()}>
             {publishing ? 'Publishing…' : 'Publish settings'}
           </button>
           <p className="admin-field__help">
@@ -237,20 +203,11 @@ export function SettingsWorkspaceView({
         </div>
       </header>
       <nav className="admin-settings-workspace__nav" aria-label="Settings sections">
-        <button
-          type="button"
-          aria-current={section === 'overview' ? 'page' : undefined}
-          onClick={() => onSectionChange('overview')}
-        >
+        <button type="button" aria-current={section === 'overview' ? 'page' : undefined} onClick={() => onSectionChange('overview')}>
           Overview
         </button>
         {sections.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            aria-current={section === item.id ? 'page' : undefined}
-            onClick={() => onSectionChange(item.id)}
-          >
+          <button key={item.id} type="button" aria-current={section === item.id ? 'page' : undefined} onClick={() => onSectionChange(item.id)}>
             {item.label}
           </button>
         ))}
@@ -263,77 +220,72 @@ export function SettingsWorkspaceView({
 export function SettingsPage() {
   const { scope } = useShopScope();
   const [location, navigate] = useLocation();
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const section = settingsSectionForLocation(location);
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const settings = useSettings(shopId);
 
-  if (!shopId)
-    return (
-      <PageScaffold
-        eyebrow="Settings"
-        title="Select a shop"
-        description="Settings changes require a concrete shop scope."
-      />
-    );
-  if (settings.workspaceQuery.isPending)
-    return (
-      <PageScaffold
-        eyebrow="Settings"
-        title="Loading settings"
-        description="Loading the current published shop configuration."
-      />
-    );
-  if (settings.workspaceQuery.isError || !settings.workspaceQuery.data)
-    return (
-      <PageScaffold
-        eyebrow="Settings"
-        title="Settings unavailable"
-        description="The settings workspace could not be loaded."
-      />
-    );
-
-  async function deleteOrArchiveShop(): Promise<void> {
-    const confirmed = window.confirm(
-      'Archive this shop? If the shop has no business history, the server may delete it instead.',
-    );
-    if (!confirmed) return;
-    await settings.deleteOrArchiveShop.mutateAsync();
+  if (!shopId) {
+    return <PageScaffold eyebrow="Settings" title="Select a shop" description="Settings changes require a concrete shop scope." />;
+  }
+  if (settings.workspaceQuery.isPending) {
+    return <PageScaffold eyebrow="Settings" title="Loading settings" description="Loading the current published shop configuration." />;
+  }
+  if (settings.workspaceQuery.isError || !settings.workspaceQuery.data) {
+    return <PageScaffold eyebrow="Settings" title="Settings unavailable" description="The settings workspace could not be loaded." />;
   }
 
+  const workspace = settings.workspaceQuery.data;
+
   return (
-    <SettingsScheduleActionProvider
-      action={{
-        schedule: (draft) => settings.scheduleSettingsChange.mutateAsync(draft),
-        busy: settings.scheduleSettingsChange.isPending,
-      }}
-    >
-      <SettingsWorkspaceView
-        workspace={settings.workspaceQuery.data}
-        section={section}
-        onSectionChange={(nextSection) => navigate(settingsLocationForSection(nextSection))}
-        onPublish={() => settings.publish.mutateAsync()}
-        publishing={settings.publish.isPending}
-        onUpdateOperationalState={(draft) => settings.updateOperationalState.mutateAsync(draft)}
-        operationalStateUpdating={settings.updateOperationalState.isPending}
-        onUpdateShopIdentity={(draft) => settings.updateShopIdentity.mutateAsync(draft)}
-        onUpsertWeeklyHours={(draft) => settings.upsertWeeklyHours.mutateAsync(draft)}
-        onUpsertSpecialHours={(draft) => settings.upsertSpecialHours.mutateAsync(draft)}
-        shopManagementUpdating={
-          settings.updateShopIdentity.isPending ||
-          settings.upsertWeeklyHours.isPending ||
-          settings.upsertSpecialHours.isPending
-        }
-        onDeleteOrArchiveShop={deleteOrArchiveShop}
-        deletingOrArchivingShop={settings.deleteOrArchiveShop.isPending}
-        onUpdateSettingOverride={(draft) => settings.updateSettingOverride.mutateAsync(draft)}
-        settingOverrideUpdating={settings.updateSettingOverride.isPending}
-        onUpsertReasonCode={(draft) => settings.upsertReasonCode.mutateAsync(draft)}
-        reasonCodeUpdating={settings.upsertReasonCode.isPending}
-        onUpdateOrderType={(draft) => settings.updateOrderType.mutateAsync(draft)}
-        orderTypeUpdating={settings.updateOrderType.isPending}
-        onUpdatePaymentMethod={(draft) => settings.updatePaymentMethod.mutateAsync(draft)}
-        paymentMethodUpdating={settings.updatePaymentMethod.isPending}
+    <>
+      <SettingsScheduleActionProvider
+        action={{
+          schedule: (draft) => settings.scheduleSettingsChange.mutateAsync(draft),
+          busy: settings.scheduleSettingsChange.isPending,
+        }}
+      >
+        <SettingsWorkspaceView
+          workspace={workspace}
+          section={section}
+          onSectionChange={(nextSection) => navigate(settingsLocationForSection(nextSection))}
+          onPublish={() => settings.publish.mutateAsync()}
+          publishing={settings.publish.isPending}
+          onUpdateOperationalState={(draft) => settings.updateOperationalState.mutateAsync(draft)}
+          operationalStateUpdating={settings.updateOperationalState.isPending}
+          onUpdateShopIdentity={(draft) => settings.updateShopIdentity.mutateAsync(draft)}
+          onUpsertWeeklyHours={(draft) => settings.upsertWeeklyHours.mutateAsync(draft)}
+          onUpsertSpecialHours={(draft) => settings.upsertSpecialHours.mutateAsync(draft)}
+          shopManagementUpdating={
+            settings.updateShopIdentity.isPending ||
+            settings.upsertWeeklyHours.isPending ||
+            settings.upsertSpecialHours.isPending
+          }
+          onDeleteOrArchiveShop={() => setArchiveConfirmOpen(true)}
+          deletingOrArchivingShop={settings.deleteOrArchiveShop.isPending}
+          onUpdateSettingOverride={(draft) => settings.updateSettingOverride.mutateAsync(draft)}
+          settingOverrideUpdating={settings.updateSettingOverride.isPending}
+          onUpsertReasonCode={(draft) => settings.upsertReasonCode.mutateAsync(draft)}
+          reasonCodeUpdating={settings.upsertReasonCode.isPending}
+          onUpdateOrderType={(draft) => settings.updateOrderType.mutateAsync(draft)}
+          orderTypeUpdating={settings.updateOrderType.isPending}
+          onUpdatePaymentMethod={(draft) => settings.updatePaymentMethod.mutateAsync(draft)}
+          paymentMethodUpdating={settings.updatePaymentMethod.isPending}
+        />
+      </SettingsScheduleActionProvider>
+      <ConfirmationDialog
+        open={archiveConfirmOpen}
+        title={`Archive ${workspace.shop.name}?`}
+        description="If this shop has business or configuration history, it will be archived: new operational activity will be disabled and historical records will remain. If the shop has no recorded usage or configuration, it may be deleted instead."
+        confirmLabel="Archive shop"
+        destructive
+        pending={settings.deleteOrArchiveShop.isPending}
+        onOpenChange={setArchiveConfirmOpen}
+        onConfirm={async () => {
+          await settings.deleteOrArchiveShop.mutateAsync();
+          setArchiveConfirmOpen(false);
+        }}
       />
-    </SettingsScheduleActionProvider>
+    </>
   );
 }
