@@ -1,0 +1,93 @@
+name: One-shot Vercel type identity fixer
+
+on:
+  push:
+    branches:
+      - fix/vercel-runtime-type-identity
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/vercel-runtime-type-identity
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Normalize Vercel workspace type identity
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          function replaceExact(file, before, after) {
+            const source = fs.readFileSync(file, 'utf8');
+            if (!source.includes(before)) {
+              throw new Error(`Expected import block not found in ${file}`);
+            }
+            fs.writeFileSync(file, source.replace(before, after));
+          }
+
+          fs.writeFileSync(
+            'server/workspaceTypes.ts',
+            `export type * from '../packages/domain/src/ids.ts';\n` +
+              `export type * from '../packages/domain/src/whatsapp.ts';\n` +
+              `export type { WhatsAppInboxOrderLink, WhatsAppInboxSnapshot } from '../packages/application/src/whatsappRemote.ts';\n`,
+          );
+
+          replaceExact(
+            'packages/application/src/whatsappRemote.ts',
+            `import type { CachedWhatsAppInboxSnapshot, CachedWhatsAppOrderLink } from '@tux/persistence';\nimport type {\n  BusinessDayId,\n  OrderId,\n  WhatsAppLocationPayload,\n  WhatsAppMessage,\n  WhatsAppMessagingTarget,\n  WorkerId,\n} from '@tux/domain';`,
+            `import type { CachedWhatsAppInboxSnapshot, CachedWhatsAppOrderLink } from '../../persistence/src/whatsappStore.ts';\nimport type { BusinessDayId, OrderId, WorkerId } from '../../domain/src/ids.ts';\nimport type {\n  WhatsAppLocationPayload,\n  WhatsAppMessage,\n  WhatsAppMessagingTarget,\n} from '../../domain/src/whatsapp.ts';`,
+          );
+
+          replaceExact(
+            'packages/application/src/whatsappWire.ts',
+            `import type {\n  DeviceId,\n  OrderId,\n  ShopId,\n  WhatsAppConversation,\n  WhatsAppConversationContext,\n  WhatsAppMessage,\n  WhatsAppMessageDirection,\n  WhatsAppMessageKind,\n  WhatsAppMessageStatus,\n  WhatsAppMediaDescriptor,\n  WhatsAppLocationPayload,\n  WhatsAppMessagingTarget,\n  WhatsAppShopMessagingConfig,\n  WhatsAppStarterTemplate,\n  WhatsAppQuickReply,\n  WhatsAppQuickReplyCategory,\n  WorkerId,\n} from '@tux/domain';`,
+            `import type { DeviceId, OrderId, ShopId, WorkerId } from '../../domain/src/ids.ts';\nimport type {\n  WhatsAppConversation,\n  WhatsAppConversationContext,\n  WhatsAppMessage,\n  WhatsAppMessageDirection,\n  WhatsAppMessageKind,\n  WhatsAppMessageStatus,\n  WhatsAppMediaDescriptor,\n  WhatsAppLocationPayload,\n  WhatsAppMessagingTarget,\n  WhatsAppShopMessagingConfig,\n  WhatsAppStarterTemplate,\n  WhatsAppQuickReply,\n  WhatsAppQuickReplyCategory,\n} from '../../domain/src/whatsapp.ts';`,
+          );
+
+          replaceExact(
+            'packages/persistence/src/whatsappStore.ts',
+            `import type {\n  Instant,\n  OrderId,\n  ShopId,\n  WhatsAppConversation,\n  WhatsAppMessage,\n  WhatsAppQuickReply,\n} from '@tux/domain';`,
+            `import type { OrderId, ShopId } from '../../domain/src/ids.ts';\nimport type { Instant } from '../../domain/src/time.ts';\nimport type {\n  WhatsAppConversation,\n  WhatsAppMessage,\n  WhatsAppQuickReply,\n} from '../../domain/src/whatsapp.ts';`,
+          );
+
+          const serverFiles = [
+            'server/operationsDeviceAuthority.ts',
+            'server/whatsappChannelResolver.ts',
+            'server/whatsappOperationsGateway.ts',
+            'server/whatsappOperationsRepository.ts',
+            'server/whatsappOutboundActions.ts',
+            'server/whatsappOutboundRepository.ts',
+            'server/whatsappWebhook.ts',
+          ];
+          for (const file of serverFiles) {
+            let source = fs.readFileSync(file, 'utf8');
+            source = source.replaceAll("from '@tux/domain';", "from './workspaceTypes.js';");
+            source = source.replaceAll("from '@tux/application';", "from './workspaceTypes.js';");
+            fs.writeFileSync(file, source);
+          }
+          NODE
+      - name: Format changed files
+        run: npx prettier --write server/workspaceTypes.ts server/operationsDeviceAuthority.ts server/whatsappChannelResolver.ts server/whatsappOperationsGateway.ts server/whatsappOperationsRepository.ts server/whatsappOutboundActions.ts server/whatsappOutboundRepository.ts server/whatsappWebhook.ts packages/application/src/whatsappRemote.ts packages/application/src/whatsappWire.ts packages/persistence/src/whatsappStore.ts
+      - name: Verify Vercel import graph
+        run: node scripts/test-operations-vercel-esm-imports.mjs
+      - name: Verify API types
+        run: npx tsc --noEmit -p tsconfig.api.json
+      - name: Verify focused WhatsApp behavior
+        run: npx vitest run server/operationsDeviceAuthority.test.ts 'server/whatsapp*.test.ts' 'packages/application/src/whatsapp*.test.ts'
+      - name: Commit verified correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/workspaceTypes.ts server/operationsDeviceAuthority.ts server/whatsappChannelResolver.ts server/whatsappOperationsGateway.ts server/whatsappOperationsRepository.ts server/whatsappOutboundActions.ts server/whatsappOutboundRepository.ts server/whatsappWebhook.ts packages/application/src/whatsappRemote.ts packages/application/src/whatsappWire.ts packages/persistence/src/whatsappStore.ts
+          git diff --cached --check
+          git commit -m "fix(vercel): unify serverless workspace type identity"
+          git push origin HEAD:fix/vercel-runtime-type-identity
