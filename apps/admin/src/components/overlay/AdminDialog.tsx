@@ -1,9 +1,4 @@
-import {
-  useEffect,
-  useId,
-  useRef,
-  type ReactNode,
-} from 'react';
+import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react';
 
 export type AdminDialogVariant = 'dialog' | 'sheet';
 
@@ -11,11 +6,11 @@ export type AdminDialogProps = {
   open: boolean;
   title: string;
   description?: string;
-  children: ReactNode;
+  children?: ReactNode;
   footer?: ReactNode;
   variant?: AdminDialogVariant;
   destructive?: boolean;
-  initialFocusRef?: React.RefObject<HTMLElement | null>;
+  initialFocusRef?: RefObject<HTMLElement | null>;
   onOpenChange(open: boolean): void;
 };
 
@@ -44,14 +39,17 @@ export function AdminDialog({
       return;
     }
 
-    restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    restoreFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     if (!dialog.open) dialog.showModal();
 
-    const focusTarget = initialFocusRef?.current ?? dialog.querySelector<HTMLElement>(
-      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    );
+    const focusTarget =
+      initialFocusRef?.current ??
+      dialog.querySelector<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
     focusTarget?.focus();
 
     return () => {
@@ -64,6 +62,7 @@ export function AdminDialog({
   return (
     <dialog
       ref={dialogRef}
+      role="dialog"
       className={`admin-dialog admin-dialog--${variant}${destructive ? ' is-destructive' : ''}`}
       aria-modal="true"
       aria-labelledby={titleId}
@@ -81,7 +80,7 @@ export function AdminDialog({
           <h2 id={titleId}>{title}</h2>
           {description ? <p id={descriptionId}>{description}</p> : null}
         </header>
-        <div className="admin-dialog__body">{children}</div>
+        {children ? <div className="admin-dialog__body">{children}</div> : null}
         {footer ? <footer className="admin-dialog__footer">{footer}</footer> : null}
       </div>
     </dialog>
@@ -139,8 +138,6 @@ export function ConfirmationDialog({
           </button>
         </>
       }
-    >
-      <p className="admin-dialog__confirmation-copy">{description}</p>
-    </AdminDialog>
+    />
   );
 }
