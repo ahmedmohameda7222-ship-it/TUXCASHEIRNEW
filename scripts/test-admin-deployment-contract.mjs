@@ -119,6 +119,11 @@ const expectedOperations = {
   installCommand: 'cd ../.. && npm ci',
   buildCommand: 'cd ../.. && npm run build -w @tux/operations',
   outputDirectory: 'dist',
+  functions: {
+    'api/**/*.ts': {
+      includeFiles: '{../../packages/application/src/**,../../packages/domain/src/**}',
+    },
+  },
   rewrites: [
     { source: '/api/device-bootstrap', destination: '/api/device?route=device-bootstrap' },
     { source: '/api/device-enroll', destination: '/api/device?route=device-enroll' },
