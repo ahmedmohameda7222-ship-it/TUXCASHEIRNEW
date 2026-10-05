@@ -7,6 +7,8 @@ on:
       - 'api/**'
       - 'server/**'
       - 'apps/operations/api/**'
+      - 'apps/operations/tsconfig.json'
+      - 'apps/operations/tsconfig.vercel.json'
       - 'apps/operations/vercel.json'
       - 'scripts/test-operations-vercel-hobby-budget.mjs'
       - 'scripts/test-operations-vercel-route-rewrites.mjs'
@@ -23,9 +25,13 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+      - name: Install locked dependencies
+        run: npm ci
       - name: Operations Vercel Hobby function budget
         run: node scripts/test-operations-vercel-hobby-budget.mjs
       - name: Operations Vercel consolidated public route rewrites
         run: node scripts/test-operations-vercel-route-rewrites.mjs
       - name: Operations Vercel Node ESM import graph
         run: node scripts/test-operations-vercel-esm-imports.mjs
+      - name: Operations Vercel serverless type identity
+        run: npx tsc -p apps/operations/tsconfig.vercel.json --pretty false
