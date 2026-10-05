@@ -24,9 +24,14 @@ export function AdminTopBar({
       </div>
       <div className="admin-topbar__spacer" />
       {shopControl}
-      <button className="admin-icon-button admin-topbar__logout" type="button" onClick={onLogout}>
+      <button
+        className="admin-icon-button admin-topbar__logout"
+        type="button"
+        aria-label="Log out"
+        onClick={onLogout}
+      >
         <LogOut size={18} aria-hidden="true" />
-        <span>Log out</span>
+        <span aria-hidden="true">Log out</span>
       </button>
     </header>
   );
