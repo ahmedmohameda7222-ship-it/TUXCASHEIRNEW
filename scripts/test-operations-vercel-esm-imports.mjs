@@ -220,7 +220,7 @@ try {
     smokeConfig,
     `${JSON.stringify(
       {
-        extends: './tsconfig.api.json',
+        extends: './apps/operations/tsconfig.vercel.json',
         compilerOptions: {
           noEmit: false,
           noEmitOnError: true,
@@ -233,6 +233,7 @@ try {
           incremental: false,
         },
         files: ['server/workspaceRuntime.ts'],
+        include: [],
       },
       null,
       2,
