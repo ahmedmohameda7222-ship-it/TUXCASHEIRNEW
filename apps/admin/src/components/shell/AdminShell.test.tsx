@@ -3,24 +3,51 @@ import { describe, expect, it } from 'vitest';
 
 import type { AdminSessionPrincipal } from '@tux/admin-contracts';
 import { AdminShell, primaryDestinationsFor } from './AdminShell';
+import { AdminTopBar } from './AdminTopBar';
+import { DesktopSidebar } from './DesktopSidebar';
 import { MobileTabBar } from './MobileTabBar';
 
 const owner: AdminSessionPrincipal = {
   employeeId: 'employee-1',
   businessId: 'business-1',
   role: 'OWNER',
-  permissions: ['orders.view', 'catalog.view', 'inventory.view', 'customers.view', 'finance.view'],
+  permissions: [
+    'orders.view',
+    'catalog.view',
+    'inventory.view',
+    'customers.view',
+    'finance.view',
+  ],
   shopIds: ['shop-a'],
 };
 
 describe('adaptive Admin shell', () => {
   it('renders the five approved phone destinations when permitted', () => {
     const html = renderToStaticMarkup(
-      <MobileTabBar permitted={['home', 'orders', 'catalog', 'inventory', 'more']} />,
+      <MobileTabBar
+        permitted={['home', 'orders', 'catalog', 'inventory', 'more']}
+        currentPath="/orders"
+      />,
     );
     for (const label of ['Home', 'Orders', 'Catalog', 'Inventory', 'More']) {
       expect(html).toContain(`>${label}<`);
     }
+    expect(html).toContain('href="/orders"');
+    expect(html).toContain('aria-current="page"');
+  });
+
+  it('keeps tablet rail links named and marks the active section', () => {
+    const html = renderToStaticMarkup(<DesktopSidebar principal={owner} currentPath="/customers" />);
+    expect(html).toContain('aria-label="Customers"');
+    expect(html).toContain('href="/customers"');
+    expect(html).toContain('aria-current="page"');
+  });
+
+  it('gives the phone logout action an explicit accessible name', () => {
+    const html = renderToStaticMarkup(
+      <AdminTopBar principal={owner} onLogout={() => undefined} />,
+    );
+    expect(html).toContain('aria-label="Log out"');
   });
 
   it('removes a primary destination when the principal lacks its permission', () => {
