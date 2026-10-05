@@ -119,6 +119,16 @@ const expectedOperations = {
   installCommand: 'cd ../.. && npm ci',
   buildCommand: 'cd ../.. && npm run build -w @tux/operations',
   outputDirectory: 'dist',
+  functions: {
+    'api/whatsapp*.ts': {
+      includeFiles: [
+        '../../packages/domain/package.json',
+        '../../packages/domain/src/**',
+        '../../packages/application/package.json',
+        '../../packages/application/src/whatsapp*.ts',
+      ],
+    },
+  },
   rewrites: [
     { source: '/api/device-bootstrap', destination: '/api/device?route=device-bootstrap' },
     { source: '/api/device-enroll', destination: '/api/device?route=device-enroll' },

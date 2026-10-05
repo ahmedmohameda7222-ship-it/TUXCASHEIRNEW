@@ -13,6 +13,7 @@ on:
       - 'scripts/test-operations-vercel-hobby-budget.mjs'
       - 'scripts/test-operations-vercel-route-rewrites.mjs'
       - 'scripts/test-operations-vercel-esm-imports.mjs'
+      - 'scripts/test-operations-vercel-workspace-bundle.mjs'
 
 permissions:
   contents: read
@@ -33,5 +34,7 @@ jobs:
         run: node scripts/test-operations-vercel-route-rewrites.mjs
       - name: Operations Vercel Node ESM import graph
         run: node scripts/test-operations-vercel-esm-imports.mjs
+      - name: Operations Vercel workspace source bundle
+        run: node scripts/test-operations-vercel-workspace-bundle.mjs
       - name: Operations Vercel serverless type identity
         run: npx tsc -p apps/operations/tsconfig.vercel.json --pretty false
