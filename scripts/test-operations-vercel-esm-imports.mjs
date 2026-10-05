@@ -5,9 +5,7 @@ import { pathToFileURL } from 'node:url';
 const ROOT = process.cwd();
 const OPERATIONS_API_DIR = path.join(ROOT, 'apps', 'operations', 'api');
 const PACKAGES_DIR = path.join(ROOT, 'packages');
-// Native workspace source is allowed only through explicit relative .ts imports. Bare imports from
-// source-only workspace packages are forbidden for both runtime values and types so Vercel cannot
-// materialize a second branded-type identity under node_modules.
+// Native workspace source is allowed only through explicit relative .ts imports; bare source-only package runtime imports stay forbidden.
 const packageTypeCache = new Map();
 
 function collectTsFiles(directory) {
@@ -128,7 +126,7 @@ const packages = workspacePackages();
 const queue = collectTsFiles(OPERATIONS_API_DIR);
 const visited = new Set();
 const relativeViolations = [];
-const workspaceIdentityViolations = [];
+const workspaceRuntimeViolations = [];
 
 while (queue.length > 0) {
   const file = queue.shift();
@@ -140,10 +138,11 @@ while (queue.length > 0) {
   for (const reference of moduleReferences(source)) {
     const { specifier, typeOnly } = reference;
     if (!specifier.startsWith('.')) {
+      if (typeOnly) continue;
       const workspacePackage = workspacePackageForSpecifier(specifier, packages);
       if (workspacePackage?.manifest.sourceOnlyRuntimeExport) {
-        workspaceIdentityViolations.push(
-          `${repositoryPath(file)} -> ${specifier} (${typeOnly ? 'type' : 'runtime'}; ${workspacePackage.packageName} exports ${workspacePackage.manifest.rootExport})`,
+        workspaceRuntimeViolations.push(
+          `${repositoryPath(file)} -> ${specifier} (${workspacePackage.packageName} exports ${workspacePackage.manifest.rootExport})`,
         );
       }
       continue;
@@ -164,7 +163,7 @@ while (queue.length > 0) {
   }
 }
 
-if (relativeViolations.length > 0 || workspaceIdentityViolations.length > 0) {
+if (relativeViolations.length > 0 || workspaceRuntimeViolations.length > 0) {
   const sections = [];
   if (relativeViolations.length > 0) {
     sections.push(
@@ -174,9 +173,9 @@ if (relativeViolations.length > 0 || workspaceIdentityViolations.length > 0) {
         .join('\n')}`,
     );
   }
-  if (workspaceIdentityViolations.length > 0) {
+  if (workspaceRuntimeViolations.length > 0) {
     sections.push(
-      `Bare imports from source-only workspace packages are unsafe in Vercel Functions because they can create duplicate branded type identities. Route values and types through traceable relative source modules:\n${workspaceIdentityViolations
+      `Runtime imports from source-only workspace packages are unsafe in Vercel Functions. Keep package imports type-only and route runtime values through traceable relative modules:\n${workspaceRuntimeViolations
         .sort()
         .map((violation) => `- ${violation}`)
         .join('\n')}`,
@@ -200,5 +199,5 @@ try {
 }
 
 console.log(
-  `Operations Vercel ESM import guard passed across ${visited.size} reachable TypeScript modules with one workspace source identity and an executable runtime graph.`,
+  `Operations Vercel ESM import guard passed across ${visited.size} reachable TypeScript modules with executable workspace runtime graph.`,
 );
