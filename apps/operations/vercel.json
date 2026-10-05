@@ -7,7 +7,9 @@
   "functions": {
     "api/whatsapp*.ts": {
       "includeFiles": [
+        "../../packages/domain/package.json",
         "../../packages/domain/src/**",
+        "../../packages/application/package.json",
         "../../packages/application/src/whatsapp*.ts"
       ]
     }
