@@ -1,8 +1,13 @@
 import type { AdminApprovalStatus } from '@tux/admin-contracts';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import { useLocation } from 'wouter';
 
+import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
 import { PageScaffold } from '../components/layout/PageScaffold';
+import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
+import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
+import { AdminDialog } from '../components/overlay/AdminDialog';
 import { adminFetch } from '../lib/adminApi';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { AuditDetailPage, type AuditDetailViewModel } from './AuditDetailPage';
@@ -57,9 +62,7 @@ function parseBusinessDate(value: string): { year: number; month: number; day: n
     check.getUTCFullYear() !== year ||
     check.getUTCMonth() !== month - 1 ||
     check.getUTCDate() !== day
-  ) {
-    return null;
-  }
+  ) return null;
   return { year, month, day };
 }
 
@@ -96,7 +99,6 @@ export function cairoDateBoundary(value: string, endOfDay: boolean): string | nu
   if (!parsed) return null;
   const start = cairoStartOfDateMillis(parsed.year, parsed.month, parsed.day);
   if (!endOfDay) return new Date(start).toISOString();
-
   const nextDate = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day + 1));
   const nextStart = cairoStartOfDateMillis(
     nextDate.getUTCFullYear(),
@@ -108,6 +110,9 @@ export function cairoDateBoundary(value: string, endOfDay: boolean): string | nu
 
 export function AuditPage() {
   const { principal } = useShopScope();
+  const [location, navigate] = useLocation();
+  const selectedId = detailIdFromPath(location, '/audit');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [shopId, setShopId] = useState('');
@@ -115,19 +120,9 @@ export function AuditPage() {
   const [actionType, setActionType] = useState('');
   const [entityType, setEntityType] = useState('');
   const [approvalStatus, setApprovalStatus] = useState<AdminApprovalStatus | ''>('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+
   const auditQuery = useInfiniteQuery({
-    queryKey: [
-      'admin',
-      'audit',
-      fromDate,
-      toDate,
-      shopId,
-      actorEmployeeId,
-      actionType,
-      entityType,
-      approvalStatus,
-    ],
+    queryKey: ['admin', 'audit', fromDate, toDate, shopId, actorEmployeeId, actionType, entityType, approvalStatus],
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams();
@@ -146,152 +141,175 @@ export function AuditPage() {
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
-  const events = useMemo(
-    () => auditQuery.data?.pages.flatMap((page) => page.events) ?? [],
-    [auditQuery.data],
-  );
+
+  const detailQuery = useQuery({
+    queryKey: ['admin', 'audit', 'detail', selectedId],
+    enabled: selectedId !== null,
+    queryFn: () =>
+      adminFetch<AuditResponse>(`/api/admin/audit?eventId=${encodeURIComponent(selectedId!)}`).then(
+        (response) => response.events[0] ?? null,
+      ),
+  });
+
+  const events = useMemo(() => auditQuery.data?.pages.flatMap((page) => page.events) ?? [], [auditQuery.data]);
   const actorOptions = auditQuery.data?.pages[0]?.actorOptions ?? [];
-  const selected = useMemo(
-    () => events.find((event) => event.id === selectedId) ?? events[0] ?? null,
-    [events, selectedId],
-  );
   const shopNames = useMemo(
-    () =>
-      new Map(events.flatMap((event) => (event.shopId ? [[event.shopId, event.shopName]] : []))),
+    () => new Map(events.flatMap((event) => (event.shopId ? [[event.shopId, event.shopName]] : []))),
     [events],
+  );
+  const activeFilterCount = [fromDate, toDate, shopId, actorEmployeeId, entityType, approvalStatus].filter(Boolean).length;
+  const selected = detailQuery.data ?? null;
+
+  const filters = (
+    <div className="admin-audit-filters" aria-label="Advanced audit filters">
+      <label className="admin-field">
+        <span>From date</span>
+        <input aria-label="From date" type="date" value={fromDate} onChange={(event) => setFromDate(event.currentTarget.value)} />
+      </label>
+      <label className="admin-field">
+        <span>To date</span>
+        <input aria-label="To date" type="date" value={toDate} onChange={(event) => setToDate(event.currentTarget.value)} />
+      </label>
+      <label className="admin-field">
+        <span>Shop</span>
+        <select aria-label="Shop" value={shopId} onChange={(event) => setShopId(event.currentTarget.value)}>
+          <option value="">All authorized shops</option>
+          {principal.shopIds.map((authorizedShopId, index) => (
+            <option key={authorizedShopId} value={authorizedShopId}>
+              {shopNames.get(authorizedShopId) ?? `Authorized shop ${index + 1}`}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="admin-field">
+        <span>Actor</span>
+        <select aria-label="Actor" value={actorEmployeeId} onChange={(event) => setActorEmployeeId(event.currentTarget.value)}>
+          <option value="">All human actors</option>
+          {actorOptions.map((actor) => <option key={actor.employeeId} value={actor.employeeId}>{actor.label}</option>)}
+        </select>
+      </label>
+      <label className="admin-field">
+        <span>Entity</span>
+        <input aria-label="Entity" value={entityType} onChange={(event) => setEntityType(event.currentTarget.value)} />
+      </label>
+      <label className="admin-field">
+        <span>Approval status</span>
+        <select
+          aria-label="Approval status"
+          value={approvalStatus}
+          onChange={(event) => setApprovalStatus(event.currentTarget.value as AdminApprovalStatus | '')}
+        >
+          <option value="">All approval statuses</option>
+          {APPROVAL_STATUSES.map((status) => (
+            <option key={status} value={status}>{status.charAt(0) + status.slice(1).toLowerCase()}</option>
+          ))}
+        </select>
+      </label>
+    </div>
   );
 
   return (
     <PageScaffold
       eyebrow="History"
       title="Audit log"
-      description="Immutable business mutation history with actor role, shop, entity, reason, and approval linkage."
+      description="Business activity history with actor, shop, entity, reason and approval context."
     >
-      <div className="admin-audit-filters" aria-label="Audit filters">
+      <div className="admin-inventory-page-actions">
         <label className="admin-field">
-          <span>From date</span>
-          <input
-            aria-label="From date"
-            type="date"
-            value={fromDate}
-            onChange={(event) => setFromDate(event.currentTarget.value)}
-          />
+          <span>Search by action</span>
+          <input value={actionType} placeholder="e.g. order.cancel" onChange={(event) => setActionType(event.currentTarget.value)} />
         </label>
-        <label className="admin-field">
-          <span>To date</span>
-          <input
-            aria-label="To date"
-            type="date"
-            value={toDate}
-            onChange={(event) => setToDate(event.currentTarget.value)}
-          />
-        </label>
-        <label className="admin-field">
-          <span>Shop</span>
-          <select
-            aria-label="Shop"
-            value={shopId}
-            onChange={(event) => setShopId(event.currentTarget.value)}
-          >
-            <option value="">All authorized shops</option>
-            {principal.shopIds.map((authorizedShopId, index) => (
-              <option key={authorizedShopId} value={authorizedShopId}>
-                {shopNames.get(authorizedShopId) ?? `Shop ${index + 1}`}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="admin-field">
-          <span>Actor</span>
-          <select
-            aria-label="Actor"
-            value={actorEmployeeId}
-            onChange={(event) => setActorEmployeeId(event.currentTarget.value)}
-          >
-            <option value="">All human actors</option>
-            {actorOptions.map((actor) => (
-              <option key={actor.employeeId} value={actor.employeeId}>
-                {actor.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="admin-field">
-          <span>Action</span>
-          <input
-            aria-label="Action"
-            value={actionType}
-            onChange={(event) => setActionType(event.currentTarget.value)}
-          />
-        </label>
-        <label className="admin-field">
-          <span>Entity</span>
-          <input
-            aria-label="Entity"
-            value={entityType}
-            onChange={(event) => setEntityType(event.currentTarget.value)}
-          />
-        </label>
-        <label className="admin-field">
-          <span>Approval status</span>
-          <select
-            aria-label="Approval status"
-            value={approvalStatus}
-            onChange={(event) =>
-              setApprovalStatus(event.currentTarget.value as AdminApprovalStatus | '')
-            }
-          >
-            <option value="">All approval statuses</option>
-            {APPROVAL_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {status.charAt(0) + status.slice(1).toLowerCase()}
-              </option>
-            ))}
-          </select>
-        </label>
+        <button className="admin-secondary-button" type="button" onClick={() => setFiltersOpen(true)}>
+          Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+        </button>
+        {activeFilterCount > 0 ? <span>{activeFilterCount} advanced filter{activeFilterCount === 1 ? '' : 's'} active</span> : null}
       </div>
-      {auditQuery.isLoading ? <p>Loading audit history…</p> : null}
-      {auditQuery.isError ? (
-        <p className="admin-error-text">Audit history could not be loaded.</p>
-      ) : null}
-      {!auditQuery.isLoading && events.length === 0 ? (
-        <p>No audit events match these filters.</p>
-      ) : null}
-      <div className="admin-audit-layout">
-        <nav className="admin-audit-list" aria-label="Audit events">
-          {events.map((event) => (
-            <button
-              className="admin-audit-list__item"
-              aria-current={event.id === selected?.id ? 'true' : undefined}
-              key={event.id}
-              type="button"
-              onClick={() => setSelectedId(event.id)}
-            >
-              <strong>{event.actionType.replaceAll('_', ' ')}</strong>
-              <span>{event.actorLabel}</span>
-              <span>{event.shopName}</span>
-              <span>{formatInstant(event.createdAt)}</span>
-            </button>
-          ))}
-          {auditQuery.hasNextPage ? (
-            <button
-              className="admin-audit-list__item"
-              type="button"
-              disabled={auditQuery.isFetchingNextPage}
-              onClick={() => void auditQuery.fetchNextPage()}
-            >
-              {auditQuery.isFetchingNextPage
-                ? 'Loading more audit events…'
-                : 'Load more audit events'}
-            </button>
-          ) : null}
-        </nav>
-        {selected ? (
-          <AuditDetailPage
-            event={{ ...selected, createdAtLabel: formatInstant(selected.createdAt) }}
-          />
-        ) : null}
-      </div>
+
+      <ResponsiveMasterDetail
+        listLabel="Audit events"
+        detailLabel="Audit event detail"
+        detailActive={selectedId !== null}
+        backHref="/audit"
+        list={
+          <div className="admin-audit-list">
+            {auditQuery.isLoading ? <LoadingState title="Loading audit history" /> : null}
+            {auditQuery.isError ? (
+              <ErrorState
+                title="Audit history could not be loaded"
+                action={<button className="admin-secondary-button" type="button" onClick={() => void auditQuery.refetch()}>Retry</button>}
+              />
+            ) : null}
+            {!auditQuery.isLoading && !auditQuery.isError && events.length === 0 ? (
+              <EmptyState title="No audit events" description="No events match the current search and filters." />
+            ) : null}
+            {events.map((event) => (
+              <button
+                className="admin-audit-list__item"
+                aria-current={event.id === selectedId ? 'true' : undefined}
+                key={event.id}
+                type="button"
+                onClick={() => navigate(detailPath('/audit', event.id))}
+              >
+                <strong>{event.actionType.replaceAll('_', ' ')}</strong>
+                <span>{event.actorLabel}</span>
+                <span>{event.shopName}</span>
+                <span>{formatInstant(event.createdAt)}</span>
+              </button>
+            ))}
+            {auditQuery.hasNextPage ? (
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={auditQuery.isFetchingNextPage}
+                onClick={() => void auditQuery.fetchNextPage()}
+              >
+                {auditQuery.isFetchingNextPage ? 'Loading…' : 'Load more'}
+              </button>
+            ) : null}
+          </div>
+        }
+        detail={
+          detailQuery.isLoading ? (
+            <LoadingState title="Loading audit event" />
+          ) : detailQuery.isError ? (
+            <ErrorState title="Audit event unavailable" description="This event may not exist or may not be visible in your authorized scope." />
+          ) : selected ? (
+            <AuditDetailPage event={{ ...selected, createdAtLabel: formatInstant(selected.createdAt) }} />
+          ) : (
+            <EmptyState title="Audit event unavailable" description="Choose another event from the history." />
+          )
+        }
+        emptyDetail={<EmptyState title="Select an audit event" description="Review actor, entity, reason and approval context." />}
+      />
+
+      <AdminDialog
+        open={filtersOpen}
+        variant="sheet"
+        title="Audit filters"
+        description="Narrow history without reducing the available audit filter capabilities."
+        onOpenChange={setFiltersOpen}
+      >
+        {filters}
+        <div className="admin-inventory-page-actions">
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={() => {
+              setFromDate('');
+              setToDate('');
+              setShopId('');
+              setActorEmployeeId('');
+              setEntityType('');
+              setApprovalStatus('');
+            }}
+          >
+            Clear advanced filters
+          </button>
+          <button className="admin-primary-button" type="button" onClick={() => setFiltersOpen(false)}>
+            Show results
+          </button>
+        </div>
+      </AdminDialog>
     </PageScaffold>
   );
 }
