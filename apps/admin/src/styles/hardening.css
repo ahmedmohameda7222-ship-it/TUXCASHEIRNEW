@@ -2,28 +2,29 @@
 .admin-sidebar__link[aria-current='page'] {
   color: var(--tux-text-primary);
   background: var(--tux-surface-subtle);
-  box-shadow: inset 3px 0 0 var(--tux-accent-primary);
+  box-shadow: inset 3px 0 0 var(--tux-accent);
 }
 
 .admin-mobile-tabs__item.is-active,
 .admin-mobile-tabs__item[aria-current='page'] {
+  position: relative;
   color: var(--tux-text-primary);
 }
 
 .admin-mobile-tabs__item[aria-current='page']::before {
   content: '';
   position: absolute;
+  top: 4px;
   width: 22px;
   height: 3px;
-  margin-top: -50px;
   border-radius: 999px;
-  background: var(--tux-accent-primary);
+  background: var(--tux-accent);
 }
 
 .admin-master-detail {
   min-width: 0;
   display: grid;
-  gap: var(--tux-space-4, 16px);
+  gap: var(--tux-space-4);
 }
 
 .admin-master-detail__list,
@@ -50,9 +51,9 @@
 .admin-master-detail__back {
   display: inline-flex;
   align-items: center;
-  min-height: var(--admin-touch-min, 44px);
-  margin: 8px 12px 0;
-  padding: 0 6px;
+  min-height: var(--tux-touch-target);
+  margin: var(--tux-space-2) var(--tux-space-3) 0;
+  padding: 0 var(--tux-space-2);
   color: var(--tux-text-secondary);
   font-weight: 700;
 }
@@ -62,8 +63,8 @@
   display: grid;
   align-content: center;
   justify-items: start;
-  gap: 8px;
-  padding: 20px;
+  gap: var(--tux-space-2);
+  padding: var(--tux-space-5);
   border: 1px solid var(--tux-border-subtle);
   border-radius: var(--tux-radius-lg);
   background: var(--tux-surface-subtle);
@@ -83,13 +84,13 @@
 }
 
 .admin-state__action {
-  margin-top: 4px;
+  margin-top: var(--tux-space-1);
 }
 
 .admin-inline-error {
   margin: 6px 0 0;
   color: var(--tux-destructive);
-  font-size: 13px;
+  font-size: var(--tux-font-size-sm);
   font-weight: 650;
 }
 
@@ -98,10 +99,10 @@
   max-height: min(88vh, 760px);
   padding: 0;
   border: 0;
-  border-radius: var(--tux-radius-xl, 20px);
+  border-radius: var(--tux-radius-lg);
   color: var(--tux-text-primary);
   background: var(--tux-surface-panel);
-  box-shadow: var(--tux-shadow-lg);
+  box-shadow: var(--tux-shadow-md);
 }
 
 .admin-dialog::backdrop {
@@ -117,11 +118,11 @@
 .admin-dialog__header,
 .admin-dialog__body,
 .admin-dialog__footer {
-  padding: 20px;
+  padding: var(--tux-space-5);
 }
 
 .admin-dialog__header {
-  padding-bottom: 8px;
+  padding-bottom: var(--tux-space-2);
 }
 
 .admin-dialog__header h2,
@@ -132,7 +133,7 @@
 
 .admin-dialog__header p,
 .admin-dialog__confirmation-copy {
-  margin-top: 8px;
+  margin-top: var(--tux-space-2);
   color: var(--tux-text-secondary);
   line-height: 1.5;
 }
@@ -145,17 +146,17 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 10px;
+  gap: var(--tux-space-2);
   border-top: 1px solid var(--tux-border-subtle);
 }
 
 .admin-destructive-button {
-  min-height: 48px;
+  min-height: var(--tux-touch-target);
   border: 1px solid var(--tux-destructive);
-  border-radius: var(--tux-radius-md, 14px);
-  padding: 0 18px;
+  border-radius: var(--tux-radius-md);
+  padding: 0 var(--tux-space-4);
   background: var(--tux-destructive);
-  color: var(--tux-surface-panel);
+  color: var(--tux-action-foreground);
   font-weight: 750;
   cursor: pointer;
 }
@@ -166,9 +167,9 @@
 
 .admin-tabs__list {
   display: flex;
-  gap: 4px;
+  gap: var(--tux-space-1);
   overflow-x: auto;
-  padding: 4px;
+  padding: var(--tux-space-1);
   border: 1px solid var(--tux-border-subtle);
   border-radius: var(--tux-radius-lg);
   background: var(--tux-surface-subtle);
@@ -176,10 +177,10 @@
 
 .admin-tabs__tab {
   flex: 0 0 auto;
-  min-height: var(--admin-touch-min, 44px);
+  min-height: var(--tux-touch-target);
   border: 0;
   border-radius: var(--tux-radius-md);
-  padding: 0 14px;
+  padding: 0 var(--tux-space-3);
   color: var(--tux-text-secondary);
   background: transparent;
   font-weight: 700;
@@ -189,12 +190,12 @@
 .admin-tabs__tab[aria-selected='true'] {
   color: var(--tux-text-primary);
   background: var(--tux-surface-panel);
-  box-shadow: var(--tux-shadow-sm);
+  box-shadow: var(--tux-shadow-xs);
 }
 
 .admin-tabs__panel {
   min-width: 0;
-  margin-top: 16px;
+  margin-top: var(--tux-space-4);
 }
 
 @keyframes admin-state-pulse {
@@ -212,7 +213,7 @@
     max-width: none;
     max-height: 92vh;
     margin: auto 0 0;
-    border-radius: var(--tux-radius-xl, 20px) var(--tux-radius-xl, 20px) 0 0;
+    border-radius: var(--tux-radius-lg) var(--tux-radius-lg) 0 0;
   }
 }
 
