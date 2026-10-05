@@ -198,126 +198,147 @@ if (adminApiTestFiles.length > 0) {
 const adminCronApiFiles = adminApiFiles.filter((fileName) => fileName.startsWith('cron/'));
 if (adminCronApiFiles.length > 0) {
   throw new Error(
-    `Admin Cron entrypoints must not be deployed from apps/admin/api: ${adminCronApiFiles.join(', ')}`,
+    `Admin Vercel cron endpoints must be absent while Cron Jobs are disabled: ${adminCronApiFiles.join(', ')}`,
   );
 }
 
+const rootApiFiles = collectTsFiles(rootApiDir);
 const operationsApiFiles = collectTsFiles(operationsApiDir);
-const operationsApiTestFiles = operationsApiFiles.filter((fileName) => fileName.endsWith('.test.ts'));
-if (operationsApiTestFiles.length > 0) {
-  throw new Error(
-    `Operations test files must live outside apps/operations/api so Vercel does not deploy them as Functions: ${operationsApiTestFiles.join(', ')}`,
-  );
-}
+const consolidatedOperationsRoutes = {
+  'device.ts': ['device-bootstrap.ts', 'device-enroll.ts', 'device-session.ts'],
+  'worker.ts': ['worker-auth.ts', 'worker-menu-layout.ts', 'worker-ui-preferences.ts'],
+};
+const consolidatedRootApiFiles = new Set(Object.values(consolidatedOperationsRoutes).flat());
+const passthroughRootApiFiles = rootApiFiles.filter(
+  (fileName) => !consolidatedRootApiFiles.has(fileName),
+);
+const expectedOperationsApiFiles = [
+  ...passthroughRootApiFiles,
+  ...Object.keys(consolidatedOperationsRoutes),
+].sort();
+
+assertJsonEqual(
+  operationsApiFiles,
+  expectedOperationsApiFiles,
+  'Operations app-local API entrypoints must preserve passthrough routes and approved dispatchers',
+);
 if (operationsApiFiles.length > 12) {
   throw new Error(
     `Operations Vercel deployment exceeds the Hobby Serverless Function limit: ${operationsApiFiles.length} > 12`,
   );
 }
 
-const rootApiFiles = collectTsFiles(rootApiDir).filter((fileName) => !fileName.endsWith('.test.ts'));
-const consolidatedRootApiFiles = new Set([
-  'device-bootstrap.ts',
-  'device-enroll.ts',
-  'device-session.ts',
-  'worker-auth.ts',
-  'worker-menu-layout.ts',
-  'worker-ui-preferences.ts',
-]);
-const requiredOperationsWrappers = rootApiFiles.filter(
-  (fileName) => !consolidatedRootApiFiles.has(fileName),
-);
-for (const fileName of requiredOperationsWrappers) {
+for (const fileName of passthroughRootApiFiles) {
   const wrapperPath = path.join(operationsApiDir, fileName);
-  if (!fs.existsSync(wrapperPath)) {
-    throw new Error(`Missing app-local Operations API wrapper for root API handler: ${fileName}`);
-  }
-  const wrapperSource = fs.readFileSync(wrapperPath, 'utf8').trim();
-  const relativeRootHandler = path
-    .relative(path.dirname(wrapperPath), path.join(rootApiDir, fileName))
+  const source = fs.readFileSync(wrapperPath, 'utf8').trim();
+  const rootModulePath = path.join(rootApiDir, fileName.slice(0, -3));
+  let relativeImport = path
+    .relative(path.dirname(wrapperPath), rootModulePath)
     .split(path.sep)
-    .join('/')
-    .replace(/\.ts$/, '.js');
-  const expectedWrapper = `export { default } from '${relativeRootHandler.startsWith('.') ? relativeRootHandler : `./${relativeRootHandler}`}';`;
-  if (wrapperSource !== expectedWrapper) {
-    throw new Error(
-      `Operations API wrapper must delegate only to the canonical root handler: ${wrapperPath}`,
-    );
+    .join('/');
+  if (!relativeImport.startsWith('.')) {
+    relativeImport = `./${relativeImport}`;
   }
+  assertEqual(
+    source,
+    `export { default } from '${relativeImport}.js';`,
+    `Operations API entrypoint ${fileName}`,
+  );
 }
 
-for (const [dispatcherFile, expectedRoutes] of [
-  [
-    'device.ts',
-    ['device-bootstrap', 'device-enroll', 'device-session'],
-  ],
-  [
-    'worker.ts',
-    ['worker-auth', 'worker-menu-layout', 'worker-ui-preferences'],
-  ],
-]) {
+for (const [dispatcherFile, routedFiles] of Object.entries(consolidatedOperationsRoutes)) {
   const source = fs.readFileSync(path.join(operationsApiDir, dispatcherFile), 'utf8');
-  for (const route of expectedRoutes) {
-    const relativeRootHandler = path
-      .relative(operationsApiDir, path.join(rootApiDir, `${route}.ts`))
-      .split(path.sep)
-      .join('/')
-      .replace(/\.ts$/, '.js');
-    const expectedImport = relativeRootHandler.startsWith('.')
-      ? relativeRootHandler
-      : `./${relativeRootHandler}`;
-    if (!source.includes(`'${expectedImport}'`) && !source.includes(`"${expectedImport}"`)) {
+  for (const routedFile of routedFiles) {
+    const routeName = routedFile.slice(0, -3);
+    if (!source.includes(`../../../api/${routeName}.js`)) {
       throw new Error(
-        `Operations ${dispatcherFile} must import canonical root handler ${route} using Node ESM-safe .js specifier.`,
+        `Operations dispatcher ${dispatcherFile} must import root handler ${routeName} with an explicit .js runtime extension`,
+      );
+    }
+    if (!source.includes(`'${routeName}'`)) {
+      throw new Error(
+        `Operations dispatcher ${dispatcherFile} must route key ${routeName}`,
       );
     }
   }
 }
 
-if (!apiTsconfig.include?.includes('apps/admin/api/**/*.ts')) {
-  throw new Error('API typecheck must include apps/admin/api/**/*.ts');
+if (!apiTsconfig.include?.includes('apps/operations/api/**/*.ts')) {
+  throw new Error('Root API typecheck must include apps/operations/api/**/*.ts');
 }
 
-if (!adminFoundationWorkflow.includes('npm run test:admin-deployment')) {
-  throw new Error('Admin Foundation TDD must execute the Admin deployment contract test');
-}
+// Preserve the proven Menu app-local deployment boundary.
+assertEqual(menuConfig.framework, 'vite', 'Menu Vercel framework');
+assertEqual(menuConfig.installCommand, 'cd ../.. && npm ci', 'Menu Vercel install command');
+assertEqual(menuConfig.buildCommand, 'cd ../.. && npm run build:menu', 'Menu Vercel build command');
+assertEqual(menuConfig.outputDirectory, 'dist', 'Menu Vercel output directory');
+assertJsonEqual(
+  menuConfig.git?.deploymentEnabled,
+  { '**': false, main: true },
+  'Menu Git deployment policy',
+);
 
-for (const requirement of [
-  'apps/admin',
-  'Root Directory',
-  'Production Branch',
-  'main',
-  'apps/admin/vercel.json',
+// Final deployment docs must describe isolated app-local project contracts.
+for (const requiredText of [
+  'repository root `/vercel.json` is absent',
+  'Root Directory: `apps/admin`',
+  'Include source files outside Root Directory',
   'cd ../.. && npm ci',
-  'npm run build:admin',
+  'cd ../.. && npm run build:admin',
+  'Output Directory: `dist`',
+  'Final production acceptance is still Plan 10',
 ]) {
-  if (!adminDeploymentDoc.includes(requirement)) {
-    throw new Error(`Admin deployment doc missing required contract token: ${requirement}`);
+  if (!adminDeploymentDoc.includes(requiredText)) {
+    throw new Error(`Admin deployment docs missing isolated-project statement: ${requiredText}`);
   }
 }
-if (/deploys the Vite frontend only/i.test(adminDeploymentDoc)) {
-  throw new Error('Admin deployment doc must describe the Admin API functions as part of deployment');
-}
-
-for (const requirement of [
-  'apps/operations',
-  'Root Directory',
-  'Production Branch',
-  'main',
-  'apps/operations/vercel.json',
+for (const requiredText of [
+  'Cutover status: complete',
+  'Root Directory: `apps/operations`',
+  'Include source files outside Root Directory',
   'cd ../.. && npm ci',
-  'npm run build -w @tux/operations',
+  'cd ../.. && npm run build -w @tux/operations',
+  'Output Directory: `dist`',
+  'dpl_9M6i179C83S6Hzry2rumFm9Tqx68',
+  'repository-root `/vercel.json` is absent',
 ]) {
-  if (!operationsDeploymentDoc.includes(requirement)) {
-    throw new Error(`Operations deployment doc missing required contract token: ${requirement}`);
+  if (!operationsDeploymentDoc.includes(requiredText)) {
+    throw new Error(`Operations deployment docs missing completed-cutover statement: ${requiredText}`);
   }
 }
 
-if (!adminExecutionLedger.includes('apps/admin/vercel.json')) {
-  throw new Error('Admin execution ledger must record the app-local Vercel deployment contract');
-}
-if (!adminExecutionLedger.includes('apps/admin')) {
-  throw new Error('Admin execution ledger must record the Admin Vercel Root Directory');
+for (const requiredLedgerText of [
+  'Operations Vercel cutover was verified with production deployment `dpl_9M6i179C83S6Hzry2rumFm9Tqx68` in `READY` state',
+  'The legacy root `/vercel.json` is removed',
+  'Admin may now be created as a separate Vercel project rooted at `apps/admin`',
+  'Final production acceptance remains gated by Plan 10',
+]) {
+  if (!adminExecutionLedger.includes(requiredLedgerText)) {
+    throw new Error(
+      `Admin execution ledger missing final deployment-policy reconciliation: ${requiredLedgerText}`,
+    );
+  }
 }
 
-console.log('Admin Vercel deployment contract is complete.');
+if (
+  adminExecutionLedger.includes(
+    'Admin Vercel project must not be created until the existing Operations project is cut over',
+  )
+) {
+  throw new Error('Admin execution ledger still contains the obsolete Vercel migration gate');
+}
+
+for (const requiredWorkflowPath of [
+  "      - 'vercel.json'",
+  "      - 'apps/menu/vercel.json'",
+  "      - 'apps/operations/**'",
+  "      - 'api/**'",
+]) {
+  if (!adminFoundationWorkflow.includes(requiredWorkflowPath)) {
+    throw new Error(
+      `Admin Foundation deployment contract must trigger when ${requiredWorkflowPath.trim()} changes`,
+    );
+  }
+}
+
+console.log('Admin/Menu/Operations Vercel isolation contracts passed.');
