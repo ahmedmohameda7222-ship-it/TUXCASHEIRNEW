@@ -6,10 +6,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/**/*.ts": {
-      "includeFiles": [
-        "../../packages/domain/src/**",
-        "../../packages/application/src/**"
-      ]
+      "includeFiles": "../../packages/{domain,application}/src/**"
     }
   },
   "rewrites": [
