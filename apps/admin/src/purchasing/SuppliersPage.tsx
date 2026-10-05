@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import type { AdminSupplier } from '@tux/admin-contracts';
+import { AdminDialog } from '../components/overlay/AdminDialog';
 
 export function SuppliersPage({
   suppliers,
@@ -12,23 +13,33 @@ export function SuppliersPage({
   canManage: boolean;
   pending: boolean;
   onCreate(
-    input: {
-      name: string;
-      contactName: string | null;
-      phone: string | null;
-      email: string | null;
-    },
+    input: { name: string; contactName: string | null; phone: string | null; email: string | null },
     onSuccess: () => void,
   ): void;
 }) {
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [contactName, setContactName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
 
+  function clearDraft() {
+    setName('');
+    setContactName('');
+    setPhone('');
+    setEmail('');
+  }
+
   return (
     <section aria-labelledby="purchasing-suppliers-heading">
-      <h2 id="purchasing-suppliers-heading">Suppliers</h2>
+      <div className="admin-catalog-editor__section-heading">
+        <h2 id="purchasing-suppliers-heading">Suppliers</h2>
+        {canManage ? (
+          <button className="admin-secondary-button" type="button" onClick={() => setOpen(true)}>
+            Add supplier
+          </button>
+        ) : null}
+      </div>
       <div className="admin-card-grid">
         {suppliers.map((supplier) => (
           <article className="admin-card" key={supplier.id}>
@@ -39,55 +50,61 @@ export function SuppliersPage({
         ))}
       </div>
       {canManage ? (
-        <form
-          className="admin-form-grid"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const trimmed = name.trim();
-            if (!trimmed) return;
-            onCreate(
-              {
-                name: trimmed,
-                contactName: contactName.trim() || null,
-                phone: phone.trim() || null,
-                email: email.trim() || null,
-              },
-              () => {
-                setName('');
-                setContactName('');
-                setPhone('');
-                setEmail('');
-              },
-            );
+        <AdminDialog
+          open={open}
+          variant="sheet"
+          title="Add supplier"
+          description="Create a supplier record for purchasing at this shop."
+          onOpenChange={(nextOpen) => {
+            if (!pending) setOpen(nextOpen);
           }}
         >
-          <label>
-            Supplier name
-            <input value={name} onChange={(event) => setName(event.currentTarget.value)} />
-          </label>
-          <label>
-            Contact name
-            <input
-              value={contactName}
-              onChange={(event) => setContactName(event.currentTarget.value)}
-            />
-          </label>
-          <label>
-            Phone
-            <input value={phone} onChange={(event) => setPhone(event.currentTarget.value)} />
-          </label>
-          <label>
-            Email
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.currentTarget.value)}
-            />
-          </label>
-          <button className="admin-secondary-button" type="submit" disabled={pending}>
-            Add supplier
-          </button>
-        </form>
+          <form
+            className="admin-form-grid"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const trimmed = name.trim();
+              if (!trimmed) return;
+              onCreate(
+                {
+                  name: trimmed,
+                  contactName: contactName.trim() || null,
+                  phone: phone.trim() || null,
+                  email: email.trim() || null,
+                },
+                () => {
+                  clearDraft();
+                  setOpen(false);
+                },
+              );
+            }}
+          >
+            <label>
+              Supplier name
+              <input autoFocus value={name} onChange={(event) => setName(event.currentTarget.value)} />
+            </label>
+            <label>
+              Contact name
+              <input value={contactName} onChange={(event) => setContactName(event.currentTarget.value)} />
+            </label>
+            <label>
+              Phone
+              <input value={phone} onChange={(event) => setPhone(event.currentTarget.value)} />
+            </label>
+            <label>
+              Email
+              <input type="email" value={email} onChange={(event) => setEmail(event.currentTarget.value)} />
+            </label>
+            <div className="admin-inventory-page-actions">
+              <button className="admin-secondary-button" type="button" disabled={pending} onClick={() => setOpen(false)}>
+                Cancel
+              </button>
+              <button className="admin-primary-button" type="submit" disabled={pending || !name.trim()}>
+                {pending ? 'Adding…' : 'Add supplier'}
+              </button>
+            </div>
+          </form>
+        </AdminDialog>
       ) : null}
     </section>
   );
