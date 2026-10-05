@@ -1,11 +1,13 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 const ROOT = process.cwd();
 const OPERATIONS_API_DIR = path.join(ROOT, 'apps', 'operations', 'api');
 const PACKAGES_DIR = path.join(ROOT, 'packages');
-// Native workspace source is allowed only through explicit relative .ts imports; bare source-only package runtime imports stay forbidden.
+// Native workspace source is traced through emitted .js specifiers at the Vercel boundary.
 const packageTypeCache = new Map();
 
 function collectTsFiles(directory) {
@@ -200,7 +202,7 @@ if (
   }
   if (rawTsRuntimeViolations.length > 0) {
     sections.push(
-      `Raw .ts runtime imports from Vercel boundary modules are not deployable Lambda paths. Import the TypeScript source through its emitted .js specifier so Vercel traces and compiles it:\n${rawTsRuntimeViolations
+      `Raw .ts runtime imports from Vercel boundary modules are not deployable Lambda paths. Import TypeScript source through emitted .js specifiers so Vercel traces and compiles it:\n${rawTsRuntimeViolations
         .sort()
         .map((violation) => `- ${violation}`)
         .join('\n')}`,
@@ -211,18 +213,48 @@ if (
   );
 }
 
-const runtimeAdapterSource = fs.readFileSync(
-  path.join(ROOT, 'server', 'workspaceRuntime.ts'),
-  'utf8',
-);
-const runtimeSmoke = path.join(ROOT, 'server', `.workspaceRuntime-smoke-${process.pid}.mjs`);
+const smokeDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'tux-vercel-runtime-'));
+const smokeConfig = path.join(ROOT, `.workspaceRuntime-smoke-${process.pid}.json`);
 try {
-  fs.writeFileSync(runtimeSmoke, runtimeAdapterSource);
-  await import(`${pathToFileURL(runtimeSmoke).href}?run=${Date.now()}`);
+  fs.writeFileSync(
+    smokeConfig,
+    `${JSON.stringify(
+      {
+        extends: './tsconfig.api.json',
+        compilerOptions: {
+          noEmit: false,
+          noEmitOnError: true,
+          outDir: smokeDirectory,
+          rootDir: '.',
+          rewriteRelativeImportExtensions: true,
+          declaration: false,
+          declarationMap: false,
+          sourceMap: false,
+          incremental: false,
+        },
+        files: ['server/workspaceRuntime.ts'],
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  execFileSync(process.execPath, [path.join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', smokeConfig, '--pretty', 'false'], {
+    cwd: ROOT,
+    stdio: 'inherit',
+  });
+
+  fs.writeFileSync(path.join(smokeDirectory, 'package.json'), '{"type":"module"}\n');
+  const emittedAdapter = path.join(smokeDirectory, 'server', 'workspaceRuntime.js');
+  if (!fs.existsSync(emittedAdapter)) {
+    throw new Error(`Expected emitted runtime adapter at ${emittedAdapter}.`);
+  }
+  await import(`${pathToFileURL(emittedAdapter).href}?run=${Date.now()}`);
 } finally {
-  fs.rmSync(runtimeSmoke, { force: true });
+  fs.rmSync(smokeConfig, { force: true });
+  fs.rmSync(smokeDirectory, { recursive: true, force: true });
 }
 
 console.log(
-  `Operations Vercel ESM import guard passed across ${visited.size} reachable TypeScript modules with executable workspace runtime graph.`,
+  `Operations Vercel ESM import guard passed across ${visited.size} reachable TypeScript modules with executable emitted workspace runtime graph.`,
 );
