@@ -1,4 +1,4 @@
-import type { ShopId } from '@tux/domain';
+import type { ShopId } from './workspaceTypes.js';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { normalizeEgyptianPhone } from './workspaceRuntime.js';
 import type { WhatsAppChannelResolver } from './whatsappChannelResolver.js';

@@ -5,7 +5,7 @@ import type {
   WhatsAppLocationPayload,
   WhatsAppMessage,
   WorkerId,
-} from '@tux/domain';
+} from './workspaceTypes.js';
 import { createHash } from 'node:crypto';
 import { assertWhatsAppMessageInvariant, parseEntityId } from './workspaceRuntime.js';
 import type { WhatsAppChannelResolver } from './whatsappChannelResolver.js';

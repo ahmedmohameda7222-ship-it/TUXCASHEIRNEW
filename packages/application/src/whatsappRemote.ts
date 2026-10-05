@@ -1,12 +1,13 @@
-import type { CachedWhatsAppInboxSnapshot, CachedWhatsAppOrderLink } from '@tux/persistence';
 import type {
-  BusinessDayId,
-  OrderId,
+  CachedWhatsAppInboxSnapshot,
+  CachedWhatsAppOrderLink,
+} from '../../persistence/src/whatsappStore.ts';
+import type { BusinessDayId, OrderId, WorkerId } from '../../domain/src/ids.ts';
+import type {
   WhatsAppLocationPayload,
   WhatsAppMessage,
   WhatsAppMessagingTarget,
-  WorkerId,
-} from '@tux/domain';
+} from '../../domain/src/whatsapp.ts';
 
 export type WhatsAppRemoteErrorCode =
   | 'OPERATOR_NOT_SYNCHRONIZED'

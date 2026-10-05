@@ -1,7 +1,5 @@
+import type { DeviceId, OrderId, ShopId, WorkerId } from '../../domain/src/ids.ts';
 import type {
-  DeviceId,
-  OrderId,
-  ShopId,
   WhatsAppConversation,
   WhatsAppConversationContext,
   WhatsAppMessage,
@@ -15,8 +13,7 @@ import type {
   WhatsAppStarterTemplate,
   WhatsAppQuickReply,
   WhatsAppQuickReplyCategory,
-  WorkerId,
-} from '@tux/domain';
+} from '../../domain/src/whatsapp.ts';
 import { parseEntityId } from '../../domain/src/ids.ts';
 import { instant } from '../../domain/src/time.ts';
 import { assertWhatsAppMessageInvariant } from '../../domain/src/whatsapp.ts';

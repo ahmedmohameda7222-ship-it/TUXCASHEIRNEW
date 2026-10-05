@@ -1,4 +1,4 @@
-import type { BusinessDayId, DeviceId, OrderId, ShopId, WorkerId } from '@tux/domain';
+import type { BusinessDayId, DeviceId, OrderId, ShopId, WorkerId } from './workspaceTypes.js';
 import {
   assertWhatsAppMessageInvariant,
   normalizeEgyptianPhone,

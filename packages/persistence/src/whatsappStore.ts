@@ -1,11 +1,10 @@
+import type { OrderId, ShopId } from '../../domain/src/ids.ts';
+import type { Instant } from '../../domain/src/time.ts';
 import type {
-  Instant,
-  OrderId,
-  ShopId,
   WhatsAppConversation,
   WhatsAppMessage,
   WhatsAppQuickReply,
-} from '@tux/domain';
+} from '../../domain/src/whatsapp.ts';
 
 export interface CachedWhatsAppOrderLink {
   readonly conversationId: string;

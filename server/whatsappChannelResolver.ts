@@ -1,4 +1,4 @@
-import type { ShopId } from '@tux/domain';
+import type { ShopId } from './workspaceTypes.js';
 import { parseEntityId } from './workspaceRuntime.js';
 
 export type WhatsAppProvider = 'META_CLOUD_API';

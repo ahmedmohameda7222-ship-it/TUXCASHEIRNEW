@@ -1,4 +1,4 @@
-import type { WhatsAppInboxOrderLink, WhatsAppInboxSnapshot } from '@tux/application';
+import type { WhatsAppInboxOrderLink, WhatsAppInboxSnapshot } from './workspaceTypes.js';
 import type {
   BusinessDayId,
   DeviceId,
@@ -15,7 +15,7 @@ import type {
   WhatsAppShopMessagingConfig,
   WhatsAppStarterTemplate,
   WorkerId,
-} from '@tux/domain';
+} from './workspaceTypes.js';
 import { assertWhatsAppMessageInvariant, instant, parseEntityId } from './workspaceRuntime.js';
 import type { WhatsAppDataServerConfig } from './whatsappServerConfig.js';
 

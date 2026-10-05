@@ -6,7 +6,7 @@ import type {
   WhatsAppLocationPayload,
   WhatsAppMessage,
   WorkerId,
-} from '@tux/domain';
+} from './workspaceTypes.js';
 import {
   SupabaseWhatsAppOperationsRepository,
   WhatsAppOperationsRepositoryError,
