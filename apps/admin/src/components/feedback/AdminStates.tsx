@@ -28,7 +28,13 @@ function StateSurface({
 }
 
 export function LoadingState({ title = 'Loading…', description }: Partial<StateProps>) {
-  return <StateSurface kind="loading" title={title} description={description} />;
+  return (
+    <StateSurface
+      kind="loading"
+      title={title}
+      {...(description === undefined ? {} : { description })}
+    />
+  );
 }
 
 export function EmptyState(props: StateProps) {
