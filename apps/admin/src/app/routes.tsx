@@ -1,16 +1,16 @@
 import type { AdminPermission, AdminSessionPrincipal } from '@tux/admin-contracts';
-import { useLocation } from 'wouter';
+import { Link, useLocation } from 'wouter';
 
 import { ApprovalsPage } from '../approvals/ApprovalsPage';
 import { AuditPage } from '../audit/AuditPage';
-import { InventoryPage } from '../inventory/InventoryPage';
-import { CustomersPage } from '../customers/CustomersPage';
-import { DeliveryPage } from '../delivery/DeliveryPage';
-import { OrdersPage } from '../orders/OrdersPage';
-import { PurchasingPage } from '../purchasing/PurchasingPage';
 import { CatalogPage } from '../catalog/CatalogPage';
 import { PublishReviewPage } from '../catalog/PublishReviewPage';
 import { PageScaffold } from '../components/layout/PageScaffold';
+import { CustomersPage } from '../customers/CustomersPage';
+import { DeliveryPage } from '../delivery/DeliveryPage';
+import { InventoryPage } from '../inventory/InventoryPage';
+import { OrdersPage } from '../orders/OrdersPage';
+import { PurchasingPage } from '../purchasing/PurchasingPage';
 import { SettingsPage } from '../settings/SettingsPage';
 import { StaffPage } from '../staff/StaffPage';
 
@@ -89,33 +89,22 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   if (route.path === '/more') {
     const secondary = ADMIN_ROUTES.filter(
       (candidate) =>
-        !new Set(['/', '/orders', '/catalog/products', '/inventory', '/more']).has(
-          candidate.path,
-        ) && routeIsPermitted(principal, candidate.path),
+        !new Set(['/', '/orders', '/catalog/products', '/inventory', '/more']).has(candidate.path) &&
+        routeIsPermitted(principal, candidate.path),
     );
     return (
-      <PageScaffold
-        eyebrow="TUX Admin"
-        title="More"
-        description="Additional management areas available to your role."
-      >
+      <PageScaffold eyebrow="TUX Admin" title="More" description="Additional management areas available to your role.">
         <div className="admin-more-grid">
           {secondary.map((candidate) => (
-            <a className="admin-more-card" href={candidate.path} key={candidate.path}>
+            <Link className="admin-more-card" href={candidate.path} key={candidate.path}>
               <strong>{candidate.label}</strong>
               <span>Open</span>
-            </a>
+            </Link>
           ))}
         </div>
       </PageScaffold>
     );
   }
 
-  return (
-    <PageScaffold
-      eyebrow="TUX Admin"
-      title={route.label}
-      description="Authenticated management workspace."
-    />
-  );
+  return <PageScaffold eyebrow="TUX Admin" title={route.label} description="Authenticated management workspace." />;
 }
