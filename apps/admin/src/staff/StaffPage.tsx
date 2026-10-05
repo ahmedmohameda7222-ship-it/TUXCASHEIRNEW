@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
 
@@ -6,9 +7,12 @@ import { PageScaffold } from '../components/layout/PageScaffold';
 import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { AdminDialog } from '../components/overlay/AdminDialog';
+import { adminFetch } from '../lib/adminApi';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { EmployeeDetailPage } from './EmployeeDetailPage';
 import { useStaff, type StaffApiCommandDraft } from './useStaff';
+
+type StaffShopChoice = { id: string; name: string };
 
 function readableError(error: unknown): string | null {
   if (!error) return null;
@@ -25,6 +29,11 @@ export function StaffPage() {
   const [newEmployeeName, setNewEmployeeName] = useState('');
   const [newEmployeePhone, setNewEmployeePhone] = useState('');
   const staff = useStaff(shopId, selectedId);
+  const shopChoices = useQuery({
+    queryKey: ['admin', 'staff', 'shop-labels'],
+    enabled: Boolean(shopId),
+    queryFn: () => adminFetch<{ shops: StaffShopChoice[] }>('/api/admin/staff-shops'),
+  });
 
   const rows = useMemo(() => staff.workspaceQuery.data?.employees.rows ?? [], [staff.workspaceQuery.data]);
 
@@ -43,10 +52,7 @@ export function StaffPage() {
   const detail = staff.detailQuery.data;
   const actionError = readableError(staff.sensitiveCommand.error) ?? readableError(staff.command.error);
 
-  const execute = (command: StaffApiCommandDraft) => {
-    staff.command.mutate(command);
-  };
-
+  const execute = (command: StaffApiCommandDraft) => staff.command.mutate(command);
   const executeSensitive = (command: StaffApiCommandDraft, pin: string) => {
     staff.sensitiveCommand.mutate({ draft: command, pin });
   };
@@ -109,10 +115,7 @@ export function StaffPage() {
               />
             ) : null}
             {rows.length === 0 && !staff.workspaceQuery.isLoading ? (
-              <EmptyState
-                title="No employees assigned to this shop"
-                description="Add or assign a staff profile to begin."
-              />
+              <EmptyState title="No employees assigned to this shop" description="Add or assign a staff profile to begin." />
             ) : null}
             {rows.map((employee) => (
               <button
@@ -124,9 +127,7 @@ export function StaffPage() {
               >
                 <span>
                   <strong>{employee.displayName}</strong>
-                  <small>
-                    {employee.role} · {employee.shopIds.length} shop{employee.shopIds.length === 1 ? '' : 's'}
-                  </small>
+                  <small>{employee.role} · {employee.shopIds.length} shop{employee.shopIds.length === 1 ? '' : 's'}</small>
                 </span>
                 <span>
                   {employee.active ? 'Active' : 'Suspended'}
@@ -137,9 +138,9 @@ export function StaffPage() {
           </div>
         }
         detail={
-          staff.detailQuery.isLoading ? (
+          staff.detailQuery.isLoading || shopChoices.isLoading ? (
             <LoadingState title="Loading employee" />
-          ) : staff.detailQuery.isError ? (
+          ) : staff.detailQuery.isError || shopChoices.isError ? (
             <ErrorState
               title="Employee unavailable"
               description="This employee may not exist or may not be available in your current shop scope."
@@ -153,7 +154,7 @@ export function StaffPage() {
               canPay={canPay}
               financeAccounts={staff.workspaceQuery.data?.financeAccounts ?? []}
               workers={staff.workspaceQuery.data?.workers ?? []}
-              availableShopIds={principal.shopIds}
+              shops={shopChoices.data?.shops ?? []}
               onCommand={execute}
               onSensitiveCommand={executeSensitive}
             />
@@ -162,10 +163,7 @@ export function StaffPage() {
           )
         }
         emptyDetail={
-          <EmptyState
-            title="Select an employee"
-            description="Review profile, schedule, attendance, leave, pay and permissions."
-          />
+          <EmptyState title="Select an employee" description="Review profile, schedule, attendance, leave, pay and permissions." />
         }
       />
 
@@ -195,19 +193,10 @@ export function StaffPage() {
               <input value={newEmployeePhone} onChange={(event) => setNewEmployeePhone(event.target.value)} />
             </label>
             <div className="admin-inventory-page-actions">
-              <button
-                className="admin-secondary-button"
-                type="button"
-                disabled={staff.command.isPending}
-                onClick={() => setCreateOpen(false)}
-              >
+              <button className="admin-secondary-button" type="button" disabled={staff.command.isPending} onClick={() => setCreateOpen(false)}>
                 Cancel
               </button>
-              <button
-                className="admin-primary-button"
-                type="submit"
-                disabled={!newEmployeeName.trim() || staff.command.isPending}
-              >
+              <button className="admin-primary-button" type="submit" disabled={!newEmployeeName.trim() || staff.command.isPending}>
                 {staff.command.isPending ? 'Adding…' : 'Add employee'}
               </button>
             </div>
