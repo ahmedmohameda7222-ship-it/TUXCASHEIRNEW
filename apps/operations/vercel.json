@@ -4,6 +4,14 @@
   "installCommand": "cd ../.. && npm ci",
   "buildCommand": "cd ../.. && npm run build -w @tux/operations",
   "outputDirectory": "dist",
+  "functions": {
+    "api/whatsapp*.ts": {
+      "includeFiles": [
+        "../../packages/domain/src/**",
+        "../../packages/application/src/whatsapp*.ts"
+      ]
+    }
+  },
   "rewrites": [
     {
       "source": "/api/device-bootstrap",
