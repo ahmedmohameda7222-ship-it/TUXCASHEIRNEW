@@ -6,6 +6,7 @@ import { Toaster } from 'sonner';
 import App from './app/App';
 import { queryClient } from './app/queryClient';
 import './styles/index.css';
+import './styles/hardening.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('TUX Admin root element is missing');
