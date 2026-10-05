@@ -1,6 +1,8 @@
 import type { AdminOrderDetail, AdminReasonCodeConfiguration } from '@tux/admin-contracts';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 
+import { AdminDialog } from '../components/overlay/AdminDialog';
+
 export type RefundDraft = {
   paymentId: string;
   amountMinor: number;
@@ -15,6 +17,10 @@ export type ReturnDraft = {
   note: string | null;
   pin: string;
 };
+
+function money(minor: number): string {
+  return `${(minor / 100).toFixed(2)} EGP`;
+}
 
 export function RefundReturnPage({
   order,
@@ -73,49 +79,28 @@ export function RefundReturnPage({
   async function submitRefund(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parsedAmount = Number(amountMinor);
-    if (
-      !paymentId ||
-      !reasonCodeId ||
-      !pin ||
-      !Number.isSafeInteger(parsedAmount) ||
-      parsedAmount <= 0
-    ) {
-      return;
-    }
-    await onRefund({
-      paymentId,
-      amountMinor: parsedAmount,
-      reasonCodeId,
-      note: note.trim() || null,
-      pin,
-    });
+    if (!paymentId || !reasonCodeId || !pin || !Number.isSafeInteger(parsedAmount) || parsedAmount <= 0) return;
+    await onRefund({ paymentId, amountMinor: parsedAmount, reasonCodeId, note: note.trim() || null, pin });
     setPin('');
   }
 
   async function submitReturn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!reasonCodeId || !pin || returnItems.length === 0) return;
-    await onReturn({
-      items: returnItems,
-      reasonCodeId,
-      note: note.trim() || null,
-      pin,
-    });
+    await onReturn({ items: returnItems, reasonCodeId, note: note.trim() || null, pin });
     setPin('');
   }
 
   return (
-    <section className="admin-catalog-editor__section" aria-labelledby="refund-return-title">
-      <div className="admin-catalog-editor__section-heading">
-        <div>
-          <p className="admin-page__eyebrow">Sensitive order action</p>
-          <h2 id="refund-return-title">Refund / return</h2>
-        </div>
-        <button className="admin-secondary-button" type="button" onClick={onCancel}>
-          Back
-        </button>
-      </div>
-
+    <AdminDialog
+      open
+      variant="sheet"
+      title="Refund or return"
+      description="Choose a reason and confirm the transaction with your Admin PIN."
+      onOpenChange={(open) => {
+        if (!open && !refunding && !returning) onCancel();
+      }}
+    >
       <label className="admin-field">
         <span>Reason</span>
         <select
@@ -151,10 +136,7 @@ export function RefundReturnPage({
         />
       </label>
 
-      <form
-        className="admin-catalog-editor__section is-compact"
-        onSubmit={(event) => void submitRefund(event)}
-      >
+      <form className="admin-catalog-editor__section is-compact" onSubmit={(event) => void submitRefund(event)}>
         <h3>Refund payment</h3>
         <label className="admin-field">
           <span>Payment</span>
@@ -163,28 +145,26 @@ export function RefundReturnPage({
             disabled={refunding || returning}
             onChange={(event) => {
               setPaymentId(event.target.value);
-              const payment = order.payments.find(
-                (candidate) => candidate.id === event.target.value,
-              );
+              const payment = order.payments.find((candidate) => candidate.id === event.target.value);
               if (payment) setAmountMinor(String(payment.allocatedMinor));
             }}
           >
             {order.payments.map((payment) => (
               <option key={payment.id} value={payment.id}>
-                {payment.methodLabel} · {payment.allocatedMinor} minor
+                {payment.methodLabel} · {money(payment.allocatedMinor)}
               </option>
             ))}
           </select>
         </label>
         <label className="admin-field">
-          <span>Refund amount (minor units)</span>
+          <span>Refund amount (EGP)</span>
           <input
             type="number"
-            min={1}
-            step={1}
-            value={amountMinor}
+            min={0.01}
+            step={0.01}
+            value={Number(amountMinor) / 100 || ''}
             disabled={refunding || returning}
-            onChange={(event) => setAmountMinor(event.target.value)}
+            onChange={(event) => setAmountMinor(String(Math.round(Number(event.target.value) * 100)))}
           />
         </label>
         <button
@@ -196,10 +176,7 @@ export function RefundReturnPage({
         </button>
       </form>
 
-      <form
-        className="admin-catalog-editor__section is-compact"
-        onSubmit={(event) => void submitReturn(event)}
-      >
+      <form className="admin-catalog-editor__section is-compact" onSubmit={(event) => void submitReturn(event)}>
         <h3>Return items</h3>
         {order.items.map((item) => (
           <label className="admin-field" key={item.id}>
@@ -228,6 +205,9 @@ export function RefundReturnPage({
           {returning ? 'Returning…' : 'Return selected items'}
         </button>
       </form>
-    </section>
+      <button className="admin-secondary-button" type="button" disabled={refunding || returning} onClick={onCancel}>
+        Cancel
+      </button>
+    </AdminDialog>
   );
 }
