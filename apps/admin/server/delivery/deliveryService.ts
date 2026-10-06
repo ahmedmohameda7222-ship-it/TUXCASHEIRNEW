@@ -23,11 +23,7 @@ export type DeliveryHours = {
 };
 
 export interface DeliveryStore {
-  loadWorkspace(input: {
-    businessId: string;
-    shopId: string;
-    authorizedShopIds: readonly string[];
-  }): Promise<AdminDeliveryWorkspace>;
+  loadWorkspace(input: { businessId: string; shopId: string }): Promise<AdminDeliveryWorkspace>;
   loadRoutingContext(input: { businessId: string; requestedShopId: string }): Promise<{
     requestedShopAvailable: boolean;
     requestedShopHours: readonly DeliveryHours[];
@@ -103,7 +99,6 @@ export function createDeliveryService(store: DeliveryStore) {
       return store.loadWorkspace({
         businessId: principal.businessId,
         shopId,
-        authorizedShopIds: principal.shopIds,
       });
     },
 
