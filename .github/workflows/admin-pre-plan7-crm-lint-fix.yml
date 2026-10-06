@@ -1,0 +1,41 @@
+name: Admin Pre-Plan-7 CRM Lint Fix
+
+on:
+  push:
+    branches:
+      - feat/admin-pre-plan-7-ui-ux-hardening
+    paths:
+      - .github/workflows/admin-pre-plan7-crm-lint-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/admin-pre-plan-7-ui-ux-hardening
+      - name: Fix CRM Playwright type import
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('e2e/admin-customers-promotions.spec.ts')
+          text = path.read_text()
+          text = text.replace("import { expect, test } from '@playwright/test';", "import { expect, test, type Page } from '@playwright/test';", 1)
+          text = text.replace("async function openCustomer(page: import('@playwright/test').Page) {", "async function openCustomer(page: Page) {", 1)
+          path.write_text(text)
+          PY
+      - name: Remove one-shot workflow
+        run: rm .github/workflows/admin-pre-plan7-crm-lint-fix.yml
+      - name: Commit lint-only change
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add e2e/admin-customers-promotions.spec.ts .github/workflows/admin-pre-plan7-crm-lint-fix.yml
+          git diff --cached --check
+          git commit -m 'fix(admin): use explicit Playwright type import'
+          git push origin HEAD:feat/admin-pre-plan-7-ui-ux-hardening
