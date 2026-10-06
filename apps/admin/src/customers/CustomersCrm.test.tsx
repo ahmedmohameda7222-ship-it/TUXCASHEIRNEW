@@ -85,7 +85,7 @@ const promotion: AdminPromotion = {
 };
 
 describe('Plan 5 CRM and promotion controls', () => {
-  it('renders canonical customer identity, history, segments, and merge action', () => {
+  it('renders canonical customer identity, overview, available detail tabs, and merge action', () => {
     const html = renderToStaticMarkup(
       <CustomerDetailPage customer={customer} canMerge onMerge={vi.fn()} />,
     );
@@ -93,16 +93,19 @@ describe('Plan 5 CRM and promotion controls', () => {
     for (const value of [
       'Mona',
       '+201012345678',
-      'Maadi',
-      'Road 9, Maadi',
       '12 orders',
       'VIP',
       'Top Spenders',
       'Frequent Delivery',
+      'Addresses',
+      'Linked shops',
       'Merge customer',
     ]) {
       expect(html).toContain(value);
     }
+
+    expect(html).not.toContain('Road 9, Maadi');
+    expect(html).not.toContain('>Maadi<');
   });
 
   it('renders immutable loyalty history and permission-gated manual adjustment controls', () => {

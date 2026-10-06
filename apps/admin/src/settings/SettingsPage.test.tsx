@@ -157,7 +157,9 @@ describe('Settings workspace', () => {
     const html = renderSection('overview');
 
     expect(html).toContain('TUX Maadi');
-    expect(html).toContain('Live settings version 7');
+    expect(html).toContain('data-settings-version="7"');
+    expect(html).toContain('Shop settings and operational controls');
+    expect(html).not.toContain('Live settings version 7');
     for (const label of [
       'Shop',
       'Order types',

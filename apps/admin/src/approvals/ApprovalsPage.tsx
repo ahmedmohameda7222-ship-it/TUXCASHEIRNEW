@@ -1,9 +1,13 @@
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { AdminApprovalStatus } from '@tux/admin-contracts';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'wouter';
 
 import { useAdminSession } from '../auth/useAdminSession';
+import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
 import { PageScaffold } from '../components/layout/PageScaffold';
+import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
+import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { AdminApiError, adminFetch } from '../lib/adminApi';
 import {
   ApprovalDetailView,
@@ -35,10 +39,7 @@ type ApprovalApiModel = {
   decidedAt: string | null;
 };
 
-type ApprovalListResponse = {
-  approvals: ApprovalApiModel[];
-  nextCursor?: string | null;
-};
+type ApprovalListResponse = { approvals: ApprovalApiModel[]; nextCursor?: string | null };
 type StatusFilter = 'ALL' | AdminApprovalStatus;
 type ApprovalDecisionState = { kind: ApprovalDecisionKind; requestId: string };
 
@@ -75,8 +76,9 @@ function toViewModel(approval: ApprovalApiModel): ApprovalDetailViewModel {
 export function ApprovalsPage() {
   const session = useAdminSession();
   const queryClient = useQueryClient();
+  const [location, navigate] = useLocation();
+  const selectedId = detailIdFromPath(location, '/approvals');
   const [status, setStatus] = useState<StatusFilter>('ALL');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [decision, setDecision] = useState<ApprovalDecisionState | null>(null);
 
   const approvalsQuery = useInfiniteQuery({
@@ -93,25 +95,32 @@ export function ApprovalsPage() {
     refetchInterval: 15_000,
   });
 
+  const detailQuery = useQuery({
+    queryKey: ['admin', 'approvals', 'detail', selectedId],
+    enabled: selectedId !== null,
+    queryFn: () =>
+      adminFetch<ApprovalListResponse>(
+        `/api/admin/approvals?id=${encodeURIComponent(selectedId!)}`,
+      ).then((response) => response.approvals[0] ?? null),
+    refetchInterval: 15_000,
+  });
+
   const approvals = useMemo(
     () => approvalsQuery.data?.pages.flatMap((page) => page.approvals) ?? [],
     [approvalsQuery.data],
   );
+  const selected = detailQuery.data ?? null;
 
   useEffect(() => {
-    if (approvals.length === 0) {
-      setSelectedId(null);
+    if (!decision) return;
+    if (decision.requestId !== selectedId) {
+      setDecision(null);
       return;
     }
-    if (!selectedId || !approvals.some((row) => row.id === selectedId)) {
-      setSelectedId(approvals[0]?.id ?? null);
+    if (!detailQuery.isLoading && !detailQuery.isFetching && selected === null) {
+      setDecision(null);
     }
-  }, [approvals, selectedId]);
-
-  const selected = useMemo(
-    () => approvals.find((row) => row.id === selectedId) ?? null,
-    [approvals, selectedId],
-  );
+  }, [decision, detailQuery.isFetching, detailQuery.isLoading, selected, selectedId]);
 
   const decisionMutation = useMutation({
     mutationFn: async ({
@@ -125,17 +134,17 @@ export function ApprovalsPage() {
       pin: string;
       reason: string | null;
     }) => {
-      const approval = approvals.find((row) => row.id === requestId);
+      const approval =
+        selected?.id === requestId
+          ? selected
+          : (approvals.find((row) => row.id === requestId) ?? null);
       if (!approval || approval.displayStatus === 'EXPIRED' || approval.canDecide === false) {
         throw new Error('approval_selection_not_actionable');
       }
       if (session.state.status !== 'authenticated') throw new Error('session_required');
       await adminFetch<{ ok: true; requestId: string; status: AdminApprovalStatus }>(
         '/api/admin/approvals',
-        {
-          method: 'POST',
-          body: JSON.stringify({ requestId, decision: kind, pin, reason }),
-        },
+        { method: 'POST', body: JSON.stringify({ requestId, decision: kind, pin, reason }) },
         session.state.session.csrfToken,
       );
     },
@@ -144,19 +153,6 @@ export function ApprovalsPage() {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'approvals'] });
     },
   });
-
-  useEffect(() => {
-    if (!decision) return;
-    const approval = approvals.find((row) => row.id === decision.requestId);
-    if (
-      !approval ||
-      approval.displayStatus === 'EXPIRED' ||
-      approval.canDecide === false ||
-      selectedId !== decision.requestId
-    ) {
-      setDecision(null);
-    }
-  }, [approvals, decision, selectedId]);
 
   const decisionError =
     decisionMutation.error instanceof AdminApiError
@@ -169,7 +165,7 @@ export function ApprovalsPage() {
     <PageScaffold
       eyebrow="Controls"
       title="Approvals"
-      description="Review sensitive Admin commands. Approval is always a distinct-person, PIN-confirmed action."
+      description="Review sensitive Admin requests with distinct-person approval and PIN confirmation."
     >
       <div className="admin-approvals-toolbar">
         <label className="admin-field">
@@ -188,51 +184,94 @@ export function ApprovalsPage() {
           </select>
         </label>
       </div>
-      {approvalsQuery.isLoading ? <p>Loading approvals…</p> : null}
-      {approvalsQuery.isError ? (
-        <p className="admin-error-text">Approvals could not be loaded.</p>
-      ) : null}
-      {!approvalsQuery.isLoading && approvals.length === 0 ? (
-        <p>No approval requests match this filter.</p>
-      ) : null}
-      <div className="admin-approvals-layout">
-        <nav className="admin-approval-list" aria-label="Approval requests">
-          {approvals.map((approval) => (
-            <button
-              className="admin-approval-list__item"
-              aria-current={approval.id === selectedId ? 'true' : undefined}
-              key={approval.id}
-              type="button"
-              onClick={() => setSelectedId(approval.id)}
-            >
-              <strong>{approval.actionLabel}</strong>
-              <span>{approval.requesterName}</span>
-              <span>{approval.shopName}</span>
-              <span>{approval.displayStatus ?? approval.status}</span>
-            </button>
-          ))}
-          {approvalsQuery.hasNextPage ? (
-            <button
-              className="admin-approval-list__item"
-              type="button"
-              disabled={approvalsQuery.isFetchingNextPage}
-              onClick={() => void approvalsQuery.fetchNextPage()}
-            >
-              {approvalsQuery.isFetchingNextPage
-                ? 'Loading more approvals…'
-                : 'Load more approvals'}
-            </button>
-          ) : null}
-        </nav>
-        {selected ? (
-          <ApprovalDetailView
-            approval={toViewModel(selected)}
-            deciding={decisionMutation.isPending}
-            onApprove={() => setDecision({ kind: 'APPROVE', requestId: selected.id })}
-            onReject={() => setDecision({ kind: 'REJECT', requestId: selected.id })}
+
+      <ResponsiveMasterDetail
+        listLabel="Approval requests"
+        detailLabel="Approval detail"
+        detailActive={selectedId !== null}
+        backHref="/approvals"
+        list={
+          <div className="admin-approval-list">
+            {approvalsQuery.isLoading ? <LoadingState title="Loading approvals" /> : null}
+            {approvalsQuery.isError ? (
+              <ErrorState
+                title="Approvals could not be loaded"
+                action={
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    onClick={() => void approvalsQuery.refetch()}
+                  >
+                    Retry
+                  </button>
+                }
+              />
+            ) : null}
+            {!approvalsQuery.isLoading && !approvalsQuery.isError && approvals.length === 0 ? (
+              <EmptyState
+                title="No approval requests"
+                description="No requests match this status filter."
+              />
+            ) : null}
+            {approvals.map((approval) => (
+              <button
+                className="admin-approval-list__item"
+                aria-current={approval.id === selectedId ? 'true' : undefined}
+                key={approval.id}
+                type="button"
+                onClick={() => {
+                  setDecision(null);
+                  navigate(detailPath('/approvals', approval.id));
+                }}
+              >
+                <strong>{approval.actionLabel}</strong>
+                <span>{approval.requesterName}</span>
+                <span>{approval.shopName}</span>
+                <span>{approval.displayStatus ?? approval.status}</span>
+              </button>
+            ))}
+            {approvalsQuery.hasNextPage ? (
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={approvalsQuery.isFetchingNextPage}
+                onClick={() => void approvalsQuery.fetchNextPage()}
+              >
+                {approvalsQuery.isFetchingNextPage ? 'Loading…' : 'Load more'}
+              </button>
+            ) : null}
+          </div>
+        }
+        detail={
+          detailQuery.isLoading ? (
+            <LoadingState title="Loading approval" />
+          ) : detailQuery.isError ? (
+            <ErrorState
+              title="Approval unavailable"
+              description="This request may not exist or may not be visible in your authorized scope."
+            />
+          ) : selected ? (
+            <ApprovalDetailView
+              approval={toViewModel(selected)}
+              deciding={decisionMutation.isPending}
+              onApprove={() => setDecision({ kind: 'APPROVE', requestId: selected.id })}
+              onReject={() => setDecision({ kind: 'REJECT', requestId: selected.id })}
+            />
+          ) : (
+            <EmptyState
+              title="Approval unavailable"
+              description="Choose another request from the list."
+            />
+          )
+        }
+        emptyDetail={
+          <EmptyState
+            title="Select an approval"
+            description="Review the request, reason and consequences before deciding."
           />
-        ) : null}
-      </div>
+        }
+      />
+
       {decision ? (
         <RePinDialog
           decision={decision.kind}

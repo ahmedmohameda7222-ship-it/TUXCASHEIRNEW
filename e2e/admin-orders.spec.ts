@@ -460,6 +460,7 @@ test('orders search filters real Admin list and exposes status-contextual action
   await page.goto('/orders');
 
   await expect(page.getByRole('heading', { name: 'Orders' })).toBeVisible();
+  await page.getByRole('button', { name: /#101/ }).click();
   await expect(page.getByRole('button', { name: 'Cancel order' })).toBeVisible();
 
   await page.getByRole('button', { name: /#102/ }).click();
@@ -490,6 +491,7 @@ test('ACTIVE cancellation uses a valid central reason and refreshes immutable re
 }) => {
   const fixture = await mockOrders(page);
   await page.goto('/orders');
+  await page.getByRole('button', { name: /#101/ }).click();
 
   await page.getByRole('button', { name: 'Cancel order' }).click();
   const reason = page.getByLabel('Cancellation reason');
@@ -523,6 +525,7 @@ test('stale operational revision conflict is surfaced without pretending cancell
 }) => {
   await mockOrders(page, { staleCancellation: true });
   await page.goto('/orders');
+  await page.getByRole('button', { name: /#101/ }).click();
 
   await page.getByRole('button', { name: 'Cancel order' }).click();
   await page.getByLabel('Admin PIN').fill('1234');

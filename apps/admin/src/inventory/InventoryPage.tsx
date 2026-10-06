@@ -1,7 +1,11 @@
 import type { AdminStocktakeSnapshot } from '@tux/admin-contracts';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useLocation } from 'wouter';
 
+import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
 import { PageScaffold } from '../components/layout/PageScaffold';
+import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
+import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { AdjustStockSheet } from './AdjustStockSheet';
 import { InventoryItemPage } from './InventoryItemPage';
@@ -40,7 +44,8 @@ type ItemAction = 'adjust' | 'waste' | null;
 export function InventoryPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [location, navigate] = useLocation();
+  const selectedItemId = detailIdFromPath(location, '/inventory');
   const inventory = useInventory(shopId, selectedItemId);
   const [mode, setMode] = useState<WorkspaceMode>('detail');
   const [itemAction, setItemAction] = useState<ItemAction>(null);
@@ -59,16 +64,6 @@ export function InventoryPage() {
   const mutationErrorText = mutationErrorMessage(mutationError);
   const items = workspace?.items ?? [];
   const stocktakeItems = useMemo(() => items.filter((item) => item.active), [items]);
-
-  useEffect(() => {
-    const selected = selectedItemId ? items.find((item) => item.id === selectedItemId) : null;
-    if (selected) {
-      if (!selected.active) setItemAction(null);
-      return;
-    }
-    setSelectedItemId(null);
-    setItemAction(null);
-  }, [items, selectedItemId]);
 
   const selectedItem = useMemo(() => {
     const item = items.find((candidate) => candidate.id === selectedItemId) ?? null;
@@ -96,6 +91,7 @@ export function InventoryPage() {
           setStocktakeSnapshot(snapshot);
           setMode('stocktake');
           setItemAction(null);
+          navigate('/inventory');
         },
       },
     );
@@ -106,7 +102,7 @@ export function InventoryPage() {
       <PageScaffold
         eyebrow="Inventory"
         title="Inventory"
-        description="Select a concrete shop to work with inventory balances and movements."
+        description="Select a shop to review inventory balances and movements."
       />
     );
   }
@@ -120,7 +116,16 @@ export function InventoryPage() {
 
   if (inventory.workspaceQuery.isLoading) {
     return (
-      <PageScaffold eyebrow="Inventory" title="Inventory" description="Loading inventory ledger…" />
+      <PageScaffold
+        eyebrow="Inventory"
+        title="Inventory"
+        description="Review stock across this shop."
+      >
+        <LoadingState
+          title="Loading inventory"
+          description="Preparing current balances and availability."
+        />
+      </PageScaffold>
     );
   }
 
@@ -129,16 +134,36 @@ export function InventoryPage() {
       <PageScaffold
         eyebrow="Inventory"
         title="Inventory"
-        description="Inventory could not be loaded. Retry after the Admin backend is available."
-      />
+        description="Review stock across this shop."
+      >
+        <ErrorState
+          title="Inventory could not be loaded"
+          description="Retry when the Admin service is available."
+          action={
+            <button
+              className="admin-secondary-button"
+              type="button"
+              onClick={() => void inventory.workspaceQuery.refetch()}
+            >
+              Retry
+            </button>
+          }
+        />
+      </PageScaffold>
     );
+  }
+
+  function openWorkflow(nextMode: WorkspaceMode) {
+    navigate('/inventory');
+    setMode(nextMode);
+    setItemAction(null);
   }
 
   return (
     <PageScaffold
       eyebrow="Inventory control"
       title="Inventory"
-      description="On-hand, reservations, stock counts, waste and inter-shop transfers are posted through the immutable inventory ledger."
+      description="Review availability, stock counts, waste and transfers for this shop."
       primaryAction={
         <div className="admin-inventory-page-actions">
           {canStocktake ? (
@@ -148,8 +173,7 @@ export function InventoryPage() {
               disabled={inventory.beginStocktake.isPending || stocktakeItems.length === 0}
               onClick={() => {
                 if (stocktakeItems.length > STOCKTAKE_BATCH_SIZE) {
-                  setMode('stocktake-select');
-                  setItemAction(null);
+                  openWorkflow('stocktake-select');
                   return;
                 }
                 beginStocktakeBatch(stocktakeItems);
@@ -161,20 +185,14 @@ export function InventoryPage() {
           <button
             className="admin-secondary-button"
             type="button"
-            onClick={() => {
-              setMode('reorder');
-              setItemAction(null);
-            }}
+            onClick={() => openWorkflow('reorder')}
           >
             Reorder
           </button>
           <button
             className="admin-secondary-button"
             type="button"
-            onClick={() => {
-              setMode('variance');
-              setItemAction(null);
-            }}
+            onClick={() => openWorkflow('variance')}
           >
             Variance & margins
           </button>
@@ -182,10 +200,7 @@ export function InventoryPage() {
             <button
               className="admin-primary-button"
               type="button"
-              onClick={() => {
-                setMode('transfer');
-                setItemAction(null);
-              }}
+              onClick={() => openWorkflow('transfer')}
             >
               Transfer stock
             </button>
@@ -205,8 +220,8 @@ export function InventoryPage() {
         >
           <div className="admin-inventory-workflow__header">
             <div>
-              <p className="admin-page__eyebrow">Bounded count session</p>
-              <h2 id="inventory-stocktake-batch-title">Choose a stock count batch</h2>
+              <p className="admin-page__eyebrow">Stock count</p>
+              <h2 id="inventory-stocktake-batch-title">Choose a batch</h2>
             </div>
             <button
               className="admin-secondary-button"
@@ -217,8 +232,8 @@ export function InventoryPage() {
             </button>
           </div>
           <p>
-            Count up to {STOCKTAKE_BATCH_SIZE} items per frozen snapshot. Complete one batch, then
-            start the next batch from Inventory.
+            Count up to {STOCKTAKE_BATCH_SIZE} items per session. Complete one batch, then start the
+            next batch from Inventory.
           </p>
           <div className="admin-inventory-list" aria-label="Stock count batches">
             {stocktakeBatches.map((batch, index) => {
@@ -295,49 +310,62 @@ export function InventoryPage() {
           onReceive={(transferId) => inventory.receiveTransfer.mutate(transferId)}
         />
       ) : (
-        <div className="admin-inventory-layout">
-          <section className="admin-inventory-list" aria-label="Inventory items">
-            <div className="admin-inventory-list__header">
-              <strong>{items.length} items</strong>
-              <span>Available = On Hand − Reserved</span>
-            </div>
-            {items.length === 0 ? (
-              <div className="admin-empty-state">
-                <strong>No inventory items</strong>
-                <span>Inventory configuration for this shop is empty.</span>
+        <ResponsiveMasterDetail
+          listLabel="Inventory items"
+          detailLabel="Inventory item detail"
+          detailActive={selectedItemId !== null}
+          backHref="/inventory"
+          list={
+            <div className="admin-inventory-list">
+              <div className="admin-inventory-list__header">
+                <strong>{items.length} items</strong>
+                <span>Available = On Hand − Reserved</span>
               </div>
-            ) : (
-              items.map((item) => (
-                <button
-                  className={
-                    item.id === selectedItemId
-                      ? 'admin-inventory-row is-selected'
-                      : 'admin-inventory-row'
-                  }
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedItemId(item.id);
-                    setItemAction(null);
-                  }}
-                >
-                  <span>
-                    <strong>{item.name}</strong>
-                    <small>{item.trackingMode.replaceAll('_', ' ')}</small>
-                  </span>
-                  <span>
-                    {new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(
-                      item.availableMicros / 1_000_000,
-                    )}{' '}
-                    {item.unitLabel}
-                  </span>
-                </button>
-              ))
-            )}
-          </section>
-
-          <section className="admin-inventory-inspector">
-            {selectedItem ? (
+              {items.length === 0 ? (
+                <EmptyState
+                  title="No inventory items"
+                  description="Inventory configuration for this shop is empty."
+                />
+              ) : (
+                items.map((item) => (
+                  <button
+                    className={
+                      item.id === selectedItemId
+                        ? 'admin-inventory-row is-selected'
+                        : 'admin-inventory-row'
+                    }
+                    aria-current={item.id === selectedItemId ? 'true' : undefined}
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      navigate(detailPath('/inventory', item.id));
+                      setItemAction(null);
+                    }}
+                  >
+                    <span>
+                      <strong>{item.name}</strong>
+                      <small>{item.trackingMode.replaceAll('_', ' ')}</small>
+                    </span>
+                    <span>
+                      {new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(
+                        item.availableMicros / 1_000_000,
+                      )}{' '}
+                      {item.unitLabel}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          }
+          detail={
+            inventory.itemHistoryQuery.isLoading ? (
+              <LoadingState title="Loading item detail" />
+            ) : inventory.itemHistoryQuery.isError ? (
+              <ErrorState
+                title="Inventory item unavailable"
+                description="This item may not exist or may not be available in your current shop scope."
+              />
+            ) : selectedItem ? (
               <>
                 <InventoryItemPage
                   item={selectedItem}
@@ -394,13 +422,19 @@ export function InventoryPage() {
                 ) : null}
               </>
             ) : (
-              <div className="admin-empty-state">
-                <strong>Select an inventory item</strong>
-                <span>Review balances, history, adjustments and waste from one detail view.</span>
-              </div>
-            )}
-          </section>
-        </div>
+              <EmptyState
+                title="Inventory item unavailable"
+                description="Choose another item from the list."
+              />
+            )
+          }
+          emptyDetail={
+            <EmptyState
+              title="Select an inventory item"
+              description="Review balances, history, adjustments and waste from one detail view."
+            />
+          }
+        />
       )}
     </PageScaffold>
   );

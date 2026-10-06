@@ -1,6 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useLocation } from 'wouter';
 
+import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
 import { PageScaffold } from '../components/layout/PageScaffold';
+import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
+import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
+import { AdminTabs } from '../components/navigation/AdminTabs';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { PurchaseOrderPage } from './PurchaseOrderPage';
 import { PurchaseOrdersPage } from './PurchaseOrdersPage';
@@ -9,6 +14,7 @@ import { SuppliersPage } from './SuppliersPage';
 import { usePurchasing } from './usePurchasing';
 
 type ActionMode = 'receive' | 'return' | null;
+type PurchasingSection = 'orders' | 'suppliers';
 
 function latestMutationError(
   mutations: readonly { error: unknown; submittedAt: number }[],
@@ -31,6 +37,8 @@ function mutationErrorMessage(error: unknown): string | null {
 export function PurchasingPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
+  const [location, navigate] = useLocation();
+  const selectedId = detailIdFromPath(location, '/purchasing');
   const purchasing = usePurchasing(shopId);
   const workspace = purchasing.workspace.data;
   const mutationError = latestMutationError([
@@ -42,15 +50,8 @@ export function PurchasingPage() {
     purchasing.returnPurchase,
   ]);
   const mutationErrorText = mutationErrorMessage(mutationError);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [action, setAction] = useState<ActionMode>(null);
-
-  useEffect(() => {
-    const orders = workspace?.purchaseOrders ?? [];
-    if (selectedId && orders.some((order) => order.id === selectedId)) return;
-    setSelectedId(orders[0]?.id ?? null);
-    setAction(null);
-  }, [selectedId, workspace?.purchaseOrders]);
+  const [section, setSection] = useState<PurchasingSection>('orders');
 
   const selected = useMemo(
     () => workspace?.purchaseOrders.find((order) => order.id === selectedId) ?? null,
@@ -62,24 +63,41 @@ export function PurchasingPage() {
       <PageScaffold
         eyebrow="Purchasing"
         title="Purchasing"
-        description="Select a concrete shop to manage suppliers and purchase orders."
+        description="Select a shop to manage suppliers and purchase orders."
       />
     );
   }
-
   if (purchasing.workspace.isLoading) {
     return (
-      <PageScaffold eyebrow="Purchasing" title="Purchasing" description="Loading purchasing…" />
+      <PageScaffold
+        eyebrow="Purchasing"
+        title="Purchasing"
+        description="Manage supplier purchasing for this shop."
+      >
+        <LoadingState title="Loading purchasing" />
+      </PageScaffold>
     );
   }
-
   if (purchasing.workspace.isError || !workspace) {
     return (
       <PageScaffold
         eyebrow="Purchasing"
         title="Purchasing"
-        description="Purchasing could not be loaded. Retry after the Admin backend is available."
-      />
+        description="Manage supplier purchasing for this shop."
+      >
+        <ErrorState
+          title="Purchasing could not be loaded"
+          action={
+            <button
+              className="admin-secondary-button"
+              type="button"
+              onClick={() => void purchasing.workspace.refetch()}
+            >
+              Retry
+            </button>
+          }
+        />
+      </PageScaffold>
     );
   }
 
@@ -90,37 +108,62 @@ export function PurchasingPage() {
     <PageScaffold
       eyebrow="Supplier purchasing"
       title="Purchasing"
-      description="Draft, order, receive and return supplier purchases through trusted server-side inventory transactions."
+      description="Create purchase orders, receive deliveries and record supplier returns."
     >
       {mutationErrorText ? (
         <p className="admin-inventory-note" role="alert">
           {mutationErrorText}
         </p>
       ) : null}
-      <div className="admin-inventory-layout">
-        <div className="admin-inventory-list">
-          <SuppliersPage
-            suppliers={workspace.suppliers}
-            canManage={canManage}
-            pending={purchasing.createSupplier.isPending}
-            onCreate={(input, onSuccess) => purchasing.createSupplier.mutate(input, { onSuccess })}
+      <ResponsiveMasterDetail
+        listLabel="Purchasing"
+        detailLabel="Purchase order detail"
+        detailActive={selectedId !== null}
+        backHref="/purchasing"
+        list={
+          <AdminTabs<PurchasingSection>
+            label="Purchasing sections"
+            value={section}
+            onChange={setSection}
+            tabs={[
+              {
+                id: 'orders',
+                label: 'Purchase orders',
+                content: (
+                  <PurchaseOrdersPage
+                    purchaseOrders={workspace.purchaseOrders}
+                    suppliers={workspace.suppliers}
+                    inventoryItems={workspace.inventoryItems}
+                    selectedId={selectedId}
+                    canManage={canManage}
+                    pending={purchasing.createPurchaseOrder.isPending}
+                    onSelect={(id) => {
+                      navigate(detailPath('/purchasing', id));
+                      setAction(null);
+                    }}
+                    onCreate={(input) => purchasing.createPurchaseOrder.mutate(input)}
+                  />
+                ),
+              },
+              {
+                id: 'suppliers',
+                label: 'Suppliers',
+                content: (
+                  <SuppliersPage
+                    suppliers={workspace.suppliers}
+                    canManage={canManage}
+                    pending={purchasing.createSupplier.isPending}
+                    onCreate={(input, onSuccess) =>
+                      purchasing.createSupplier.mutate(input, { onSuccess })
+                    }
+                  />
+                ),
+              },
+            ]}
           />
-          <PurchaseOrdersPage
-            purchaseOrders={workspace.purchaseOrders}
-            suppliers={workspace.suppliers}
-            inventoryItems={workspace.inventoryItems}
-            selectedId={selectedId}
-            canManage={canManage}
-            pending={purchasing.createPurchaseOrder.isPending}
-            onSelect={(id) => {
-              setSelectedId(id);
-              setAction(null);
-            }}
-            onCreate={(input) => purchasing.createPurchaseOrder.mutate(input)}
-          />
-        </div>
-        <div className="admin-inventory-inspector">
-          {selected ? (
+        }
+        detail={
+          selected ? (
             <>
               <PurchaseOrderPage
                 order={selected}
@@ -162,13 +205,19 @@ export function PurchasingPage() {
               ) : null}
             </>
           ) : (
-            <div className="admin-empty-state">
-              <strong>Select a purchase order</strong>
-              <span>Review supplier, quantities, receiving progress and returns.</span>
-            </div>
-          )}
-        </div>
-      </div>
+            <ErrorState
+              title="Purchase order unavailable"
+              description="This purchase order may not exist or may not be available in your current shop scope."
+            />
+          )
+        }
+        emptyDetail={
+          <EmptyState
+            title="Select a purchase order"
+            description="Review supplier, quantities, receiving progress and returns."
+          />
+        }
+      />
     </PageScaffold>
   );
 }

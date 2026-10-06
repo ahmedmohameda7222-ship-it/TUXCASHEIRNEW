@@ -1,8 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const otherShopId = '99999999-9999-4999-8999-999999999999';
 const customerId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const mergedCustomerId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const csrfToken = 'c'.repeat(64);
 let postedCommands: Array<Record<string, unknown> & { type: string }> = [];
 
@@ -15,6 +16,17 @@ const session = {
     shopIds: [shopId],
   },
   csrfToken,
+};
+
+const mergeCandidate = {
+  id: mergedCustomerId,
+  normalizedPhone: '+201099999999',
+  displayName: 'Nour',
+  orderCount: 2,
+  lifetimeSpendMinor: 12_000,
+  lastOrderAt: '2026-09-10T12:00:00.000Z',
+  loyaltyBalance: 10,
+  segments: ['Returning'],
 };
 
 test.beforeEach(async ({ page }) => {
@@ -42,7 +54,7 @@ test.beforeEach(async ({ page }) => {
             ? {
                 ok: true,
                 survivorCustomerId: customerId,
-                mergedCustomerId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+                mergedCustomerId,
                 replayed: false,
               }
             : command.type === 'loyalty.adjust'
@@ -66,21 +78,24 @@ test.beforeEach(async ({ page }) => {
     }
 
     const view = url.searchParams.get('view');
+    const search = url.searchParams.get('q')?.trim() ?? '';
     const payload =
       view === 'customers'
         ? {
-            customers: [
-              {
-                id: customerId,
-                normalizedPhone: '+201012345678',
-                displayName: 'Mona',
-                orderCount: 12,
-                lifetimeSpendMinor: 150000,
-                lastOrderAt: '2026-09-20T12:00:00.000Z',
-                loyaltyBalance: 120,
-                segments: ['Returning', 'VIP', 'Top Spenders'],
-              },
-            ],
+            customers: search
+              ? [mergeCandidate]
+              : [
+                  {
+                    id: customerId,
+                    normalizedPhone: '+201012345678',
+                    displayName: 'Mona',
+                    orderCount: 12,
+                    lifetimeSpendMinor: 150000,
+                    lastOrderAt: '2026-09-20T12:00:00.000Z',
+                    loyaltyBalance: 120,
+                    segments: ['Returning', 'VIP', 'Top Spenders'],
+                  },
+                ],
           }
         : view === 'customer'
           ? {
@@ -177,17 +192,32 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('renders canonical CRM identity, loyalty history and automatic segments', async ({ page }) => {
+async function openCustomer(page: Page) {
   await page.goto('/customers');
   await expect(page.getByRole('heading', { name: 'Customers' })).toBeVisible();
+  await page.getByRole('button', { name: /Mona/ }).click();
+  await expect(page).toHaveURL(new RegExp(`/customers/${customerId}$`));
+}
+
+test('renders canonical CRM identity, loyalty history and automatic segments', async ({ page }) => {
+  await openCustomer(page);
+
   await expect(page.getByLabel('Customer detail').getByText('+201012345678')).toBeVisible();
-  await expect(page.getByText('Road 9, Maadi')).toBeVisible();
   await expect(page.getByText('VIP')).toBeVisible();
   await expect(page.getByText('Frequent Delivery')).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Addresses' }).click();
+  await expect(page.getByText('Road 9, Maadi')).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Linked shops' }).click();
+  await expect(page.getByText('Maadi', { exact: true })).toBeVisible();
+
   await expect(page.getByLabel('Customer loyalty').getByText('120 points')).toBeVisible();
   await expect(
     page.getByLabel('Customer loyalty').getByText('EARN', { exact: true }),
   ).toBeVisible();
+
+  await page.getByRole('tab', { name: 'CRM settings' }).click();
   await expect(page.getByRole('heading', { name: 'Promotions' })).toBeVisible();
   await expect(page.getByText(/Lunch 10%/)).toBeVisible();
 });
@@ -195,16 +225,22 @@ test('renders canonical CRM identity, loyalty history and automatic segments', a
 test('exposes controlled merge, loyalty configuration and full promotion editor', async ({
   page,
 }) => {
-  await page.goto('/customers');
+  await openCustomer(page);
 
-  await page
-    .getByLabel('Customer ID to merge into this survivor')
-    .fill('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
-  await page.getByLabel('Confirm canonical merge').check();
-  await expect(page.getByRole('button', { name: 'Merge customer' }).last()).toBeEnabled();
+  await page.getByLabel('Customer detail').getByRole('button', { name: 'Merge customer' }).click();
+  await page.getByLabel('Search merge candidates').fill('Nour');
+  await page.getByLabel('Merge candidates').getByRole('button', { name: /Nour/ }).click();
+  await page.getByLabel('I reviewed both customers and want to merge them.').check();
+  const mergeButton = page.getByRole('dialog').getByRole('button', { name: 'Merge customer' });
+  await expect(mergeButton).toBeEnabled();
+  await mergeButton.click();
+  await expect
+    .poll(() => postedCommands.some((command) => command.type === 'customer.merge'))
+    .toBe(true);
 
-  await expect(page.getByLabel('Minimum redemption points')).toBeVisible();
-  await expect(page.getByLabel('Point expiry days')).toBeVisible();
+  await page.getByRole('tab', { name: 'CRM settings' }).click();
+  await expect(page.getByLabel('Minimum points to redeem')).toBeVisible();
+  await expect(page.getByLabel('Point expiry (days)')).toBeVisible();
 
   await page.getByRole('button', { name: 'New promotion' }).click();
   await expect(page.getByLabel('Type')).toContainText('PERCENT');
@@ -223,14 +259,15 @@ test('hydrates canonical loyalty values and preserves hidden multi-shop scopes o
   page,
 }) => {
   await page.goto('/customers');
+  await page.getByRole('tab', { name: 'CRM settings' }).click();
 
   await expect(page.getByLabel('Enabled')).not.toBeChecked();
-  await expect(page.getByLabel('Earn points per 1 EGP')).toHaveValue('3');
-  await expect(page.getByLabel('Redemption minor per point')).toHaveValue('17');
-  await expect(page.getByLabel('Minimum redemption points')).toHaveValue('75');
-  await expect(page.getByLabel('Point expiry days')).toHaveValue('180');
+  await expect(page.getByLabel('Points earned per 1 EGP')).toHaveValue('3');
+  await expect(page.getByLabel('Point value (EGP)')).toHaveValue('0.17');
+  await expect(page.getByLabel('Minimum points to redeem')).toHaveValue('75');
+  await expect(page.getByLabel('Point expiry (days)')).toHaveValue('180');
 
-  await page.getByLabel('Minimum redemption points').fill('80');
+  await page.getByLabel('Minimum points to redeem').fill('80');
   await page.getByRole('button', { name: 'Save loyalty program' }).click();
 
   await expect

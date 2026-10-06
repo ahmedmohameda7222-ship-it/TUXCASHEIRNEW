@@ -16,12 +16,7 @@ import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAd
 const uuidSchema = z.string().uuid();
 const textFilterSchema = z.string().trim().min(1).max(160);
 const instantSchema = z.string().datetime({ offset: true });
-const auditCursorSchema = z
-  .object({
-    createdAt: instantSchema,
-    id: uuidSchema,
-  })
-  .strict();
+const auditCursorSchema = z.object({ createdAt: instantSchema, id: uuidSchema }).strict();
 const approvalStatusSchema = z.enum([
   'PENDING',
   'APPROVED',
@@ -87,6 +82,9 @@ export default async function handler(
     const rawShopId = requestUrl.searchParams.get('shopId');
     const rawCursor = requestUrl.searchParams.get('cursor');
     const shopId = rawShopId === null ? undefined : uuidSchema.parse(rawShopId);
+    const eventId = requestUrl.searchParams.has('eventId')
+      ? uuidSchema.parse(requestUrl.searchParams.get('eventId'))
+      : undefined;
     const cursor = rawCursor === null ? undefined : decodeAuditCursor(rawCursor);
     if (rawCursor !== null && cursor === null) {
       sendJson(response, 400, { error: 'invalid_audit_cursor' });
@@ -111,6 +109,7 @@ export default async function handler(
 
     const [page, actorOptions] = await Promise.all([
       listAuditReadPage(client, context.principal, {
+        ...(eventId ? { id: eventId } : {}),
         ...(shopId ? { shopId } : {}),
         ...(actorEmployeeId ? { actorEmployeeId } : {}),
         ...(actionType ? { actionType } : {}),
@@ -118,16 +117,16 @@ export default async function handler(
         ...(approvalStatus ? { approvalStatus } : {}),
         ...(from ? { from } : {}),
         ...(to ? { to } : {}),
-        ...(cursor ? { cursor } : {}),
+        ...(!eventId && cursor ? { cursor } : {}),
       }),
-      shouldLoadAuditActorOptions(cursor)
+      !eventId && shouldLoadAuditActorOptions(cursor)
         ? listAuditActorOptions(client, context.principal)
         : Promise.resolve([]),
     ]);
     sendJson(response, 200, {
       events: page.events,
       actorOptions,
-      nextCursor: page.nextCursor ? encodeAuditCursor(page.nextCursor) : null,
+      nextCursor: !eventId && page.nextCursor ? encodeAuditCursor(page.nextCursor) : null,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

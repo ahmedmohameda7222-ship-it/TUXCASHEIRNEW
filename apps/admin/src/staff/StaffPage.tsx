@@ -1,6 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useLocation } from 'wouter';
 
+import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
 import { PageScaffold } from '../components/layout/PageScaffold';
+import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
+import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
+import { AdminDialog } from '../components/overlay/AdminDialog';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { EmployeeDetailPage } from './EmployeeDetailPage';
 import { useStaff, type StaffApiCommandDraft } from './useStaff';
@@ -14,27 +19,32 @@ function readableError(error: unknown): string | null {
 export function StaffPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [location, navigate] = useLocation();
+  const selectedId = detailIdFromPath(location, '/staff');
+  const [createOpen, setCreateOpen] = useState(false);
   const [newEmployeeName, setNewEmployeeName] = useState('');
   const [newEmployeePhone, setNewEmployeePhone] = useState('');
   const staff = useStaff(shopId, selectedId);
+  const shopChoices = useMemo(
+    () =>
+      principal.shopIds.map((id, index) => ({
+        id,
+        name: id === shopId ? 'Current shop' : `Shop ${index + 1}`,
+      })),
+    [principal.shopIds, shopId],
+  );
 
   const rows = useMemo(
     () => staff.workspaceQuery.data?.employees.rows ?? [],
     [staff.workspaceQuery.data],
   );
 
-  useEffect(() => {
-    if (selectedId && rows.some((employee) => employee.id === selectedId)) return;
-    setSelectedId(rows[0]?.id ?? null);
-  }, [rows, selectedId]);
-
   if (!shopId) {
     return (
       <PageScaffold
         eyebrow="Workforce"
         title="Staff"
-        description="Select a concrete shop to manage staff, attendance, leave, schedule and pay."
+        description="Select a shop to manage staff, attendance, leave, schedules and pay."
       />
     );
   }
@@ -45,109 +55,120 @@ export function StaffPage() {
   const actionError =
     readableError(staff.sensitiveCommand.error) ?? readableError(staff.command.error);
 
-  const execute = (command: StaffApiCommandDraft) => {
-    staff.command.mutate(command);
-  };
-
+  const execute = (command: StaffApiCommandDraft) => staff.command.mutate(command);
   const executeSensitive = (command: StaffApiCommandDraft, pin: string) => {
     staff.sensitiveCommand.mutate({ draft: command, pin });
   };
+
+  function createEmployee() {
+    const displayName = newEmployeeName.trim();
+    if (!displayName) return;
+    staff.command.mutate(
+      {
+        type: 'employee.create',
+        shopId,
+        displayName,
+        phone: newEmployeePhone.trim() || null,
+        hireDate: null,
+        notes: null,
+        role: 'STAFF',
+      },
+      {
+        onSuccess: (result) => {
+          setNewEmployeeName('');
+          setNewEmployeePhone('');
+          setCreateOpen(false);
+          if (result.ok && result.employeeId) navigate(detailPath('/staff', result.employeeId));
+        },
+      },
+    );
+  }
 
   return (
     <PageScaffold
       eyebrow="Workforce"
       title="Staff"
-      description="Shop-scoped staff profiles, Operations identity, schedule, attendance, leave and recorded pay."
+      description="Manage staff profiles, Operations access, schedules, attendance, leave and recorded pay."
+      primaryAction={
+        canManage ? (
+          <button
+            className="admin-primary-button"
+            type="button"
+            onClick={() => setCreateOpen(true)}
+          >
+            Add employee
+          </button>
+        ) : undefined
+      }
     >
       {actionError ? <p role="alert">{actionError}</p> : null}
 
-      <div className="admin-inventory-layout">
-        <section className="admin-inventory-list" aria-label="Employees">
-          {canManage ? (
-            <section
-              className="admin-catalog-editor__section is-compact"
-              aria-label="Create employee"
-            >
-              <h3>Add employee</h3>
-              <p>
-                New employees start as STAFF. Use the audited role-change flow after creation for
-                elevated access.
-              </p>
-              <label className="admin-field">
-                <span>Name</span>
-                <input
-                  value={newEmployeeName}
-                  onChange={(event) => setNewEmployeeName(event.target.value)}
-                />
-              </label>
-              <label className="admin-field">
-                <span>Phone</span>
-                <input
-                  value={newEmployeePhone}
-                  onChange={(event) => setNewEmployeePhone(event.target.value)}
-                />
-              </label>
-              <button
-                className="admin-primary-button"
-                type="button"
-                disabled={!newEmployeeName.trim() || staff.command.isPending}
-                onClick={() =>
-                  execute({
-                    type: 'employee.create',
-                    shopId,
-                    displayName: newEmployeeName.trim(),
-                    phone: newEmployeePhone.trim() || null,
-                    hireDate: null,
-                    notes: null,
-                    role: 'STAFF',
-                  })
+      <ResponsiveMasterDetail
+        listLabel="Employees"
+        detailLabel="Employee detail"
+        detailActive={selectedId !== null}
+        backHref="/staff"
+        list={
+          <div className="admin-inventory-list">
+            {staff.workspaceQuery.isLoading ? <LoadingState title="Loading staff" /> : null}
+            {staff.workspaceQuery.isError ? (
+              <ErrorState
+                title="Staff could not be loaded"
+                action={
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    onClick={() => void staff.workspaceQuery.refetch()}
+                  >
+                    Retry
+                  </button>
                 }
+              />
+            ) : null}
+            {rows.length === 0 && !staff.workspaceQuery.isLoading ? (
+              <EmptyState
+                title="No employees assigned to this shop"
+                description="Add or assign a staff profile to begin."
+              />
+            ) : null}
+            {rows.map((employee) => (
+              <button
+                className={
+                  employee.id === selectedId
+                    ? 'admin-inventory-row is-selected'
+                    : 'admin-inventory-row'
+                }
+                aria-current={employee.id === selectedId ? 'true' : undefined}
+                key={employee.id}
+                type="button"
+                onClick={() => navigate(detailPath('/staff', employee.id))}
               >
-                Add employee
+                <span>
+                  <strong>{employee.displayName}</strong>
+                  <small>
+                    {employee.role} · {employee.shopIds.length} shop
+                    {employee.shopIds.length === 1 ? '' : 's'}
+                  </small>
+                </span>
+                <span>
+                  {employee.active ? 'Active' : 'Suspended'}
+                  {employee.operationsSetupRequiredShopIds.length > 0
+                    ? ' · Operations setup required'
+                    : ''}
+                </span>
               </button>
-            </section>
-          ) : null}
-          {staff.workspaceQuery.isLoading ? <p>Loading staff…</p> : null}
-          {staff.workspaceQuery.isError ? <p role="alert">Staff could not be loaded.</p> : null}
-          {rows.length === 0 && !staff.workspaceQuery.isLoading ? (
-            <div className="admin-empty-state">
-              <strong>No employees assigned to this shop</strong>
-              <span>Create or assign a staff profile to begin.</span>
-            </div>
-          ) : null}
-
-          {rows.map((employee) => (
-            <button
-              className={
-                employee.id === selectedId
-                  ? 'admin-inventory-row is-selected'
-                  : 'admin-inventory-row'
-              }
-              key={employee.id}
-              type="button"
-              onClick={() => setSelectedId(employee.id)}
-            >
-              <span>
-                <strong>{employee.displayName}</strong>
-                <small>
-                  {employee.role} · {employee.shopIds.length} shop
-                  {employee.shopIds.length === 1 ? '' : 's'}
-                </small>
-              </span>
-              <span>
-                {employee.active ? 'Active' : 'Suspended'}
-                {employee.operationsSetupRequiredShopIds.length > 0 ? ' · Ops setup required' : ''}
-              </span>
-            </button>
-          ))}
-        </section>
-
-        <section className="admin-inventory-inspector">
-          {staff.detailQuery.isLoading ? <p>Loading employee…</p> : null}
-          {staff.detailQuery.isError ? (
-            <p role="alert">Employee detail could not be loaded.</p>
-          ) : null}
-          {detail ? (
+            ))}
+          </div>
+        }
+        detail={
+          staff.detailQuery.isLoading ? (
+            <LoadingState title="Loading employee" />
+          ) : staff.detailQuery.isError ? (
+            <ErrorState
+              title="Employee unavailable"
+              description="This employee may not exist or may not be available in your current shop scope."
+            />
+          ) : detail ? (
             <EmployeeDetailPage
               key={`${detail.id}:${shopId}`}
               employee={detail}
@@ -156,18 +177,77 @@ export function StaffPage() {
               canPay={canPay}
               financeAccounts={staff.workspaceQuery.data?.financeAccounts ?? []}
               workers={staff.workspaceQuery.data?.workers ?? []}
-              availableShopIds={principal.shopIds}
+              shops={shopChoices}
               onCommand={execute}
               onSensitiveCommand={executeSensitive}
             />
-          ) : !staff.detailQuery.isLoading ? (
-            <div className="admin-empty-state">
-              <strong>Select an employee</strong>
-              <span>Review profile, schedule, attendance, leave, pay and permissions.</span>
+          ) : (
+            <EmptyState
+              title="Employee unavailable"
+              description="Choose another employee from the list."
+            />
+          )
+        }
+        emptyDetail={
+          <EmptyState
+            title="Select an employee"
+            description="Review profile, schedule, attendance, leave, pay and permissions."
+          />
+        }
+      />
+
+      {canManage ? (
+        <AdminDialog
+          open={createOpen}
+          variant="sheet"
+          title="Add employee"
+          description="New employees start as Staff. Elevated access is granted separately through the controlled role-change flow."
+          onOpenChange={(open) => {
+            if (!staff.command.isPending) setCreateOpen(open);
+          }}
+        >
+          <form
+            className="admin-form-grid"
+            onSubmit={(event) => {
+              event.preventDefault();
+              createEmployee();
+            }}
+          >
+            <label className="admin-field">
+              <span>Name</span>
+              <input
+                autoFocus
+                value={newEmployeeName}
+                onChange={(event) => setNewEmployeeName(event.target.value)}
+              />
+            </label>
+            <label className="admin-field">
+              <span>Phone</span>
+              <input
+                value={newEmployeePhone}
+                onChange={(event) => setNewEmployeePhone(event.target.value)}
+              />
+            </label>
+            <div className="admin-inventory-page-actions">
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={staff.command.isPending}
+                onClick={() => setCreateOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="admin-primary-button"
+                type="submit"
+                disabled={!newEmployeeName.trim() || staff.command.isPending}
+              >
+                {staff.command.isPending ? 'Adding…' : 'Add employee'}
+              </button>
             </div>
-          ) : null}
-        </section>
-      </div>
+          </form>
+        </AdminDialog>
+      ) : null}
     </PageScaffold>
   );
 }

@@ -1,7 +1,9 @@
 import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
+import { useState } from 'react';
 import { useLocation } from 'wouter';
 
 import { PageScaffold } from '../components/layout/PageScaffold';
+import { ConfirmationDialog } from '../components/overlay/AdminDialog';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { CheckoutPage } from './CheckoutPage';
 import { OrderTypesPage } from './OrderTypesPage';
@@ -113,7 +115,7 @@ function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
       </section>
       <section className="admin-catalog-editor__section" aria-labelledby="settings-live-summary">
         <p className="admin-catalog-editor__eyebrow">Live controls</p>
-        <h2 id="settings-live-summary">Receipt and reason authority</h2>
+        <h2 id="settings-live-summary">Receipt and reason settings</h2>
         <p className="admin-field__help">
           Receipt prefix: {receiptPrefix === null ? 'Not configured' : String(receiptPrefix)}
         </p>
@@ -220,7 +222,7 @@ export function SettingsWorkspaceView({
         <div>
           <p className="admin-catalog-editor__eyebrow">Settings</p>
           <h1>{workspace.shop.name}</h1>
-          <p className="admin-field__help">Live settings version {workspace.settingsVersion}</p>
+          <p className="admin-field__help">Shop settings and operational controls</p>
         </div>
         <div className="admin-settings-workspace__publish">
           <button
@@ -263,11 +265,12 @@ export function SettingsWorkspaceView({
 export function SettingsPage() {
   const { scope } = useShopScope();
   const [location, navigate] = useLocation();
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const section = settingsSectionForLocation(location);
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const settings = useSettings(shopId);
 
-  if (!shopId)
+  if (!shopId) {
     return (
       <PageScaffold
         eyebrow="Settings"
@@ -275,7 +278,8 @@ export function SettingsPage() {
         description="Settings changes require a concrete shop scope."
       />
     );
-  if (settings.workspaceQuery.isPending)
+  }
+  if (settings.workspaceQuery.isPending) {
     return (
       <PageScaffold
         eyebrow="Settings"
@@ -283,7 +287,8 @@ export function SettingsPage() {
         description="Loading the current published shop configuration."
       />
     );
-  if (settings.workspaceQuery.isError || !settings.workspaceQuery.data)
+  }
+  if (settings.workspaceQuery.isError || !settings.workspaceQuery.data) {
     return (
       <PageScaffold
         eyebrow="Settings"
@@ -291,49 +296,59 @@ export function SettingsPage() {
         description="The settings workspace could not be loaded."
       />
     );
-
-  async function deleteOrArchiveShop(): Promise<void> {
-    const confirmed = window.confirm(
-      'Archive this shop? If the shop has no business history, the server may delete it instead.',
-    );
-    if (!confirmed) return;
-    await settings.deleteOrArchiveShop.mutateAsync();
   }
 
+  const workspace = settings.workspaceQuery.data;
+
   return (
-    <SettingsScheduleActionProvider
-      action={{
-        schedule: (draft) => settings.scheduleSettingsChange.mutateAsync(draft),
-        busy: settings.scheduleSettingsChange.isPending,
-      }}
-    >
-      <SettingsWorkspaceView
-        workspace={settings.workspaceQuery.data}
-        section={section}
-        onSectionChange={(nextSection) => navigate(settingsLocationForSection(nextSection))}
-        onPublish={() => settings.publish.mutateAsync()}
-        publishing={settings.publish.isPending}
-        onUpdateOperationalState={(draft) => settings.updateOperationalState.mutateAsync(draft)}
-        operationalStateUpdating={settings.updateOperationalState.isPending}
-        onUpdateShopIdentity={(draft) => settings.updateShopIdentity.mutateAsync(draft)}
-        onUpsertWeeklyHours={(draft) => settings.upsertWeeklyHours.mutateAsync(draft)}
-        onUpsertSpecialHours={(draft) => settings.upsertSpecialHours.mutateAsync(draft)}
-        shopManagementUpdating={
-          settings.updateShopIdentity.isPending ||
-          settings.upsertWeeklyHours.isPending ||
-          settings.upsertSpecialHours.isPending
-        }
-        onDeleteOrArchiveShop={deleteOrArchiveShop}
-        deletingOrArchivingShop={settings.deleteOrArchiveShop.isPending}
-        onUpdateSettingOverride={(draft) => settings.updateSettingOverride.mutateAsync(draft)}
-        settingOverrideUpdating={settings.updateSettingOverride.isPending}
-        onUpsertReasonCode={(draft) => settings.upsertReasonCode.mutateAsync(draft)}
-        reasonCodeUpdating={settings.upsertReasonCode.isPending}
-        onUpdateOrderType={(draft) => settings.updateOrderType.mutateAsync(draft)}
-        orderTypeUpdating={settings.updateOrderType.isPending}
-        onUpdatePaymentMethod={(draft) => settings.updatePaymentMethod.mutateAsync(draft)}
-        paymentMethodUpdating={settings.updatePaymentMethod.isPending}
+    <>
+      <SettingsScheduleActionProvider
+        action={{
+          schedule: (draft) => settings.scheduleSettingsChange.mutateAsync(draft),
+          busy: settings.scheduleSettingsChange.isPending,
+        }}
+      >
+        <SettingsWorkspaceView
+          workspace={workspace}
+          section={section}
+          onSectionChange={(nextSection) => navigate(settingsLocationForSection(nextSection))}
+          onPublish={() => settings.publish.mutateAsync()}
+          publishing={settings.publish.isPending}
+          onUpdateOperationalState={(draft) => settings.updateOperationalState.mutateAsync(draft)}
+          operationalStateUpdating={settings.updateOperationalState.isPending}
+          onUpdateShopIdentity={(draft) => settings.updateShopIdentity.mutateAsync(draft)}
+          onUpsertWeeklyHours={(draft) => settings.upsertWeeklyHours.mutateAsync(draft)}
+          onUpsertSpecialHours={(draft) => settings.upsertSpecialHours.mutateAsync(draft)}
+          shopManagementUpdating={
+            settings.updateShopIdentity.isPending ||
+            settings.upsertWeeklyHours.isPending ||
+            settings.upsertSpecialHours.isPending
+          }
+          onDeleteOrArchiveShop={() => setArchiveConfirmOpen(true)}
+          deletingOrArchivingShop={settings.deleteOrArchiveShop.isPending}
+          onUpdateSettingOverride={(draft) => settings.updateSettingOverride.mutateAsync(draft)}
+          settingOverrideUpdating={settings.updateSettingOverride.isPending}
+          onUpsertReasonCode={(draft) => settings.upsertReasonCode.mutateAsync(draft)}
+          reasonCodeUpdating={settings.upsertReasonCode.isPending}
+          onUpdateOrderType={(draft) => settings.updateOrderType.mutateAsync(draft)}
+          orderTypeUpdating={settings.updateOrderType.isPending}
+          onUpdatePaymentMethod={(draft) => settings.updatePaymentMethod.mutateAsync(draft)}
+          paymentMethodUpdating={settings.updatePaymentMethod.isPending}
+        />
+      </SettingsScheduleActionProvider>
+      <ConfirmationDialog
+        open={archiveConfirmOpen}
+        title={`Archive ${workspace.shop.name}?`}
+        description="If this shop has business or configuration history, it will be archived: new operational activity will be disabled and historical records will remain. If the shop has no recorded usage or configuration, it may be deleted instead."
+        confirmLabel="Archive shop"
+        destructive
+        pending={settings.deleteOrArchiveShop.isPending}
+        onOpenChange={setArchiveConfirmOpen}
+        onConfirm={async () => {
+          await settings.deleteOrArchiveShop.mutateAsync();
+          setArchiveConfirmOpen(false);
+        }}
       />
-    </SettingsScheduleActionProvider>
+    </>
   );
 }

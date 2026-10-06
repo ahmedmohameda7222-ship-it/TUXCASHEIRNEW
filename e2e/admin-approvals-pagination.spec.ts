@@ -106,7 +106,7 @@ test('loads approvals beyond the first bounded page using the continuation curso
   await page.goto('/approvals');
   await expect(page.getByText('Newest inventory adjustment').first()).toBeVisible();
   await expect(page.getByText('Older inventory adjustment')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Load more approvals' }).click();
+  await page.getByRole('button', { name: 'Load more', exact: true }).click();
   await expect(page.getByText('Older inventory adjustment').first()).toBeVisible();
 });
 
@@ -117,7 +117,8 @@ test('closes the PIN dialog if its reviewed request disappears during the same-q
   await mockSession(page);
   const firstId = '66666666-6666-4666-8666-666666666666';
   const replacementId = '77777777-7777-4777-8777-777777777777';
-  let getCount = 0;
+  let listGetCount = 0;
+  let detailGetCount = 0;
   let postedRequestId: string | null = null;
 
   await page.route('**/api/admin/approvals*', async (route) => {
@@ -132,9 +133,27 @@ test('closes the PIN dialog if its reviewed request disappears during the same-q
       return;
     }
 
-    getCount += 1;
+    const url = new URL(route.request().url());
+    const detailId = url.searchParams.get('id');
+    if (detailId) {
+      detailGetCount += 1;
+      const detail =
+        detailId === firstId && detailGetCount === 1
+          ? approval(firstId, 'Reviewed request', '2026-09-18T00:00:00.000Z')
+          : detailId === replacementId
+            ? approval(replacementId, 'Replacement request', '2026-09-17T23:59:00.000Z')
+            : null;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ approvals: detail ? [detail] : [], nextCursor: null }),
+      });
+      return;
+    }
+
+    listGetCount += 1;
     const approvals =
-      getCount === 1
+      listGetCount === 1
         ? [
             approval(firstId, 'Reviewed request', '2026-09-18T00:00:00.000Z'),
             approval(replacementId, 'Replacement request', '2026-09-17T23:59:00.000Z'),
@@ -149,11 +168,13 @@ test('closes the PIN dialog if its reviewed request disappears during the same-q
 
   await page.goto('/approvals');
   await expect(page.getByText('Reviewed request').first()).toBeVisible();
+  await page.getByRole('button', { name: /Reviewed request/ }).click();
   await page.getByRole('button', { name: 'Approve' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
 
   await page.clock.fastForward(16_000);
-  await expect.poll(() => getCount).toBeGreaterThan(1);
+  await expect.poll(() => listGetCount).toBeGreaterThan(1);
+  await expect.poll(() => detailGetCount).toBeGreaterThan(1);
   await expect(page.getByText('Reviewed request')).toHaveCount(0);
   await expect(page.getByText('Replacement request').first()).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -200,6 +221,6 @@ test('loads audit events beyond the first bounded page using the continuation cu
   await page.goto('/audit');
   await expect(page.getByText('NEWEST INVENTORY ADJUSTMENT').first()).toBeVisible();
   await expect(page.getByText('OLDER INVENTORY ADJUSTMENT')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Load more audit events' }).click();
+  await page.getByRole('button', { name: 'Load more', exact: true }).click();
   await expect(page.getByText('OLDER INVENTORY ADJUSTMENT').first()).toBeVisible();
 });

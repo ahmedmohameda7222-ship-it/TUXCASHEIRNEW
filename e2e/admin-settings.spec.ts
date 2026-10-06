@@ -330,10 +330,13 @@ test('confirms archive before routing shop lifecycle management through the trus
   page,
 }) => {
   const { commands } = await mockSettings(page);
-  page.once('dialog', (dialog) => dialog.accept());
 
   await page.goto('/settings/shop');
   await page.getByRole('button', { name: 'Archive / delete unused shop' }).click();
+  const confirmation = page.getByRole('dialog', { name: 'Archive TUX Maadi?' });
+  await expect(confirmation).toBeVisible();
+  await expect(confirmation).toContainText('historical records will remain');
+  await confirmation.getByRole('button', { name: 'Archive shop' }).click();
 
   await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);
   expect(commands[0]).toEqual({ type: 'shop.delete-or-archive', shopId });

@@ -17,6 +17,7 @@ import {
   UsersRound,
   type LucideIcon,
 } from 'lucide-react';
+import { Link, useLocation } from 'wouter';
 
 import type { AdminSessionPrincipal } from '@tux/admin-contracts';
 import { ADMIN_ROUTES, routeIsPermitted } from '../../app/routes';
@@ -39,7 +40,18 @@ const ICONS: Record<string, LucideIcon> = {
   '/audit': ShieldCheck,
 };
 
-export function DesktopSidebar({ principal }: { principal: AdminSessionPrincipal }) {
+function routeIsActive(currentPath: string, href: string): boolean {
+  return href === '/'
+    ? currentPath === '/'
+    : currentPath === href || currentPath.startsWith(`${href}/`);
+}
+
+type DesktopSidebarProps = {
+  principal: AdminSessionPrincipal;
+  currentPath?: string;
+};
+
+function DesktopSidebarView({ principal, currentPath }: Required<DesktopSidebarProps>) {
   const routes = ADMIN_ROUTES.filter(
     (route) => route.path !== '/more' && routeIsPermitted(principal, route.path),
   );
@@ -52,14 +64,34 @@ export function DesktopSidebar({ principal }: { principal: AdminSessionPrincipal
       <nav className="admin-sidebar__nav" aria-label="Admin sections">
         {routes.map((route) => {
           const Icon = ICONS[route.path] ?? ClipboardList;
+          const active = routeIsActive(currentPath, route.path);
           return (
-            <a className="admin-sidebar__link" href={route.path} key={route.path}>
+            <Link
+              className={active ? 'admin-sidebar__link is-active' : 'admin-sidebar__link'}
+              href={route.path}
+              aria-label={route.label}
+              aria-current={active ? 'page' : undefined}
+              key={route.path}
+            >
               <Icon size={19} aria-hidden="true" />
-              <span>{route.label}</span>
-            </a>
+              <span aria-hidden="true">{route.label}</span>
+            </Link>
           );
         })}
       </nav>
     </aside>
+  );
+}
+
+function RoutedDesktopSidebar({ principal }: Pick<DesktopSidebarProps, 'principal'>) {
+  const [currentPath] = useLocation();
+  return <DesktopSidebarView principal={principal} currentPath={currentPath} />;
+}
+
+export function DesktopSidebar({ principal, currentPath }: DesktopSidebarProps) {
+  return currentPath === undefined ? (
+    <RoutedDesktopSidebar principal={principal} />
+  ) : (
+    <DesktopSidebarView principal={principal} currentPath={currentPath} />
   );
 }
