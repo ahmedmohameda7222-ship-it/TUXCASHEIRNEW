@@ -189,6 +189,30 @@ async function mockPurchasing(
   return { commands };
 }
 
+async function openPurchaseOrders(page: Page) {
+  await page.getByRole('tab', { name: 'Purchase orders' }).click();
+  await expect(page.getByRole('heading', { name: 'Purchase orders' })).toBeVisible();
+}
+
+async function selectPurchaseOrder(page: Page, reference = 'PO-100') {
+  await openPurchaseOrders(page);
+  await page.getByRole('button', { name: new RegExp(reference) }).click();
+  await expect(page.getByRole('region', { name: 'Purchase order detail' })).toBeVisible();
+}
+
+async function openSuppliers(page: Page) {
+  await page.getByRole('tab', { name: 'Suppliers' }).click();
+  await expect(page.getByRole('heading', { name: 'Suppliers' })).toBeVisible();
+}
+
+async function openSupplierDialog(page: Page) {
+  await openSuppliers(page);
+  await page.getByRole('button', { name: 'Add supplier' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
 test('purchasing renders suppliers and can order a draft PO through the trusted BFF', async ({
   page,
 }) => {
@@ -199,6 +223,7 @@ test('purchasing renders suppliers and can order a draft PO through the trusted 
   await expect(page.getByText('Prime Foods').first()).toBeVisible();
   await expect(page.getByText('PO-100').first()).toBeVisible();
 
+  await selectPurchaseOrder(page);
   await page.getByRole('button', { name: 'Mark ordered' }).click();
 
   await expect.poll(() => fixture.commands.length).toBe(1);
@@ -217,6 +242,7 @@ test('purchasing surfaces ordinary mutation conflicts to the operator', async ({
   });
   await page.goto('/purchasing');
 
+  await selectPurchaseOrder(page);
   await page.getByRole('button', { name: 'Mark ordered' }).click();
 
   await expect(page.getByRole('alert')).toContainText(/stale purchase order version/i);
@@ -233,10 +259,13 @@ test('purchasing replaces an older mutation error with the most recent failure',
   });
   await page.goto('/purchasing');
 
-  await page.getByLabel('Supplier name').fill('Duplicate supplier');
-  await page.getByRole('button', { name: 'Add supplier' }).click();
+  const dialog = await openSupplierDialog(page);
+  await dialog.getByLabel('Supplier name').fill('Duplicate supplier');
+  await dialog.getByRole('button', { name: 'Add supplier' }).click();
   await expect(page.getByRole('alert')).toContainText(/supplier name conflict/i);
 
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await selectPurchaseOrder(page);
   await page.getByRole('button', { name: 'Mark ordered' }).click();
   await expect(page.getByRole('alert')).toContainText(/stale purchase order version/i);
 });
@@ -250,10 +279,13 @@ test('purchasing clears an older mutation error after a later action succeeds', 
   });
   await page.goto('/purchasing');
 
-  await page.getByLabel('Supplier name').fill('Duplicate supplier');
-  await page.getByRole('button', { name: 'Add supplier' }).click();
+  const dialog = await openSupplierDialog(page);
+  await dialog.getByLabel('Supplier name').fill('Duplicate supplier');
+  await dialog.getByRole('button', { name: 'Add supplier' }).click();
   await expect(page.getByRole('alert')).toContainText(/supplier name conflict/i);
 
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await selectPurchaseOrder(page);
   await page.getByRole('button', { name: 'Mark ordered' }).click();
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
@@ -265,11 +297,12 @@ test('supplier creation retains its command id across a lost response retry', as
   });
   await page.goto('/purchasing');
 
-  await page.getByLabel('Supplier name').fill('Prime Foods');
-  await page.getByRole('button', { name: 'Add supplier' }).click();
+  const dialog = await openSupplierDialog(page);
+  await dialog.getByLabel('Supplier name').fill('Prime Foods');
+  await dialog.getByRole('button', { name: 'Add supplier' }).click();
   await expect(page.getByRole('alert')).toContainText(/temporary supplier response loss/i);
 
-  await page.getByRole('button', { name: 'Add supplier' }).click();
+  await dialog.getByRole('button', { name: 'Add supplier' }).click();
   await expect.poll(() => fixture.commands.length).toBe(2);
 
   const firstCommandId = fixture.commands[0]?.commandId;
@@ -306,7 +339,9 @@ test('purchase order creation excludes inactive suppliers from options and defau
   });
   await page.goto('/purchasing');
 
+  await openSuppliers(page);
   await expect(page.getByText('Archived Foods').first()).toBeVisible();
+  await openPurchaseOrders(page);
   const purchaseOrders = page.getByRole('region', { name: 'Purchase orders' });
   const supplierSelect = purchaseOrders.getByRole('combobox').first();
   await expect(supplierSelect.getByRole('option', { name: 'Archived Foods' })).toHaveCount(0);
@@ -328,10 +363,12 @@ test('purchase order defaults adopt the first supplier created after an initiall
   const fixture = await mockPurchasing(page, { startWithoutSuppliers: true });
   await page.goto('/purchasing');
 
-  await page.getByLabel('Supplier name').fill('Prime Foods');
-  await page.getByRole('button', { name: 'Add supplier' }).click();
+  const dialog = await openSupplierDialog(page);
+  await dialog.getByLabel('Supplier name').fill('Prime Foods');
+  await dialog.getByRole('button', { name: 'Add supplier' }).click();
   await expect(page.getByText('Prime Foods').first()).toBeVisible();
 
+  await openPurchaseOrders(page);
   await page.getByLabel('Order quantity (purchase units)').fill('1');
   await page.getByRole('button', { name: 'Create purchase order' }).click();
 
@@ -360,6 +397,7 @@ test('purchasing posts partial receiving and purchase returns without pretending
   const fixture = await mockPurchasing(page);
   await page.goto('/purchasing');
 
+  await selectPurchaseOrder(page);
   await page.getByRole('button', { name: 'Mark ordered' }).click();
   await expect(page.getByText('ORDERED').first()).toBeVisible();
 
