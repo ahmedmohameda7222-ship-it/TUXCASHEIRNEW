@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
 
@@ -7,12 +6,9 @@ import { PageScaffold } from '../components/layout/PageScaffold';
 import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { AdminDialog } from '../components/overlay/AdminDialog';
-import { adminFetch } from '../lib/adminApi';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { EmployeeDetailPage } from './EmployeeDetailPage';
 import { useStaff, type StaffApiCommandDraft } from './useStaff';
-
-type StaffShopChoice = { id: string; name: string };
 
 function readableError(error: unknown): string | null {
   if (!error) return null;
@@ -29,11 +25,14 @@ export function StaffPage() {
   const [newEmployeeName, setNewEmployeeName] = useState('');
   const [newEmployeePhone, setNewEmployeePhone] = useState('');
   const staff = useStaff(shopId, selectedId);
-  const shopChoices = useQuery({
-    queryKey: ['admin', 'staff', 'shop-labels'],
-    enabled: Boolean(shopId),
-    queryFn: () => adminFetch<{ shops: StaffShopChoice[] }>('/api/admin/staff-shops'),
-  });
+  const shopChoices = useMemo(
+    () =>
+      principal.shopIds.map((id, index) => ({
+        id,
+        name: id === shopId ? 'Current shop' : `Shop ${index + 1}`,
+      })),
+    [principal.shopIds, shopId],
+  );
 
   const rows = useMemo(() => staff.workspaceQuery.data?.employees.rows ?? [], [staff.workspaceQuery.data]);
 
@@ -138,9 +137,9 @@ export function StaffPage() {
           </div>
         }
         detail={
-          staff.detailQuery.isLoading || shopChoices.isLoading ? (
+          staff.detailQuery.isLoading ? (
             <LoadingState title="Loading employee" />
-          ) : staff.detailQuery.isError || shopChoices.isError ? (
+          ) : staff.detailQuery.isError ? (
             <ErrorState
               title="Employee unavailable"
               description="This employee may not exist or may not be available in your current shop scope."
@@ -154,7 +153,7 @@ export function StaffPage() {
               canPay={canPay}
               financeAccounts={staff.workspaceQuery.data?.financeAccounts ?? []}
               workers={staff.workspaceQuery.data?.workers ?? []}
-              shops={shopChoices.data?.shops ?? []}
+              shops={shopChoices}
               onCommand={execute}
               onSensitiveCommand={executeSensitive}
             />
