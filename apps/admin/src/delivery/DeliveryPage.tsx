@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
 import { useAdminSession } from '../auth/useAdminSession';
+import { EmptyState, ErrorState, InlineError, LoadingState } from '../components/feedback/AdminStates';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { AdminApiError, adminFetch } from '../lib/adminApi';
 import { createRetainedCommandIds } from '../lib/retainedCommandIds';
@@ -133,7 +134,7 @@ export function DeliveryPage() {
       <PageScaffold
         eyebrow="Delivery"
         title="Delivery"
-        description="Select a concrete shop to manage delivery zones, riders and dispatch state."
+        description="Select a shop to manage its delivery zones, riders, and active deliveries."
       />
     );
   }
@@ -144,15 +145,37 @@ export function DeliveryPage() {
     typeof editingZoneId === 'string'
       ? (workspace?.zones.find((zone) => zone.id === editingZoneId) ?? null)
       : null;
+  const fallbackShops = principal.shopIds
+    .map((authorizedShopId, index) => ({ id: authorizedShopId, label: `Shop ${index + 1}` }))
+    .filter((option) => option.id !== shopId);
 
   return (
     <PageScaffold
-      eyebrow="Delivery authority"
+      eyebrow="Delivery"
       title="Delivery"
-      description="Server-authoritative zones, routing constraints, riders and append-only dispatch state."
+      description="Manage delivery zones, riders, routing, and delivery status for the selected shop."
     >
-      {workspaceQuery.isLoading ? <p>Loading delivery workspace…</p> : null}
-      {workspaceQuery.isError ? <p role="alert">Delivery workspace could not be loaded.</p> : null}
+      {workspaceQuery.isLoading ? (
+        <LoadingState
+          title="Loading delivery"
+          description="Getting the latest zones, riders, and delivery status."
+        />
+      ) : null}
+      {workspaceQuery.isError ? (
+        <ErrorState
+          title="Delivery unavailable"
+          description="The delivery workspace could not be loaded."
+          action={
+            <button
+              className="admin-secondary-button"
+              type="button"
+              onClick={() => void workspaceQuery.refetch()}
+            >
+              Try again
+            </button>
+          }
+        />
+      ) : null}
 
       {workspace ? (
         <>
@@ -160,9 +183,7 @@ export function DeliveryPage() {
             <header className="admin-section-header">
               <div>
                 <h2>Delivery zones</h2>
-                <p>
-                  Canonical fee, minimum, boundary, priority and explicit fallback configuration.
-                </p>
+                <p>Configure fees, minimum orders, coverage, routing priority, and fallback behavior.</p>
               </div>
               {canManage ? (
                 <button
@@ -176,35 +197,57 @@ export function DeliveryPage() {
             </header>
 
             {workspace.zones.length === 0 ? (
-              <p>No delivery zones configured.</p>
+              <EmptyState
+                title="No delivery zones yet"
+                description={
+                  canManage
+                    ? 'Create a delivery zone to define coverage and fees.'
+                    : 'No delivery zones are configured for this shop.'
+                }
+              />
             ) : (
               <div className="admin-inventory-list">
-                {workspace.zones.map((zone) => (
-                  <button
-                    className="admin-inventory-row"
-                    type="button"
-                    key={zone.id}
-                    disabled={!canManage}
-                    onClick={() => setEditingZoneId(zone.id)}
-                  >
-                    <span>
-                      <strong>{zone.name}</strong>
-                      <small>
-                        Priority {zone.priority} · {zone.active ? 'Active' : 'Inactive'}
-                      </small>
-                    </span>
-                    <span>
-                      <strong>{formatMinor(zone.feeMinor)}</strong>
-                      <small>{formatMinor(zone.minimumOrderMinor)} minimum</small>
-                    </span>
-                  </button>
-                ))}
+                {workspace.zones.map((zone) =>
+                  canManage ? (
+                    <button
+                      className="admin-inventory-row"
+                      type="button"
+                      key={zone.id}
+                      onClick={() => setEditingZoneId(zone.id)}
+                    >
+                      <span>
+                        <strong>{zone.name}</strong>
+                        <small>
+                          Priority {zone.priority} · {zone.active ? 'Active' : 'Inactive'}
+                        </small>
+                      </span>
+                      <span>
+                        <strong>{formatMinor(zone.feeMinor)}</strong>
+                        <small>{formatMinor(zone.minimumOrderMinor)} minimum</small>
+                      </span>
+                    </button>
+                  ) : (
+                    <article className="admin-inventory-row" key={zone.id}>
+                      <span>
+                        <strong>{zone.name}</strong>
+                        <small>
+                          Priority {zone.priority} · {zone.active ? 'Active' : 'Inactive'}
+                        </small>
+                      </span>
+                      <span>
+                        <strong>{formatMinor(zone.feeMinor)}</strong>
+                        <small>{formatMinor(zone.minimumOrderMinor)} minimum</small>
+                      </span>
+                    </article>
+                  ),
+                )}
               </div>
             )}
 
             {editingZoneId !== undefined && canManage ? (
               <ZoneEditor
                 zone={editingZone}
+                fallbackShops={fallbackShops}
                 saving={saveZone.isPending}
                 onSave={(input) => saveZone.mutate(input)}
                 onCancel={() => setEditingZoneId(undefined)}
@@ -215,13 +258,17 @@ export function DeliveryPage() {
           <RidersPage
             riders={workspace.riders}
             saving={saveRider.isPending}
+            canManage={canManage}
             onSave={(input) => saveRider.mutate(input)}
           />
 
           <section aria-label="Delivery orders">
             <h2>Delivery orders</h2>
             {workspace.orders.length === 0 ? (
-              <p>No delivery orders require dispatch management.</p>
+              <EmptyState
+                title="No active delivery orders"
+                description="Delivery orders that need dispatch attention will appear here."
+              />
             ) : (
               workspace.orders.map((order) =>
                 canManage ? (
@@ -234,7 +281,7 @@ export function DeliveryPage() {
                   />
                 ) : (
                   <article key={order.orderId} aria-label={`Delivery order ${order.orderId}`}>
-                    <strong>{order.orderId}</strong>
+                    <strong>Delivery order</strong>
                     <span>{order.state}</span>
                   </article>
                 ),
@@ -245,7 +292,7 @@ export function DeliveryPage() {
       ) : null}
 
       {saveZone.isError || saveRider.isError || transitionOrder.isError ? (
-        <p role="alert">Delivery action failed. Refresh the workspace and try again.</p>
+        <InlineError>Delivery action failed. Refresh the workspace and try again.</InlineError>
       ) : null}
     </PageScaffold>
   );
