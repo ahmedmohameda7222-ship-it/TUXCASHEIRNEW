@@ -51,7 +51,10 @@ async function mockAdmin(page: Page) {
             reason: 'Cycle count mismatch',
             consequence: 'The persisted command will execute after approval.',
             status: approvalDecided ? 'EXECUTING' : 'PENDING',
+            displayStatus: approvalDecided ? 'EXECUTING' : 'PENDING',
+            canDecide: !approvalDecided,
             executionLabel: approvalDecided ? 'Execution in progress' : 'Not started',
+            expiresAt: '2099-01-01T00:00:00.000Z',
             createdAt: '2026-09-16T16:30:00.000Z',
             decidedAt: approvalDecided ? '2026-09-16T16:40:00.000Z' : null,
           },
@@ -99,6 +102,7 @@ for (const viewport of [
     await page.goto('/approvals');
     await expect(page.getByRole('heading', { name: 'Approvals' })).toBeVisible();
     await expect(page.getByText('Emergency inventory adjustment').first()).toBeVisible();
+    await page.getByRole('button', { name: /Emergency inventory adjustment/ }).click();
     await expect(page.getByText('Cycle count mismatch')).toBeVisible();
   });
 }
@@ -108,6 +112,7 @@ test('requires PIN confirmation and preserves recoverable execution state after 
 }) => {
   await mockAdmin(page);
   await page.goto('/approvals');
+  await page.getByRole('button', { name: /Emergency inventory adjustment/ }).click();
   await page.getByRole('button', { name: 'Approve' }).click();
   await expect(page.getByRole('dialog')).toContainText('Enter PIN to approve');
   await page.getByRole('textbox', { name: 'PIN' }).fill('482731');
@@ -122,9 +127,9 @@ test('renders audit history as human-readable structured changes', async ({ page
   await mockAdmin(page);
   await page.goto('/audit');
   await expect(page.getByRole('heading', { name: 'Audit log' })).toBeVisible();
-  await expect(
-    page.getByRole('navigation', { name: 'Audit events' }).getByRole('button').first(),
-  ).toContainText('Manager Two');
+  const auditEvent = page.getByLabel('Audit events').getByRole('button').first();
+  await expect(auditEvent).toContainText('Manager Two');
+  await auditEvent.click();
   await expect(page.getByRole('heading', { name: 'Before' })).toBeVisible();
   await expect(page.getByText('PENDING', { exact: true })).toBeVisible();
   await expect(page.getByText('APPROVED', { exact: true })).toBeVisible();
@@ -134,15 +139,9 @@ test('exposes every required audit filter', async ({ page }) => {
   await mockAdmin(page);
   await page.goto('/audit');
 
-  for (const label of [
-    'From date',
-    'To date',
-    'Shop',
-    'Actor',
-    'Action',
-    'Entity',
-    'Approval status',
-  ]) {
+  await expect(page.getByLabel('Search by action', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Filters', exact: true }).click();
+  for (const label of ['From date', 'To date', 'Shop', 'Actor', 'Entity', 'Approval status']) {
     await expect(page.getByLabel(label, { exact: true })).toBeVisible();
   }
 });

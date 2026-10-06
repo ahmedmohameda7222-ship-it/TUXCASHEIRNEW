@@ -1,6 +1,6 @@
 import type { AdminApprovalStatus } from '@tux/admin-contracts';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
 
 import { useAdminSession } from '../auth/useAdminSession';
@@ -110,6 +110,17 @@ export function ApprovalsPage() {
     [approvalsQuery.data],
   );
   const selected = detailQuery.data ?? null;
+
+  useEffect(() => {
+    if (!decision) return;
+    if (decision.requestId !== selectedId) {
+      setDecision(null);
+      return;
+    }
+    if (!detailQuery.isLoading && !detailQuery.isFetching && selected === null) {
+      setDecision(null);
+    }
+  }, [decision, detailQuery.isFetching, detailQuery.isLoading, selected, selectedId]);
 
   const decisionMutation = useMutation({
     mutationFn: async ({
