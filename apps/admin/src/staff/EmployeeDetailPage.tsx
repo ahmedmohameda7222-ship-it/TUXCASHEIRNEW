@@ -80,6 +80,8 @@ export function EmployeeDetailPage({
   const setupRequired = employee.operationsIdentities.filter(
     (identity) => identity.kind === 'SETUP_REQUIRED',
   );
+  const currentShopSetupRequired = setupRequired.some((identity) => identity.shopId === shopId);
+  const otherShopSetupRequired = setupRequired.filter((identity) => identity.shopId !== shopId);
   const inactiveOperationsIdentities = employee.operationsIdentities.filter(
     isInactiveLinkedOperationsIdentity,
   );
@@ -217,7 +219,7 @@ export function EmployeeDetailPage({
             <span>
               A linked Operations worker is missing for {setupRequired.map((identity) => shopName(identity.shopId)).join(', ')}.
             </span>
-            {canManage && availableWorkers.length > 0 ? (
+            {currentShopSetupRequired && canManage && availableWorkers.length > 0 ? (
               <>
                 <label className="admin-field">
                   <span>Operations worker</span>
@@ -234,8 +236,11 @@ export function EmployeeDetailPage({
                   Complete Operations setup
                 </button>
               </>
-            ) : canManage ? (
+            ) : currentShopSetupRequired && canManage ? (
               <span>No unlinked active Operations worker is available for this shop.</span>
+            ) : null}
+            {canManage && otherShopSetupRequired.length > 0 ? (
+              <span>Switch to that shop to complete Operations setup.</span>
             ) : null}
           </div>
         ) : null}
