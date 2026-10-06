@@ -226,7 +226,7 @@ test('delivery zone editor uses EGP amounts and named fallback choices', async (
   await expect(page.getByLabel(/fallback shop id/i)).toHaveCount(0);
 
   await page.getByLabel('Use fallback shop').check();
-  await page.getByLabel('Fallback shop').selectOption({ label: 'Shop 2' });
+  await page.getByRole('combobox', { name: 'Fallback shop' }).selectOption({ label: 'Shop 2' });
   await page.getByRole('button', { name: 'Save delivery zone' }).click();
 
   await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);
