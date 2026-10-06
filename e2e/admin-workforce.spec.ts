@@ -140,6 +140,11 @@ async function mockWorkforce(page: Page, withAccount = true) {
   return commands;
 }
 
+async function selectEmployee(page: Page, name: string) {
+  await page.getByRole('button', { name: new RegExp(name) }).click();
+  await expect(page.getByRole('heading', { name })).toBeVisible();
+}
+
 test('staff profile exposes Operations setup and posts payment only to a trusted account', async ({
   page,
 }) => {
@@ -148,9 +153,10 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
 
   await expect(page.getByRole('heading', { name: 'Staff' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
-  await expect(page.getByText('Operations identity setup required')).toBeVisible();
+  await selectEmployee(page, 'Mona Ali');
+  await expect(page.getByText('Operations setup required')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Pay' }).click();
+  await page.getByRole('tab', { name: 'Pay' }).click();
   await expect(page.getByLabel('Payment account')).toHaveValue(accountId);
   await expect(page.getByRole('option', { name: /Payroll Cash/ })).toHaveCount(1);
   await page.getByLabel('Pay period start').fill('2026-09-01');
@@ -177,7 +183,8 @@ test('staff payment shows a clear no-account state instead of inventing an accou
 }) => {
   await mockWorkforce(page, false);
   await page.goto('/staff');
-  await page.getByRole('button', { name: 'Pay' }).click();
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Pay' }).click();
 
   await expect(page.getByText('No active payment account')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Record payment' })).toHaveCount(0);
@@ -186,7 +193,8 @@ test('staff payment shows a clear no-account state instead of inventing an accou
 test('attendance correction posts a separate audited correction command', async ({ page }) => {
   const commands = await mockWorkforce(page);
   await page.goto('/staff');
-  await page.getByRole('button', { name: 'Attendance' }).click();
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Attendance' }).click();
 
   await page.getByLabel('Corrected time').fill('2026-09-27T09:15');
   await page.getByLabel('Reason').fill('Forgot to clock in');
@@ -275,12 +283,13 @@ test('switching employees resets local profile editor state to the selected empl
   });
 
   await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
   const monaProfile = page.getByRole('article', { name: 'Employee Mona Ali' });
   await expect(monaProfile.getByLabel('Name')).toHaveValue('Mona Ali');
 
-  await page.getByRole('button', { name: /Youssef Hassan/ }).click();
+  await page.getByRole('link', { name: 'Back to Employees' }).click();
+  await selectEmployee(page, 'Youssef Hassan');
 
-  await expect(page.getByRole('heading', { name: 'Youssef Hassan' })).toBeVisible();
   const youssefProfile = page.getByRole('article', { name: 'Employee Youssef Hassan' });
   await expect(youssefProfile.getByLabel('Name')).toHaveValue('Youssef Hassan');
   await expect(youssefProfile.getByLabel('Phone')).toHaveValue('+201011111111');
