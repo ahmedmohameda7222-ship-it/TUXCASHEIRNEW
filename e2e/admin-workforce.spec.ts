@@ -154,7 +154,7 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
   await expect(page.getByRole('heading', { name: 'Staff' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
   await selectEmployee(page, 'Mona Ali');
-  await expect(page.getByText('Operations setup required')).toBeVisible();
+  await expect(page.getByText('Operations setup required', { exact: true })).toBeVisible();
 
   await page.getByRole('tab', { name: 'Pay' }).click();
   await expect(page.getByLabel('Payment account')).toHaveValue(accountId);
@@ -287,7 +287,6 @@ test('switching employees resets local profile editor state to the selected empl
   const monaProfile = page.getByRole('article', { name: 'Employee Mona Ali' });
   await expect(monaProfile.getByLabel('Name')).toHaveValue('Mona Ali');
 
-  await page.getByRole('link', { name: 'Back to Employees' }).click();
   await selectEmployee(page, 'Youssef Hassan');
 
   const youssefProfile = page.getByRole('article', { name: 'Employee Youssef Hassan' });
