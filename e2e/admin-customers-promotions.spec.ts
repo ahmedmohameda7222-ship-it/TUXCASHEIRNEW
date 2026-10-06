@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const otherShopId = '99999999-9999-4999-8999-999999999999';
@@ -192,7 +192,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-async function openCustomer(page: import('@playwright/test').Page) {
+async function openCustomer(page: Page) {
   await page.goto('/customers');
   await expect(page.getByRole('heading', { name: 'Customers' })).toBeVisible();
   await page.getByRole('button', { name: /Mona/ }).click();
