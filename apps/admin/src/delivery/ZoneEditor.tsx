@@ -258,7 +258,10 @@ export function ZoneEditor({
       {fallbackEnabled ? (
         <label className="admin-field">
           <span>Fallback shop</span>
-          <select value={fallbackShopId} onChange={(event) => setFallbackShopId(event.target.value)}>
+          <select
+            value={fallbackShopId}
+            onChange={(event) => setFallbackShopId(event.target.value)}
+          >
             <option value="">Select a shop</option>
             {configuredFallbackUnavailable ? (
               <option value={fallbackShopId}>Current configured fallback</option>
