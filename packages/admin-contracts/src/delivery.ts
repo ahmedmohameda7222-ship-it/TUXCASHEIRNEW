@@ -41,12 +41,7 @@ export type AdminDeliveryRider = {
 };
 
 export type AdminDeliveryOrderState =
-  | 'UNASSIGNED'
-  | 'ASSIGNED'
-  | 'OUT_FOR_DELIVERY'
-  | 'DELIVERED'
-  | 'FAILED'
-  | 'RETURNED';
+  'UNASSIGNED' | 'ASSIGNED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED' | 'RETURNED';
 
 export type AdminDeliveryOrder = {
   orderId: string;
@@ -69,14 +64,8 @@ export type AdminDeliveryStateEvent = {
   createdAt: string;
 };
 
-export type AdminDeliveryShopOption = {
-  id: string;
-  name: string;
-};
-
 export type AdminDeliveryWorkspace = {
   shopId: string;
-  fallbackShops: readonly AdminDeliveryShopOption[];
   zones: readonly AdminDeliveryZone[];
   riders: readonly AdminDeliveryRider[];
   orders: readonly AdminDeliveryOrder[];
