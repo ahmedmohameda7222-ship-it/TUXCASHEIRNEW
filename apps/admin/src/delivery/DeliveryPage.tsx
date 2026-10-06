@@ -7,7 +7,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
 import { useAdminSession } from '../auth/useAdminSession';
-import { EmptyState, ErrorState, InlineError, LoadingState } from '../components/feedback/AdminStates';
+import {
+  EmptyState,
+  ErrorState,
+  InlineError,
+  LoadingState,
+} from '../components/feedback/AdminStates';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { AdminApiError, adminFetch } from '../lib/adminApi';
 import { createRetainedCommandIds } from '../lib/retainedCommandIds';
@@ -98,7 +103,13 @@ export function DeliveryPage() {
       orderId: string;
       riderId: string | null;
       expectedVersion: number;
-      toState: 'UNASSIGNED' | 'ASSIGNED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED' | 'RETURNED';
+      toState:
+        | 'UNASSIGNED'
+        | 'ASSIGNED'
+        | 'OUT_FOR_DELIVERY'
+        | 'DELIVERED'
+        | 'FAILED'
+        | 'RETURNED';
       note: string | null;
     }) => {
       if (!shopId) throw new Error('concrete_shop_required');
@@ -146,7 +157,10 @@ export function DeliveryPage() {
       ? (workspace?.zones.find((zone) => zone.id === editingZoneId) ?? null)
       : null;
   const fallbackShops = principal.shopIds
-    .map((authorizedShopId, index) => ({ id: authorizedShopId, label: `Shop ${index + 1}` }))
+    .map((authorizedShopId, index) => ({
+      id: authorizedShopId,
+      label: `Shop ${index + 1}`,
+    }))
     .filter((option) => option.id !== shopId);
 
   return (
@@ -183,7 +197,9 @@ export function DeliveryPage() {
             <header className="admin-section-header">
               <div>
                 <h2>Delivery zones</h2>
-                <p>Configure fees, minimum orders, coverage, routing priority, and fallback behavior.</p>
+                <p>
+                  Configure fees, minimum orders, coverage, routing priority, and fallback behavior.
+                </p>
               </div>
               {canManage ? (
                 <button
