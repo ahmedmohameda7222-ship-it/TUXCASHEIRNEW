@@ -1,6 +1,8 @@
 import type { AdminDeliveryRider } from '@tux/admin-contracts';
 import { useState, type FormEvent } from 'react';
 
+import { EmptyState } from '../components/feedback/AdminStates';
+
 export type DeliveryRiderDraft = {
   riderId: string | null;
   expectedVersion: number | null;
@@ -13,10 +15,12 @@ export type DeliveryRiderDraft = {
 export function RidersPage({
   riders,
   saving,
+  canManage,
   onSave,
 }: {
   riders: readonly AdminDeliveryRider[];
   saving: boolean;
+  canManage: boolean;
   onSave(input: DeliveryRiderDraft): void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -27,6 +31,7 @@ export function RidersPage({
   const [state, setState] = useState<AdminDeliveryRider['state']>('AVAILABLE');
 
   function begin(rider: AdminDeliveryRider | null) {
+    if (!canManage) return;
     setEditingId(rider?.id ?? '');
     setName(rider?.displayName ?? '');
     setPhone(rider?.phone ?? '');
@@ -36,7 +41,7 @@ export function RidersPage({
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!name.trim()) return;
+    if (!canManage || !name.trim()) return;
     onSave({
       riderId: editing?.id ?? null,
       expectedVersion: editing?.version ?? null,
@@ -47,26 +52,48 @@ export function RidersPage({
     });
   }
 
-  const formOpen = editingId !== null;
+  const formOpen = editingId !== null && canManage;
 
   return (
     <section aria-label="Delivery riders">
-      <header>
-        <h2>Riders</h2>
-        <button className="admin-primary-button" type="button" onClick={() => begin(null)}>
-          New rider
-        </button>
+      <header className="admin-section-header">
+        <div>
+          <h2>Riders</h2>
+          <p>Manage rider availability and contact details for this shop.</p>
+        </div>
+        {canManage ? (
+          <button className="admin-primary-button" type="button" onClick={() => begin(null)}>
+            New rider
+          </button>
+        ) : null}
       </header>
 
       {riders.length === 0 ? (
-        <p>No riders configured.</p>
+        <EmptyState
+          title="No riders yet"
+          description={
+            canManage
+              ? 'Add a rider when delivery coverage is ready.'
+              : 'No riders are configured for this shop.'
+          }
+        />
       ) : (
         <ul>
           {riders.map((rider) => (
             <li key={rider.id}>
-              <button className="admin-secondary-button" type="button" onClick={() => begin(rider)}>
-                {rider.displayName} · {rider.state} · {rider.active ? 'Active' : 'Inactive'}
-              </button>
+              {canManage ? (
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  onClick={() => begin(rider)}
+                >
+                  {rider.displayName} · {rider.state} · {rider.active ? 'Active' : 'Inactive'}
+                </button>
+              ) : (
+                <span className="admin-secondary-button" aria-disabled="true">
+                  {rider.displayName} · {rider.state} · {rider.active ? 'Active' : 'Inactive'}
+                </span>
+              )}
             </li>
           ))}
         </ul>
