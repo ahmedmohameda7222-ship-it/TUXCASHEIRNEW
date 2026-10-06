@@ -1,5 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
+import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
+import { Router } from 'wouter';
 
 import type { AdminSessionPrincipal } from '@tux/admin-contracts';
 import { AdminShell, primaryDestinationsFor } from './AdminShell';
@@ -21,9 +23,14 @@ const owner: AdminSessionPrincipal = {
   shopIds: ['shop-a'],
 };
 
+function renderAt(path: string, node: ReactNode): string {
+  return renderToStaticMarkup(<Router ssrPath={path}>{node}</Router>);
+}
+
 describe('adaptive Admin shell', () => {
   it('renders the five approved phone destinations when permitted', () => {
-    const html = renderToStaticMarkup(
+    const html = renderAt(
+      '/orders',
       <MobileTabBar
         permitted={['home', 'orders', 'catalog', 'inventory', 'more']}
         currentPath="/orders"
@@ -37,7 +44,10 @@ describe('adaptive Admin shell', () => {
   });
 
   it('keeps tablet rail links named and marks the active section', () => {
-    const html = renderToStaticMarkup(<DesktopSidebar principal={owner} currentPath="/customers" />);
+    const html = renderAt(
+      '/customers',
+      <DesktopSidebar principal={owner} currentPath="/customers" />,
+    );
     expect(html).toContain('aria-label="Customers"');
     expect(html).toContain('href="/customers"');
     expect(html).toContain('aria-current="page"');
@@ -56,7 +66,8 @@ describe('adaptive Admin shell', () => {
   });
 
   it('renders explicit mobile and desktop navigation surfaces around content', () => {
-    const html = renderToStaticMarkup(
+    const html = renderAt(
+      '/',
       <AdminShell principal={owner} onLogout={() => undefined}>
         <p>Workspace content</p>
       </AdminShell>,
