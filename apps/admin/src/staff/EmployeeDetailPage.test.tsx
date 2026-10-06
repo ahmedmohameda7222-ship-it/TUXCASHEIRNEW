@@ -43,7 +43,7 @@ function render(detail: EmployeeDetail, canManage = true) {
       canPay
       financeAccounts={[]}
       workers={[]}
-      availableShopIds={[SHOP_ID]}
+      shops={[{ id: SHOP_ID, name: 'Current shop' }]}
       onCommand={() => undefined}
       onSensitiveCommand={() => undefined}
     />,
@@ -51,11 +51,13 @@ function render(detail: EmployeeDetail, canManage = true) {
 }
 
 describe('EmployeeDetailPage', () => {
-  it('shows profile facts and Operations setup guidance', () => {
+  it('shows profile facts and Operations setup guidance without exposing shop IDs', () => {
     const html = render(employee());
     expect(html).toContain('Mona Ali');
-    expect(html).toContain('Operations identity setup required');
+    expect(html).toContain('Operations setup required');
+    expect(html).toContain('Current shop');
     expect(html).toContain('No unlinked active Operations worker is available for this shop.');
+    expect(html).not.toContain(SHOP_ID);
   });
 
   it('renders an inactive preserved link as disabled rather than healthy setup', () => {
@@ -73,9 +75,9 @@ describe('EmployeeDetailPage', () => {
         ],
       }),
     );
-    expect(html).toContain('Operations identity disabled');
-    expect(html).toContain('Reactivate Operations identity');
-    expect(html).not.toContain('Operations identity linked for every assigned shop.');
+    expect(html).toContain('Operations access disabled');
+    expect(html).toContain('Restore Operations access');
+    expect(html).not.toContain('Operations access: Ready');
   });
 
   it('does not offer Operations reactivation to a viewer without staff.manage', () => {
@@ -94,7 +96,7 @@ describe('EmployeeDetailPage', () => {
       }),
       false,
     );
-    expect(html).toContain('Operations identity disabled');
-    expect(html).not.toContain('Reactivate Operations identity');
+    expect(html).toContain('Operations access disabled');
+    expect(html).not.toContain('Restore Operations access');
   });
 });
