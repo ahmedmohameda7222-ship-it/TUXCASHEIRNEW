@@ -1,0 +1,131 @@
+name: Admin Pre-Plan-7 Approvals E2E Fix
+
+on:
+  push:
+    branches:
+      - feat/admin-pre-plan-7-ui-ux-hardening
+    paths:
+      - .github/workflows/admin-pre-plan7-approvals-e2e-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/admin-pre-plan-7-ui-ux-hardening
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Align approval and audit flows with hardened master-detail UI
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected 1 match, found {count}')
+              return text.replace(old, new, 1)
+
+          page_path = Path('apps/admin/src/approvals/ApprovalsPage.tsx')
+          text = page_path.read_text()
+          text = replace_once(
+              text,
+              "import { useMemo, useState } from 'react';",
+              "import { useEffect, useMemo, useState } from 'react';",
+              'approval useEffect import',
+          )
+          text = replace_once(
+              text,
+              "  const selected = detailQuery.data ?? null;\n\n  const decisionMutation = useMutation({",
+              """  const selected = detailQuery.data ?? null;\n\n  useEffect(() => {\n    if (!decision) return;\n    if (decision.requestId !== selectedId) {\n      setDecision(null);\n      return;\n    }\n    if (!detailQuery.isLoading && !detailQuery.isFetching && selected === null) {\n      setDecision(null);\n    }\n  }, [decision, detailQuery.isFetching, detailQuery.isLoading, selected, selectedId]);\n\n  const decisionMutation = useMutation({""",
+              'approval stale decision guard',
+          )
+          page_path.write_text(text)
+
+          spec_path = Path('e2e/admin-approvals-audit.spec.ts')
+          text = spec_path.read_text()
+          text = replace_once(
+              text,
+              """            status: approvalDecided ? 'EXECUTING' : 'PENDING',\n            executionLabel: approvalDecided ? 'Execution in progress' : 'Not started',\n            createdAt: '2026-09-16T16:30:00.000Z',""",
+              """            status: approvalDecided ? 'EXECUTING' : 'PENDING',\n            displayStatus: approvalDecided ? 'EXECUTING' : 'PENDING',\n            canDecide: !approvalDecided,\n            executionLabel: approvalDecided ? 'Execution in progress' : 'Not started',\n            expiresAt: '2099-01-01T00:00:00.000Z',\n            createdAt: '2026-09-16T16:30:00.000Z',""",
+              'approval mock contract',
+          )
+          text = replace_once(
+              text,
+              """    await expect(page.getByRole('heading', { name: 'Approvals' })).toBeVisible();\n    await expect(page.getByText('Emergency inventory adjustment').first()).toBeVisible();\n    await expect(page.getByText('Cycle count mismatch')).toBeVisible();""",
+              """    await expect(page.getByRole('heading', { name: 'Approvals' })).toBeVisible();\n    await expect(page.getByText('Emergency inventory adjustment').first()).toBeVisible();\n    await page.getByRole('button', { name: /Emergency inventory adjustment/ }).click();\n    await expect(page.getByText('Cycle count mismatch')).toBeVisible();""",
+              'responsive approval detail selection',
+          )
+          text = replace_once(
+              text,
+              """  await mockAdmin(page);\n  await page.goto('/approvals');\n  await page.getByRole('button', { name: 'Approve' }).click();""",
+              """  await mockAdmin(page);\n  await page.goto('/approvals');\n  await page.getByRole('button', { name: /Emergency inventory adjustment/ }).click();\n  await page.getByRole('button', { name: 'Approve' }).click();""",
+              'approval decision detail selection',
+          )
+          text = replace_once(
+              text,
+              """  await expect(\n    page.getByRole('navigation', { name: 'Audit events' }).getByRole('button').first(),\n  ).toContainText('Manager Two');\n  await expect(page.getByRole('heading', { name: 'Before' })).toBeVisible();""",
+              """  const auditEvent = page.getByLabel('Audit events').getByRole('button').first();\n  await expect(auditEvent).toContainText('Manager Two');\n  await auditEvent.click();\n  await expect(page.getByRole('heading', { name: 'Before' })).toBeVisible();""",
+              'audit detail selection',
+          )
+          text = replace_once(
+              text,
+              """  await page.goto('/audit');\n\n  for (const label of [\n    'From date',\n    'To date',\n    'Shop',\n    'Actor',\n    'Action',\n    'Entity',\n    'Approval status',\n  ]) {\n    await expect(page.getByLabel(label, { exact: true })).toBeVisible();\n  }""",
+              """  await page.goto('/audit');\n\n  await expect(page.getByLabel('Search by action', { exact: true })).toBeVisible();\n  await page.getByRole('button', { name: 'Filters', exact: true }).click();\n  for (const label of [\n    'From date',\n    'To date',\n    'Shop',\n    'Actor',\n    'Entity',\n    'Approval status',\n  ]) {\n    await expect(page.getByLabel(label, { exact: true })).toBeVisible();\n  }""",
+              'audit filter dialog',
+          )
+          spec_path.write_text(text)
+
+          pagination_path = Path('e2e/admin-approvals-pagination.spec.ts')
+          text = pagination_path.read_text()
+          text = text.replace(
+              "page.getByRole('button', { name: 'Load more approvals' })",
+              "page.getByRole('button', { name: 'Load more', exact: true })",
+          )
+          text = text.replace(
+              "page.getByRole('button', { name: 'Load more audit events' })",
+              "page.getByRole('button', { name: 'Load more', exact: true })",
+          )
+          text = replace_once(
+              text,
+              """  let getCount = 0;\n  let postedRequestId: string | null = null;""",
+              """  let listGetCount = 0;\n  let detailGetCount = 0;\n  let postedRequestId: string | null = null;""",
+              'approval pagination counters',
+          )
+          old_get = """    getCount += 1;\n    const approvals =\n      getCount === 1\n        ? [\n            approval(firstId, 'Reviewed request', '2026-09-18T00:00:00.000Z'),\n            approval(replacementId, 'Replacement request', '2026-09-17T23:59:00.000Z'),\n          ]\n        : [approval(replacementId, 'Replacement request', '2026-09-17T23:59:00.000Z')];\n    await route.fulfill({\n      status: 200,\n      contentType: 'application/json',\n      body: JSON.stringify({ approvals, nextCursor: null }),\n    });"""
+          new_get = """    const url = new URL(route.request().url());\n    const detailId = url.searchParams.get('id');\n    if (detailId) {\n      detailGetCount += 1;\n      const detail =\n        detailId === firstId && detailGetCount === 1\n          ? approval(firstId, 'Reviewed request', '2026-09-18T00:00:00.000Z')\n          : detailId === replacementId\n            ? approval(replacementId, 'Replacement request', '2026-09-17T23:59:00.000Z')\n            : null;\n      await route.fulfill({\n        status: 200,\n        contentType: 'application/json',\n        body: JSON.stringify({ approvals: detail ? [detail] : [], nextCursor: null }),\n      });\n      return;\n    }\n\n    listGetCount += 1;\n    const approvals =\n      listGetCount === 1\n        ? [\n            approval(firstId, 'Reviewed request', '2026-09-18T00:00:00.000Z'),\n            approval(replacementId, 'Replacement request', '2026-09-17T23:59:00.000Z'),\n          ]\n        : [approval(replacementId, 'Replacement request', '2026-09-17T23:59:00.000Z')];\n    await route.fulfill({\n      status: 200,\n      contentType: 'application/json',\n      body: JSON.stringify({ approvals, nextCursor: null }),\n    });"""
+          text = replace_once(text, old_get, new_get, 'approval detail-aware pagination mock')
+          text = replace_once(
+              text,
+              """  await page.goto('/approvals');\n  await expect(page.getByText('Reviewed request').first()).toBeVisible();\n  await page.getByRole('button', { name: 'Approve' }).click();""",
+              """  await page.goto('/approvals');\n  await expect(page.getByText('Reviewed request').first()).toBeVisible();\n  await page.getByRole('button', { name: /Reviewed request/ }).click();\n  await page.getByRole('button', { name: 'Approve' }).click();""",
+              'disappearing approval detail selection',
+          )
+          text = replace_once(
+              text,
+              """  await page.clock.fastForward(16_000);\n  await expect.poll(() => getCount).toBeGreaterThan(1);""",
+              """  await page.clock.fastForward(16_000);\n  await expect.poll(() => listGetCount).toBeGreaterThan(1);\n  await expect.poll(() => detailGetCount).toBeGreaterThan(1);""",
+              'approval disappearance refetch assertions',
+          )
+          pagination_path.write_text(text)
+          PY
+          npx prettier --write apps/admin/src/approvals/ApprovalsPage.tsx e2e/admin-approvals-audit.spec.ts e2e/admin-approvals-pagination.spec.ts
+      - name: Remove one-shot workflow
+        run: rm .github/workflows/admin-pre-plan7-approvals-e2e-fix.yml
+      - name: Commit scoped approval regression fix
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/admin/src/approvals/ApprovalsPage.tsx e2e/admin-approvals-audit.spec.ts e2e/admin-approvals-pagination.spec.ts .github/workflows/admin-pre-plan7-approvals-e2e-fix.yml
+          git diff --cached --check
+          git commit -m 'fix(admin): align approvals hardening flows'
+          git push origin HEAD:feat/admin-pre-plan-7-ui-ux-hardening
