@@ -16,9 +16,7 @@ import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAd
 const uuidSchema = z.string().uuid();
 const textFilterSchema = z.string().trim().min(1).max(160);
 const instantSchema = z.string().datetime({ offset: true });
-const auditCursorSchema = z
-  .object({ createdAt: instantSchema, id: uuidSchema })
-  .strict();
+const auditCursorSchema = z.object({ createdAt: instantSchema, id: uuidSchema }).strict();
 const approvalStatusSchema = z.enum([
   'PENDING',
   'APPROVED',

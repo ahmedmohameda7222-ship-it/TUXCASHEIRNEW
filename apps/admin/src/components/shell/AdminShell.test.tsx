@@ -13,13 +13,7 @@ const owner: AdminSessionPrincipal = {
   employeeId: 'employee-1',
   businessId: 'business-1',
   role: 'OWNER',
-  permissions: [
-    'orders.view',
-    'catalog.view',
-    'inventory.view',
-    'customers.view',
-    'finance.view',
-  ],
+  permissions: ['orders.view', 'catalog.view', 'inventory.view', 'customers.view', 'finance.view'],
   shopIds: ['shop-a'],
 };
 
@@ -54,9 +48,7 @@ describe('adaptive Admin shell', () => {
   });
 
   it('gives the phone logout action an explicit accessible name', () => {
-    const html = renderToStaticMarkup(
-      <AdminTopBar principal={owner} onLogout={() => undefined} />,
-    );
+    const html = renderToStaticMarkup(<AdminTopBar principal={owner} onLogout={() => undefined} />);
     expect(html).toContain('aria-label="Log out"');
   });
 

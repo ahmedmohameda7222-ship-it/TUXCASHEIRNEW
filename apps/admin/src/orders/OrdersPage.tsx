@@ -31,7 +31,14 @@ export function OrdersPage() {
   const [action, setAction] = useState<ActionMode>(null);
 
   const filters = useMemo<OrderSearchFilters>(
-    () => ({ query, statuses: status ? [status] : [], source: source || null, from: null, to: null, limit: 50 }),
+    () => ({
+      query,
+      statuses: status ? [status] : [],
+      source: source || null,
+      from: null,
+      to: null,
+      limit: 50,
+    }),
     [query, source, status],
   );
   const ordersApi = useOrders(shopId, selectedId, filters);
@@ -52,8 +59,12 @@ export function OrdersPage() {
 
   const detail = ordersApi.detailQuery.data;
   const reasons = ordersApi.actionReasonsQuery.data?.reasons ?? [];
-  const cancellationReasons = reasons.filter((reason) => reason.active && reason.family === 'CANCELLATION');
-  const refundReasons = reasons.filter((reason) => reason.active && reason.family === 'REFUND_RETURN');
+  const cancellationReasons = reasons.filter(
+    (reason) => reason.active && reason.family === 'CANCELLATION',
+  );
+  const refundReasons = reasons.filter(
+    (reason) => reason.active && reason.family === 'REFUND_RETURN',
+  );
   const canCancel = principal.permissions.includes('orders.cancel');
   const canRefund = principal.permissions.includes('orders.refund');
   const actionError =
@@ -78,7 +89,10 @@ export function OrdersPage() {
         </label>
         <label className="admin-field">
           <span>Status</span>
-          <select value={status} onChange={(event) => setStatus(event.target.value as AdminOrderStatus | '')}>
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.target.value as AdminOrderStatus | '')}
+          >
             <option value="">All statuses</option>
             <option value="ACTIVE">Active</option>
             <option value="DONE">Done</option>
@@ -88,7 +102,10 @@ export function OrdersPage() {
         </label>
         <label className="admin-field">
           <span>Source</span>
-          <select value={source} onChange={(event) => setSource(event.target.value as AdminOrderSource | '')}>
+          <select
+            value={source}
+            onChange={(event) => setSource(event.target.value as AdminOrderSource | '')}
+          >
             <option value="">All sources</option>
             <option value="POS">POS</option>
             <option value="ONLINE">Online</option>
@@ -110,18 +127,27 @@ export function OrdersPage() {
               <ErrorState
                 title="Orders could not be loaded"
                 action={
-                  <button className="admin-secondary-button" type="button" onClick={() => void ordersApi.searchQuery.refetch()}>
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    onClick={() => void ordersApi.searchQuery.refetch()}
+                  >
                     Retry
                   </button>
                 }
               />
             ) : null}
             {rows.length === 0 && !ordersApi.searchQuery.isLoading ? (
-              <EmptyState title="No matching orders" description="Adjust the search or filters for this shop." />
+              <EmptyState
+                title="No matching orders"
+                description="Adjust the search or filters for this shop."
+              />
             ) : null}
             {rows.map((row) => (
               <button
-                className={row.id === selectedId ? 'admin-inventory-row is-selected' : 'admin-inventory-row'}
+                className={
+                  row.id === selectedId ? 'admin-inventory-row is-selected' : 'admin-inventory-row'
+                }
                 aria-current={row.id === selectedId ? 'true' : undefined}
                 key={row.id}
                 type="button"
@@ -132,9 +158,13 @@ export function OrdersPage() {
               >
                 <span>
                   <strong>{row.displayOrderLabel ?? `#${row.displayOrderNo}`}</strong>
-                  <small>{row.customerName ?? row.normalizedPhone ?? 'Walk-in'} · {row.orderTypeLabel}</small>
+                  <small>
+                    {row.customerName ?? row.normalizedPhone ?? 'Walk-in'} · {row.orderTypeLabel}
+                  </small>
                 </span>
-                <span>{row.status} · {row.source}</span>
+                <span>
+                  {row.status} · {row.source}
+                </span>
               </button>
             ))}
             {ordersApi.searchQuery.hasNextPage ? (
@@ -177,7 +207,11 @@ export function OrdersPage() {
                   onCancel={() => setAction(null)}
                   onSubmit={(input) =>
                     ordersApi.cancelOrder.mutate(
-                      { orderId: detail.id, expectedOperationalRevision: detail.operationalRevision, ...input },
+                      {
+                        orderId: detail.id,
+                        expectedOperationalRevision: detail.operationalRevision,
+                        ...input,
+                      },
                       { onSuccess: () => setAction(null) },
                     )
                   }
@@ -191,16 +225,25 @@ export function OrdersPage() {
                   returning={ordersApi.returnOrderItems.isPending}
                   onCancel={() => setAction(null)}
                   onRefund={(input) =>
-                    ordersApi.refundOrder.mutate({ orderId: detail.id, ...input }, { onSuccess: () => setAction(null) })
+                    ordersApi.refundOrder.mutate(
+                      { orderId: detail.id, ...input },
+                      { onSuccess: () => setAction(null) },
+                    )
                   }
                   onReturn={(input) =>
-                    ordersApi.returnOrderItems.mutate({ orderId: detail.id, ...input }, { onSuccess: () => setAction(null) })
+                    ordersApi.returnOrderItems.mutate(
+                      { orderId: detail.id, ...input },
+                      { onSuccess: () => setAction(null) },
+                    )
                   }
                 />
               ) : null}
             </>
           ) : (
-            <EmptyState title="Order unavailable" description="Choose another order from the list." />
+            <EmptyState
+              title="Order unavailable"
+              description="Choose another order from the list."
+            />
           )
         }
         emptyDetail={

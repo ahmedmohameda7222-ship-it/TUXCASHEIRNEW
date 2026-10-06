@@ -20,7 +20,10 @@ export function AdminTabs<T extends string>({
 }) {
   const baseId = useId();
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const selectedIndex = Math.max(0, tabs.findIndex((tab) => tab.id === value));
+  const selectedIndex = Math.max(
+    0,
+    tabs.findIndex((tab) => tab.id === value),
+  );
 
   function moveFocus(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     const enabled = tabs
@@ -30,7 +33,8 @@ export function AdminTabs<T extends string>({
     const currentEnabledIndex = enabled.findIndex(({ candidateIndex }) => candidateIndex === index);
     let nextEnabledIndex = currentEnabledIndex;
     if (event.key === 'ArrowRight') nextEnabledIndex = (currentEnabledIndex + 1) % enabled.length;
-    else if (event.key === 'ArrowLeft') nextEnabledIndex = (currentEnabledIndex - 1 + enabled.length) % enabled.length;
+    else if (event.key === 'ArrowLeft')
+      nextEnabledIndex = (currentEnabledIndex - 1 + enabled.length) % enabled.length;
     else if (event.key === 'Home') nextEnabledIndex = 0;
     else if (event.key === 'End') nextEnabledIndex = enabled.length - 1;
     else return;

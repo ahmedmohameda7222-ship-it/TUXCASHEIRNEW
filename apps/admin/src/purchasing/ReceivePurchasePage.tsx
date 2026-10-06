@@ -29,7 +29,11 @@ export function ReceivePurchasePage({
   onCancel(): void;
   onReceive(input: {
     supplierReference: string | null;
-    lines: readonly { lineId: string; receivedPurchaseUnitsMicros: number; purchaseUnitCostMinor: number }[];
+    lines: readonly {
+      lineId: string;
+      receivedPurchaseUnitsMicros: number;
+      purchaseUnitCostMinor: number;
+    }[];
   }): void;
   onReturn(input: {
     supplierReference: string | null;
@@ -98,7 +102,9 @@ export function ReceivePurchasePage({
                 ? `Receive ${line.itemName} (${line.purchaseUnitLabel})`
                 : `Return ${line.itemName} (${line.purchaseUnitLabel})`}
               <input
-                aria-label={mode === 'receive' ? `Receive ${line.itemName}` : `Return ${line.itemName}`}
+                aria-label={
+                  mode === 'receive' ? `Receive ${line.itemName}` : `Return ${line.itemName}`
+                }
                 inputMode="decimal"
                 value={quantities[line.id] ?? ''}
                 onChange={(event) => {
@@ -124,10 +130,19 @@ export function ReceivePurchasePage({
           </div>
         ))}
         <div className="admin-inventory-page-actions">
-          <button className="admin-secondary-button" type="button" disabled={pending} onClick={onCancel}>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={pending}
+            onClick={onCancel}
+          >
             Cancel
           </button>
-          <button className="admin-primary-button" type="submit" disabled={pending || eligible.length === 0}>
+          <button
+            className="admin-primary-button"
+            type="submit"
+            disabled={pending || eligible.length === 0}
+          >
             {pending ? 'Saving…' : mode === 'receive' ? 'Post receipt' : 'Post return'}
           </button>
         </div>

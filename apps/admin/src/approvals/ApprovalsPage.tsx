@@ -99,9 +99,9 @@ export function ApprovalsPage() {
     queryKey: ['admin', 'approvals', 'detail', selectedId],
     enabled: selectedId !== null,
     queryFn: () =>
-      adminFetch<ApprovalListResponse>(`/api/admin/approvals?id=${encodeURIComponent(selectedId!)}`).then(
-        (response) => response.approvals[0] ?? null,
-      ),
+      adminFetch<ApprovalListResponse>(
+        `/api/admin/approvals?id=${encodeURIComponent(selectedId!)}`,
+      ).then((response) => response.approvals[0] ?? null),
     refetchInterval: 15_000,
   });
 
@@ -124,7 +124,9 @@ export function ApprovalsPage() {
       reason: string | null;
     }) => {
       const approval =
-        selected?.id === requestId ? selected : approvals.find((row) => row.id === requestId) ?? null;
+        selected?.id === requestId
+          ? selected
+          : (approvals.find((row) => row.id === requestId) ?? null);
       if (!approval || approval.displayStatus === 'EXPIRED' || approval.canDecide === false) {
         throw new Error('approval_selection_not_actionable');
       }
@@ -157,7 +159,10 @@ export function ApprovalsPage() {
       <div className="admin-approvals-toolbar">
         <label className="admin-field">
           <span>Status</span>
-          <select value={status} onChange={(event) => setStatus(event.currentTarget.value as StatusFilter)}>
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.currentTarget.value as StatusFilter)}
+          >
             <option value="ALL">All</option>
             <option value="PENDING">Pending</option>
             <option value="APPROVED">Approved</option>
@@ -180,11 +185,22 @@ export function ApprovalsPage() {
             {approvalsQuery.isError ? (
               <ErrorState
                 title="Approvals could not be loaded"
-                action={<button className="admin-secondary-button" type="button" onClick={() => void approvalsQuery.refetch()}>Retry</button>}
+                action={
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    onClick={() => void approvalsQuery.refetch()}
+                  >
+                    Retry
+                  </button>
+                }
               />
             ) : null}
             {!approvalsQuery.isLoading && !approvalsQuery.isError && approvals.length === 0 ? (
-              <EmptyState title="No approval requests" description="No requests match this status filter." />
+              <EmptyState
+                title="No approval requests"
+                description="No requests match this status filter."
+              />
             ) : null}
             {approvals.map((approval) => (
               <button
@@ -231,11 +247,17 @@ export function ApprovalsPage() {
               onReject={() => setDecision({ kind: 'REJECT', requestId: selected.id })}
             />
           ) : (
-            <EmptyState title="Approval unavailable" description="Choose another request from the list." />
+            <EmptyState
+              title="Approval unavailable"
+              description="Choose another request from the list."
+            />
           )
         }
         emptyDetail={
-          <EmptyState title="Select an approval" description="Review the request, reason and consequences before deciding." />
+          <EmptyState
+            title="Select an approval"
+            description="Review the request, reason and consequences before deciding."
+          />
         }
       />
 

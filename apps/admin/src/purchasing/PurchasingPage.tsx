@@ -16,7 +16,9 @@ import { usePurchasing } from './usePurchasing';
 type ActionMode = 'receive' | 'return' | null;
 type PurchasingSection = 'orders' | 'suppliers';
 
-function latestMutationError(mutations: readonly { error: unknown; submittedAt: number }[]): unknown {
+function latestMutationError(
+  mutations: readonly { error: unknown; submittedAt: number }[],
+): unknown {
   let latest: { error: unknown; submittedAt: number } | null = null;
   for (const mutation of mutations) {
     if (mutation.submittedAt <= 0) continue;
@@ -57,21 +59,43 @@ export function PurchasingPage() {
   );
 
   if (!shopId) {
-    return <PageScaffold eyebrow="Purchasing" title="Purchasing" description="Select a shop to manage suppliers and purchase orders." />;
+    return (
+      <PageScaffold
+        eyebrow="Purchasing"
+        title="Purchasing"
+        description="Select a shop to manage suppliers and purchase orders."
+      />
+    );
   }
   if (purchasing.workspace.isLoading) {
     return (
-      <PageScaffold eyebrow="Purchasing" title="Purchasing" description="Manage supplier purchasing for this shop.">
+      <PageScaffold
+        eyebrow="Purchasing"
+        title="Purchasing"
+        description="Manage supplier purchasing for this shop."
+      >
         <LoadingState title="Loading purchasing" />
       </PageScaffold>
     );
   }
   if (purchasing.workspace.isError || !workspace) {
     return (
-      <PageScaffold eyebrow="Purchasing" title="Purchasing" description="Manage supplier purchasing for this shop.">
+      <PageScaffold
+        eyebrow="Purchasing"
+        title="Purchasing"
+        description="Manage supplier purchasing for this shop."
+      >
         <ErrorState
           title="Purchasing could not be loaded"
-          action={<button className="admin-secondary-button" type="button" onClick={() => void purchasing.workspace.refetch()}>Retry</button>}
+          action={
+            <button
+              className="admin-secondary-button"
+              type="button"
+              onClick={() => void purchasing.workspace.refetch()}
+            >
+              Retry
+            </button>
+          }
         />
       </PageScaffold>
     );
@@ -81,8 +105,16 @@ export function PurchasingPage() {
   const canReceive = principal.permissions.includes('purchasing.receive');
 
   return (
-    <PageScaffold eyebrow="Supplier purchasing" title="Purchasing" description="Create purchase orders, receive deliveries and record supplier returns.">
-      {mutationErrorText ? <p className="admin-inventory-note" role="alert">{mutationErrorText}</p> : null}
+    <PageScaffold
+      eyebrow="Supplier purchasing"
+      title="Purchasing"
+      description="Create purchase orders, receive deliveries and record supplier returns."
+    >
+      {mutationErrorText ? (
+        <p className="admin-inventory-note" role="alert">
+          {mutationErrorText}
+        </p>
+      ) : null}
       <ResponsiveMasterDetail
         listLabel="Purchasing"
         detailLabel="Purchase order detail"
@@ -121,7 +153,9 @@ export function PurchasingPage() {
                     suppliers={workspace.suppliers}
                     canManage={canManage}
                     pending={purchasing.createSupplier.isPending}
-                    onCreate={(input, onSuccess) => purchasing.createSupplier.mutate(input, { onSuccess })}
+                    onCreate={(input, onSuccess) =>
+                      purchasing.createSupplier.mutate(input, { onSuccess })
+                    }
                   />
                 ),
               },
@@ -136,7 +170,12 @@ export function PurchasingPage() {
                 canManage={canManage}
                 canReceive={canReceive}
                 ordering={purchasing.orderPurchaseOrder.isPending}
-                onOrder={() => purchasing.orderPurchaseOrder.mutate({ purchaseOrderId: selected.id, expectedVersion: selected.version })}
+                onOrder={() =>
+                  purchasing.orderPurchaseOrder.mutate({
+                    purchaseOrderId: selected.id,
+                    expectedVersion: selected.version,
+                  })
+                }
                 onReceive={() => setAction('receive')}
                 onReturn={() => setAction('return')}
               />
@@ -144,7 +183,11 @@ export function PurchasingPage() {
                 <ReceivePurchasePage
                   order={selected}
                   mode={action}
-                  pending={action === 'receive' ? purchasing.receivePurchase.isPending : purchasing.returnPurchase.isPending}
+                  pending={
+                    action === 'receive'
+                      ? purchasing.receivePurchase.isPending
+                      : purchasing.returnPurchase.isPending
+                  }
                   onCancel={() => setAction(null)}
                   onReceive={(input) =>
                     purchasing.receivePurchase.mutate(
@@ -162,10 +205,18 @@ export function PurchasingPage() {
               ) : null}
             </>
           ) : (
-            <ErrorState title="Purchase order unavailable" description="This purchase order may not exist or may not be available in your current shop scope." />
+            <ErrorState
+              title="Purchase order unavailable"
+              description="This purchase order may not exist or may not be available in your current shop scope."
+            />
           )
         }
-        emptyDetail={<EmptyState title="Select a purchase order" description="Review supplier, quantities, receiving progress and returns." />}
+        emptyDetail={
+          <EmptyState
+            title="Select a purchase order"
+            description="Review supplier, quantities, receiving progress and returns."
+          />
+        }
       />
     </PageScaffold>
   );

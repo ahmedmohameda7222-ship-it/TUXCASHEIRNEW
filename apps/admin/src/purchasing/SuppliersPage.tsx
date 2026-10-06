@@ -81,11 +81,18 @@ export function SuppliersPage({
           >
             <label>
               Supplier name
-              <input autoFocus value={name} onChange={(event) => setName(event.currentTarget.value)} />
+              <input
+                autoFocus
+                value={name}
+                onChange={(event) => setName(event.currentTarget.value)}
+              />
             </label>
             <label>
               Contact name
-              <input value={contactName} onChange={(event) => setContactName(event.currentTarget.value)} />
+              <input
+                value={contactName}
+                onChange={(event) => setContactName(event.currentTarget.value)}
+              />
             </label>
             <label>
               Phone
@@ -93,13 +100,26 @@ export function SuppliersPage({
             </label>
             <label>
               Email
-              <input type="email" value={email} onChange={(event) => setEmail(event.currentTarget.value)} />
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.currentTarget.value)}
+              />
             </label>
             <div className="admin-inventory-page-actions">
-              <button className="admin-secondary-button" type="button" disabled={pending} onClick={() => setOpen(false)}>
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={pending}
+                onClick={() => setOpen(false)}
+              >
                 Cancel
               </button>
-              <button className="admin-primary-button" type="submit" disabled={pending || !name.trim()}>
+              <button
+                className="admin-primary-button"
+                type="submit"
+                disabled={pending || !name.trim()}
+              >
                 {pending ? 'Adding…' : 'Add supplier'}
               </button>
             </div>

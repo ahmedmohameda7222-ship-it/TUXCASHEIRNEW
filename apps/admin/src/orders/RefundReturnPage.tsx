@@ -79,8 +79,21 @@ export function RefundReturnPage({
   async function submitRefund(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parsedAmount = Number(amountMinor);
-    if (!paymentId || !reasonCodeId || !pin || !Number.isSafeInteger(parsedAmount) || parsedAmount <= 0) return;
-    await onRefund({ paymentId, amountMinor: parsedAmount, reasonCodeId, note: note.trim() || null, pin });
+    if (
+      !paymentId ||
+      !reasonCodeId ||
+      !pin ||
+      !Number.isSafeInteger(parsedAmount) ||
+      parsedAmount <= 0
+    )
+      return;
+    await onRefund({
+      paymentId,
+      amountMinor: parsedAmount,
+      reasonCodeId,
+      note: note.trim() || null,
+      pin,
+    });
     setPin('');
   }
 
@@ -136,7 +149,10 @@ export function RefundReturnPage({
         />
       </label>
 
-      <form className="admin-catalog-editor__section is-compact" onSubmit={(event) => void submitRefund(event)}>
+      <form
+        className="admin-catalog-editor__section is-compact"
+        onSubmit={(event) => void submitRefund(event)}
+      >
         <h3>Refund payment</h3>
         <label className="admin-field">
           <span>Payment</span>
@@ -145,7 +161,9 @@ export function RefundReturnPage({
             disabled={refunding || returning}
             onChange={(event) => {
               setPaymentId(event.target.value);
-              const payment = order.payments.find((candidate) => candidate.id === event.target.value);
+              const payment = order.payments.find(
+                (candidate) => candidate.id === event.target.value,
+              );
               if (payment) setAmountMinor(String(payment.allocatedMinor));
             }}
           >
@@ -164,7 +182,9 @@ export function RefundReturnPage({
             step={0.01}
             value={Number(amountMinor) / 100 || ''}
             disabled={refunding || returning}
-            onChange={(event) => setAmountMinor(String(Math.round(Number(event.target.value) * 100)))}
+            onChange={(event) =>
+              setAmountMinor(String(Math.round(Number(event.target.value) * 100)))
+            }
           />
         </label>
         <button
@@ -176,7 +196,10 @@ export function RefundReturnPage({
         </button>
       </form>
 
-      <form className="admin-catalog-editor__section is-compact" onSubmit={(event) => void submitReturn(event)}>
+      <form
+        className="admin-catalog-editor__section is-compact"
+        onSubmit={(event) => void submitReturn(event)}
+      >
         <h3>Return items</h3>
         {order.items.map((item) => (
           <label className="admin-field" key={item.id}>
@@ -205,7 +228,12 @@ export function RefundReturnPage({
           {returning ? 'Returning…' : 'Return selected items'}
         </button>
       </form>
-      <button className="admin-secondary-button" type="button" disabled={refunding || returning} onClick={onCancel}>
+      <button
+        className="admin-secondary-button"
+        type="button"
+        disabled={refunding || returning}
+        onClick={onCancel}
+      >
         Cancel
       </button>
     </AdminDialog>

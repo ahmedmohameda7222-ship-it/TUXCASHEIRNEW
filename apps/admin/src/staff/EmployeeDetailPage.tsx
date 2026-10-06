@@ -99,7 +99,8 @@ export function EmployeeDetailPage({
           <dd>{employee.hireDate ?? 'Not set'}</dd>
           <dt>Assigned shops</dt>
           <dd>
-            {employee.assignments.map((assignment) => shopName(assignment.shopId)).join(', ') || 'None'}
+            {employee.assignments.map((assignment) => shopName(assignment.shopId)).join(', ') ||
+              'None'}
           </dd>
         </dl>
         {canManage ? (
@@ -115,7 +116,11 @@ export function EmployeeDetailPage({
             </label>
             <label className="admin-field">
               <span>Hire date</span>
-              <input type="date" value={hireDate} onChange={(event) => setHireDate(event.target.value)} />
+              <input
+                type="date"
+                value={hireDate}
+                onChange={(event) => setHireDate(event.target.value)}
+              />
             </label>
             <label className="admin-field">
               <span>Notes</span>
@@ -148,9 +153,14 @@ export function EmployeeDetailPage({
             <h4>Assign another shop</h4>
             <label className="admin-field">
               <span>Shop</span>
-              <select value={assignShopId} onChange={(event) => setAssignShopId(event.target.value)}>
+              <select
+                value={assignShopId}
+                onChange={(event) => setAssignShopId(event.target.value)}
+              >
                 {unassignedShopIds.map((candidate) => (
-                  <option key={candidate} value={candidate}>{shopName(candidate)}</option>
+                  <option key={candidate} value={candidate}>
+                    {shopName(candidate)}
+                  </option>
                 ))}
               </select>
             </label>
@@ -158,7 +168,13 @@ export function EmployeeDetailPage({
               className="admin-secondary-button"
               type="button"
               disabled={!assignShopId}
-              onClick={() => onCommand({ type: 'employee.assign-shop', employeeId: employee.id, shopId: assignShopId })}
+              onClick={() =>
+                onCommand({
+                  type: 'employee.assign-shop',
+                  employeeId: employee.id,
+                  shopId: assignShopId,
+                })
+              }
             >
               Assign shop
             </button>
@@ -170,30 +186,49 @@ export function EmployeeDetailPage({
             <h4>Compensation</h4>
             {latestCompensation ? (
               <p>
-                Current: {latestCompensation.compensationType} · {(latestCompensation.rateMinor / 100).toFixed(2)} EGP · effective {latestCompensation.effectiveFrom}
+                Current: {latestCompensation.compensationType} ·{' '}
+                {(latestCompensation.rateMinor / 100).toFixed(2)} EGP · effective{' '}
+                {latestCompensation.effectiveFrom}
               </p>
             ) : (
               <p>No compensation record yet.</p>
             )}
             <label className="admin-field">
               <span>Compensation type</span>
-              <select value={compensationType} onChange={(event) => setCompensationType(event.target.value as 'HOURLY' | 'MONTHLY')}>
+              <select
+                value={compensationType}
+                onChange={(event) =>
+                  setCompensationType(event.target.value as 'HOURLY' | 'MONTHLY')
+                }
+              >
                 <option value="HOURLY">Hourly</option>
                 <option value="MONTHLY">Monthly</option>
               </select>
             </label>
             <label className="admin-field">
               <span>Rate (EGP)</span>
-              <input inputMode="decimal" value={compensationRate} onChange={(event) => setCompensationRate(event.target.value)} />
+              <input
+                inputMode="decimal"
+                value={compensationRate}
+                onChange={(event) => setCompensationRate(event.target.value)}
+              />
             </label>
             <label className="admin-field">
               <span>Effective from</span>
-              <input type="date" value={compensationEffectiveFrom} onChange={(event) => setCompensationEffectiveFrom(event.target.value)} />
+              <input
+                type="date"
+                value={compensationEffectiveFrom}
+                onChange={(event) => setCompensationEffectiveFrom(event.target.value)}
+              />
             </label>
             <button
               className="admin-secondary-button"
               type="button"
-              disabled={!compensationEffectiveFrom || !Number.isFinite(Number(compensationRate)) || Number(compensationRate) < 0}
+              disabled={
+                !compensationEffectiveFrom ||
+                !Number.isFinite(Number(compensationRate)) ||
+                Number(compensationRate) < 0
+              }
               onClick={() =>
                 onCommand({
                   type: 'compensation.set',
@@ -217,21 +252,33 @@ export function EmployeeDetailPage({
           <div className="admin-empty-state">
             <strong>Operations setup required</strong>
             <span>
-              A linked Operations worker is missing for {setupRequired.map((identity) => shopName(identity.shopId)).join(', ')}.
+              A linked Operations worker is missing for{' '}
+              {setupRequired.map((identity) => shopName(identity.shopId)).join(', ')}.
             </span>
             {currentShopSetupRequired && canManage && availableWorkers.length > 0 ? (
               <>
                 <label className="admin-field">
                   <span>Operations worker</span>
                   <select value={workerId} onChange={(event) => setWorkerId(event.target.value)}>
-                    {availableWorkers.map((worker) => <option key={worker.id} value={worker.id}>{worker.displayName}</option>)}
+                    {availableWorkers.map((worker) => (
+                      <option key={worker.id} value={worker.id}>
+                        {worker.displayName}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <button
                   className="admin-secondary-button"
                   type="button"
                   disabled={!workerId}
-                  onClick={() => onCommand({ type: 'employee.link-worker', employeeId: employee.id, shopId, workerId })}
+                  onClick={() =>
+                    onCommand({
+                      type: 'employee.link-worker',
+                      employeeId: employee.id,
+                      shopId,
+                      workerId,
+                    })
+                  }
                 >
                   Complete Operations setup
                 </button>
@@ -248,7 +295,9 @@ export function EmployeeDetailPage({
         {inactiveOperationsIdentities.length > 0 ? (
           <div className="admin-empty-state">
             <strong>Operations access disabled</strong>
-            <span>Restoring access requires your Admin PIN and the preserved linked worker identity.</span>
+            <span>
+              Restoring access requires your Admin PIN and the preserved linked worker identity.
+            </span>
             {inactiveOperationsIdentities.map((identity) => (
               <article className="admin-more-card" key={identity.shopId}>
                 <strong>{identity.workerName}</strong>
@@ -274,7 +323,9 @@ export function EmployeeDetailPage({
                   >
                     Restore Operations access
                   </button>
-                ) : canManage ? <span>Reactivate the employee before restoring Operations access.</span> : null}
+                ) : canManage ? (
+                  <span>Reactivate the employee before restoring Operations access.</span>
+                ) : null}
               </article>
             ))}
           </div>
@@ -286,7 +337,10 @@ export function EmployeeDetailPage({
       <StaffMetricsPanel employee={employee} />
 
       {canManage ? (
-        <section className="admin-catalog-editor__section is-compact" aria-labelledby="staff-sensitive-actions">
+        <section
+          className="admin-catalog-editor__section is-compact"
+          aria-labelledby="staff-sensitive-actions"
+        >
           <h3 id="staff-sensitive-actions">Sensitive access actions</h3>
           <p>These actions change employee access. Confirm them with your own Admin PIN.</p>
           <label className="admin-field">
@@ -301,7 +355,10 @@ export function EmployeeDetailPage({
           </label>
           <label className="admin-field">
             <span>Role</span>
-            <select value={roleDraft} onChange={(event) => setRoleDraft(event.target.value as AdminRole)}>
+            <select
+              value={roleDraft}
+              onChange={(event) => setRoleDraft(event.target.value as AdminRole)}
+            >
               <option value="OWNER">OWNER</option>
               <option value="ADMIN">ADMIN</option>
               <option value="MANAGER">MANAGER</option>
@@ -314,7 +371,13 @@ export function EmployeeDetailPage({
             disabled={!actorPin || roleDraft === employee.role}
             onClick={() =>
               onSensitiveCommand(
-                { type: 'employee.role', employeeId: employee.id, shopId, role: roleDraft, expectedVersion: employee.profileVersion },
+                {
+                  type: 'employee.role',
+                  employeeId: employee.id,
+                  shopId,
+                  role: roleDraft,
+                  expectedVersion: employee.profileVersion,
+                },
                 actorPin,
               )
             }
@@ -341,7 +404,13 @@ export function EmployeeDetailPage({
             disabled={!actorPin || !/^\d{4,12}$/.test(newPin)}
             onClick={() =>
               onSensitiveCommand(
-                { type: 'employee.pin', employeeId: employee.id, shopId, newPin, commandId: pinCommandId },
+                {
+                  type: 'employee.pin',
+                  employeeId: employee.id,
+                  shopId,
+                  newPin,
+                  commandId: pinCommandId,
+                },
                 actorPin,
               )
             }
@@ -356,11 +425,21 @@ export function EmployeeDetailPage({
             onClick={() =>
               employee.active
                 ? onSensitiveCommand(
-                    { type: 'employee.suspend', employeeId: employee.id, shopId, expectedVersion: employee.profileVersion },
+                    {
+                      type: 'employee.suspend',
+                      employeeId: employee.id,
+                      shopId,
+                      expectedVersion: employee.profileVersion,
+                    },
                     actorPin,
                   )
                 : onSensitiveCommand(
-                    { type: 'employee.reactivate', employeeId: employee.id, shopId, expectedVersion: employee.profileVersion },
+                    {
+                      type: 'employee.reactivate',
+                      employeeId: employee.id,
+                      shopId,
+                      expectedVersion: employee.profileVersion,
+                    },
                     actorPin,
                   )
             }
@@ -378,7 +457,9 @@ export function EmployeeDetailPage({
         <div>
           <p className="admin-page__eyebrow">Staff profile</p>
           <h2>{employee.displayName}</h2>
-          <p className="admin-page__description">{employee.role} · {employee.active ? 'Active' : 'Suspended'}</p>
+          <p className="admin-page__description">
+            {employee.role} · {employee.active ? 'Active' : 'Suspended'}
+          </p>
         </div>
       </header>
 
@@ -391,17 +472,38 @@ export function EmployeeDetailPage({
           {
             id: 'schedule',
             label: 'Schedule',
-            content: <SchedulePage employee={employee} shopId={shopId} canManage={canManage} onCommand={onCommand} />,
+            content: (
+              <SchedulePage
+                employee={employee}
+                shopId={shopId}
+                canManage={canManage}
+                onCommand={onCommand}
+              />
+            ),
           },
           {
             id: 'attendance',
             label: 'Attendance',
-            content: <AttendancePage employee={employee} shopId={shopId} canManage={canManage} onCommand={onCommand} />,
+            content: (
+              <AttendancePage
+                employee={employee}
+                shopId={shopId}
+                canManage={canManage}
+                onCommand={onCommand}
+              />
+            ),
           },
           {
             id: 'leave',
             label: 'Leave',
-            content: <LeavePage employee={employee} shopId={shopId} canManage={canManage} onCommand={onCommand} />,
+            content: (
+              <LeavePage
+                employee={employee}
+                shopId={shopId}
+                canManage={canManage}
+                onCommand={onCommand}
+              />
+            ),
           },
           {
             id: 'pay',
@@ -419,7 +521,9 @@ export function EmployeeDetailPage({
           {
             id: 'permissions',
             label: 'Permissions',
-            content: <PermissionsEditor employee={employee} canManage={canManage} onCommand={onCommand} />,
+            content: (
+              <PermissionsEditor employee={employee} canManage={canManage} onCommand={onCommand} />
+            ),
           },
         ]}
       />

@@ -261,12 +261,21 @@ export function CustomersPage() {
                           }
                         />
                       ) : null}
-                      {!customersQuery.isLoading && !customersQuery.isError && customers.length === 0 ? (
-                        <EmptyState title="No matching customers" description="Try another name or phone number." />
+                      {!customersQuery.isLoading &&
+                      !customersQuery.isError &&
+                      customers.length === 0 ? (
+                        <EmptyState
+                          title="No matching customers"
+                          description="Try another name or phone number."
+                        />
                       ) : null}
                       {customers.map((customer) => (
                         <button
-                          className={customer.id === selectedId ? 'admin-inventory-row is-selected' : 'admin-inventory-row'}
+                          className={
+                            customer.id === selectedId
+                              ? 'admin-inventory-row is-selected'
+                              : 'admin-inventory-row'
+                          }
                           aria-current={customer.id === selectedId ? 'true' : undefined}
                           key={customer.id}
                           type="button"
@@ -308,7 +317,10 @@ export function CustomersPage() {
                         />
                       </>
                     ) : (
-                      <EmptyState title="Customer unavailable" description="Choose another customer from the list." />
+                      <EmptyState
+                        title="Customer unavailable"
+                        description="Choose another customer from the list."
+                      />
                     )
                   }
                   emptyDetail={
@@ -334,7 +346,10 @@ export function CustomersPage() {
                         type="checkbox"
                         checked={programDraft.enabled}
                         onChange={(event) =>
-                          setProgramDraft((current) => ({ ...current, enabled: event.target.checked }))
+                          setProgramDraft((current) => ({
+                            ...current,
+                            enabled: event.target.checked,
+                          }))
                         }
                       />{' '}
                       Enabled
@@ -345,7 +360,10 @@ export function CustomersPage() {
                         inputMode="numeric"
                         value={programDraft.earnPointsPer100Minor}
                         onChange={(event) =>
-                          setProgramDraft((current) => ({ ...current, earnPointsPer100Minor: event.target.value }))
+                          setProgramDraft((current) => ({
+                            ...current,
+                            earnPointsPer100Minor: event.target.value,
+                          }))
                         }
                       />
                     </label>
@@ -355,7 +373,10 @@ export function CustomersPage() {
                         inputMode="decimal"
                         value={programDraft.pointValueEgp}
                         onChange={(event) =>
-                          setProgramDraft((current) => ({ ...current, pointValueEgp: event.target.value }))
+                          setProgramDraft((current) => ({
+                            ...current,
+                            pointValueEgp: event.target.value,
+                          }))
                         }
                       />
                     </label>
@@ -366,7 +387,10 @@ export function CustomersPage() {
                         inputMode="numeric"
                         value={programDraft.minimumRedemptionPoints}
                         onChange={(event) =>
-                          setProgramDraft((current) => ({ ...current, minimumRedemptionPoints: event.target.value }))
+                          setProgramDraft((current) => ({
+                            ...current,
+                            minimumRedemptionPoints: event.target.value,
+                          }))
                         }
                       />
                     </label>
@@ -376,18 +400,28 @@ export function CustomersPage() {
                         inputMode="numeric"
                         value={programDraft.pointExpiryDays}
                         onChange={(event) =>
-                          setProgramDraft((current) => ({ ...current, pointExpiryDays: event.target.value }))
+                          setProgramDraft((current) => ({
+                            ...current,
+                            pointExpiryDays: event.target.value,
+                          }))
                         }
                       />
                     </label>
-                    <button className="admin-primary-button" type="submit" disabled={saveProgram.isPending}>
+                    <button
+                      className="admin-primary-button"
+                      type="submit"
+                      disabled={saveProgram.isPending}
+                    >
                       {saveProgram.isPending ? 'Saving…' : 'Save loyalty program'}
                     </button>
                   </form>
                 ) : null}
                 {canManagePromotions ? <PromotionsPage shopId={shopId} /> : null}
                 {!canManageLoyalty && !canManagePromotions ? (
-                  <EmptyState title="No CRM settings available" description="Your role does not manage loyalty or promotions." />
+                  <EmptyState
+                    title="No CRM settings available"
+                    description="Your role does not manage loyalty or promotions."
+                  />
                 ) : null}
               </div>
             ),

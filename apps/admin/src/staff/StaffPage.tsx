@@ -34,7 +34,10 @@ export function StaffPage() {
     [principal.shopIds, shopId],
   );
 
-  const rows = useMemo(() => staff.workspaceQuery.data?.employees.rows ?? [], [staff.workspaceQuery.data]);
+  const rows = useMemo(
+    () => staff.workspaceQuery.data?.employees.rows ?? [],
+    [staff.workspaceQuery.data],
+  );
 
   if (!shopId) {
     return (
@@ -49,7 +52,8 @@ export function StaffPage() {
   const canManage = principal.permissions.includes('staff.manage');
   const canPay = principal.permissions.includes('staff.payments');
   const detail = staff.detailQuery.data;
-  const actionError = readableError(staff.sensitiveCommand.error) ?? readableError(staff.command.error);
+  const actionError =
+    readableError(staff.sensitiveCommand.error) ?? readableError(staff.command.error);
 
   const execute = (command: StaffApiCommandDraft) => staff.command.mutate(command);
   const executeSensitive = (command: StaffApiCommandDraft, pin: string) => {
@@ -87,7 +91,11 @@ export function StaffPage() {
       description="Manage staff profiles, Operations access, schedules, attendance, leave and recorded pay."
       primaryAction={
         canManage ? (
-          <button className="admin-primary-button" type="button" onClick={() => setCreateOpen(true)}>
+          <button
+            className="admin-primary-button"
+            type="button"
+            onClick={() => setCreateOpen(true)}
+          >
             Add employee
           </button>
         ) : undefined
@@ -107,18 +115,29 @@ export function StaffPage() {
               <ErrorState
                 title="Staff could not be loaded"
                 action={
-                  <button className="admin-secondary-button" type="button" onClick={() => void staff.workspaceQuery.refetch()}>
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    onClick={() => void staff.workspaceQuery.refetch()}
+                  >
                     Retry
                   </button>
                 }
               />
             ) : null}
             {rows.length === 0 && !staff.workspaceQuery.isLoading ? (
-              <EmptyState title="No employees assigned to this shop" description="Add or assign a staff profile to begin." />
+              <EmptyState
+                title="No employees assigned to this shop"
+                description="Add or assign a staff profile to begin."
+              />
             ) : null}
             {rows.map((employee) => (
               <button
-                className={employee.id === selectedId ? 'admin-inventory-row is-selected' : 'admin-inventory-row'}
+                className={
+                  employee.id === selectedId
+                    ? 'admin-inventory-row is-selected'
+                    : 'admin-inventory-row'
+                }
                 aria-current={employee.id === selectedId ? 'true' : undefined}
                 key={employee.id}
                 type="button"
@@ -126,11 +145,16 @@ export function StaffPage() {
               >
                 <span>
                   <strong>{employee.displayName}</strong>
-                  <small>{employee.role} · {employee.shopIds.length} shop{employee.shopIds.length === 1 ? '' : 's'}</small>
+                  <small>
+                    {employee.role} · {employee.shopIds.length} shop
+                    {employee.shopIds.length === 1 ? '' : 's'}
+                  </small>
                 </span>
                 <span>
                   {employee.active ? 'Active' : 'Suspended'}
-                  {employee.operationsSetupRequiredShopIds.length > 0 ? ' · Operations setup required' : ''}
+                  {employee.operationsSetupRequiredShopIds.length > 0
+                    ? ' · Operations setup required'
+                    : ''}
                 </span>
               </button>
             ))}
@@ -158,11 +182,17 @@ export function StaffPage() {
               onSensitiveCommand={executeSensitive}
             />
           ) : (
-            <EmptyState title="Employee unavailable" description="Choose another employee from the list." />
+            <EmptyState
+              title="Employee unavailable"
+              description="Choose another employee from the list."
+            />
           )
         }
         emptyDetail={
-          <EmptyState title="Select an employee" description="Review profile, schedule, attendance, leave, pay and permissions." />
+          <EmptyState
+            title="Select an employee"
+            description="Review profile, schedule, attendance, leave, pay and permissions."
+          />
         }
       />
 
@@ -185,17 +215,33 @@ export function StaffPage() {
           >
             <label className="admin-field">
               <span>Name</span>
-              <input autoFocus value={newEmployeeName} onChange={(event) => setNewEmployeeName(event.target.value)} />
+              <input
+                autoFocus
+                value={newEmployeeName}
+                onChange={(event) => setNewEmployeeName(event.target.value)}
+              />
             </label>
             <label className="admin-field">
               <span>Phone</span>
-              <input value={newEmployeePhone} onChange={(event) => setNewEmployeePhone(event.target.value)} />
+              <input
+                value={newEmployeePhone}
+                onChange={(event) => setNewEmployeePhone(event.target.value)}
+              />
             </label>
             <div className="admin-inventory-page-actions">
-              <button className="admin-secondary-button" type="button" disabled={staff.command.isPending} onClick={() => setCreateOpen(false)}>
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={staff.command.isPending}
+                onClick={() => setCreateOpen(false)}
+              >
                 Cancel
               </button>
-              <button className="admin-primary-button" type="submit" disabled={!newEmployeeName.trim() || staff.command.isPending}>
+              <button
+                className="admin-primary-button"
+                type="submit"
+                disabled={!newEmployeeName.trim() || staff.command.isPending}
+              >
                 {staff.command.isPending ? 'Adding…' : 'Add employee'}
               </button>
             </div>

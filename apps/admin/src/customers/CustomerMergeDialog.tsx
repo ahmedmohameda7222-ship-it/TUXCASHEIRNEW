@@ -37,7 +37,11 @@ function CustomerSnapshot({
         <dt>Loyalty balance</dt>
         <dd>{customer.loyaltyBalance} points</dd>
         <dt>Last order</dt>
-        <dd>{customer.lastOrderAt ? new Date(customer.lastOrderAt).toLocaleDateString() : 'No orders yet'}</dd>
+        <dd>
+          {customer.lastOrderAt
+            ? new Date(customer.lastOrderAt).toLocaleDateString()
+            : 'No orders yet'}
+        </dd>
         <dt>Customer groups</dt>
         <dd>{customer.segments.length > 0 ? customer.segments.join(', ') : 'None'}</dd>
       </dl>
@@ -109,7 +113,9 @@ export function CustomerMergeDialog({
       </label>
 
       {loading ? <LoadingState title="Searching customers" /> : null}
-      {error ? <ErrorState title="Customer search failed" description="Try the search again." /> : null}
+      {error ? (
+        <ErrorState title="Customer search failed" description="Try the search again." />
+      ) : null}
       {!loading && !error && candidates.length === 0 ? (
         <EmptyState title="No merge candidates" description="Try another name or phone number." />
       ) : null}
@@ -117,7 +123,9 @@ export function CustomerMergeDialog({
         <div className="admin-inventory-list" aria-label="Merge candidates">
           {candidates.map((item) => (
             <button
-              className={item.id === candidateId ? 'admin-inventory-row is-selected' : 'admin-inventory-row'}
+              className={
+                item.id === candidateId ? 'admin-inventory-row is-selected' : 'admin-inventory-row'
+              }
               type="button"
               key={item.id}
               aria-pressed={item.id === candidateId}
@@ -145,7 +153,9 @@ export function CustomerMergeDialog({
             <CustomerSnapshot label="Customer to merge" customer={candidate} />
           </div>
           <p>
-            The surviving customer keeps their profile. Order history, linked shop history, addresses and loyalty history are preserved or transferred according to the existing merge rules.
+            The surviving customer keeps their profile. Order history, linked shop history,
+            addresses and loyalty history are preserved or transferred according to the existing
+            merge rules.
           </p>
           <label>
             <input
@@ -157,7 +167,12 @@ export function CustomerMergeDialog({
             I reviewed both customers and want to merge them.
           </label>
           <div className="admin-inventory-page-actions">
-            <button className="admin-secondary-button" type="button" disabled={pending} onClick={close}>
+            <button
+              className="admin-secondary-button"
+              type="button"
+              disabled={pending}
+              onClick={close}
+            >
               Cancel
             </button>
             <button

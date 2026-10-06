@@ -38,12 +38,7 @@ function mutationErrorMessage(error: unknown): string | null {
 }
 
 type WorkspaceMode =
-  | 'detail'
-  | 'stocktake-select'
-  | 'stocktake'
-  | 'transfer'
-  | 'reorder'
-  | 'variance';
+  'detail' | 'stocktake-select' | 'stocktake' | 'transfer' | 'reorder' | 'variance';
 type ItemAction = 'adjust' | 'waste' | null;
 
 export function InventoryPage() {
@@ -121,15 +116,26 @@ export function InventoryPage() {
 
   if (inventory.workspaceQuery.isLoading) {
     return (
-      <PageScaffold eyebrow="Inventory" title="Inventory" description="Review stock across this shop.">
-        <LoadingState title="Loading inventory" description="Preparing current balances and availability." />
+      <PageScaffold
+        eyebrow="Inventory"
+        title="Inventory"
+        description="Review stock across this shop."
+      >
+        <LoadingState
+          title="Loading inventory"
+          description="Preparing current balances and availability."
+        />
       </PageScaffold>
     );
   }
 
   if (inventory.workspaceQuery.isError || !workspace) {
     return (
-      <PageScaffold eyebrow="Inventory" title="Inventory" description="Review stock across this shop.">
+      <PageScaffold
+        eyebrow="Inventory"
+        title="Inventory"
+        description="Review stock across this shop."
+      >
         <ErrorState
           title="Inventory could not be loaded"
           description="Retry when the Admin service is available."
@@ -176,14 +182,26 @@ export function InventoryPage() {
               Stock count
             </button>
           ) : null}
-          <button className="admin-secondary-button" type="button" onClick={() => openWorkflow('reorder')}>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={() => openWorkflow('reorder')}
+          >
             Reorder
           </button>
-          <button className="admin-secondary-button" type="button" onClick={() => openWorkflow('variance')}>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={() => openWorkflow('variance')}
+          >
             Variance & margins
           </button>
           {canTransfer ? (
-            <button className="admin-primary-button" type="button" onClick={() => openWorkflow('transfer')}>
+            <button
+              className="admin-primary-button"
+              type="button"
+              onClick={() => openWorkflow('transfer')}
+            >
               Transfer stock
             </button>
           ) : null}
@@ -196,13 +214,20 @@ export function InventoryPage() {
         </p>
       ) : null}
       {mode === 'stocktake-select' ? (
-        <section className="admin-inventory-workflow" aria-labelledby="inventory-stocktake-batch-title">
+        <section
+          className="admin-inventory-workflow"
+          aria-labelledby="inventory-stocktake-batch-title"
+        >
           <div className="admin-inventory-workflow__header">
             <div>
               <p className="admin-page__eyebrow">Stock count</p>
               <h2 id="inventory-stocktake-batch-title">Choose a batch</h2>
             </div>
-            <button className="admin-secondary-button" type="button" onClick={() => setMode('detail')}>
+            <button
+              className="admin-secondary-button"
+              type="button"
+              onClick={() => setMode('detail')}
+            >
               Back to inventory
             </button>
           </div>
@@ -224,7 +249,9 @@ export function InventoryPage() {
                 >
                   <span>
                     <strong>Batch {index + 1}</strong>
-                    <small>{first && last ? `${first.name} – ${last.name}` : 'Inventory items'}</small>
+                    <small>
+                      {first && last ? `${first.name} – ${last.name}` : 'Inventory items'}
+                    </small>
                   </span>
                   <span>{batch.length} items</span>
                 </button>
@@ -295,11 +322,18 @@ export function InventoryPage() {
                 <span>Available = On Hand − Reserved</span>
               </div>
               {items.length === 0 ? (
-                <EmptyState title="No inventory items" description="Inventory configuration for this shop is empty." />
+                <EmptyState
+                  title="No inventory items"
+                  description="Inventory configuration for this shop is empty."
+                />
               ) : (
                 items.map((item) => (
                   <button
-                    className={item.id === selectedItemId ? 'admin-inventory-row is-selected' : 'admin-inventory-row'}
+                    className={
+                      item.id === selectedItemId
+                        ? 'admin-inventory-row is-selected'
+                        : 'admin-inventory-row'
+                    }
                     aria-current={item.id === selectedItemId ? 'true' : undefined}
                     key={item.id}
                     type="button"
@@ -338,10 +372,18 @@ export function InventoryPage() {
                   actions={
                     canAdjust && selectedItem.active ? (
                       <>
-                        <button className="admin-secondary-button" type="button" onClick={() => setItemAction('adjust')}>
+                        <button
+                          className="admin-secondary-button"
+                          type="button"
+                          onClick={() => setItemAction('adjust')}
+                        >
                           Adjust stock
                         </button>
-                        <button className="admin-secondary-button" type="button" onClick={() => setItemAction('waste')}>
+                        <button
+                          className="admin-secondary-button"
+                          type="button"
+                          onClick={() => setItemAction('waste')}
+                        >
                           Record waste
                         </button>
                       </>
@@ -380,7 +422,10 @@ export function InventoryPage() {
                 ) : null}
               </>
             ) : (
-              <EmptyState title="Inventory item unavailable" description="Choose another item from the list." />
+              <EmptyState
+                title="Inventory item unavailable"
+                description="Choose another item from the list."
+              />
             )
           }
           emptyDetail={

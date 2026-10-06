@@ -47,7 +47,10 @@ export function CancelOrderSheet({
         if (!open && !pending) onCancel();
       }}
     >
-      <form className="admin-catalog-editor__section is-compact" onSubmit={(event) => void submit(event)}>
+      <form
+        className="admin-catalog-editor__section is-compact"
+        onSubmit={(event) => void submit(event)}
+      >
         <label className="admin-field">
           <span>Cancellation reason</span>
           <select
@@ -83,7 +86,12 @@ export function CancelOrderSheet({
           />
         </label>
         <div className="admin-page__primary-action">
-          <button className="admin-secondary-button" type="button" disabled={pending} onClick={onCancel}>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={pending}
+            onClick={onCancel}
+          >
             Cancel
           </button>
           <button

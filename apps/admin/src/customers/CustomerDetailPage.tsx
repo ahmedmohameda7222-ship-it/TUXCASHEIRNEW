@@ -42,7 +42,9 @@ export function CustomerDetailPage({
                 <dl>
                   <div>
                     <dt>Order history</dt>
-                    <dd>{customer.orderCount} orders · {money(customer.lifetimeSpendMinor)}</dd>
+                    <dd>
+                      {customer.orderCount} orders · {money(customer.lifetimeSpendMinor)}
+                    </dd>
                   </div>
                   <div>
                     <dt>Delivery orders</dt>

@@ -62,7 +62,8 @@ function parseBusinessDate(value: string): { year: number; month: number; day: n
     check.getUTCFullYear() !== year ||
     check.getUTCMonth() !== month - 1 ||
     check.getUTCDate() !== day
-  ) return null;
+  )
+    return null;
   return { year, month, day };
 }
 
@@ -122,7 +123,17 @@ export function AuditPage() {
   const [approvalStatus, setApprovalStatus] = useState<AdminApprovalStatus | ''>('');
 
   const auditQuery = useInfiniteQuery({
-    queryKey: ['admin', 'audit', fromDate, toDate, shopId, actorEmployeeId, actionType, entityType, approvalStatus],
+    queryKey: [
+      'admin',
+      'audit',
+      fromDate,
+      toDate,
+      shopId,
+      actorEmployeeId,
+      actionType,
+      entityType,
+      approvalStatus,
+    ],
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams();
@@ -151,28 +162,53 @@ export function AuditPage() {
       ),
   });
 
-  const events = useMemo(() => auditQuery.data?.pages.flatMap((page) => page.events) ?? [], [auditQuery.data]);
+  const events = useMemo(
+    () => auditQuery.data?.pages.flatMap((page) => page.events) ?? [],
+    [auditQuery.data],
+  );
   const actorOptions = auditQuery.data?.pages[0]?.actorOptions ?? [];
   const shopNames = useMemo(
-    () => new Map(events.flatMap((event) => (event.shopId ? [[event.shopId, event.shopName]] : []))),
+    () =>
+      new Map(events.flatMap((event) => (event.shopId ? [[event.shopId, event.shopName]] : []))),
     [events],
   );
-  const activeFilterCount = [fromDate, toDate, shopId, actorEmployeeId, entityType, approvalStatus].filter(Boolean).length;
+  const activeFilterCount = [
+    fromDate,
+    toDate,
+    shopId,
+    actorEmployeeId,
+    entityType,
+    approvalStatus,
+  ].filter(Boolean).length;
   const selected = detailQuery.data ?? null;
 
   const filters = (
     <div className="admin-audit-filters" aria-label="Advanced audit filters">
       <label className="admin-field">
         <span>From date</span>
-        <input aria-label="From date" type="date" value={fromDate} onChange={(event) => setFromDate(event.currentTarget.value)} />
+        <input
+          aria-label="From date"
+          type="date"
+          value={fromDate}
+          onChange={(event) => setFromDate(event.currentTarget.value)}
+        />
       </label>
       <label className="admin-field">
         <span>To date</span>
-        <input aria-label="To date" type="date" value={toDate} onChange={(event) => setToDate(event.currentTarget.value)} />
+        <input
+          aria-label="To date"
+          type="date"
+          value={toDate}
+          onChange={(event) => setToDate(event.currentTarget.value)}
+        />
       </label>
       <label className="admin-field">
         <span>Shop</span>
-        <select aria-label="Shop" value={shopId} onChange={(event) => setShopId(event.currentTarget.value)}>
+        <select
+          aria-label="Shop"
+          value={shopId}
+          onChange={(event) => setShopId(event.currentTarget.value)}
+        >
           <option value="">All authorized shops</option>
           {principal.shopIds.map((authorizedShopId, index) => (
             <option key={authorizedShopId} value={authorizedShopId}>
@@ -183,25 +219,41 @@ export function AuditPage() {
       </label>
       <label className="admin-field">
         <span>Actor</span>
-        <select aria-label="Actor" value={actorEmployeeId} onChange={(event) => setActorEmployeeId(event.currentTarget.value)}>
+        <select
+          aria-label="Actor"
+          value={actorEmployeeId}
+          onChange={(event) => setActorEmployeeId(event.currentTarget.value)}
+        >
           <option value="">All human actors</option>
-          {actorOptions.map((actor) => <option key={actor.employeeId} value={actor.employeeId}>{actor.label}</option>)}
+          {actorOptions.map((actor) => (
+            <option key={actor.employeeId} value={actor.employeeId}>
+              {actor.label}
+            </option>
+          ))}
         </select>
       </label>
       <label className="admin-field">
         <span>Entity</span>
-        <input aria-label="Entity" value={entityType} onChange={(event) => setEntityType(event.currentTarget.value)} />
+        <input
+          aria-label="Entity"
+          value={entityType}
+          onChange={(event) => setEntityType(event.currentTarget.value)}
+        />
       </label>
       <label className="admin-field">
         <span>Approval status</span>
         <select
           aria-label="Approval status"
           value={approvalStatus}
-          onChange={(event) => setApprovalStatus(event.currentTarget.value as AdminApprovalStatus | '')}
+          onChange={(event) =>
+            setApprovalStatus(event.currentTarget.value as AdminApprovalStatus | '')
+          }
         >
           <option value="">All approval statuses</option>
           {APPROVAL_STATUSES.map((status) => (
-            <option key={status} value={status}>{status.charAt(0) + status.slice(1).toLowerCase()}</option>
+            <option key={status} value={status}>
+              {status.charAt(0) + status.slice(1).toLowerCase()}
+            </option>
           ))}
         </select>
       </label>
@@ -217,12 +269,24 @@ export function AuditPage() {
       <div className="admin-inventory-page-actions">
         <label className="admin-field">
           <span>Search by action</span>
-          <input value={actionType} placeholder="e.g. order.cancel" onChange={(event) => setActionType(event.currentTarget.value)} />
+          <input
+            value={actionType}
+            placeholder="e.g. order.cancel"
+            onChange={(event) => setActionType(event.currentTarget.value)}
+          />
         </label>
-        <button className="admin-secondary-button" type="button" onClick={() => setFiltersOpen(true)}>
+        <button
+          className="admin-secondary-button"
+          type="button"
+          onClick={() => setFiltersOpen(true)}
+        >
           Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
         </button>
-        {activeFilterCount > 0 ? <span>{activeFilterCount} advanced filter{activeFilterCount === 1 ? '' : 's'} active</span> : null}
+        {activeFilterCount > 0 ? (
+          <span>
+            {activeFilterCount} advanced filter{activeFilterCount === 1 ? '' : 's'} active
+          </span>
+        ) : null}
       </div>
 
       <ResponsiveMasterDetail
@@ -236,11 +300,22 @@ export function AuditPage() {
             {auditQuery.isError ? (
               <ErrorState
                 title="Audit history could not be loaded"
-                action={<button className="admin-secondary-button" type="button" onClick={() => void auditQuery.refetch()}>Retry</button>}
+                action={
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    onClick={() => void auditQuery.refetch()}
+                  >
+                    Retry
+                  </button>
+                }
               />
             ) : null}
             {!auditQuery.isLoading && !auditQuery.isError && events.length === 0 ? (
-              <EmptyState title="No audit events" description="No events match the current search and filters." />
+              <EmptyState
+                title="No audit events"
+                description="No events match the current search and filters."
+              />
             ) : null}
             {events.map((event) => (
               <button
@@ -272,14 +347,27 @@ export function AuditPage() {
           detailQuery.isLoading ? (
             <LoadingState title="Loading audit event" />
           ) : detailQuery.isError ? (
-            <ErrorState title="Audit event unavailable" description="This event may not exist or may not be visible in your authorized scope." />
+            <ErrorState
+              title="Audit event unavailable"
+              description="This event may not exist or may not be visible in your authorized scope."
+            />
           ) : selected ? (
-            <AuditDetailPage event={{ ...selected, createdAtLabel: formatInstant(selected.createdAt) }} />
+            <AuditDetailPage
+              event={{ ...selected, createdAtLabel: formatInstant(selected.createdAt) }}
+            />
           ) : (
-            <EmptyState title="Audit event unavailable" description="Choose another event from the history." />
+            <EmptyState
+              title="Audit event unavailable"
+              description="Choose another event from the history."
+            />
           )
         }
-        emptyDetail={<EmptyState title="Select an audit event" description="Review actor, entity, reason and approval context." />}
+        emptyDetail={
+          <EmptyState
+            title="Select an audit event"
+            description="Review actor, entity, reason and approval context."
+          />
+        }
       />
 
       <AdminDialog
@@ -305,7 +393,11 @@ export function AuditPage() {
           >
             Clear advanced filters
           </button>
-          <button className="admin-primary-button" type="button" onClick={() => setFiltersOpen(false)}>
+          <button
+            className="admin-primary-button"
+            type="button"
+            onClick={() => setFiltersOpen(false)}
+          >
             Show results
           </button>
         </div>

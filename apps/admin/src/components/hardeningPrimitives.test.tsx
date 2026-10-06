@@ -46,10 +46,12 @@ describe('Admin hardening primitives', () => {
         label="Purchasing sections"
         value="orders"
         onChange={() => undefined}
-        tabs={[
-          { id: 'orders', label: 'Purchase orders', content: <p>Orders panel</p> },
-          { id: 'suppliers', label: 'Suppliers', content: <p>Suppliers panel</p> },
-        ] as const}
+        tabs={
+          [
+            { id: 'orders', label: 'Purchase orders', content: <p>Orders panel</p> },
+            { id: 'suppliers', label: 'Suppliers', content: <p>Suppliers panel</p> },
+          ] as const
+        }
       />,
     );
 

@@ -63,7 +63,11 @@ export function RePinDialog({
             onChange={(event) => setReason(event.currentTarget.value)}
           />
         </label>
-        {error ? <p className="admin-error-text" role="alert">{error}</p> : null}
+        {error ? (
+          <p className="admin-error-text" role="alert">
+            {error}
+          </p>
+        ) : null}
         <div className="admin-approval-actions">
           <button
             className={decision === 'REJECT' ? 'admin-destructive-button' : 'admin-primary-button'}
@@ -72,7 +76,12 @@ export function RePinDialog({
           >
             {busy ? 'Confirming…' : `Confirm ${decision === 'APPROVE' ? 'approval' : 'rejection'}`}
           </button>
-          <button className="admin-secondary-button" type="button" disabled={busy} onClick={onCancel}>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={busy}
+            onClick={onCancel}
+          >
             Cancel
           </button>
         </div>
