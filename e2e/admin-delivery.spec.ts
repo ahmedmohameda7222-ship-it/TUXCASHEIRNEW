@@ -118,7 +118,7 @@ async function mockDelivery(page: Page) {
   return { commands };
 }
 
-test('renders canonical delivery zones, riders, and delivery-order state', async ({ page }) => {
+test('renders delivery zones, riders, and delivery-order state', async ({ page }) => {
   await mockDelivery(page);
   await page.goto('/delivery');
 
@@ -168,4 +168,31 @@ test('routes delivery mutations through the trusted BFF and clears rider on unas
     toState: 'UNASSIGNED',
   });
   expect(typeof commands[1]?.commandId).toBe('string');
+});
+
+test('delivery uses business-facing copy and stays usable across phone, tablet, and laptop widths', async ({
+  page,
+}) => {
+  await mockDelivery(page);
+
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 1440, height: 960 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/delivery');
+
+    await expect(page.getByRole('heading', { name: 'Delivery', exact: true })).toBeVisible();
+    await expect(page.getByText('Maadi Core')).toBeVisible();
+    await expect(page.getByText('Omar Rider')).toBeVisible();
+    await expect(page.getByText(/server-authoritative/i)).toHaveCount(0);
+    await expect(page.getByText(/append-only/i)).toHaveCount(0);
+    await expect(page.getByText(/canonical fee/i)).toHaveCount(0);
+
+    const hasHorizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth + 1,
+    );
+    expect(hasHorizontalOverflow).toBe(false);
+  }
 });
