@@ -31,7 +31,7 @@ export function AdminTabs<T extends string>({
       .filter(({ tab }) => !tab.disabled);
     if (enabled.length === 0) return;
     const currentEnabledIndex = enabled.findIndex(({ candidateIndex }) => candidateIndex === index);
-    let nextEnabledIndex = currentEnabledIndex;
+    let nextEnabledIndex: number;
     if (event.key === 'ArrowRight') nextEnabledIndex = (currentEnabledIndex + 1) % enabled.length;
     else if (event.key === 'ArrowLeft')
       nextEnabledIndex = (currentEnabledIndex - 1 + enabled.length) % enabled.length;
