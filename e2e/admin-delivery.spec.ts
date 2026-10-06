@@ -20,17 +20,10 @@ const session = {
 };
 
 type DeliveryCommand = Record<string, unknown>;
-type DeliveryWorkspaceFixture = AdminDeliveryWorkspace & {
-  fallbackShops: readonly { id: string; name: string }[];
-};
 
-function workspace(): DeliveryWorkspaceFixture {
+function workspace(): AdminDeliveryWorkspace {
   return {
     shopId,
-    fallbackShops: [
-      { id: shopId, name: 'TUX Maadi' },
-      { id: backupShopId, name: 'TUX Backup' },
-    ],
     zones: [
       {
         id: zoneId,
@@ -223,7 +216,7 @@ test('delivery view-only users do not receive mutation controls', async ({ page 
   await expect(page.getByLabel(`Delivery order ${orderId}`)).toContainText('ASSIGNED');
 });
 
-test('delivery zone editor uses EGP amounts and named fallback shops', async ({ page }) => {
+test('delivery zone editor uses EGP amounts and named fallback choices', async ({ page }) => {
   const { commands } = await mockDelivery(page);
   await page.goto('/delivery');
 
@@ -233,7 +226,7 @@ test('delivery zone editor uses EGP amounts and named fallback shops', async ({ 
   await expect(page.getByLabel(/fallback shop id/i)).toHaveCount(0);
 
   await page.getByLabel('Use fallback shop').check();
-  await page.getByLabel('Fallback shop').selectOption({ label: 'TUX Backup' });
+  await page.getByLabel('Fallback shop').selectOption({ label: 'Shop 2' });
   await page.getByRole('button', { name: 'Save delivery zone' }).click();
 
   await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);
