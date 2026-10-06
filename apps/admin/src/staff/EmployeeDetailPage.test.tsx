@@ -1,10 +1,11 @@
-import type { EmployeeDetail } from '@tux/admin-contracts';
+import type { EmployeeDetail, StaffWorkerChoice } from '@tux/admin-contracts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { EmployeeDetailPage } from './EmployeeDetailPage';
 
 const SHOP_ID = '11111111-1111-4111-8111-111111111111';
+const OTHER_SHOP_ID = '77777777-7777-4777-8777-777777777777';
 const WORKER_ID = '33333333-3333-4333-8333-333333333333';
 
 function employee(overrides: Partial<EmployeeDetail> = {}): EmployeeDetail {
@@ -34,7 +35,11 @@ function employee(overrides: Partial<EmployeeDetail> = {}): EmployeeDetail {
   };
 }
 
-function render(detail: EmployeeDetail, canManage = true) {
+function render(
+  detail: EmployeeDetail,
+  canManage = true,
+  workers: readonly StaffWorkerChoice[] = [],
+) {
   return renderToStaticMarkup(
     <EmployeeDetailPage
       employee={detail}
@@ -42,8 +47,11 @@ function render(detail: EmployeeDetail, canManage = true) {
       canManage={canManage}
       canPay
       financeAccounts={[]}
-      workers={[]}
-      shops={[{ id: SHOP_ID, name: 'Current shop' }]}
+      workers={workers}
+      shops={[
+        { id: SHOP_ID, name: 'Current shop' },
+        { id: OTHER_SHOP_ID, name: 'Other shop' },
+      ]}
       onCommand={() => undefined}
       onSensitiveCommand={() => undefined}
     />,
@@ -98,5 +106,40 @@ describe('EmployeeDetailPage', () => {
     );
     expect(html).toContain('Operations access disabled');
     expect(html).not.toContain('Restore Operations access');
+  });
+
+  it('does not submit current-shop setup when only another shop is missing Operations access', () => {
+    const html = render(
+      employee({
+        assignments: [
+          { shopId: SHOP_ID, assigned: true },
+          { shopId: OTHER_SHOP_ID, assigned: true },
+        ],
+        operationsIdentities: [
+          {
+            kind: 'LINKED',
+            shopId: SHOP_ID,
+            workerId: WORKER_ID,
+            workerName: 'Mona Ops',
+            workerActive: true,
+            credentialVersion: 8,
+          },
+          { kind: 'SETUP_REQUIRED', shopId: OTHER_SHOP_ID },
+        ],
+      }),
+      true,
+      [
+        {
+          id: '99999999-9999-4999-8999-999999999999',
+          shopId: SHOP_ID,
+          displayName: 'Available current-shop worker',
+          linkedEmployeeId: null,
+        },
+      ],
+    );
+
+    expect(html).toContain('Other shop');
+    expect(html).toContain('Switch to that shop to complete Operations setup.');
+    expect(html).not.toContain('Complete Operations setup');
   });
 });
