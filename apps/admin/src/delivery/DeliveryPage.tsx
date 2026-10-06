@@ -103,13 +103,7 @@ export function DeliveryPage() {
       orderId: string;
       riderId: string | null;
       expectedVersion: number;
-      toState:
-        | 'UNASSIGNED'
-        | 'ASSIGNED'
-        | 'OUT_FOR_DELIVERY'
-        | 'DELIVERED'
-        | 'FAILED'
-        | 'RETURNED';
+      toState: 'UNASSIGNED' | 'ASSIGNED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED' | 'RETURNED';
       note: string | null;
     }) => {
       if (!shopId) throw new Error('concrete_shop_required');
@@ -157,10 +151,7 @@ export function DeliveryPage() {
       ? (workspace?.zones.find((zone) => zone.id === editingZoneId) ?? null)
       : null;
   const fallbackShops = principal.shopIds
-    .map((authorizedShopId, index) => ({
-      id: authorizedShopId,
-      label: `Shop ${index + 1}`,
-    }))
+    .map((authorizedShopId, index) => ({ id: authorizedShopId, label: `Shop ${index + 1}` }))
     .filter((option) => option.id !== shopId);
 
   return (
