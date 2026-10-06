@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import type { AdminDeliveryWorkspace } from '@tux/admin-contracts';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const backupShopId = 'abababab-abab-4bab-8bab-abababababab';
 const zoneId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const riderId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const orderId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
@@ -13,16 +14,23 @@ const session = {
     businessId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
     role: 'OWNER',
     permissions: ['delivery.view', 'delivery.manage'],
-    shopIds: [shopId],
+    shopIds: [shopId, backupShopId],
   },
   csrfToken,
 };
 
 type DeliveryCommand = Record<string, unknown>;
+type DeliveryWorkspaceFixture = AdminDeliveryWorkspace & {
+  fallbackShops: readonly { id: string; name: string }[];
+};
 
-function workspace(): AdminDeliveryWorkspace {
+function workspace(): DeliveryWorkspaceFixture {
   return {
     shopId,
+    fallbackShops: [
+      { id: shopId, name: 'TUX Maadi' },
+      { id: backupShopId, name: 'TUX Backup' },
+    ],
     zones: [
       {
         id: zoneId,
@@ -143,7 +151,7 @@ test('routes delivery mutations through the trusted BFF and clears rider on unas
   await page.goto('/delivery');
 
   await page.getByRole('button', { name: /Maadi Core/ }).click();
-  await page.getByLabel('Delivery fee minor').fill('3000');
+  await page.getByLabel('Delivery fee (EGP)').fill('30.00');
   await page.getByRole('button', { name: 'Save delivery zone' }).click();
 
   await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);
@@ -213,4 +221,27 @@ test('delivery view-only users do not receive mutation controls', async ({ page 
   await expect(page.getByRole('button', { name: 'New rider' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Save rider' })).toHaveCount(0);
   await expect(page.getByLabel(`Delivery order ${orderId}`)).toContainText('ASSIGNED');
+});
+
+test('delivery zone editor uses EGP amounts and named fallback shops', async ({ page }) => {
+  const { commands } = await mockDelivery(page);
+  await page.goto('/delivery');
+
+  await page.getByRole('button', { name: /Maadi Core/ }).click();
+  await expect(page.getByLabel('Delivery fee (EGP)')).toHaveValue('25.00');
+  await expect(page.getByLabel('Minimum order (EGP)')).toHaveValue('120.00');
+  await expect(page.getByLabel(/fallback shop id/i)).toHaveCount(0);
+
+  await page.getByLabel('Use fallback shop').check();
+  await page.getByLabel('Fallback shop').selectOption({ label: 'TUX Backup' });
+  await page.getByRole('button', { name: 'Save delivery zone' }).click();
+
+  await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);
+  expect(commands[0]).toMatchObject({
+    type: 'delivery.zone.upsert',
+    feeMinor: 2500,
+    minimumOrderMinor: 12000,
+    fallbackEnabled: true,
+    fallbackShopId: backupShopId,
+  });
 });
