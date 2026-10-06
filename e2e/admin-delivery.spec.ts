@@ -68,14 +68,20 @@ function workspace(): AdminDeliveryWorkspace {
   };
 }
 
-async function mockDelivery(page: Page) {
+async function mockDelivery(
+  page: Page,
+  permissions: readonly string[] = session.principal.permissions,
+) {
   const commands: DeliveryCommand[] = [];
 
   await page.route('**/api/admin/session', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(session),
+      body: JSON.stringify({
+        ...session,
+        principal: { ...session.principal, permissions },
+      }),
     }),
   );
 
@@ -195,4 +201,16 @@ test('delivery uses business-facing copy and stays usable across phone, tablet, 
     );
     expect(hasHorizontalOverflow).toBe(false);
   }
+});
+
+test('delivery view-only users do not receive mutation controls', async ({ page }) => {
+  await mockDelivery(page, ['delivery.view']);
+  await page.goto('/delivery');
+
+  await expect(page.getByText('Maadi Core')).toBeVisible();
+  await expect(page.getByText('Omar Rider')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New delivery zone' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'New rider' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Save rider' })).toHaveCount(0);
+  await expect(page.getByLabel(`Delivery order ${orderId}`)).toContainText('ASSIGNED');
 });
