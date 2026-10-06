@@ -14,6 +14,11 @@ export type DeliveryZoneDraft = {
   fallbackEnabled: boolean;
 };
 
+type FallbackShopOption = {
+  id: string;
+  label: string;
+};
+
 function initialBoundary(zone: AdminDeliveryZone | null): AdminDeliveryZoneBoundary {
   return (
     zone?.boundary ?? {
@@ -25,20 +30,40 @@ function initialBoundary(zone: AdminDeliveryZone | null): AdminDeliveryZoneBound
   );
 }
 
+function formatMinorInput(value: number): string {
+  const whole = Math.floor(value / 100);
+  const fraction = String(value % 100).padStart(2, '0');
+  return `${whole}.${fraction}`;
+}
+
+function parseMinorInput(value: string): number | null {
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(value.trim());
+  if (!match) return null;
+  const whole = Number(match[1]);
+  const fraction = Number((match[2] ?? '').padEnd(2, '0') || '0');
+  if (!Number.isSafeInteger(whole) || !Number.isSafeInteger(fraction)) return null;
+  const minor = whole * 100 + fraction;
+  return Number.isSafeInteger(minor) ? minor : null;
+}
+
 export function ZoneEditor({
   zone,
   saving,
+  fallbackShops,
   onSave,
   onCancel,
 }: {
   zone: AdminDeliveryZone | null;
   saving: boolean;
+  fallbackShops: readonly FallbackShopOption[];
   onSave(input: DeliveryZoneDraft): void;
   onCancel(): void;
 }) {
   const [name, setName] = useState(zone?.name ?? '');
-  const [feeMinor, setFeeMinor] = useState(String(zone?.feeMinor ?? 0));
-  const [minimumOrderMinor, setMinimumOrderMinor] = useState(String(zone?.minimumOrderMinor ?? 0));
+  const [feeAmount, setFeeAmount] = useState(formatMinorInput(zone?.feeMinor ?? 0));
+  const [minimumOrderAmount, setMinimumOrderAmount] = useState(
+    formatMinorInput(zone?.minimumOrderMinor ?? 0),
+  );
   const [priority, setPriority] = useState(String(zone?.priority ?? 0));
   const [active, setActive] = useState(zone?.active ?? true);
   const [boundary, setBoundary] = useState<AdminDeliveryZoneBoundary>(initialBoundary(zone));
@@ -47,8 +72,8 @@ export function ZoneEditor({
 
   useEffect(() => {
     setName(zone?.name ?? '');
-    setFeeMinor(String(zone?.feeMinor ?? 0));
-    setMinimumOrderMinor(String(zone?.minimumOrderMinor ?? 0));
+    setFeeAmount(formatMinorInput(zone?.feeMinor ?? 0));
+    setMinimumOrderAmount(formatMinorInput(zone?.minimumOrderMinor ?? 0));
     setPriority(String(zone?.priority ?? 0));
     setActive(zone?.active ?? true);
     setBoundary(initialBoundary(zone));
@@ -58,16 +83,15 @@ export function ZoneEditor({
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const fee = Number(feeMinor);
-    const minimum = Number(minimumOrderMinor);
+    const fee = parseMinorInput(feeAmount);
+    const minimum = parseMinorInput(minimumOrderAmount);
     const zonePriority = Number(priority);
     if (
       !name.trim() ||
-      !Number.isSafeInteger(fee) ||
-      fee < 0 ||
-      !Number.isSafeInteger(minimum) ||
-      minimum < 0 ||
-      !Number.isSafeInteger(zonePriority)
+      fee === null ||
+      minimum === null ||
+      !Number.isSafeInteger(zonePriority) ||
+      (fallbackEnabled && !fallbackShopId)
     ) {
       return;
     }
@@ -80,10 +104,14 @@ export function ZoneEditor({
       priority: zonePriority,
       active,
       boundary,
-      fallbackShopId: fallbackEnabled && fallbackShopId.trim() ? fallbackShopId.trim() : null,
+      fallbackShopId: fallbackEnabled ? fallbackShopId : null,
       fallbackEnabled,
     });
   }
+
+  const configuredFallbackUnavailable = Boolean(
+    fallbackShopId && !fallbackShops.some((option) => option.id === fallbackShopId),
+  );
 
   return (
     <form onSubmit={submit} aria-label="Delivery zone editor">
@@ -93,19 +121,19 @@ export function ZoneEditor({
         <input value={name} onChange={(event) => setName(event.target.value)} required />
       </label>
       <label className="admin-field">
-        <span>Delivery fee minor</span>
+        <span>Delivery fee (EGP)</span>
         <input
-          inputMode="numeric"
-          value={feeMinor}
-          onChange={(event) => setFeeMinor(event.target.value)}
+          inputMode="decimal"
+          value={feeAmount}
+          onChange={(event) => setFeeAmount(event.target.value)}
         />
       </label>
       <label className="admin-field">
-        <span>Minimum order minor</span>
+        <span>Minimum order (EGP)</span>
         <input
-          inputMode="numeric"
-          value={minimumOrderMinor}
-          onChange={(event) => setMinimumOrderMinor(event.target.value)}
+          inputMode="decimal"
+          value={minimumOrderAmount}
+          onChange={(event) => setMinimumOrderAmount(event.target.value)}
         />
       </label>
       <label className="admin-field">
@@ -174,7 +202,7 @@ export function ZoneEditor({
             />
           </label>
           <label className="admin-field">
-            <span>Radius meters</span>
+            <span>Radius (meters)</span>
             <input
               inputMode="numeric"
               value={boundary.radiusMeters}
@@ -189,7 +217,7 @@ export function ZoneEditor({
         </>
       ) : (
         <label className="admin-field">
-          <span>Polygon points (latitude,longitude per line)</span>
+          <span>Polygon points (latitude, longitude per line)</span>
           <textarea
             value={boundary.points
               .map((point) => `${point.latitude},${point.longitude}`)
@@ -225,15 +253,22 @@ export function ZoneEditor({
           checked={fallbackEnabled}
           onChange={(event) => setFallbackEnabled(event.target.checked)}
         />
-        Explicit fallback enabled
+        Use fallback shop
       </label>
       {fallbackEnabled ? (
         <label className="admin-field">
-          <span>Fallback shop ID</span>
-          <input
-            value={fallbackShopId}
-            onChange={(event) => setFallbackShopId(event.target.value)}
-          />
+          <span>Fallback shop</span>
+          <select value={fallbackShopId} onChange={(event) => setFallbackShopId(event.target.value)}>
+            <option value="">Select a shop</option>
+            {configuredFallbackUnavailable ? (
+              <option value={fallbackShopId}>Current configured fallback</option>
+            ) : null}
+            {fallbackShops.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </label>
       ) : null}
 
