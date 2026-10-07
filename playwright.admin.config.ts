@@ -19,6 +19,13 @@ export default defineConfig({
     headless: true,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    ...(process.env['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH']
+      ? {
+          launchOptions: {
+            executablePath: process.env['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH'],
+          },
+        }
+      : {}),
   },
   webServer: {
     command: 'npm run build:admin && npm run preview -w @tux/admin -- --host 127.0.0.1 --port 4175',
