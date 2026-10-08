@@ -144,7 +144,8 @@ export async function handleReportsRequest(
           savedViews: savedViews.filter((view) => {
             if (!view || typeof view !== 'object') return false;
             const area = (view as Record<string, unknown>)['reportArea'];
-            return typeof area === 'string' && (
+            return (
+              typeof area === 'string' &&
               // Never return a saved finance/customer/staff filter to someone who lost access.
               area in reportDomainPermissions &&
               principal.permissions.includes(
@@ -166,35 +167,14 @@ export async function handleReportsRequest(
           ['deliveryZones', 'delivery_zones', 'name'],
         ] as const;
         const optionSets = await Promise.all(
-          definitions.filter(([key]) => canReadReportFilterOption(principal, key)).map(async ([key, table, label]) => {
-            const rows = await client.select<Array<Record<string, unknown>>>(
-              table,
-              new URLSearchParams({
-                select: `id,${label}`,
-                shop_id: `eq.${shopId}`,
-                order: `${label}.asc`,
-                limit: '100',
-              }),
-            );
-            return [
-              key,
-              rows.map((item) => ({ id: item['id'], label: item[label] || 'Unnamed' })),
-            ] as const;
-          }),
-        );
-        if (principal.role === 'OWNER' || principal.role === 'ADMIN') {
-          const businessDefinitions = [
-            ['promotions', 'promotion_rules', 'name'],
-            ['suppliers', 'suppliers', 'name'],
-            ['employees', 'business_employees', 'display_name'],
-          ] as const;
-          const businessSets = await Promise.all(
-            businessDefinitions.filter(([key]) => canReadReportFilterOption(principal, key)).map(async ([key, table, label]) => {
+          definitions
+            .filter(([key]) => canReadReportFilterOption(principal, key))
+            .map(async ([key, table, label]) => {
               const rows = await client.select<Array<Record<string, unknown>>>(
                 table,
                 new URLSearchParams({
                   select: `id,${label}`,
-                  business_id: `eq.${principal.businessId}`,
+                  shop_id: `eq.${shopId}`,
                   order: `${label}.asc`,
                   limit: '100',
                 }),
@@ -204,6 +184,31 @@ export async function handleReportsRequest(
                 rows.map((item) => ({ id: item['id'], label: item[label] || 'Unnamed' })),
               ] as const;
             }),
+        );
+        if (principal.role === 'OWNER' || principal.role === 'ADMIN') {
+          const businessDefinitions = [
+            ['promotions', 'promotion_rules', 'name'],
+            ['suppliers', 'suppliers', 'name'],
+            ['employees', 'business_employees', 'display_name'],
+          ] as const;
+          const businessSets = await Promise.all(
+            businessDefinitions
+              .filter(([key]) => canReadReportFilterOption(principal, key))
+              .map(async ([key, table, label]) => {
+                const rows = await client.select<Array<Record<string, unknown>>>(
+                  table,
+                  new URLSearchParams({
+                    select: `id,${label}`,
+                    business_id: `eq.${principal.businessId}`,
+                    order: `${label}.asc`,
+                    limit: '100',
+                  }),
+                );
+                return [
+                  key,
+                  rows.map((item) => ({ id: item['id'], label: item[label] || 'Unnamed' })),
+                ] as const;
+              }),
           );
           sendJson(response, 200, {
             options: Object.fromEntries([...optionSets, ...businessSets]),
