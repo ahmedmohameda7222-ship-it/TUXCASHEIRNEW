@@ -35,7 +35,7 @@ const activated=rpc(`public.set_finance_account_active_v1(
   '${e}'::uuid,'${s}'::uuid,'${cashId}'::uuid,2,true,'reenable-finance-cash')`,'reactivate cash');
 assert.equal(activated.ok,true);
 
-const manager='33000000-0000-4000-8000-000000000002';
+const manager='33000000-0000-4000-8000-000000000003';
 sql(`insert into public.business_employees(id,business_id,display_name,role,active)
   values ('${manager}','${b}','Finance manager','MANAGER',true);
 insert into public.employee_shop_assignments(business_id,employee_id,shop_id)
