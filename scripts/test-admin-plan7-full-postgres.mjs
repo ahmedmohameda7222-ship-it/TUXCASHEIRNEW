@@ -220,9 +220,9 @@ sql(`insert into public.suppliers(
 values ('${supplierA}','${b}','Supplier A','${e}','supplier-a'),
        ('${supplierB}','${b}','Supplier B','${e}','supplier-b');
 insert into public.purchase_orders(
- business_id,shop_id,supplier_id,status,created_by_employee_id,create_command_id)
-values ('${b}','${s}','${supplierA}','DRAFT','${e}','purchase-a'),
-       ('${b}','${s}','${supplierB}','ORDERED','${e}','purchase-b');`,
+ business_id,shop_id,supplier_id,status,created_by_employee_id,create_command_id,ordered_at)
+values ('${b}','${s}','${supplierA}','DRAFT','${e}','purchase-a',null),
+       ('${b}','${s}','${supplierB}','ORDERED','${e}','purchase-b',now());`,
  'canonical purchase order report facts');
 const contextPurchasing=(context)=>rpc(`public.admin_finance_report_query_v2(
  '${e}'::uuid,array['${s}'::uuid],'purchasing',
