@@ -207,5 +207,5 @@ begin
         and z.business_day_id=v_day.id)
   ) || private.plan7_shop_money_at_day_v1(v_business_id,p_shop_id,v_day.id);
 end;
-$;
+$$;
 
