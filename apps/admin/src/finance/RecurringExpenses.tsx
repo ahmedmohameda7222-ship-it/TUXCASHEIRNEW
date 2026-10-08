@@ -117,10 +117,14 @@ export function RecurringExpenses({
               type="button"
               className="admin-secondary-button"
               disabled={finance.command.isPending}
-              onClick={() => finance.command.mutate({ draft: {
-                type: 'finance.recurring.process',
-                shopId,
-              } })}
+              onClick={() =>
+                finance.command.mutate({
+                  draft: {
+                    type: 'finance.recurring.process',
+                    shopId,
+                  },
+                })
+              }
             >
               Process due recurring expenses
             </button>
