@@ -227,6 +227,18 @@ const deniedContext=rpc(`public.admin_finance_report_query_v2(
 assert.equal(deniedContext.code,'report_context_invalid',
   'unapplicable context cannot return misleading unfiltered results');
 
+const dashboard=rpc(`public.admin_plan7_dashboard_metrics_v1(
+  '${e}'::uuid,array['${s}'::uuid],'${today}'::date,'${today}'::date)`,
+  'server-authoritative Home dashboard');
+assert.equal(dashboard.ok,true);
+assert.equal(dashboard.netSalesMinor,0);
+assert.equal(dashboard.orderCount,0);
+assert.equal(dashboard.averageOrderMinor,null);
+assert.equal(dashboard.estimatedOperatingProfitMinor,-2150);
+assert.equal(dashboard.salesTrend.length,1);
+assert.equal(dashboard.shopComparison.length,1);
+assert.equal(dashboard.sourceMix.length,0);
+
 const targets=rpc(`public.admin_report_config_command_v1(
   '${e}'::uuid,'${s}'::uuid,'SET_TARGET',
   '{"metric":"NET_SALES","periodStart":"${today}","periodEnd":"${today}","targetValue":4000,"expectedVersion":0}'::jsonb,
