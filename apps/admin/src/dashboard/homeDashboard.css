@@ -13,7 +13,9 @@
   background: var(--tux-surface-panel);
   min-width: 0;
 }
-.tux-home-kpi small { color: var(--tux-text-secondary); }
+.tux-home-kpi small {
+  color: var(--tux-text-secondary);
+}
 .tux-home-kpi strong {
   font-size: clamp(1rem, 3.2vw, 1.5rem);
   overflow-wrap: anywhere;
@@ -32,7 +34,10 @@
   border-radius: 16px;
   background: var(--tux-surface-panel);
 }
-.tux-home-insights h2 { font-size: 1.05rem; margin: 0 0 0.8rem; }
+.tux-home-insights h2 {
+  font-size: 1.05rem;
+  margin: 0 0 0.8rem;
+}
 .tux-home-trend {
   display: flex;
   align-items: end;
@@ -64,8 +69,16 @@
   overflow-wrap: anywhere;
   text-align: center;
 }
-.tux-home-trend small { color: var(--tux-text-secondary); }
-.tux-home-insight-list { display: grid; gap: 0.7rem; padding: 0; margin: 0; list-style: none; }
+.tux-home-trend small {
+  color: var(--tux-text-secondary);
+}
+.tux-home-insight-list {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
 .tux-home-insight-list li,
 .tux-home-insight-list div {
   display: flex;
@@ -74,8 +87,15 @@
   gap: 0.5rem;
   overflow-wrap: anywhere;
 }
-.tux-home-insight-list dd { margin: 0; font-weight: 650; }
+.tux-home-insight-list dd {
+  margin: 0;
+  font-weight: 650;
+}
 @media (max-width: 639px) {
-  .tux-home-trend li > span:last-child { display: none; }
-  .tux-home-trend li { height: 140px; }
+  .tux-home-trend li > span:last-child {
+    display: none;
+  }
+  .tux-home-trend li {
+    height: 140px;
+  }
 }
