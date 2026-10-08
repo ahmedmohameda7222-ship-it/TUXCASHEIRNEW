@@ -438,5 +438,8 @@ const limitedDashboard=rpc(`public.admin_plan7_dashboard_metrics_v1(
 '${today}'::date,'${today}'::date)`, 'staff dashboard masking');
 assert.equal(limitedDashboard.ok,true);
 assert.equal(limitedDashboard.estimatedOperatingProfitMinor,null);
+const limitedConfig=rpc(`public.admin_report_config_query_v1(
+ '${limited}'::uuid,'${s}'::uuid)`,'staff config isolation');
+assert.deepEqual(limitedConfig.targets,[],'finance targets cannot leak via reports.view');
 
 console.log('Plan 7 complete management, X/Z, report, recurrence and audit integration passed.');
