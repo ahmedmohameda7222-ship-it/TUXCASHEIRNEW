@@ -144,6 +144,17 @@ assert.equal(sql(`select unit_cost_minor from public.inventory_movements
   'immutable consumption cost snapshot'),'400.000000',
   'server cost binding ignores client supplied zero and uses trusted weighted state');
 
+// Bank & Cash must show the authoritative latest-day operating estimate, not a permanent placeholder.
+const workspaceProfit=rpc(`public.finance_workspace_v1('${e}'::uuid,'${s}'::uuid)`,
+  'finance workspace profit readback');
+assert.equal(workspaceProfit.ok,true);
+assert(workspaceProfit.profitSummary,'cost-complete day produces a profit summary');
+assert.equal(workspaceProfit.profitSummary.netSalesMinor,0);
+assert.equal(workspaceProfit.profitSummary.cogsMinor,400);
+assert.equal(workspaceProfit.profitSummary.expensesMinor,1750);
+assert.equal(workspaceProfit.profitSummary.estimatedOperatingProfitMinor,-2150);
+assert.equal(workspaceProfit.profitSummary.businessDayId,day);
+
 const nowReport=rpc(`public.admin_finance_report_query_v1(
   '${e}'::uuid,array['${s}'::uuid],'expenses',
   '${today}'::date,'${today}'::date,50,0,null::text)`,'expense report');
