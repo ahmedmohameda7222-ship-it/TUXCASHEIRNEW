@@ -10,7 +10,9 @@ function targetLabel(metric: ReportTargetRow['metric']): string {
   }[metric];
 }
 function targetAmount(metric: ReportTargetRow['metric'], value: number): string {
-  return metric === 'NET_SALES' || metric === 'WASTE' ? formatEgp(value) : String(value);
+  if (metric === 'NET_SALES' || metric === 'WASTE') return formatEgp(value);
+  if (metric === 'FOOD_COST_PERCENT') return (value / 100).toLocaleString('en-EG') + '%';
+  return String(value);
 }
 export function TargetsPanel({
   targets,
