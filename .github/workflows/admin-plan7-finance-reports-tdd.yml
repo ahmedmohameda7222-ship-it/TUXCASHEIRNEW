@@ -53,6 +53,7 @@ jobs:
       - run: npm ci
       - run: npm run format:check
       - run: npm run lint
+      - run: npx vitest run apps/admin/server/finance/calculations.test.ts
       - run: npm run typecheck
       - run: npm run test:admin-security
       - run: npm run test:admin-deployment
