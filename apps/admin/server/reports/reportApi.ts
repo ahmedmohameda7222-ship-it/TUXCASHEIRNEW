@@ -34,6 +34,10 @@ const area = z.enum([
   'end-day',
   'bank-cash',
   'shop-comparison',
+  'loyalty',
+  'promotions',
+  'segments',
+  'attendance',
 ]);
 const commandSchema = z.discriminatedUnion('type', [
   z
