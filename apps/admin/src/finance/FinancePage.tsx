@@ -6,7 +6,12 @@ import type {
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 
-import { EmptyState, ErrorState, InlineError, LoadingState } from '../components/feedback/AdminStates';
+import {
+  EmptyState,
+  ErrorState,
+  InlineError,
+  LoadingState,
+} from '../components/feedback/AdminStates';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
@@ -221,26 +226,39 @@ export function FinancePage() {
       primaryAction={
         canManage ? (
           <div className="tux-finance-toolbar">
-          <button
-            type="button"
-            className="admin-primary-button"
-            onClick={() => setAccountFormOpen(true)}
-          >
-            Add account
-          </button>
-          {principal.permissions.includes('finance.adjust') ? (
-            <button type="button" className="admin-secondary-button"
-              onClick={() => setMoneyMovementOpen(true)}>Money movement</button>
-          ) : null}
+            <button
+              type="button"
+              className="admin-primary-button"
+              onClick={() => setAccountFormOpen(true)}
+            >
+              Add account
+            </button>
+            {principal.permissions.includes('finance.adjust') ? (
+              <button
+                type="button"
+                className="admin-secondary-button"
+                onClick={() => setMoneyMovementOpen(true)}
+              >
+                Money movement
+              </button>
+            ) : null}
           </div>
         ) : undefined
       }
     >
       <nav className="tux-finance-toolbar" aria-label="Finance sections">
-        <Link className="admin-secondary-button" href="/finance">Bank & Cash</Link>
-        <Link className="admin-secondary-button" href="/finance/expenses">Expenses</Link>
-        <Link className="admin-secondary-button" href="/finance/settlements">Settlements</Link>
-        <Link className="admin-secondary-button" href="/finance/end-day">End Day</Link>
+        <Link className="admin-secondary-button" href="/finance">
+          Bank & Cash
+        </Link>
+        <Link className="admin-secondary-button" href="/finance/expenses">
+          Expenses
+        </Link>
+        <Link className="admin-secondary-button" href="/finance/settlements">
+          Settlements
+        </Link>
+        <Link className="admin-secondary-button" href="/finance/end-day">
+          End Day
+        </Link>
       </nav>
       {actionError ? <InlineError>{actionError}</InlineError> : null}
       {finance.workspaceQuery.isLoading ? <LoadingState title="Loading finance" /> : null}
@@ -275,14 +293,12 @@ export function FinancePage() {
           }
         />
       ) : null}
-      {workspace?.moneyPosition ? (
-        <FinancePosition position={workspace.moneyPosition} />
-      ) : null}
+      {workspace?.moneyPosition ? <FinancePosition position={workspace.moneyPosition} /> : null}
       {workspace && workspace.unmappedPaymentMethodCount > 0 ? (
         <p className="tux-finance-attention" role="status">
           {workspace.unmappedPaymentMethodCount} payment{' '}
-          {workspace.unmappedPaymentMethodCount === 1 ? 'method needs' : 'methods need'} an
-          account link. Existing payments are not assigned to an account automatically.
+          {workspace.unmappedPaymentMethodCount === 1 ? 'method needs' : 'methods need'} an account
+          link. Existing payments are not assigned to an account automatically.
         </p>
       ) : null}
       {workspace && accounts.length > 0 ? (
@@ -417,7 +433,9 @@ export function FinancePage() {
               onChange={(event) => setAccountType(event.target.value as FinanceAccountType)}
             >
               {Object.entries(accountTypeLabels).map(([type, label]) => (
-                <option key={type} value={type}>{label}</option>
+                <option key={type} value={type}>
+                  {label}
+                </option>
               ))}
             </select>
           </label>
@@ -441,7 +459,9 @@ export function FinancePage() {
               onChange={(event) => setOpeningEgp(event.target.value)}
               aria-describedby="opening-balance-help"
             />
-            <small id="opening-balance-help">Use EGP, for example 1,250.00 without the comma.</small>
+            <small id="opening-balance-help">
+              Use EGP, for example 1,250.00 without the comma.
+            </small>
           </label>
           {validationError ? <InlineError>{validationError}</InlineError> : null}
         </div>
@@ -483,18 +503,24 @@ export function FinancePage() {
               onChange={(event) => setMappedAccountId(event.target.value)}
             >
               <option value="unmapped">Not linked</option>
-              {accounts.filter((account) => account.active).map((account) => (
-                <option value={account.id} key={account.id}>
-                  {account.name} · {accountTypeLabels[account.accountType]}
-                </option>
-              ))}
+              {accounts
+                .filter((account) => account.active)
+                .map((account) => (
+                  <option value={account.id} key={account.id}>
+                    {account.name} · {accountTypeLabels[account.accountType]}
+                  </option>
+                ))}
             </select>
           </label>
         </div>
       </AdminDialog>
 
-      <MoneyMovementSheet shopId={shopId} accounts={accounts}
-        open={moneyMovementOpen} onClose={() => setMoneyMovementOpen(false)} />
+      <MoneyMovementSheet
+        shopId={shopId}
+        accounts={accounts}
+        open={moneyMovementOpen}
+        onClose={() => setMoneyMovementOpen(false)}
+      />
       <ConfirmationDialog
         open={deactivateAccount !== null}
         title="Deactivate account?"

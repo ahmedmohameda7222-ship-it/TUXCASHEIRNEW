@@ -83,7 +83,9 @@ export function deriveAccountBalances(
   }[],
   movements: readonly { readonly financeAccountId: string; readonly amountMinor: number }[],
 ): { balances: Record<string, number>; totalTrackedMoneyMinor: number } {
-  const byId = new Map(accounts.map((account) => [account.id, [checkedMinor(account.openingBalanceMinor, true)]]));
+  const byId = new Map(
+    accounts.map((account) => [account.id, [checkedMinor(account.openingBalanceMinor, true)]]),
+  );
   if (byId.size !== accounts.length) throw new Error('finance_account_duplicate');
   for (const movement of movements) {
     const amounts = byId.get(movement.financeAccountId);

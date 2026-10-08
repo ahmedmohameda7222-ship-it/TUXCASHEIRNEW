@@ -95,56 +95,63 @@ export type ReportConfigDraft =
     };
 
 export function useReports(shopId: string | undefined, filters: ReportFilters) {
-  const session=useAdminSession();
-  const cache=useQueryClient();
-  const namespace=session.state.status==='authenticated'
-    ? `${session.state.session.principal.businessId}:${session.state.session.principal.employeeId}`
-    :'unauthenticated';
-  const commandIds=useMemo(()=>createRetainedCommandIds(namespace),[namespace]);
-  const reportQuery=useQuery({
-    queryKey:['admin','reports',namespace,'report',shopId,filters],
-    enabled:Boolean(shopId && filters.shopIds.length>0),
-    queryFn:()=>{
-      const params=new URLSearchParams({
-        shopId:shopId!,area:filters.area,from:filters.fromDate,
-        to:filters.toDate,pageSize:'50',offset:String(filters.offset),
+  const session = useAdminSession();
+  const cache = useQueryClient();
+  const namespace =
+    session.state.status === 'authenticated'
+      ? `${session.state.session.principal.businessId}:${session.state.session.principal.employeeId}`
+      : 'unauthenticated';
+  const commandIds = useMemo(() => createRetainedCommandIds(namespace), [namespace]);
+  const reportQuery = useQuery({
+    queryKey: ['admin', 'reports', namespace, 'report', shopId, filters],
+    enabled: Boolean(shopId && filters.shopIds.length > 0),
+    queryFn: () => {
+      const params = new URLSearchParams({
+        shopId: shopId!,
+        area: filters.area,
+        from: filters.fromDate,
+        to: filters.toDate,
+        pageSize: '50',
+        offset: String(filters.offset),
       });
-      if (filters.source) params.set('source',filters.source);
-      if (filters.comparePrevious) params.set('compare','previous');
-      for (const selected of filters.shopIds) params.append('reportShopId',selected);
+      if (filters.source) params.set('source', filters.source);
+      if (filters.comparePrevious) params.set('compare', 'previous');
+      for (const selected of filters.shopIds) params.append('reportShopId', selected);
       return adminFetch<ReportResponse>(`/api/admin/reports?${params}`);
     },
   });
-  const configQuery=useQuery({
-    queryKey:['admin','reports',namespace,'config',shopId],
-    enabled:Boolean(shopId),
-    queryFn:()=>adminFetch<ReportConfigResponse>(
-      `/api/admin/reports?view=configuration&shopId=${encodeURIComponent(shopId!)}`,
-    ),
+  const configQuery = useQuery({
+    queryKey: ['admin', 'reports', namespace, 'config', shopId],
+    enabled: Boolean(shopId),
+    queryFn: () =>
+      adminFetch<ReportConfigResponse>(
+        `/api/admin/reports?view=configuration&shopId=${encodeURIComponent(shopId!)}`,
+      ),
   });
-  const command=useMutation({
-    mutationFn:async(draft:ReportConfigDraft)=>{
-      if (session.state.status!=='authenticated') throw new Error('session_required');
-      const scope=draft.type;
-      const commandId=commandIds.forIntent(scope,draft);
+  const command = useMutation({
+    mutationFn: async (draft: ReportConfigDraft) => {
+      if (session.state.status !== 'authenticated') throw new Error('session_required');
+      const scope = draft.type;
+      const commandId = commandIds.forIntent(scope, draft);
       try {
-        const result=await adminFetch<{ok:true;id:string;version:number}>(
+        const result = await adminFetch<{ ok: true; id: string; version: number }>(
           '/api/admin/reports',
-          {method:'POST',body:JSON.stringify({...draft,commandId})},
+          { method: 'POST', body: JSON.stringify({ ...draft, commandId }) },
           session.state.session.csrfToken,
         );
-        commandIds.complete(scope,draft);
+        commandIds.complete(scope, draft);
         return result;
-      } catch(error) {
-        if (error instanceof AdminApiError && error.status<500) {
-          commandIds.complete(scope,draft);
+      } catch (error) {
+        if (error instanceof AdminApiError && error.status < 500) {
+          commandIds.complete(scope, draft);
         }
         throw error;
       }
     },
-    onSuccess:async()=>cache.invalidateQueries({
-      queryKey:['admin','reports',namespace,'config',shopId],
-    }),
+    onSuccess: async () =>
+      cache.invalidateQueries({
+        queryKey: ['admin', 'reports', namespace, 'config', shopId],
+      }),
   });
-  return {reportQuery,configQuery,command};
+  return { reportQuery, configQuery, command };
 }

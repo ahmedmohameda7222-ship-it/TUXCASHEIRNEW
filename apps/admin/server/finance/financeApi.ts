@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-import { handleAdvancedFinance, isAdvancedFinanceCommand, isAdvancedFinanceView } from './financeOperationsApi.js';
+import {
+  handleAdvancedFinance,
+  isAdvancedFinanceCommand,
+  isAdvancedFinanceView,
+} from './financeOperationsApi.js';
 
 import { AdminAuthError, loadAdminSession, requireSessionCsrf } from '../adminAuthService.js';
 import {
@@ -180,13 +184,7 @@ export async function handleFinanceRequest(
         sendJson(
           response,
           200,
-          await readAccountHistory(
-            client,
-            principal.businessId,
-            shopId,
-            principal.role,
-            accountId,
-          ),
+          await readAccountHistory(client, principal.businessId, shopId, principal.role, accountId),
         );
         return;
       }

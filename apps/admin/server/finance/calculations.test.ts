@@ -92,7 +92,9 @@ describe('Plan 7 finance accounting invariants', () => {
     );
     expect(position.totalTrackedMoneyMinor).toBe(127000);
     expect(position.balances).toEqual({ cash: 25000, bank: 102000 });
-    expect(estimatedOperatingProfit({ netSalesMinor: 15000, cogsMinor: 6000, expensesMinor: 2000 })).toBe(7000);
+    expect(
+      estimatedOperatingProfit({ netSalesMinor: 15000, cogsMinor: 6000, expensesMinor: 2000 }),
+    ).toBe(7000);
   });
 
   it('moves money without creating revenue or net tracked-money', () => {
@@ -105,20 +107,36 @@ describe('Plan 7 finance accounting invariants', () => {
   });
 
   it('settles gross exactly once and charges only one fee', () => {
-    expect(settlementEffects({ pendingAccountId: 'pending', destinationAccountId: 'bank', grossMinor: 100000, feeMinor: 2500 })).toEqual([
+    expect(
+      settlementEffects({
+        pendingAccountId: 'pending',
+        destinationAccountId: 'bank',
+        grossMinor: 100000,
+        feeMinor: 2500,
+      }),
+    ).toEqual([
       { movementType: 'SETTLEMENT', financeAccountId: 'pending', amountMinor: -97500 },
       { movementType: 'BANK_FEE', financeAccountId: 'pending', amountMinor: -2500 },
       { movementType: 'SETTLEMENT', financeAccountId: 'bank', amountMinor: 97500 },
     ]);
-    expect(settlementEffects({ pendingAccountId: 'pending', destinationAccountId: 'bank', grossMinor: 100000, feeMinor: 0 })).toHaveLength(2);
+    expect(
+      settlementEffects({
+        pendingAccountId: 'pending',
+        destinationAccountId: 'bank',
+        grossMinor: 100000,
+        feeMinor: 0,
+      }),
+    ).toHaveLength(2);
   });
 
   it('counts staff payment expense fact once even if a duplicate appears in a projection', () => {
-    expect(staffPaymentExpenseTotal([
-      { staffPaymentRecordId: 'sp1', paidAmountMinor: 10000 },
-      { staffPaymentRecordId: 'sp1', paidAmountMinor: 10000 },
-      { staffPaymentRecordId: 'sp2', paidAmountMinor: 5000 },
-    ])).toBe(15000);
+    expect(
+      staffPaymentExpenseTotal([
+        { staffPaymentRecordId: 'sp1', paidAmountMinor: 10000 },
+        { staffPaymentRecordId: 'sp1', paidAmountMinor: 10000 },
+        { staffPaymentRecordId: 'sp2', paidAmountMinor: 5000 },
+      ]),
+    ).toBe(15000);
   });
 
   it('handles zero-account setup and unmapped payment methods without fabricated accounts', () => {
