@@ -73,8 +73,11 @@ export function SavedViews({
       const targetValue =
         targetMetric === 'NET_SALES' || targetMetric === 'WASTE'
           ? parseEgpMinor(targetAmount)
-          : Number(targetAmount);
-      if (!Number.isSafeInteger(targetValue) || targetValue < 0) {
+          : targetMetric === 'FOOD_COST_PERCENT'
+            ? Math.round(Number(targetAmount) * 100)
+            : Number(targetAmount);
+      if (!Number.isSafeInteger(targetValue) || targetValue < 0 ||
+        (targetMetric === 'FOOD_COST_PERCENT' && targetValue > 10000)) {
         throw new Error('Enter a valid nonnegative target.');
       }
       const existing = targets.find(
@@ -167,7 +170,9 @@ export function SavedViews({
               <strong>
                 {target.metric === 'NET_SALES' || target.metric === 'WASTE'
                   ? formatEgp(target.targetValue)
-                  : target.targetValue.toLocaleString('en-EG')}
+                  : target.metric === 'FOOD_COST_PERCENT'
+                    ? `${(target.targetValue / 100).toLocaleString('en-EG', { maximumFractionDigits: 2 })}%`
+                    : target.targetValue.toLocaleString('en-EG')}
               </strong>
             </li>
           ))}
@@ -239,7 +244,7 @@ export function SavedViews({
             >
               <option value="NET_SALES">Net sales (EGP)</option>
               <option value="ORDER_COUNT">Order count</option>
-              <option value="FOOD_COST_PERCENT">Food cost percentage (basis points)</option>
+              <option value="FOOD_COST_PERCENT">Food cost percentage (%)</option>
               <option value="WASTE">Waste cost (EGP)</option>
             </select>
           </label>
