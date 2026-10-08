@@ -141,6 +141,7 @@ export async function handleReportsRequest(
         const savedViews = Array.isArray(data['savedViews']) ? data['savedViews'] : [];
         sendJson(response, 200, {
           ...data,
+          targets: principal.permissions.includes('finance.view') ? data['targets'] : [],
           savedViews: savedViews.filter((view) => {
             if (!view || typeof view !== 'object') return false;
             const area = (view as Record<string, unknown>)['reportArea'];
