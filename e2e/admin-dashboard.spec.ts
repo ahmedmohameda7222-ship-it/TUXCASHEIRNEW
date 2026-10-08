@@ -14,7 +14,10 @@ async function mockHome(page: Page, role: 'OWNER' | 'MANAGER') {
           employeeId,
           role,
           shopIds: [shopId],
-          permissions: ['reports.view', 'finance.view', 'staff.view', 'delivery.view'],
+          permissions: [
+            'reports.view', 'staff.view', 'delivery.view',
+            ...(role === 'OWNER' ? ['finance.view', 'catalog.view', 'inventory.view', 'approvals.review'] : []),
+          ],
         },
         csrfToken: 'f'.repeat(64),
       }),
