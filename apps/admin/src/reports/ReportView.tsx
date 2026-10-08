@@ -23,7 +23,7 @@ export function reportDrilldownHref(target: ReportDrilldown | null): string | nu
     case 'INVENTORY_ITEM':
       return `/inventory/${encodeURIComponent(target.inventoryItemId)}`;
     case 'FINANCE_ACCOUNT':
-      return `/finance/${encodeURIComponent(target.accountId)}`;
+      return `/finance/${encodeURIComponent(target.accountId)}${target.movementId ? `?movementId=${encodeURIComponent(target.movementId)}` : ''}`;
     case 'FINANCIAL_DAY':
       return `/finance/end-day?businessDayId=${encodeURIComponent(target.businessDayId)}`;
     case 'EXPENSE':
