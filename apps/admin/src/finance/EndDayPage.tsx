@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'wouter';
+import { Link, useSearch } from 'wouter';
 
 import {
   EmptyState,
@@ -22,8 +22,8 @@ export function EndDayPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [location] = useLocation();
-  const requestedDay = new URLSearchParams(location.split('?')[1] ?? '').get('businessDayId');
+  const search = useSearch();
+  const requestedDay = new URLSearchParams(search).get('businessDayId');
   const [cashierOpen, setCashierOpen] = useState(false);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [pin, setPin] = useState('');
