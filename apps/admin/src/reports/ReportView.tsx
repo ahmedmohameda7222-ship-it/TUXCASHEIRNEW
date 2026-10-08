@@ -16,6 +16,15 @@ function sourceLink(kind: string, id: string): string | null {
   if (kind === 'staff-payment') return '/staff';
   if (kind === 'expense') return '/finance/expenses';
   if (kind === 'finance-movement') return '/finance';
+  if (kind === 'payment') return '/finance';
+  if (kind === 'purchase-order') return `/purchasing/${id}`;
+  if (kind === 'attendance-event') return '/staff';
+  if (kind === 'inventory-movement') return '/inventory';
+  if (kind === 'order-item') return '/catalog/products';
+  if (kind === 'loyalty-event' || kind === 'promotion-use' || kind === 'customer-segment')
+    return '/customers';
+  if (kind === 'return' || kind === 'refund') return '/orders';
+  if (kind === 'bank-fee') return '/finance/settlements';
   return null;
 }
 export function ReportView({
