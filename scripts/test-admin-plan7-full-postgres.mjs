@@ -95,8 +95,9 @@ assert.equal(sql("select count(*) from public.payment_settlements where command_
 
 const x=rpc(`public.finance_day_report_v1('${e}'::uuid,'${s}'::uuid,'${day}'::uuid)`,'OPEN X');
 assert.equal(x.businessDayStatus,'OPEN');
-assert.equal(x.totalExpensesMinor,1200);
-assert.equal(x.estimatedOperatingProfitMinor,-1200);
+assert.equal(x.bankFeesMinor,300,'provider fees are operating expenses');
+assert.equal(x.totalExpensesMinor,1500,'manual expense and bank fee both counted');
+assert.equal(x.estimatedOperatingProfitMinor,-1500,'settlement fees reduce X profit exactly once');
 assert.equal(sql(`select status from public.business_days where id='${day}'`,'X non-closing'),'OPEN');
 const earlyZ=rpc(`public.finance_finalize_day_v1(
   '${e}'::uuid,'${s}'::uuid,'${day}'::uuid,'z-before-ops')`,'reject early Z');
@@ -118,13 +119,41 @@ const paid=rpc(`public.post_recurring_expense_occurrence_v1(
 assert.equal(paid.ok,true);
 assert.equal(sql(`select status from public.recurring_expense_occurrences where id='${occurrenceId}'`,'due posted'),'RECORDED');
 
+// A real costed consumption must reduce, never inflate, management profit.
+sql(`insert into public.inventory_items(id,shop_id,name,unit_label,tracking_mode,
+  low_stock_threshold_micros,active) values
+  ('37000000-0000-4000-8000-000000000001','${s}','Costed ingredient','kg',
+   'RECIPE_TRACKED',0,true);
+insert into public.inventory_movements(id,shop_id,business_day_id,inventory_item_id,
+ movement_type,quantity_delta_micros,worker_id,idempotency_key,created_at,unit_cost_minor)
+values
+ ('38000000-0000-4000-8000-000000000001','${s}','${day}',
+  '37000000-0000-4000-8000-000000000001','BULK_STOCK_RECEIVED',2000000,
+  '${w}','plan7-profit-stock',now(),400),
+ ('38000000-0000-4000-8000-000000000002','${s}','${day}',
+  '37000000-0000-4000-8000-000000000001','ORDER_CONSUMPTION',-1000000,
+  '${w}','plan7-profit-consumption',now(),400);`,'real canonical ingredient consumption');
+
 const nowReport=rpc(`public.admin_finance_report_query_v1(
   '${e}'::uuid,array['${s}'::uuid],'expenses',
   '${today}'::date,'${today}'::date,50,0,null::text)`,'expense report');
 assert.equal(nowReport.ok,true);
 assert.equal(nowReport.summary.orderCount,0,'no canonical orders in finance expense fixture');
 assert(nowReport.summary.eventCount>=2,'canonical manual and recurring expenses in report');
-assert.equal(nowReport.summary.totalAmountMinor,-1450);
+assert.equal(nowReport.summary.totalAmountMinor,-1750,
+  'manual expenses, recurring expense and provider BANK_FEE are each included once');
+const profitReport=rpc(`public.admin_finance_report_query_v1(
+  '${e}'::uuid,array['${s}'::uuid],'profit',
+  '${today}'::date,'${today}'::date,50,0,null::text)`,'costed operating profit');
+assert.equal(profitReport.ok,true);
+assert.equal(profitReport.summary.totalAmountMinor,-2150,
+  'zero sales minus 1450 manual expenses, 300 provider fee and 400 COGS');
+const consumptionReport=rpc(`public.admin_finance_report_query_v1(
+  '${e}'::uuid,array['${s}'::uuid],'inventory-consumption',
+  '${today}'::date,'${today}'::date,50,0,null::text)`,'inventory consumption cost');
+assert.equal(consumptionReport.summary.totalAmountMinor,400,
+  'consumption report remains a positive cost measure');
+
 
 const targets=rpc(`public.admin_report_config_command_v1(
   '${e}'::uuid,'${s}'::uuid,'SET_TARGET',
