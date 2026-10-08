@@ -64,6 +64,17 @@ const operationSchema = z.discriminatedUnion('type', [
     commandId,
   }).strict(),
   z.object({
+    type: z.literal('finance.recurring.rule'),shopId:uuid,ruleId:uuid.nullable(),
+    expectedVersion:z.number().int().nonnegative(),
+    categoryId:uuid.nullable(),description:reason,amountMinor:minor,
+    cadence:z.enum(['DAILY','WEEKLY','MONTHLY']),nextDueDate:day,
+    active:z.boolean(),commandId,
+  }).strict(),
+  z.object({
+    type: z.literal('finance.recurring.post'),shopId:uuid,occurrenceId:uuid,
+    businessDayId:uuid,accountId:uuid.nullable(),reason,commandId,
+  }).strict(),
+  z.object({
     type: z.literal('finance.snapshot.adjust'), shopId: uuid, snapshotId: uuid,
     amountMinor: signedMinor, reason, commandId,
   }).strict(),
@@ -71,7 +82,7 @@ const operationSchema = z.discriminatedUnion('type', [
 
 const advancedViews = new Set([
   'day', 'days', 'day-history', 'expenses', 'settlements', 'categories',
-  'owner-summary', 'cashiers',
+  'owner-summary', 'cashiers', 'recurring',
 ]);
 
 export function isAdvancedFinanceView(value: string | null): boolean {
@@ -82,6 +93,7 @@ export function isAdvancedFinanceCommand(value: unknown): boolean {
     'finance.transfer','finance.bank-deposit','finance.owner-contribution',
     'finance.owner-withdrawal','finance.expense.post','finance.settlement.record',
     'finance.cashier.reconcile','finance.day.finalize','finance.snapshot.adjust',
+    'finance.recurring.rule','finance.recurring.post',
   ].includes(value);
 }
 
@@ -181,16 +193,31 @@ export async function handleAdvancedFinance(
       }
       if (view==='cashiers') {
         const businessDayId=uuid.parse(query.get('businessDayId'));
-        const workers=await client.select<Array<Record<string,unknown>>>(
-          'workers',selectQuery({
-            select:'id,display_name,active',shop_id:`eq.${shopId}`,
-            order:'display_name.asc',limit:'100'}));
-        const reconciliations=await client.select<Array<Record<string,unknown>>>(
-          'cashier_reconciliations',selectQuery({
-            select:'id,cashier_worker_id,expected_minor,actual_minor,variance_minor,posted_at',
-            business_id:`eq.${principal.businessId}`,shop_id:`eq.${shopId}`,
-            business_day_id:`eq.${businessDayId}`,limit:'100'}));
-        sendJson(response,200,{workers,reconciliations});return;
+        const expected=await client.rpc<Record<string,unknown>>('finance_cashier_expectations_v1',{
+          p_actor_employee_id:principal.employeeId,p_shop_id:shopId,
+          p_business_day_id:businessDayId,
+        });
+        if (expected['ok']!==true) {sendCommandResponse(response,expected);return;}
+        const cashiers=Array.isArray(expected['cashiers'])
+          ?expected['cashiers'] as Array<Record<string,unknown>>:[];
+        sendJson(response,200,{
+          cashiers,
+          workers:cashiers.map((c)=>({
+            id:c['cashierWorkerId'],display_name:c['displayName'],
+            expected_minor:c['expectedMinor'],
+          })),
+          reconciliations:cashiers.filter((c)=>c['reconciled']).map((c)=>({
+            id:c['cashierWorkerId'],cashier_worker_id:c['cashierWorkerId'],
+            expected_minor:c['expectedMinor'],actual_minor:c['actualMinor'],
+            variance_minor:c['varianceMinor'],
+          })),
+        });return;
+      }
+      if (view==='recurring') {
+        const result=await client.rpc<Record<string,unknown>>('finance_recurring_workspace_v1',{
+          p_actor_employee_id:principal.employeeId,p_shop_id:shopId,
+        });
+        sendCommandResponse(response,result);return;
       }
       if (view==='owner-summary') {
         const summaries=await client.select<Array<Record<string,unknown>>>(
@@ -223,7 +250,23 @@ export async function handleAdvancedFinance(
       requireRecentReauth(context.session,300);
     }
     let result:Record<string,unknown>;
-    if (command.type==='finance.cashier.reconcile') {
+    if (command.type==='finance.recurring.rule') {
+      result=await client.rpc('upsert_recurring_expense_rule_v1',{
+        p_actor_employee_id:principal.employeeId,p_shop_id:shopId,
+        p_rule_id:command.ruleId,p_expected_version:command.expectedVersion,
+        p_category_id:command.categoryId,p_description:command.description,
+        p_amount_minor:command.amountMinor,p_cadence:command.cadence,
+        p_next_due_date:command.nextDueDate,p_active:command.active,
+        p_command_id:command.commandId,
+      });
+    } else if (command.type==='finance.recurring.post') {
+      result=await client.rpc('post_recurring_expense_occurrence_v1',{
+        p_actor_employee_id:principal.employeeId,p_shop_id:shopId,
+        p_occurrence_id:command.occurrenceId,p_business_day_id:command.businessDayId,
+        p_finance_account_id:command.accountId,p_reason:command.reason,
+        p_command_id:command.commandId,
+      });
+    } else if (command.type==='finance.cashier.reconcile') {
       result=await client.rpc('finance_reconcile_cashier_v1',{
         p_actor_employee_id:principal.employeeId,p_shop_id:shopId,
         p_business_day_id:command.businessDayId,
