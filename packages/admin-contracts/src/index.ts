@@ -13,3 +13,6 @@ export * from './loyalty';
 export * from './delivery';
 
 export * from './staff';
+export * from './finance';
+export * from './endDay';
+export * from './reports';
