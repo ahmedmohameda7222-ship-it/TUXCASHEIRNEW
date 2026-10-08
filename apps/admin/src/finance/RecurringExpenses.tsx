@@ -112,9 +112,22 @@ export function RecurringExpenses({
       <div className="tux-finance-toolbar">
         <h2>Recurring expenses</h2>
         {canManage ? (
-          <button type="button" className="admin-secondary-button" onClick={() => edit(null)}>
-            Add recurring rule
-          </button>
+          <>
+            <button
+              type="button"
+              className="admin-secondary-button"
+              disabled={finance.command.isPending}
+              onClick={() => finance.command.mutate({ draft: {
+                type: 'finance.recurring.process',
+                shopId,
+              } })}
+            >
+              Process due recurring expenses
+            </button>
+            <button type="button" className="admin-secondary-button" onClick={() => edit(null)}>
+              Add recurring rule
+            </button>
+          </>
         ) : null}
       </div>
       {rules.length === 0 ? (
