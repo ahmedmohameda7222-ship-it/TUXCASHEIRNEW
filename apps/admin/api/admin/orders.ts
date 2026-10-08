@@ -30,7 +30,6 @@ import { handleDeliveryRequest } from '../../server/delivery/deliveryApi.js';
 import { handleStaffRequest } from '../../server/staff/staffApi.js';
 import { handleFinanceRequest } from '../../server/finance/financeApi.js';
 import { handleReportsRequest } from '../../server/reports/reportApi.js';
-import { handleRecurringDueCronRequest } from '../../server/finance/recurringCronApi.js';
 import { createOrderService, type OrderStore } from '../../server/orders/orderService.js';
 import { readAdminSessionToken } from '../../server/session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
@@ -822,13 +821,6 @@ export default async function handler(
     await handleReportsRequest(request, response);
     return;
   }
-  if (routedUrl.searchParams.get('__adminResource') === 'recurring-due') {
-    routedUrl.searchParams.delete('__adminResource');
-    request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
-    await handleRecurringDueCronRequest(request, response);
-    return;
-  }
-
   if (routedUrl.searchParams.get('__adminResource') === 'delivery') {
     routedUrl.searchParams.delete('__adminResource');
     request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
