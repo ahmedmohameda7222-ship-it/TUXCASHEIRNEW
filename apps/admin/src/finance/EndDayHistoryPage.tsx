@@ -68,7 +68,10 @@ export function EndDayHistoryPage({ shopId, canAdjust }: { shopId: string; canAd
                     timeZone: 'Africa/Cairo',
                   })}
                 </strong>
-                <small>Operations Business Day: {new Date(snapshot.snapshot.startedAt).toLocaleDateString('en-EG')}</small>
+                <small>
+                  Operations Business Day:{' '}
+                  {new Date(snapshot.snapshot.startedAt).toLocaleDateString('en-EG')}
+                </small>
                 <span>Original net sales: {formatEgp(snapshot.snapshot.netSalesMinor)}</span>
                 <span>
                   Original operating estimate:{' '}
