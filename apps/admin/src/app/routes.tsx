@@ -9,6 +9,7 @@ import { PageScaffold } from '../components/layout/PageScaffold';
 import { CustomersPage } from '../customers/CustomersPage';
 import { DeliveryPage } from '../delivery/DeliveryPage';
 import { InventoryPage } from '../inventory/InventoryPage';
+import { FinancePage } from '../finance/FinancePage';
 import { OrdersPage } from '../orders/OrdersPage';
 import { PurchasingPage } from '../purchasing/PurchasingPage';
 import { SettingsPage } from '../settings/SettingsPage';
@@ -85,6 +86,7 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   if (route.path === '/delivery') return <DeliveryPage />;
   if (route.path === '/purchasing') return <PurchasingPage />;
   if (route.path === '/staff') return <StaffPage />;
+  if (route.path === '/finance') return <FinancePage />;
 
   if (route.path === '/more') {
     const secondary = ADMIN_ROUTES.filter(
