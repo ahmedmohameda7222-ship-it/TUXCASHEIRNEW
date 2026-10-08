@@ -41,7 +41,7 @@ export function HomeDashboard() {
   return (
     <PageScaffold
       eyebrow="TUX Admin"
-      title="Overview"
+      title="Home"
       description="Management information from canonical shop records."
     >
       {canReport && shopId ? (

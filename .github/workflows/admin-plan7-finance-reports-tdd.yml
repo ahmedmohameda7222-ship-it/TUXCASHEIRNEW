@@ -65,6 +65,7 @@ jobs:
       - run: node scripts/test-admin-plan7-materialization-postgres.mjs
       - run: node scripts/test-admin-plan7-setup-postgres.mjs
       - run: node scripts/test-admin-plan7-full-postgres.mjs
+      - run: npm run test:migrations
 
   regression:
     needs: schema-invariants
@@ -90,4 +91,3 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:admin-security
       - run: npm run test:admin-deployment
-      - run: npm run test:migrations
