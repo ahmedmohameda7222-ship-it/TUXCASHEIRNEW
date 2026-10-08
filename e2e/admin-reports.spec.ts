@@ -39,6 +39,19 @@ async function mockReports(page: Page) {
       return;
     }
     expect(url.searchParams.get('shopId')).toBe(shopId);
+    if (url.searchParams.get('view') === 'filter-options') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          options: {
+            paymentMethods: [{ id: '66666666-6666-4666-8666-666666666666', label: 'Cash' }],
+            orderTypes: [{ id: '77777777-7777-4777-8777-777777777777', label: 'Takeaway' }],
+          },
+        }),
+      });
+      return;
+    }
     if (url.searchParams.get('view') === 'configuration') {
       await route.fulfill({
         status: 200,
@@ -120,6 +133,19 @@ test('reports preserve source filtering and period comparison on server-side req
   await expect.poll(() => queries.some((query) => query.get('area') === 'expenses')).toBe(true);
 });
 
+test('contextual payment-method filter and comparison presets reach server', async ({ page }) => {
+  const { queries } = await mockReports(page);
+  await page.goto('/reports');
+  await page.getByText('More filters').click();
+  await page.getByLabel('Payment method').selectOption('66666666-6666-4666-8666-666666666666');
+  await expect.poll(() =>
+    queries.some((query) => query.get('paymentMethodId') === '66666666-6666-4666-8666-666666666666')
+  ).toBe(true);
+  await page.getByLabel('Compare previous period').check();
+  await page.getByLabel('Comparison range').selectOption('week');
+  await expect.poll(() => queries.some((query) => query.get('compare') === 'week')).toBe(true);
+});
+
 test('saved report views send one authorized CSRF-protected versioned command', async ({
   page,
 }) => {
@@ -148,6 +174,7 @@ test('phone report presentation', async ({ page }) => {
   await mockReports(page);
   await page.goto('/reports');
   await expect(page.getByRole('list', { name: 'Report entries' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 for (const vp of [
@@ -159,5 +186,6 @@ for (const vp of [
     await mockReports(page);
     await page.goto('/reports');
     await expect(page.getByRole('table')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 }
