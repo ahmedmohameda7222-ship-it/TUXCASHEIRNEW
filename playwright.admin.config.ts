@@ -6,7 +6,7 @@ const adminE2eUrl = `http://127.0.0.1:${adminE2ePort}`;
 export default defineConfig({
   testDir: './e2e',
   testMatch:
-    /admin-(?:auth|shell|catalog|catalog-publish|catalog-recurring-availability|settings|approvals-audit|approvals-pagination|inventory|purchasing|orders|customers-promotions|delivery|workforce)\.spec\.ts/,
+    /admin-(?:auth|shell|catalog|catalog-publish|catalog-recurring-availability|settings|approvals-audit|approvals-pagination|inventory|purchasing|orders|customers-promotions|delivery|workforce|finance|reports)\.spec\.ts/,
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
