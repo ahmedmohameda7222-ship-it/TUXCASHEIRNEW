@@ -77,6 +77,28 @@ export function EndDayHistoryPage({ shopId, canAdjust }: { shopId: string; canAd
                   Original operating estimate:{' '}
                   {original === null ? 'Cost data incomplete' : formatEgp(original)}
                 </span>
+                <dl className="tux-finance-x-grid" aria-label="Frozen financial Z movement classes">
+                  {([
+                    ['Opening float', snapshot.snapshot.openingFloatMinor],
+                    ['Cash sales', snapshot.snapshot.cashPaymentsMinor],
+                    ['Cash refunds', snapshot.snapshot.cashRefundsMinor],
+                    ['Pay in', snapshot.snapshot.cashPayInsMinor],
+                    ['Pay out', snapshot.snapshot.cashPayOutsMinor],
+                    ['Cash expenses', snapshot.snapshot.cashExpensesMinor],
+                    ['Bank deposits', snapshot.snapshot.bankDepositsMinor],
+                    ['Transfers out', snapshot.snapshot.transfersOutMinor],
+                    ['Transfers in', snapshot.snapshot.transfersInMinor],
+                    ['Closing cash', snapshot.snapshot.closingCashMinor],
+                    ['Closing bank', snapshot.snapshot.closingBankMinor],
+                    ['Closing wallet', snapshot.snapshot.closingWalletMinor],
+                    ['Pending settlement', snapshot.snapshot.closingPendingSettlementMinor],
+                  ] as const).map(([label, value]) => (
+                    <div key={label}>
+                      <dt>{label}</dt>
+                      <dd>{typeof value === 'number' ? formatEgp(value) : 'Not recorded'}</dd>
+                    </div>
+                  ))}
+                </dl>
                 <span>Posted adjustments: {formatEgp(adjustTotal)}</span>
                 <strong>
                   Adjusted estimate:{' '}
