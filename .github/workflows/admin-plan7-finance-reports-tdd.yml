@@ -40,6 +40,7 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: 24 }
       - run: node scripts/test-admin-plan7-migration.mjs
+      - run: node scripts/test-admin-plan7-gateway.mjs
       - run: node scripts/test-admin-plan7-materialization-migration.mjs
       - run: node scripts/test-admin-plan7-finance-setup-migration.mjs
       - run: node scripts/test-admin-plan7-workspace-migration.mjs

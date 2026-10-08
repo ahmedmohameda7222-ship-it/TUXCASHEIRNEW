@@ -1,8 +1,8 @@
 import { timingSafeEqual } from 'node:crypto';
 
-import { getAdminServerEnv } from '../../server/env.js';
-import { firstHeader, sendJson, type AdminRequest, type AdminResponse } from '../../server/http.js';
-import { AdminSupabaseClient } from '../../server/supabaseAdmin.js';
+import { getAdminServerEnv } from '../env.js';
+import { firstHeader, sendJson, type AdminRequest, type AdminResponse } from '../http.js';
+import { AdminSupabaseClient } from '../supabaseAdmin.js';
 
 function sameSecret(provided: string, expected: string): boolean {
   const left = Buffer.from(provided, 'utf8'),
@@ -21,7 +21,7 @@ function cairoToday(): string {
 }
 
 // Callable only by a scheduler holding CRON_SECRET, not by Admin browser roles.
-export default async function handler(
+export async function handleRecurringDueCronRequest(
   request: AdminRequest,
   response: AdminResponse,
 ): Promise<void> {
