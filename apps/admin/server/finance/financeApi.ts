@@ -117,17 +117,17 @@ async function readAccountHistory(
     throw new AdminAuthorizationError('shop_forbidden');
   }
 
-  const rows = await client.select<MovementRow[]>(
-    'finance_movements',
-    new URLSearchParams({
-      select: 'id,movement_type,amount_minor,created_at',
-      business_id: `eq.${businessId}`,
-      shop_id: `eq.${shopId}`,
-      finance_account_id: `eq.${accountId}`,
-      order: 'created_at.desc,id.desc',
-      limit: '50',
-    }),
-  );
+  const movementQuery = new URLSearchParams({
+    select: 'id,movement_type,amount_minor,created_at',
+    business_id: `eq.${businessId}`,
+    finance_account_id: `eq.${accountId}`,
+    order: 'created_at.desc,id.desc',
+    limit: '50',
+  });
+  // Business accounts include movements from every shop in the tracked balance.
+  // Owner/Admin may inspect that complete account history; shop accounts remain scoped.
+  if (account.shop_id !== null) movementQuery.set('shop_id', `eq.${shopId}`);
+  const rows = await client.select<MovementRow[]>('finance_movements', movementQuery);
   return {
     accountId,
     movements: rows.map((movement) => ({
