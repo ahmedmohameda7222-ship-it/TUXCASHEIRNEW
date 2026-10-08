@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { handleAdvancedFinance, isAdvancedFinanceCommand, isAdvancedFinanceView } from './financeOperationsApi.js';
+
 import { AdminAuthError, loadAdminSession, requireSessionCsrf } from '../adminAuthService.js';
 import {
   AdminAuthorizationError,
@@ -167,6 +169,10 @@ export async function handleFinanceRequest(
 
     if (request.method === 'GET') {
       const query = new URL(request.url ?? '/', 'http://admin.local').searchParams;
+      if (isAdvancedFinanceView(query.get('view'))) {
+        await handleAdvancedFinance(request, response);
+        return;
+      }
       const shopId = uuid.parse(query.get('shopId'));
       requirePermission(principal, 'finance.view', shopId);
       if (query.get('view') === 'account-history') {
@@ -197,7 +203,12 @@ export async function handleFinanceRequest(
     }
 
     if (!requireSameOrigin(request, response)) return;
-    const command = commandSchema.parse(await readJsonObject(request));
+    const body = await readJsonObject(request);
+    if (isAdvancedFinanceCommand(body['type'])) {
+      await handleAdvancedFinance(request, response, body);
+      return;
+    }
+    const command = commandSchema.parse(body);
     requireSessionCsrf(session, firstHeader(request.headers['x-tux-admin-csrf']).trim());
     requirePermission(principal, 'finance.manage_accounts', command.shopId);
 
