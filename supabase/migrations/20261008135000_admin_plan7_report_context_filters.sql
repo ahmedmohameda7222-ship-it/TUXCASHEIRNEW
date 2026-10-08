@@ -40,8 +40,8 @@ create or replace function public.admin_finance_report_query_v2(
   p_area text,
   p_start_date date,
   p_end_date date,
-  p_page_limit integer default 50,
-  p_offset integer default 0,
+  p_page_limit integer,
+  p_offset integer,
   p_source text,
   p_context jsonb
 ) returns jsonb language plpgsql security definer
