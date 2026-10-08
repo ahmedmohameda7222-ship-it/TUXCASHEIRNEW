@@ -173,6 +173,15 @@ begin
     return jsonb_build_object('ok',false,'code','permission_forbidden');
   end if;
 
+  if not p_active and exists (
+    select 1 from public.payment_method_finance_accounts m
+    where m.business_id=v_business_id
+      and m.finance_account_id=v_account.id
+      and m.active
+  ) then
+    return jsonb_build_object('ok',false,'code','finance_account_has_active_mapping');
+  end if;
+
   update public.finance_accounts
   set active=p_active,version=version+1,updated_at=now()
   where id=v_account.id;
