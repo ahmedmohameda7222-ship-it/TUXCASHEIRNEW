@@ -149,3 +149,12 @@ test('phone report presentation', async ({ page }) => {
   await page.goto('/reports');
   await expect(page.getByRole('list', { name: 'Report entries' })).toBeVisible();
 });
+
+for (const vp of [{ width: 768, height: 1024 }, { width: 1440, height: 960 }]) {
+  test(`report table viewport ${vp.width}x${vp.height}`, async ({ page }) => {
+    await page.setViewportSize(vp);
+    await mockReports(page);
+    await page.goto('/reports');
+    await expect(page.getByRole('table')).toBeVisible();
+  });
+}
