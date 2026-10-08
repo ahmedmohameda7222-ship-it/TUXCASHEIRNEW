@@ -146,6 +146,14 @@ const profitReport=rpc(`public.admin_finance_report_query_v1(
   '${e}'::uuid,array['${s}'::uuid],'profit',
   '${today}'::date,'${today}'::date,50,0,null::text)`,'costed operating profit');
 assert.equal(profitReport.ok,true);
+const inventoryDebug=sql(`select id::text||':'||movement_type||':'||quantity_delta_micros::text||
+  ':'||coalesce(unit_cost_minor::text,'null')||':'||
+  (created_at at time zone 'Africa/Cairo')::date::text
+  from public.inventory_movements where shop_id='${s}' order by created_at,id`,
+  'inventory cost debug');
+console.log('PLAN7_PROFIT_DIAGNOSTIC',JSON.stringify({
+  today,inventoryDebug,profitSummary:profitReport.summary,profitRows:profitReport.rows,
+}));
 assert.equal(profitReport.summary.totalAmountMinor,-2150,
   'zero sales minus 1450 manual expenses, 300 provider fee and 400 COGS');
 const consumptionReport=rpc(`public.admin_finance_report_query_v1(
