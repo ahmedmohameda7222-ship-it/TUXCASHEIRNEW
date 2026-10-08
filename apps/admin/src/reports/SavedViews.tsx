@@ -61,6 +61,8 @@ export function SavedViews({
         source: filters.source,
         shopIds: filters.shopIds,
         comparePrevious: filters.comparePrevious,
+        comparisonRange: filters.comparisonRange ?? 'previous',
+        context: filters.context ?? {},
       },
       layout: {},
     });
