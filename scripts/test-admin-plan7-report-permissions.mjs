@@ -24,6 +24,7 @@ for (const [area, permission] of [
   assert(migration.includes(`when '${area}' then '${permission}'`), `SQL ${area} policy absent`);
 }
 assert.match(bff, /requireReportArea\(principal, selectedArea, id\)/);
+assert.match(bff, /sendJson\(response, 200, maskDashboardMetrics\(principal, result\)\)/);
 assert.match(bff, /canReadReportFilterOption\(principal, key\)/);
 assert.match(bff, /requireReportContextPermissions\(principal, context, id\)/);
 assert.match(migration, /private\.plan7_report_required_permission_v1\(v_area\)/);
