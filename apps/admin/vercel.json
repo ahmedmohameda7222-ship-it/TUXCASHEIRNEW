@@ -30,5 +30,11 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/admin-recurring-expenses",
+      "schedule": "0 2 * * *"
+    }
   ]
 }
