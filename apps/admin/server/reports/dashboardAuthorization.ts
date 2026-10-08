@@ -21,7 +21,9 @@ export function maskDashboardMetrics(
     sourceMix: data['sourceMix'],
     shopComparison: data['shopComparison'],
     failedOnlineOrderCount: data['failedOnlineOrderCount'],
-    estimatedOperatingProfitMinor: can('finance.view') ? data['estimatedOperatingProfitMinor'] : null,
+    estimatedOperatingProfitMinor: can('finance.view')
+      ? data['estimatedOperatingProfitMinor']
+      : null,
     lowStockCount: can('inventory.view') ? data['lowStockCount'] : null,
     outOfStockCount: can('inventory.view') ? data['outOfStockCount'] : null,
     staffOnShiftCount: can('staff.view') ? data['staffOnShiftCount'] : null,
