@@ -59,6 +59,19 @@ export type ReportConfigResponse = {
   readonly savedViews: readonly SavedReportViewRow[];
   readonly targets: readonly ReportTargetRow[];
 };
+export type ReportContext = {
+  readonly orderTypeId?: string;
+  readonly paymentMethodId?: string;
+  readonly workerId?: string;
+  readonly employeeId?: string;
+  readonly customerId?: string;
+  readonly productId?: string;
+  readonly categoryId?: string;
+  readonly promotionId?: string;
+  readonly supplierId?: string;
+  readonly deliveryZoneId?: string;
+  readonly status?: string;
+};
 export type ReportFilters = {
   readonly area: AdminReportArea;
   readonly fromDate: string;
@@ -66,6 +79,8 @@ export type ReportFilters = {
   readonly source: 'POS' | 'ONLINE' | null;
   readonly shopIds: readonly string[];
   readonly comparePrevious: boolean;
+  readonly comparisonRange?: 'previous' | 'week' | 'month' | 'year';
+  readonly context?: ReportContext;
   readonly offset: number;
 };
 export type ReportConfigDraft =
@@ -116,7 +131,10 @@ export function useReports(shopId: string | undefined, filters: ReportFilters) {
         offset: String(filters.offset),
       });
       if (filters.source) params.set('source', filters.source);
-      if (filters.comparePrevious) params.set('compare', 'previous');
+      if (filters.comparePrevious) params.set('compare', filters.comparisonRange ?? 'previous');
+      for (const [key, value] of Object.entries(filters.context ?? {})) {
+        if (value) params.set(key, value);
+      }
       for (const selected of filters.shopIds) params.append('reportShopId', selected);
       return adminFetch<ReportResponse>(`/api/admin/reports?${params}`);
     },
@@ -128,6 +146,14 @@ export function useReports(shopId: string | undefined, filters: ReportFilters) {
       adminFetch<ReportConfigResponse>(
         `/api/admin/reports?view=configuration&shopId=${encodeURIComponent(shopId!)}`,
       ),
+  });
+  const optionsQuery = useQuery({
+    queryKey: ['admin', 'reports', namespace, 'filter-options', shopId],
+    enabled: Boolean(shopId),
+    queryFn: () =>
+      adminFetch<{
+        options: Readonly<Record<string, readonly { id: string; label: string }[]>>;
+      }>(`/api/admin/reports?view=filter-options&shopId=${encodeURIComponent(shopId!)}`),
   });
   const command = useMutation({
     mutationFn: async (draft: ReportConfigDraft) => {
@@ -154,5 +180,5 @@ export function useReports(shopId: string | undefined, filters: ReportFilters) {
         queryKey: ['admin', 'reports', namespace, 'config', shopId],
       }),
   });
-  return { reportQuery, configQuery, command };
+  return { reportQuery, configQuery, optionsQuery, command };
 }
