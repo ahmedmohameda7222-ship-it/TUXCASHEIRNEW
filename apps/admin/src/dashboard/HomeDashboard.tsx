@@ -21,8 +21,8 @@ type HomeMetrics = {
   outOfStockCount: number | null;
   failedOnlineOrderCount: number;
   pendingApprovalCount: number | null;
-  staffOnShiftCount: number;
-  deliveryOpenCount: number;
+  staffOnShiftCount: number | null;
+  deliveryOpenCount: number | null;
   salesTrend: readonly { date: string; netSalesMinor: number }[];
   topProducts: readonly { name: string; quantity: number; recordedSalesMinor: number }[];
   sourceMix: readonly { source: string; orderCount: number }[];
@@ -59,6 +59,11 @@ export function HomeDashboard() {
   const shopId = scope.kind === 'shop' ? scope.shopId : principal.shopIds[0];
   const canReport = principal.permissions.includes('reports.view');
   const canFinance = principal.permissions.includes('finance.view');
+  const canInventory = principal.permissions.includes('inventory.view');
+  const canStaff = principal.permissions.includes('staff.view');
+  const canDelivery = principal.permissions.includes('delivery.view');
+  const canCatalog = principal.permissions.includes('catalog.view');
+  const canApprovals = principal.permissions.includes('approvals.review');
   const canShowAll = principal.role === 'OWNER' || principal.role === 'ADMIN';
   const scopeIds =
     scope.kind === 'all-shops' && canShowAll ? principal.shopIds : shopId ? [shopId] : [];
@@ -97,26 +102,24 @@ export function HomeDashboard() {
     1,
     ...(historic?.salesTrend ?? []).map((x) => Math.max(0, x.netSalesMinor)),
   );
-  const kpis = ownerView
-    ? [
-        ['Net sales today', metric(current?.netSalesMinor, true)],
-        ['Orders today', metric(current?.orderCount)],
-        ['Estimated operating profit', metric(current?.estimatedOperatingProfitMinor, true)],
-        ['Average order value', metric(current?.averageOrderMinor, true)],
-        ['Low-stock items', metric(current?.lowStockCount)],
-        ['Out-of-stock items', metric(current?.outOfStockCount)],
-        ['Failed online orders', metric(current?.failedOnlineOrderCount)],
-        ['Pending approvals', metric(current?.pendingApprovalCount)],
-      ]
-    : [
-        ['Net sales today', metric(current?.netSalesMinor, true)],
-        ['Orders today', metric(current?.orderCount)],
-        ['Average order value', metric(current?.averageOrderMinor, true)],
-        ['Low-stock items', metric(current?.lowStockCount)],
-        ['Staff clocked in', metric(current?.staffOnShiftCount)],
-        ['Active deliveries', metric(current?.deliveryOpenCount)],
-        ['Pending approvals', metric(current?.pendingApprovalCount)],
-      ];
+  const kpis: Array<readonly [string, string]> = [
+    ['Net sales today', metric(current?.netSalesMinor, true)],
+    ['Orders today', metric(current?.orderCount)],
+    ['Average order value', metric(current?.averageOrderMinor, true)],
+    ...(canFinance
+      ? [['Estimated operating profit', metric(current?.estimatedOperatingProfitMinor, true)] as const]
+      : []),
+    ...(canInventory
+      ? [
+          ['Low-stock items', metric(current?.lowStockCount)] as const,
+          ['Out-of-stock items', metric(current?.outOfStockCount)] as const,
+        ]
+      : []),
+    ...(canStaff ? [['Staff clocked in', metric(current?.staffOnShiftCount)] as const] : []),
+    ...(canDelivery ? [['Active deliveries', metric(current?.deliveryOpenCount)] as const] : []),
+    ...(canApprovals ? [['Pending approvals', metric(current?.pendingApprovalCount)] as const] : []),
+    ['Failed online orders', metric(current?.failedOnlineOrderCount)],
+  ];
   return (
     <PageScaffold
       eyebrow="TUX Admin"
@@ -165,7 +168,7 @@ export function HomeDashboard() {
                   ))}
                 </ul>
               </section>
-              <section aria-label="Top recorded products">
+              {canCatalog ? <section aria-label="Top recorded products">
                 <h2>Top products · 7 days</h2>
                 {historic.topProducts.length === 0 ? (
                   <p>No recorded products this week.</p>
@@ -179,7 +182,7 @@ export function HomeDashboard() {
                     ))}
                   </ol>
                 )}
-              </section>
+              </section> : null}
               <section aria-label="Sales channels">
                 <h2>POS vs online · 7 days</h2>
                 {historic.sourceMix.length === 0 ? (
