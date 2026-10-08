@@ -23,7 +23,9 @@ export function CashierReconciliation({
   const [error, setError] = useState<string | null>(null);
   const workers = finance.cashierQuery.data?.workers ?? [];
   const posted = finance.cashierQuery.data?.reconciliations ?? [];
-  const selectedCashier = finance.cashierQuery.data?.cashiers?.find((c) => c.cashierWorkerId === workerId);
+  const selectedCashier = finance.cashierQuery.data?.cashiers?.find(
+    (c) => c.cashierWorkerId === workerId,
+  );
   const remaining = workers.filter(
     (worker) => !posted.some((recon) => recon.cashier_worker_id === worker.id),
   );
@@ -98,11 +100,19 @@ export function CashierReconciliation({
         </label>
         {selectedCashier ? (
           <div className="tux-finance-attention" role="status">
-            <p>Cash sales after posted refunds: {formatEgp(selectedCashier.cashSalesExpectationMinor)}</p>
+            <p>
+              Cash sales after posted refunds:{' '}
+              {formatEgp(selectedCashier.cashSalesExpectationMinor)}
+            </p>
             <p>Recorded drawer movements: {formatEgp(selectedCashier.recordedCashMovementMinor)}</p>
-            <strong>Expected from recorded facts: {formatEgp(selectedCashier.expectedMinor)}</strong>
+            <strong>
+              Expected from recorded facts: {formatEgp(selectedCashier.expectedMinor)}
+            </strong>
             {!selectedCashier.openingFloatRecorded ? (
-              <p>No recorded opening float is available for this cashier. The recorded expectation is not a verified physical opening balance.</p>
+              <p>
+                No recorded opening float is available for this cashier. The recorded expectation is
+                not a verified physical opening balance.
+              </p>
             ) : null}
           </div>
         ) : null}
