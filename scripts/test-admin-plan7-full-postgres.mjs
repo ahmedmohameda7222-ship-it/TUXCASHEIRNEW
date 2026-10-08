@@ -438,8 +438,14 @@ const limitedDashboard=rpc(`public.admin_plan7_dashboard_metrics_v1(
 '${today}'::date,'${today}'::date)`, 'staff dashboard masking');
 assert.equal(limitedDashboard.ok,true);
 assert.equal(limitedDashboard.estimatedOperatingProfitMinor,null);
+const costTarget=rpc(`public.admin_report_config_command_v1(
+  '${e}'::uuid,'${s}'::uuid,'SET_TARGET',
+  '{"metric":"FOOD_COST_PERCENT","periodStart":"${today}","periodEnd":"${today}","targetValue":3000,"expectedVersion":0}'::jsonb,
+  'finance-cost-target')`,'create finance-only target');
+assert.equal(costTarget.ok,true);
 const limitedConfig=rpc(`public.admin_report_config_query_v1(
  '${limited}'::uuid,'${s}'::uuid)`,'staff config isolation');
-assert.deepEqual(limitedConfig.targets,[],'finance targets cannot leak via reports.view');
+assert.deepEqual(limitedConfig.targets.map(t=>t.metric),['NET_SALES'],
+  'reports.view keeps its sales target but must hide finance-only cost targets');
 
 console.log('Plan 7 complete management, X/Z, report, recurrence and audit integration passed.');
