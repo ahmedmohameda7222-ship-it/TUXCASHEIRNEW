@@ -180,6 +180,27 @@ export function EndDayPage() {
               </div>
             ))}
           </dl>
+          <h3>Cash and treasury movements</h3>
+          <dl className="tux-finance-x-grid">
+            {[
+              ['Opening float', report.openingFloatMinor],
+              ['Pay in', report.cashPayInsMinor],
+              ['Pay out', report.cashPayOutsMinor],
+              ['Cash expenses', report.cashExpensesMinor],
+              ['Bank deposits', report.bankDepositsMinor],
+              ['Transfers out', report.transfersOutMinor],
+              ['Transfers in', report.transfersInMinor],
+              ['Closing cash', report.closingCashMinor],
+              ['Closing bank', report.closingBankMinor],
+              ['Closing wallet', report.closingWalletMinor],
+              ['Pending settlement', report.closingPendingSettlementMinor],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{amount(typeof value === 'number' ? value : null)}</dd>
+              </div>
+            ))}
+          </dl>
           <h3>Payment breakdown</h3>
           <dl className="tux-finance-x-grid">
             {Object.entries(report.paymentBreakdown).map(([key, value]) => (
