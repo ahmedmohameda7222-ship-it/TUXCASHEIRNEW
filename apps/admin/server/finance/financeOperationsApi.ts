@@ -401,8 +401,12 @@ export async function handleAdvancedFinance(
         if (principal.permissions.includes('finance.adjust')) {
           const generated = await client.rpc<Record<string, unknown>>(
             'process_due_recurring_expenses_v2',
-            { p_actor_employee_id: principal.employeeId, p_shop_id: shopId,
-              p_until: cairoBusinessDate(), p_max_rules: 25 },
+            {
+              p_actor_employee_id: principal.employeeId,
+              p_shop_id: shopId,
+              p_until: cairoBusinessDate(),
+              p_max_rules: 25,
+            },
           );
           if (generated['ok'] !== true) {
             sendCommandResponse(response, generated);
