@@ -37,6 +37,8 @@ export function ReportsPage() {
     source: null,
     shopIds: scope.kind === 'all-shops' ? principal.shopIds : shopId ? [shopId] : [],
     comparePrevious: false,
+    comparisonRange: 'previous',
+    context: {},
     offset: 0,
   }));
   const reports = useReports(shopId, filters);
@@ -71,6 +73,22 @@ export function ReportsPage() {
       source: source === 'POS' || source === 'ONLINE' ? source : null,
       shopIds: savedShops.length > 0 ? savedShops : [shopId!],
       comparePrevious: view.filters['comparePrevious'] === true,
+      comparisonRange:
+        view.filters['comparisonRange'] === 'week' ||
+        view.filters['comparisonRange'] === 'month' ||
+        view.filters['comparisonRange'] === 'year'
+          ? view.filters['comparisonRange']
+          : 'previous',
+      context: Object.fromEntries(
+        Object.entries(
+          view.filters['context'] && typeof view.filters['context'] === 'object' &&
+          !Array.isArray(view.filters['context'])
+            ? view.filters['context'] as Record<string, unknown> : {},
+        ).filter((entry): entry is [string,string] => (
+          typeof entry[1] === 'string' &&
+          /^(?:[0-9a-f-]{36}|[A-Z_]{2,40})$/i.test(entry[1])
+        )),
+      ),
       offset: 0,
     });
   }
@@ -86,6 +104,7 @@ export function ReportsPage() {
         onChange={setFilters}
         canCompareShops={principal.role === 'OWNER'}
         allShopIds={principal.shopIds}
+        options={reports.optionsQuery.data?.options ?? {}}
       />
       <ReportView
         data={reports.reportQuery.data}
