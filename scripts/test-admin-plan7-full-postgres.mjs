@@ -334,4 +334,44 @@ for (const signature of [
 ]) {
   assert.equal(sql(`select has_function_privilege('anon','${signature}','EXECUTE')`,'deny browser'),'f');
 }
+// Dashboard AOV must exclude unpaid and cancelled orders from its divisor.
+const orderType='38000000-0000-4000-8000-000000000001';
+const paymentMethod='39000000-0000-4000-8000-000000000001';
+const paidOrder='40000000-0000-4000-8000-000000000001';
+const cancelledOrder='40000000-0000-4000-8000-000000000002';
+const newDay='41000000-0000-4000-8000-000000000001';
+sql(`insert into public.business_days(id,shop_id,status,started_at,started_by_worker_id)
+ values ('${newDay}','${s}','OPEN',now(),'${w}');
+insert into public.order_types(id,shop_id,name,behavior,active,sort_order)
+ values ('${orderType}','${s}','Takeaway','TAKE_AWAY',true,1);
+insert into public.payment_methods(id,shop_id,display_name,logic_type,requires_reconciliation,active,sort_order)
+ values ('${paymentMethod}','${s}','Cash','CASH',false,true,1);
+insert into public.orders(
+ id,shop_id,business_day_id,display_order_no,idempotency_key,source,status,
+ operator_worker_id,operator_name_snapshot,order_type_id,
+ order_type_label_snapshot,order_type_behavior_snapshot,
+ configured_delivery_fee_minor,final_delivery_fee_minor,
+ items_subtotal_minor,discount_minor,total_minor,
+ created_at,updated_at,operational_revision,service_charge_minor,tax_minor
+) values
+ ('${paidOrder}','${s}','${newDay}',1,'aov-paid','POS','DONE',
+ '${w}','Cashier','${orderType}','Takeaway','TAKE_AWAY',
+ 0,0,10000,0,10000,now(),now(),0,0,0),
+ ('${cancelledOrder}','${s}','${newDay}',2,'aov-cancelled','POS','CANCELLED',
+ '${w}','Cashier','${orderType}','Takeaway','TAKE_AWAY',
+ 0,0,5000,0,5000,now(),now(),0,0,0);
+insert into public.payments(
+ id,shop_id,order_id,part_index,payment_method_id,
+ payment_method_label_snapshot,logic_type_snapshot,
+ allocated_minor,received_minor,change_minor,created_at
+) values (gen_random_uuid(),'${s}','${paidOrder}',1,'${paymentMethod}',
+ 'Cash','CASH',10000,10000,0,now());`, 'AOV with one paid and one cancelled order');
+const average=rpc(`public.admin_plan7_dashboard_metrics_v1(
+ '${e}'::uuid,array['${s}'::uuid],'${today}'::date,'${today}'::date)`,
+ 'exclude unpaid orders from average order value');
+assert.equal(average.orderCount,2,'total orders still includes cancelled operational orders');
+assert.equal(average.netSalesMinor,10000,'only actual paid cash is net sales');
+assert.equal(average.averageOrderMinor,10000,
+  'average order value must divide by paid orders, not by all operational orders');
+
 console.log('Plan 7 complete management, X/Z, report, recurrence and audit integration passed.');
