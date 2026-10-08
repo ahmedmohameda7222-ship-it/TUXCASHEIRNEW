@@ -135,6 +135,7 @@ export function useFinanceOperations(
     queryFn: () =>
       adminFetch<{
         workers: Array<{ id: string; display_name: string }>;
+        cashiers: Array<{ cashierWorkerId: string; displayName: string; expectedMinor: number; cashSalesExpectationMinor: number; recordedCashMovementMinor: number; openingFloatRecorded: boolean }>;
         reconciliations: Array<{ id: string; cashier_worker_id: string }>;
       }>(path('cashiers', `&businessDayId=${encodeURIComponent(businessDayId!)}`)),
   });
