@@ -1,4 +1,4 @@
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { useState } from 'react';
 
 import {
@@ -29,6 +29,8 @@ function cairoToday(): string {
 export function ExpensesPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
+  const [location] = useLocation();
+  const requestedExpenseId = new URLSearchParams(location.split('?')[1] ?? '').get('expenseId');
   const [open, setOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [newCategory, setNewCategory] = useState('');
@@ -153,7 +155,8 @@ export function ExpensesPage() {
       ) : null}
       <ul className="tux-finance-ledger-list">
         {(operations.expensesQuery.data?.expenses ?? []).map((expense) => (
-          <li key={expense.id}>
+          <li key={expense.id} aria-current={expense.id === requestedExpenseId ? 'true' : undefined}
+            className={expense.id === requestedExpenseId ? 'is-selected' : undefined}>
             <div>
               <strong>{expense.description}</strong>
               <small>
