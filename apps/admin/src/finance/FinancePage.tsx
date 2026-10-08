@@ -85,8 +85,11 @@ function AccountDetail({
       ) : null}
       <ol className="tux-finance-activity">
         {history.map((movement) => (
-          <li key={movement.id} aria-current={movement.id === highlightedMovementId ? 'true' : undefined}
-            className={movement.id === highlightedMovementId ? 'is-selected' : undefined}>
+          <li
+            key={movement.id}
+            aria-current={movement.id === highlightedMovementId ? 'true' : undefined}
+            className={movement.id === highlightedMovementId ? 'is-selected' : undefined}
+          >
             <div>
               <strong>{movement.label}</strong>
               <small>{new Date(movement.occurredAt).toLocaleString('en-EG')}</small>
