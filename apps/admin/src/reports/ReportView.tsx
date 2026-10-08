@@ -79,6 +79,21 @@ export function ReportView({
           description="There are no matching records for this shop and date range."
         />
       ) : (
+        <ul className="tux-report-mobile-entries" aria-label="Report entries">
+          {data.rows.map((fact) => {
+            const href = sourceLink(fact.sourceKind, fact.id);
+            return (
+              <li key={`mobile:${fact.sourceKind}:${fact.id}`}>
+                <div className="tux-report-mobile-entries__top">
+                  <span>{new Date(fact.occurredAt).toLocaleDateString('en-EG', { timeZone: 'Africa/Cairo' })}</span>
+                  <strong>{fact.amountMinor === null ? 'Not available' : amountLabel(fact.amountMinor)}</strong>
+                </div>
+                <small>{fact.sourceKind.replaceAll('-', ' ')}</small>
+                <p>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</p>
+              </li>
+            );
+          })}
+        </ul>
         <div className="tux-report-table-wrap">
           <table className="tux-report-table">
             <thead>
