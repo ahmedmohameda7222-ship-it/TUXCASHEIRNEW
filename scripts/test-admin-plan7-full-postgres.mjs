@@ -213,6 +213,28 @@ for (const area of ['loyalty','promotions','segments','attendance','refunds','st
     'expanded area '+area);
   assert.equal(expanded.ok,true, 'canonical area '+area+' must return an authorized report');
 }
+const supplierA='39000000-0000-4000-8000-000000000001';
+const supplierB='39000000-0000-4000-8000-000000000002';
+sql(`insert into public.suppliers(
+ id,business_id,name,created_by_employee_id,create_command_id)
+values ('${supplierA}','${b}','Supplier A','${e}','supplier-a'),
+       ('${supplierB}','${b}','Supplier B','${e}','supplier-b');
+insert into public.purchase_orders(
+ business_id,shop_id,supplier_id,status,created_by_employee_id,create_command_id)
+values ('${b}','${s}','${supplierA}','DRAFT','${e}','purchase-a'),
+       ('${b}','${s}','${supplierB}','ORDERED','${e}','purchase-b');`,
+ 'canonical purchase order report facts');
+const contextPurchasing=(context)=>rpc(`public.admin_finance_report_query_v2(
+ '${e}'::uuid,array['${s}'::uuid],'purchasing',
+ '${today}'::date,'${today}'::date,50,0,null::text,
+ '${JSON.stringify(context)}'::jsonb)`,'contextual purchasing');
+assert.equal(contextPurchasing({}).summary.eventCount,2);
+assert.equal(contextPurchasing({supplierId:supplierA}).summary.eventCount,1,
+ 'supplier filtering must apply to summary, not merely paginated rows');
+assert.equal(contextPurchasing({status:'DRAFT'}).summary.eventCount,1);
+assert.equal(contextPurchasing({supplierId:supplierA,status:'ORDERED'}).summary.eventCount,0,
+ 'combined filters must not leak mismatched supplier facts');
+
 const v2Expense=rpc(`public.admin_finance_report_query_v2(
   '${e}'::uuid,array['${s}'::uuid],'expenses',
   '${today}'::date,'${today}'::date,50,0,null::text,'{}'::jsonb)`,
