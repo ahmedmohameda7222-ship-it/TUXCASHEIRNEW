@@ -73,9 +73,16 @@ for (const sample of samples) {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) });
     });
     await page.goto('/reports');
+    const suffix = sample.kind === 'finance-movement'
+      ? '?movementId=55555555-5555-4555-8555-555555555555'
+      : '';
+    const expected = `${sample.destination}${recordId}${suffix}`;
     const link = page.getByRole('table').getByRole('link', { name: sample.label });
-    await expect(link).toHaveAttribute('href', `${sample.destination}${recordId}`);
+    await expect(link).toHaveAttribute('href', expected);
     await link.click();
-    await expect(page).toHaveURL(new RegExp(`${sample.destination.replaceAll('/', '\\/')}${recordId}$`));
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return url.pathname + url.search;
+    }).toBe(expected);
   });
 }
