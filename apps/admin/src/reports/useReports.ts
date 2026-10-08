@@ -1,4 +1,4 @@
-import type { AdminReportArea } from '@tux/admin-contracts';
+import type { AdminReportArea, ReportDrilldown } from '@tux/admin-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
@@ -16,6 +16,7 @@ export type ReportFact = {
   readonly quantity: number;
   readonly orderSource: 'POS' | 'ONLINE' | null;
   readonly costMissing: boolean;
+  readonly drilldown: ReportDrilldown | null;
 };
 export type ReportSummary = {
   readonly eventCount: number;
