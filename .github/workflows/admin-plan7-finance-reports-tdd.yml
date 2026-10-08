@@ -65,7 +65,10 @@ jobs:
       - run: node scripts/test-admin-plan7-materialization-postgres.mjs
       - run: node scripts/test-admin-plan7-setup-postgres.mjs
       - run: node scripts/test-admin-plan7-full-postgres.mjs
-      - run: npm run test:migrations
+      - name: Run full migrations on an independent empty PostgreSQL database
+        run: |
+          psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE tux_plan7_migration_smoke;'
+          TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/tux_plan7_migration_smoke npm run test:migrations
 
   regression:
     needs: schema-invariants
