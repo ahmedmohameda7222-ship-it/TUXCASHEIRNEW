@@ -12,6 +12,12 @@ import {
 } from '../http.js';
 import { readAdminSessionToken } from '../session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../supabaseAdmin.js';
+import {
+  canReadReportFilterOption,
+  requireReportArea,
+  requireReportContextPermissions,
+  REPORT_AREA_PERMISSION as reportDomainPermissions,
+} from './reportAuthorization.js';
 
 const uuid = z.string().uuid();
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -131,7 +137,21 @@ export async function handleReportsRequest(
           rpcFailure(response, data);
           return;
         }
-        sendJson(response, 200, data);
+        const savedViews = Array.isArray(data['savedViews']) ? data['savedViews'] : [];
+        sendJson(response, 200, {
+          ...data,
+          savedViews: savedViews.filter((view) => {
+            if (!view || typeof view !== 'object') return false;
+            const area = (view as Record<string, unknown>)['reportArea'];
+            return typeof area === 'string' && (
+              // Never return a saved finance/customer/staff filter to someone who lost access.
+              area in reportDomainPermissions &&
+              principal.permissions.includes(
+                reportDomainPermissions[area as keyof typeof reportDomainPermissions],
+              )
+            );
+          }),
+        });
         return;
       }
       if (query.get('view') === 'filter-options') {
@@ -145,7 +165,7 @@ export async function handleReportsRequest(
           ['deliveryZones', 'delivery_zones', 'name'],
         ] as const;
         const optionSets = await Promise.all(
-          definitions.map(async ([key, table, label]) => {
+          definitions.filter(([key]) => canReadReportFilterOption(principal, key)).map(async ([key, table, label]) => {
             const rows = await client.select<Array<Record<string, unknown>>>(
               table,
               new URLSearchParams({
@@ -168,7 +188,7 @@ export async function handleReportsRequest(
             ['employees', 'business_employees', 'display_name'],
           ] as const;
           const businessSets = await Promise.all(
-            businessDefinitions.map(async ([key, table, label]) => {
+            businessDefinitions.filter(([key]) => canReadReportFilterOption(principal, key)).map(async ([key, table, label]) => {
               const rows = await client.select<Array<Record<string, unknown>>>(
                 table,
                 new URLSearchParams({
@@ -231,6 +251,7 @@ export async function handleReportsRequest(
         return;
       }
       const selectedArea = area.parse(query.get('area') ?? 'sales');
+      for (const id of selected) requireReportArea(principal, selectedArea, id);
       const dateNow = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Africa/Cairo',
         year: 'numeric',
@@ -295,6 +316,7 @@ export async function handleReportsRequest(
             .map((key) => [key, query.get(key)]),
         ),
       );
+      for (const id of selected) requireReportContextPermissions(principal, context, id);
       const args = {
         p_actor_employee_id: principal.employeeId,
         p_shop_ids: selected,
@@ -367,6 +389,10 @@ export async function handleReportsRequest(
       command.type === 'report.target.set' ? 'settings.manage' : 'reports.view',
       command.shopId,
     );
+    if (command.type === 'report.view.save') {
+      requireReportArea(principal, command.reportArea, command.shopId);
+      requireReportContextPermissions(principal, command.filters, command.shopId);
+    }
     const action =
       command.type === 'report.view.save'
         ? 'SAVE_VIEW'
