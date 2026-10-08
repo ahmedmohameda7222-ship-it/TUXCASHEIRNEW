@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
 import { Link } from 'wouter';
 
 import { PageScaffold } from '../components/layout/PageScaffold';
@@ -59,10 +58,15 @@ export function HomeDashboard() {
   const scopeIds = scope.kind === 'all-shops' && canShowAll ? principal.shopIds : shopId ? [shopId] : [];
   const today = cairoDay();
   const fromWeek = priorDay(today, 6);
-  const filters = useMemo<ReportFilters>(() => ({
-    area: 'sales',fromDate: today,toDate: today,source: null,
-    shopIds: scopeIds,comparePrevious: false,offset: 0,
-  }), [today,scopeIds.join(',')]);
+  const filters: ReportFilters = {
+    area: 'sales',
+    fromDate: today,
+    toDate: today,
+    source: null,
+    shopIds: scopeIds,
+    comparePrevious: false,
+    offset: 0,
+  };
   const reports = useReports(canReport ? shopId : undefined, filters);
   const readDashboard = (from: string, to: string) => {
     const params = new URLSearchParams({ shopId: shopId!, view: 'dashboard', from, to });
