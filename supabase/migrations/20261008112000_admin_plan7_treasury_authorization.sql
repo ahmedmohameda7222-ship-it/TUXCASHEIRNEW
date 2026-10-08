@@ -249,3 +249,135 @@ revoke all on function public.execute_finance_management_v1(uuid,uuid,text,jsonb
   from public,anon,authenticated;
 grant execute on function public.execute_finance_management_v1(uuid,uuid,text,jsonb,text)
   to service_role;
+
+-- A shop-only finance configuration grant cannot map new operational receipts
+-- into the global treasury without OWNER/ADMIN authority.
+create or replace function public.set_payment_method_finance_account_v1(
+  p_actor_employee_id uuid,
+  p_shop_id uuid,
+  p_payment_method_id uuid,
+  p_finance_account_id uuid,
+  p_expected_version bigint,
+  p_command_id text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private, extensions
+as $$
+declare
+  v_business_id uuid;
+  v_authorized boolean;
+  v_account public.finance_accounts%rowtype;
+  v_mapping public.payment_method_finance_accounts%rowtype;
+  v_fingerprint text;
+  v_receipt private.finance_setup_commands%rowtype;
+  v_result jsonb;
+  v_next_version bigint;
+begin
+  select a.business_id,a.authorized into v_business_id,v_authorized
+  from public.resolve_admin_authorization_v1(
+    p_actor_employee_id,p_shop_id,'finance.manage_accounts'
+  ) a;
+  if not coalesce(v_authorized,false) or v_business_id is null then
+    return jsonb_build_object('ok',false,'code','permission_forbidden');
+  end if;
+  if p_payment_method_id is null or p_expected_version is null
+     or p_expected_version < 0
+     or nullif(btrim(p_command_id),'') is null or length(p_command_id)>160 then
+    return jsonb_build_object('ok',false,'code','finance_input_invalid');
+  end if;
+
+  v_fingerprint := encode(extensions.digest(convert_to(
+    jsonb_build_object(
+      'actor',p_actor_employee_id,'shop',p_shop_id,'method',p_payment_method_id,
+      'account',p_finance_account_id,'expectedVersion',p_expected_version
+    )::text,'UTF8'),'sha256'),'hex');
+
+  perform pg_advisory_xact_lock(
+    hashtextextended(v_business_id::text||':finance-setup:'||p_command_id,0)
+  );
+  select * into v_receipt from private.finance_setup_commands
+  where business_id=v_business_id and command_id=p_command_id;
+  if found then
+    if v_receipt.request_fingerprint <> v_fingerprint then
+      return jsonb_build_object('ok',false,'code','finance_command_conflict');
+    end if;
+    return v_receipt.result || jsonb_build_object('replayed',true);
+  end if;
+
+  if not exists (
+    select 1 from public.payment_methods pm
+    where pm.shop_id=p_shop_id and pm.id=p_payment_method_id
+  ) then
+    return jsonb_build_object('ok',false,'code','finance_payment_method_forbidden');
+  end if;
+  if p_finance_account_id is not null then
+    select * into v_account from public.finance_accounts
+    where business_id=v_business_id and id=p_finance_account_id for update;
+    if not found or not v_account.active
+       or (v_account.shop_id is not null and v_account.shop_id <> p_shop_id) then
+      return jsonb_build_object('ok',false,'code','finance_account_forbidden');
+    end if;
+    if v_account.shop_id is null and not exists (
+      select 1 from public.business_employees e
+      where e.id=p_actor_employee_id and e.business_id=v_business_id
+        and e.active and e.role in ('OWNER','ADMIN')
+    ) then
+      return jsonb_build_object('ok',false,'code','permission_forbidden');
+    end if;
+  end if;
+
+  select * into v_mapping
+  from public.payment_method_finance_accounts
+  where business_id=v_business_id and shop_id=p_shop_id
+    and payment_method_id=p_payment_method_id for update;
+  if found then
+    if v_mapping.version <> p_expected_version then
+      return jsonb_build_object('ok',false,'code','finance_mapping_version_conflict');
+    end if;
+    update public.payment_method_finance_accounts
+    set finance_account_id=coalesce(p_finance_account_id,v_mapping.finance_account_id),
+        active=(p_finance_account_id is not null),
+        version=version+1,updated_at=now()
+    where business_id=v_business_id and shop_id=p_shop_id
+      and payment_method_id=p_payment_method_id;
+    v_next_version := v_mapping.version+1;
+  else
+    if p_expected_version <> 0 then
+      return jsonb_build_object('ok',false,'code','finance_mapping_version_conflict');
+    end if;
+    if p_finance_account_id is not null then
+      insert into public.payment_method_finance_accounts(
+        business_id,shop_id,payment_method_id,finance_account_id,active
+      ) values(v_business_id,p_shop_id,p_payment_method_id,p_finance_account_id,true);
+      v_next_version := 1;
+    else
+      v_next_version := 0; -- intentional no mapping, no fictional account
+    end if;
+  end if;
+
+  perform public.append_admin_audit_event_v1(
+    v_business_id,p_shop_id,p_actor_employee_id,
+    'FINANCE_PAYMENT_MAPPING_CHANGED','PAYMENT_METHOD',p_payment_method_id::text,
+    case when v_mapping.payment_method_id is null then null
+         else jsonb_build_object('accountId',v_mapping.finance_account_id,
+           'active',v_mapping.active,'version',v_mapping.version) end,
+    jsonb_build_object('accountId',p_finance_account_id,
+      'mapped',p_finance_account_id is not null,'version',v_next_version),
+    'Finance payment method mapping updated',null,null,'{}'::jsonb
+  );
+  v_result := jsonb_build_object('ok',true,'replayed',false,
+    'paymentMethodId',p_payment_method_id,'financeAccountId',p_finance_account_id,
+    'mapped',p_finance_account_id is not null,'version',v_next_version);
+  insert into private.finance_setup_commands(business_id,command_id,request_fingerprint,result)
+  values(v_business_id,p_command_id,v_fingerprint,v_result);
+  return v_result;
+end;
+$$;
+
+
+revoke all on function public.set_payment_method_finance_account_v1(uuid,uuid,uuid,uuid,bigint,text)
+  from public,anon,authenticated;
+grant execute on function public.set_payment_method_finance_account_v1(uuid,uuid,uuid,uuid,bigint,text)
+  to service_role;
