@@ -23,6 +23,7 @@ export function CashierReconciliation({
   const [error, setError] = useState<string | null>(null);
   const workers = finance.cashierQuery.data?.workers ?? [];
   const posted = finance.cashierQuery.data?.reconciliations ?? [];
+  const selectedCashier = finance.cashierQuery.data?.cashiers?.find((c) => c.cashierWorkerId === workerId);
   const remaining = workers.filter(
     (worker) => !posted.some((recon) => recon.cashier_worker_id === worker.id),
   );
@@ -66,7 +67,7 @@ export function CashierReconciliation({
       }}
       title="Cashier cash count"
       variant="sheet"
-      description="The server calculates expected cash from actual allocated cash payments and posted refunds; it never trusts a submitted expected total."
+      description="The server calculates cash sales and separately includes recorded drawer movements. Unrecorded opening cash cannot be inferred."
       footer={
         <>
           <button type="button" className="admin-secondary-button" onClick={onClose}>
@@ -95,6 +96,16 @@ export function CashierReconciliation({
             ))}
           </select>
         </label>
+        {selectedCashier ? (
+          <div className="tux-finance-attention" role="status">
+            <p>Cash sales after posted refunds: {formatEgp(selectedCashier.cashSalesExpectationMinor)}</p>
+            <p>Recorded drawer movements: {formatEgp(selectedCashier.recordedCashMovementMinor)}</p>
+            <strong>Expected from recorded facts: {formatEgp(selectedCashier.expectedMinor)}</strong>
+            {!selectedCashier.openingFloatRecorded ? (
+              <p>No recorded opening float is available for this cashier. The recorded expectation is not a verified physical opening balance.</p>
+            ) : null}
+          </div>
+        ) : null}
         <label>
           Actual counted cash (EGP)
           <input
