@@ -107,9 +107,10 @@ describe('Orders Task 2 controls', () => {
     expect(html).toContain('Confirm cancellation');
   });
 
-  it('keeps refund and item-return actions separate and reason coded', () => {
-    const html = renderToStaticMarkup(
+  it('keeps refund and item-return actions in separate reason-coded sheets', () => {
+    const refundHtml = renderToStaticMarkup(
       <RefundReturnPage
+        mode="refund"
         order={order}
         reasons={[refundReason]}
         refunding={false}
@@ -119,11 +120,25 @@ describe('Orders Task 2 controls', () => {
         onReturn={vi.fn()}
       />,
     );
-    expect(html).toContain('Quality issue');
-    expect(html).toContain('Cash');
-    expect(html).toContain('TUX Burger');
-    expect(html).toContain('Admin PIN');
-    expect(html).toContain('Submit refund');
-    expect(html).toContain('Return selected items');
+    const returnHtml = renderToStaticMarkup(
+      <RefundReturnPage
+        mode="return"
+        order={order}
+        reasons={[refundReason]}
+        refunding={false}
+        returning={false}
+        onCancel={vi.fn()}
+        onRefund={vi.fn()}
+        onReturn={vi.fn()}
+      />,
+    );
+    expect(refundHtml).toContain('Quality issue');
+    expect(refundHtml).toContain('Cash');
+    expect(refundHtml).toContain('Admin PIN');
+    expect(refundHtml).toContain('Submit refund');
+    expect(refundHtml).not.toContain('Return selected items');
+    expect(returnHtml).toContain('TUX Burger');
+    expect(returnHtml).toContain('Return selected items');
+    expect(returnHtml).not.toContain('Submit refund');
   });
 });

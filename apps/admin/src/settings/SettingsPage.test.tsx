@@ -175,27 +175,26 @@ describe('Settings workspace', () => {
     expect(html).toContain('Emergency shop controls publish immediately');
   });
 
-  it('shows editable receipt inheritance without hiding the source layer', () => {
+  it('shows editable receipt settings with business-facing source labels', () => {
     const html = renderToStaticMarkup(
       <ReceiptsPage workspace={workspace} onUpdate={noop} updating={false} />,
     );
     expect(html).toContain('MD-');
-    expect(html).toContain('Shop override');
+    expect(html).toContain('Shop setting');
     expect(html).toContain('Thank you');
-    expect(html).toContain('Business default');
+    expect(html).toContain('Business setting');
     expect(html).toContain('Sequence start');
     expect(html).toContain('Save Order prefix');
     expect(html).toContain('Save Receipt footer');
   });
 
-  it('shows stable configured reason identity and version instead of free-text-only reasons', () => {
+  it('shows configured reasons using staff-facing labels', () => {
     const html = renderToStaticMarkup(
       <ReasonCodesPage workspace={workspace} onUpsert={noop} updating={false} />,
     );
     expect(html).toContain('Customer changed mind');
-    expect(html).toContain('CUSTOMER_CHANGED_MIND');
-    expect(html).toContain('CANCELLATION');
-    expect(html).toContain('v4');
+    expect(html).toContain('Order cancellation');
+    expect(html).not.toContain('v4');
   });
 
   it('renders real shop, fulfillment, payment and editable checkout configuration', () => {
@@ -210,14 +209,14 @@ describe('Settings workspace', () => {
 
     const orderTypes = renderSection('order-types');
     expect(orderTypes).toContain('Take Away');
-    expect(orderTypes).toContain('TAKE_AWAY');
+    expect(orderTypes).not.toContain('TAKE_AWAY');
     expect(orderTypes).toContain('Delivery');
-    expect(orderTypes).toContain('DELIVERY');
+    expect(orderTypes).not.toContain('sort 20');
     expect(orderTypes).toContain('Edit Take Away');
 
     const payments = renderSection('payments');
     expect(payments).toContain('Cash');
-    expect(payments).toContain('BOTH');
+    expect(payments).toContain('In-store &amp; Online');
     expect(payments).toContain('POS Card');
     expect(payments).toContain('Reference required');
     expect(payments).toContain('Manual confirmation');
@@ -226,11 +225,11 @@ describe('Settings workspace', () => {
     const checkout = renderSection('checkout');
     expect(checkout).toContain('Maadi');
     expect(checkout).toContain('30.00 EGP');
-    expect(checkout).toContain('Minimum order (minor units)');
-    expect(checkout).toContain('Service charge (bps)');
-    expect(checkout).toContain('Tax / VAT (bps)');
-    expect(checkout).toContain('1400');
-    expect(checkout).toContain('Save Tax / VAT (bps)');
+    expect(checkout).toContain('Minimum order (EGP)');
+    expect(checkout).toContain('Service charge (%)');
+    expect(checkout).toContain('Tax / VAT (%)');
+    expect(checkout).toContain('14.00');
+    expect(checkout).toContain('Save Tax / VAT (%)');
     expect(checkout).toContain('Allow discount stacking');
     expect(checkout).toContain('Save Allow discount stacking');
   });

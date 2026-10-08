@@ -1,5 +1,11 @@
 import type { EmployeeDetail } from '@tux/admin-contracts';
 
+function formatDuration(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours > 0 ? `${hours}h ${remainder}m` : `${remainder}m`;
+}
+
 export function StaffMetricsPanel({ employee }: { employee: EmployeeDetail }) {
   const scheduledShifts = employee.shifts.filter((shift) => shift.status === 'SCHEDULED').length;
   const attendanceSessions = new Set(
@@ -26,12 +32,12 @@ export function StaffMetricsPanel({ employee }: { employee: EmployeeDetail }) {
       <h3>Activity facts</h3>
       <div className="admin-more-grid">
         <div className="admin-more-card">
-          <strong>{workedMinutes}</strong>
-          <span>Worked minutes</span>
+          <strong>{formatDuration(workedMinutes)}</strong>
+          <span>Worked</span>
         </div>
         <div className="admin-more-card">
-          <strong>{overtimeMinutes}</strong>
-          <span>Overtime minutes</span>
+          <strong>{formatDuration(overtimeMinutes)}</strong>
+          <span>Overtime</span>
         </div>
         <div className="admin-more-card">
           <strong>{lateShifts}</strong>

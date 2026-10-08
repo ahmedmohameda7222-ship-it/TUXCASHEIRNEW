@@ -14,6 +14,24 @@ const transitions: Readonly<Record<AdminDeliveryOrderState, readonly AdminDelive
   RETURNED: [],
 };
 
+const stateLabels: Readonly<Record<AdminDeliveryOrderState, string>> = {
+  UNASSIGNED: 'Waiting for rider',
+  ASSIGNED: 'Rider assigned',
+  OUT_FOR_DELIVERY: 'Out for delivery',
+  DELIVERED: 'Delivered',
+  FAILED: 'Delivery failed',
+  RETURNED: 'Returned',
+};
+
+const actionLabels: Readonly<Record<AdminDeliveryOrderState, string>> = {
+  UNASSIGNED: 'Unassign rider',
+  ASSIGNED: 'Assign rider',
+  OUT_FOR_DELIVERY: 'Start delivery',
+  DELIVERED: 'Mark delivered',
+  FAILED: 'Delivery failed',
+  RETURNED: 'Return order',
+};
+
 export function DeliveryOrderPanel({
   order,
   riders,
@@ -35,10 +53,13 @@ export function DeliveryOrderPanel({
   const [note, setNote] = useState('');
 
   return (
-    <article aria-label={`Delivery order ${order.orderId}`}>
+    <article aria-label={`Delivery order ${order.displayOrderLabel ?? order.displayOrderNo ?? ''}`}>
       <header>
-        <strong>{order.orderId}</strong>
-        <span>{order.state}</span>
+        <strong>
+          {order.displayOrderLabel ??
+            (order.displayOrderNo ? `#${order.displayOrderNo}` : 'Delivery order')}
+        </strong>
+        <span>{stateLabels[order.state]}</span>
       </header>
 
       {order.state === 'UNASSIGNED' ? (
@@ -84,7 +105,7 @@ export function DeliveryOrderPanel({
               })
             }
           >
-            {next}
+            {actionLabels[next]}
           </button>
         ))}
       </div>

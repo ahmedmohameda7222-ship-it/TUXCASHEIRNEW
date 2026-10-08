@@ -228,7 +228,7 @@ function toReadModel(
     actionLabel,
     valueSummary,
     reason: row.reason,
-    consequence: `Approving ${actionLabel} will execute the exact persisted change shown above through the durable approval executor using its existing idempotency key.`,
+    consequence: `Approving ${actionLabel} will apply the change shown above. Review the value and reason before deciding.`,
     status: row.status,
     displayStatus: expired ? 'EXPIRED' : row.status,
     canDecide: canPrincipalDecide(row, principal, expired),
@@ -242,9 +242,7 @@ function toReadModel(
     failedAt: row.failed_at,
   };
   if (row.status === 'FAILED') {
-    model.failureMessage = execution?.last_error_code
-      ? `The approved command stopped safely (${execution.last_error_code}).`
-      : 'The approved command could not be completed safely.';
+    model.failureMessage = 'The approved change could not be completed safely.';
     model.recoveryMessage =
       'Review the failure and submit a new request if the command policy still allows it.';
   }

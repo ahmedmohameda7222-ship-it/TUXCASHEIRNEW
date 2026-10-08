@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { AdminSupplier } from '@tux/admin-contracts';
+import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const supplierId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -245,7 +246,7 @@ test('purchasing surfaces ordinary mutation conflicts to the operator', async ({
   await selectPurchaseOrder(page);
   await page.getByRole('button', { name: 'Mark ordered' }).click();
 
-  await expect(page.getByRole('alert')).toContainText(/stale purchase order version/i);
+  await expect(page.getByRole('alert')).toContainText(/purchase order changed/i);
 });
 
 test('purchasing replaces an older mutation error with the most recent failure', async ({
@@ -262,12 +263,14 @@ test('purchasing replaces an older mutation error with the most recent failure',
   const dialog = await openSupplierDialog(page);
   await dialog.getByLabel('Supplier name').fill('Duplicate supplier');
   await dialog.getByRole('button', { name: 'Add supplier' }).click();
-  await expect(page.getByRole('alert')).toContainText(/supplier name conflict/i);
+  await expect(page.getByRole('alert')).toContainText(
+    /supplier with these details already exists/i,
+  );
 
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   await selectPurchaseOrder(page);
   await page.getByRole('button', { name: 'Mark ordered' }).click();
-  await expect(page.getByRole('alert')).toContainText(/stale purchase order version/i);
+  await expect(page.getByRole('alert')).toContainText(/purchase order changed/i);
 });
 
 test('purchasing clears an older mutation error after a later action succeeds', async ({
@@ -282,7 +285,9 @@ test('purchasing clears an older mutation error after a later action succeeds', 
   const dialog = await openSupplierDialog(page);
   await dialog.getByLabel('Supplier name').fill('Duplicate supplier');
   await dialog.getByRole('button', { name: 'Add supplier' }).click();
-  await expect(page.getByRole('alert')).toContainText(/supplier name conflict/i);
+  await expect(page.getByRole('alert')).toContainText(
+    /supplier with these details already exists/i,
+  );
 
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   await selectPurchaseOrder(page);
@@ -300,7 +305,7 @@ test('supplier creation retains its command id across a lost response retry', as
   const dialog = await openSupplierDialog(page);
   await dialog.getByLabel('Supplier name').fill('Prime Foods');
   await dialog.getByRole('button', { name: 'Add supplier' }).click();
-  await expect(page.getByRole('alert')).toContainText(/temporary supplier response loss/i);
+  await expect(page.getByRole('alert')).toContainText(/purchasing action could not be completed/i);
 
   await dialog.getByRole('button', { name: 'Add supplier' }).click();
   await expect.poll(() => fixture.commands.length).toBe(2);
@@ -342,6 +347,7 @@ test('purchase order creation excludes inactive suppliers from options and defau
   await openSuppliers(page);
   await expect(page.getByText('Archived Foods').first()).toBeVisible();
   await openPurchaseOrders(page);
+  await page.getByRole('button', { name: 'New purchase order' }).click();
   const purchaseOrders = page.getByRole('region', { name: 'Purchase orders' });
   const supplierSelect = purchaseOrders.getByRole('combobox').first();
   await expect(supplierSelect.getByRole('option', { name: 'Archived Foods' })).toHaveCount(0);
@@ -369,6 +375,7 @@ test('purchase order defaults adopt the first supplier created after an initiall
   await expect(page.getByText('Prime Foods').first()).toBeVisible();
 
   await openPurchaseOrders(page);
+  await page.getByRole('button', { name: 'New purchase order' }).click();
   await page.getByLabel('Order quantity (purchase units)').fill('1');
   await page.getByRole('button', { name: 'Create purchase order' }).click();
 
@@ -436,3 +443,26 @@ test('purchasing posts partial receiving and purchase returns without pretending
     ]),
   );
 });
+
+for (const viewport of ADMIN_CORE_VIEWPORTS) {
+  test(`purchasing master-detail remains usable at ${viewport.name} width`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await mockPurchasing(page);
+    await page.goto('/purchasing');
+
+    const list = page.locator('.admin-master-detail__list');
+    await list.getByRole('button', { name: /PO-100/ }).click();
+    await expect(page.locator('.admin-master-detail__detail')).toBeVisible();
+
+    if (viewport.name === 'phone') {
+      await expect(list).toBeHidden();
+      await expect(page.getByRole('link', { name: /back to purchasing/i })).toBeVisible();
+    } else {
+      await expect(list).toBeVisible();
+    }
+
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+  });
+}

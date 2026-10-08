@@ -68,11 +68,10 @@ describe('Plan 2 final review round 7 regressions', () => {
     expect(settingsHook).toContain('shopConfigSchedules: scheduleList.schedules');
     expect(settingsHook).toContain('onSuccess: invalidateWorkspace');
     expect(panel).toContain('workspace.shopConfigSchedules');
-    expect(panel).toContain('terminalFailure');
-    expect(panel).toContain('nextAttemptAt');
-    expect(panel).toContain('lastError');
-    expect(panel).toContain('Reschedule required');
-    expect(panel).toContain('Retry queued');
+    expect(panel).toContain('Needs attention');
+    expect(panel).toContain('Choose a new time');
+    expect(panel).not.toContain('attemptCount');
+    expect(panel).not.toContain('lastError');
   });
 
   it('requires additive round 14 lineage hardening for accepted SHOP_CONFIG schedules', () => {

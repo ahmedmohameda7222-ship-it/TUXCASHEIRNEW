@@ -3,6 +3,7 @@ import type {
   AdminCustomerMergeResult,
   AdminCustomerSummary,
   AdminLoyaltyProgram,
+  AdminReasonCodeConfiguration,
 } from '@tux/admin-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
@@ -36,8 +37,8 @@ export function CustomersPage() {
   const queryClient = useQueryClient();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const [location, navigate] = useLocation();
-  const selectedId = detailIdFromPath(location, '/customers');
-  const [section, setSection] = useState<CrmSection>('customers');
+  const section: CrmSection = location === '/customers/settings' ? 'settings' : 'customers';
+  const selectedId = section === 'settings' ? null : detailIdFromPath(location, '/customers');
   const [query, setQuery] = useState('');
   const [mergeOpen, setMergeOpen] = useState(false);
   const [mergeSearch, setMergeSearch] = useState('');
@@ -79,6 +80,15 @@ export function CustomersPage() {
       adminFetch<{ program: AdminLoyaltyProgram | null }>(
         `/api/admin/customers?shopId=${encodeURIComponent(shopId!)}&view=loyalty-program`,
       ).then((result) => result.program),
+  });
+
+  const adjustmentReasonsQuery = useQuery({
+    queryKey: ['admin', 'customers', shopId, 'adjustment-reasons'],
+    enabled: Boolean(shopId && principal.permissions.includes('loyalty.manage')),
+    queryFn: () =>
+      adminFetch<{ reasons: AdminReasonCodeConfiguration[] }>(
+        `/api/admin/customers?shopId=${encodeURIComponent(shopId!)}&view=adjustment-reasons`,
+      ).then((result) => result.reasons),
   });
 
   const mergeCandidatesQuery = useQuery({
@@ -222,8 +232,7 @@ export function CustomersPage() {
         label="Customer workspace"
         value={section}
         onChange={(nextSection) => {
-          setSection(nextSection);
-          if (nextSection === 'settings') navigate('/customers');
+          navigate(nextSection === 'settings' ? '/customers/settings' : '/customers');
         }}
         tabs={[
           {
@@ -302,18 +311,21 @@ export function CustomersPage() {
                       <>
                         <CustomerDetailPage
                           customer={detail}
+                          loyalty={
+                            <LoyaltyPanel
+                              customer={detail}
+                              program={programQuery.data ?? null}
+                              reasons={adjustmentReasonsQuery.data ?? []}
+                              canManage={canManageLoyalty}
+                              saving={adjustLoyalty.isPending}
+                              onAdjust={(input) => adjustLoyalty.mutate(input)}
+                            />
+                          }
                           canMerge={canMerge}
                           onMerge={() => {
                             setMergeSearch('');
                             setMergeOpen(true);
                           }}
-                        />
-                        <LoyaltyPanel
-                          customer={detail}
-                          program={programQuery.data ?? null}
-                          canManage={canManageLoyalty}
-                          saving={adjustLoyalty.isPending}
-                          onAdjust={(input) => adjustLoyalty.mutate(input)}
                         />
                       </>
                     ) : (

@@ -17,6 +17,14 @@ import { useInventory } from './useInventory';
 import { VarianceReport } from './VarianceReport';
 import './inventory.css';
 
+function trackingModeLabel(mode: string): string {
+  return mode === 'BATCH_TRACKED'
+    ? 'Batch tracked'
+    : mode === 'SERIAL_TRACKED'
+      ? 'Serial tracked'
+      : 'Standard stock';
+}
+
 const STOCKTAKE_BATCH_SIZE = 500;
 
 function latestMutationError(
@@ -32,9 +40,14 @@ function latestMutationError(
 
 function mutationErrorMessage(error: unknown): string | null {
   if (error === null || error === undefined) return null;
-  const raw = error instanceof Error ? error.message : String(error);
-  const normalized = raw.trim().replaceAll('_', ' ').replaceAll('-', ' ');
-  return normalized || 'Inventory action failed';
+  const code = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  if (code.includes('insufficient_stock'))
+    return 'There is not enough available stock for this action.';
+  if (code.includes('conflict'))
+    return 'Inventory changed while you were working. Reload and try again.';
+  if (code.includes('forbidden') || code.includes('permission'))
+    return 'You do not have permission to complete this inventory action.';
+  return 'The inventory action could not be completed. Reload and try again.';
 }
 
 type WorkspaceMode =
@@ -168,7 +181,7 @@ export function InventoryPage() {
         <div className="admin-inventory-page-actions">
           {canStocktake ? (
             <button
-              className="admin-secondary-button"
+              className="admin-primary-button"
               type="button"
               disabled={inventory.beginStocktake.isPending || stocktakeItems.length === 0}
               onClick={() => {
@@ -181,22 +194,7 @@ export function InventoryPage() {
             >
               Stock count
             </button>
-          ) : null}
-          <button
-            className="admin-secondary-button"
-            type="button"
-            onClick={() => openWorkflow('reorder')}
-          >
-            Reorder
-          </button>
-          <button
-            className="admin-secondary-button"
-            type="button"
-            onClick={() => openWorkflow('variance')}
-          >
-            Variance & margins
-          </button>
-          {canTransfer ? (
+          ) : canTransfer ? (
             <button
               className="admin-primary-button"
               type="button"
@@ -205,6 +203,34 @@ export function InventoryPage() {
               Transfer stock
             </button>
           ) : null}
+          <details className="admin-inventory-more-actions">
+            <summary className="admin-secondary-button">More actions</summary>
+            <div>
+              <button
+                className="admin-secondary-button"
+                type="button"
+                onClick={() => openWorkflow('reorder')}
+              >
+                Reorder suggestions
+              </button>
+              <button
+                className="admin-secondary-button"
+                type="button"
+                onClick={() => openWorkflow('variance')}
+              >
+                Variance &amp; margins
+              </button>
+              {canStocktake && canTransfer ? (
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  onClick={() => openWorkflow('transfer')}
+                >
+                  Transfer stock
+                </button>
+              ) : null}
+            </div>
+          </details>
         </div>
       }
     >
@@ -300,7 +326,10 @@ export function InventoryPage() {
       ) : mode === 'transfer' ? (
         <TransferPage
           shopId={shopId}
-          shopIds={principal.shopIds}
+          shops={
+            workspace.shops ??
+            principal.shopIds.map((id, index) => ({ id, name: `Authorized shop ${index + 1}` }))
+          }
           items={items}
           transfers={workspace.transfers}
           sending={inventory.sendTransfer.isPending}
@@ -344,7 +373,7 @@ export function InventoryPage() {
                   >
                     <span>
                       <strong>{item.name}</strong>
-                      <small>{item.trackingMode.replaceAll('_', ' ')}</small>
+                      <small>{trackingModeLabel(item.trackingMode)}</small>
                     </span>
                     <span>
                       {new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(

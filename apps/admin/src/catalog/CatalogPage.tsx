@@ -1,6 +1,8 @@
 import type { CatalogProductDetail } from '@tux/admin-contracts';
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'wouter';
 
+import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import './catalog.css';
@@ -17,7 +19,7 @@ function mutationMessage(error: unknown): string | null {
   if (!error) return null;
   if (error instanceof CatalogUiError) {
     if (error.code === 'stale_version') {
-      return `The live catalog changed${error.currentVersion === undefined ? '' : ` to version ${error.currentVersion}`}. Refresh before continuing.`;
+      return 'The live catalog changed. Refresh before continuing.';
     }
     if (error.code === 'stale_draft_revision') {
       return 'This draft changed in another session. Refresh before editing again.';
@@ -26,7 +28,7 @@ function mutationMessage(error: unknown): string | null {
       return 'More than one compatible saved draft exists. Select the draft you want to resume before editing.';
     }
     if (error.code === 'permission_forbidden') return 'Your role cannot make this catalog change.';
-    return `Catalog action failed: ${error.code}.`;
+    return 'We could not complete that catalog action. Refresh and try again.';
   }
   return 'Catalog action failed. Refresh and try again.';
 }
@@ -60,13 +62,14 @@ export function CatalogPage() {
   const { principal, scope } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const catalog = useCatalog(shopId);
+  const [location, navigate] = useLocation();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<CatalogStatusFilter>('all');
   const [categoryId, setCategoryId] = useState('');
   const [newProductCategoryId, setNewProductCategoryId] = useState('');
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const [mobileEditing, setMobileEditing] = useState(false);
   const [unsavedProduct, setUnsavedProduct] = useState<CatalogProductDetail | null>(null);
+  const selectedProductId = unsavedProduct?.id ?? detailIdFromPath(location, '/catalog/products');
+  const mobileEditing = selectedProductId !== null;
 
   const canEdit = permission(principal, 'catalog.edit');
   const canPrice = permission(principal, 'catalog.pricing');
@@ -102,8 +105,7 @@ export function CatalogPage() {
 
   function openProduct(productId: string) {
     setUnsavedProduct(null);
-    setSelectedProductId(productId);
-    setMobileEditing(true);
+    navigate(detailPath('/catalog/products', productId));
   }
 
   function handleCategoryFilterChange(nextCategoryId: string) {
@@ -117,16 +119,14 @@ export function CatalogPage() {
     if (!shopId || !newProductCategoryId || !canEdit || !canPrice) return;
     const product = newProductForShop(shopId, newProductCategoryId, catalog.products);
     setUnsavedProduct(product);
-    setSelectedProductId(product.id);
-    setMobileEditing(true);
+    navigate(detailPath('/catalog/products', product.id));
   }
 
   function closeEditor() {
     if (unsavedProduct) {
       setUnsavedProduct(null);
-      setSelectedProductId(null);
     }
-    setMobileEditing(false);
+    navigate('/catalog/products');
   }
 
   if (!shopId) {
@@ -134,7 +134,7 @@ export function CatalogPage() {
       <PageScaffold
         eyebrow="Catalog control"
         title="Catalog"
-        description="Catalog mutations are always scoped to one concrete shop."
+        description="Select one shop to review and change its catalog."
       >
         <div className="admin-callout" role="status">
           <strong>Select a shop to manage its catalog.</strong>
@@ -182,7 +182,7 @@ export function CatalogPage() {
     <PageScaffold
       eyebrow="Catalog control"
       title="Catalog"
-      description={`Live version ${catalog.workspaceQuery.data.currentPublishVersion}. Normal edits stay in a draft until published.`}
+      description="Manage products, prices, availability, and changes waiting to be published."
       primaryAction={
         <div className="admin-catalog-new-product-controls">
           <label>
@@ -230,8 +230,7 @@ export function CatalogPage() {
                   disabled={busy}
                   onClick={() => void catalog.resumeDraft.mutateAsync(draft.id)}
                 >
-                  Resume {draft.title ?? `draft ${draft.id.slice(0, 8)}`} · rev{' '}
-                  {draft.draftRevision}
+                  Resume {draft.title ?? 'saved changes'}
                 </button>
               ))}
             </div>
@@ -243,10 +242,7 @@ export function CatalogPage() {
         <div className="admin-catalog-draft-banner" role="status">
           <div>
             <strong>Draft in progress</strong>
-            <span>
-              Base v{catalog.activeDraft.basePublishVersion} · revision{' '}
-              {catalog.activeDraft.draftRevision}
-            </span>
+            <span>Your saved changes are not visible to customers yet.</span>
           </div>
           <span className="admin-status-pill">Not live</span>
         </div>
@@ -301,7 +297,7 @@ export function CatalogPage() {
               onSaveDraft={async (draft) => {
                 await catalog.saveProduct.mutateAsync(draft);
                 setUnsavedProduct(null);
-                setSelectedProductId(draft.product.id);
+                navigate(detailPath('/catalog/products', draft.product.id), { replace: true });
               }}
               onSetAvailability={async (soldOut) => {
                 await catalog.setAvailability.mutateAsync({

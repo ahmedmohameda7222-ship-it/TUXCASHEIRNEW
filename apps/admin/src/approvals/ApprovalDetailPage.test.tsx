@@ -6,6 +6,8 @@ import {
   approvalDecisionDialogTitle,
   type ApprovalDetailViewModel,
 } from './ApprovalDetailPage';
+import { approvalDecisionErrorMessage } from './ApprovalsPage';
+import { AdminApiError } from '../lib/adminApi';
 
 const pending: ApprovalDetailViewModel = {
   id: 'approval-1',
@@ -27,6 +29,14 @@ function render(model: ApprovalDetailViewModel): string {
 }
 
 describe('ApprovalDetailPage', () => {
+  it('turns decision errors into clear next steps without exposing error codes', () => {
+    expect(
+      approvalDecisionErrorMessage(new AdminApiError(403, 'self_approval_forbidden')),
+    ).toContain('different authorized person');
+    expect(approvalDecisionErrorMessage(new AdminApiError(403, 'pin_invalid'))).toBe(
+      'The PIN was not accepted.',
+    );
+  });
   it('requires an explicit PIN confirmation prompt for approval and rejection', () => {
     expect(approvalDecisionDialogTitle('APPROVE')).toBe('Enter PIN to approve');
     expect(approvalDecisionDialogTitle('REJECT')).toBe('Enter PIN to reject');
@@ -42,6 +52,9 @@ describe('ApprovalDetailPage', () => {
     expect(html).toContain('Inventory on-hand will be reduced');
     expect(html).toContain('Approve');
     expect(html).toContain('Reject');
+    expect(html).toContain('admin-destructive-button');
+    expect(html).toContain('Pending');
+    expect(html).not.toContain('>PENDING<');
   });
 
   it('does not offer a decision for a request whose pending approval window expired', () => {
@@ -52,7 +65,7 @@ describe('ApprovalDetailPage', () => {
       executionLabel: 'Expired — submit a new request if the action is still required.',
     } as ApprovalDetailViewModel & { displayStatus: 'EXPIRED'; canDecide: false });
 
-    expect(html).toContain('EXPIRED');
+    expect(html).toContain('Expired');
     expect(html).toContain('Expired');
     expect(html).not.toContain('>Approve<');
     expect(html).not.toContain('>Reject<');

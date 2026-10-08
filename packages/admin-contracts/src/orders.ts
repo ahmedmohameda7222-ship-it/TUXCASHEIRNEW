@@ -123,6 +123,8 @@ export type AdminOrderDetail = {
   inventoryMovements: readonly {
     id: string;
     inventoryItemId: string;
+    inventoryItemName?: string;
+    unitLabel?: string;
     movementType: string;
     quantityDeltaMicros: number;
     reservedDeltaMicros: number;

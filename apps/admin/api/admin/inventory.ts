@@ -188,6 +188,9 @@ type TransferLineRow = {
   quantity_micros: number | string;
 };
 
+type ShopNameRow = { id: string; name: string };
+type SupplierNameRow = { id: string; name: string };
+
 const TRANSFER_HISTORY_LIMIT = 100;
 const TRANSFER_PAGE_SIZE = 500;
 const TRANSFER_LINE_BATCH_SIZE = 100;
@@ -461,22 +464,40 @@ async function loadWorkspace(
 ): Promise<AdminInventoryWorkspace> {
   requirePermission(context.principal, 'inventory.view', shopId);
 
-  const [itemRows, balanceRows, costRows, reasonRows, transferRows] = await Promise.all([
-    loadInventoryItemRows(client, shopId),
-    loadInventoryBalanceRows(client, context.principal.employeeId, shopId),
-    loadInventoryCostRows(client, shopId),
-    client.select<ReasonRow[]>(
-      'admin_reason_codes',
-      new URLSearchParams({
-        select: 'id,shop_id,reason_key,family,label,version',
-        business_id: `eq.${context.principal.businessId}`,
-        active: 'eq.true',
-        or: `(shop_id.is.null,shop_id.eq.${shopId})`,
-        order: 'family.asc,reason_key.asc,version.desc',
-      }),
-    ),
-    loadTransferRows(client, shopId),
-  ]);
+  const [itemRows, balanceRows, costRows, reasonRows, transferRows, shopRows, supplierRows] =
+    await Promise.all([
+      loadInventoryItemRows(client, shopId),
+      loadInventoryBalanceRows(client, context.principal.employeeId, shopId),
+      loadInventoryCostRows(client, shopId),
+      client.select<ReasonRow[]>(
+        'admin_reason_codes',
+        new URLSearchParams({
+          select: 'id,shop_id,reason_key,family,label,version',
+          business_id: `eq.${context.principal.businessId}`,
+          active: 'eq.true',
+          or: `(shop_id.is.null,shop_id.eq.${shopId})`,
+          order: 'family.asc,reason_key.asc,version.desc',
+        }),
+      ),
+      loadTransferRows(client, shopId),
+      client.select<ShopNameRow[]>(
+        'shops',
+        new URLSearchParams({
+          select: 'id,name',
+          business_id: `eq.${context.principal.businessId}`,
+          id: `in.(${context.principal.shopIds.join(',')})`,
+          order: 'name.asc,id.asc',
+        }),
+      ),
+      client.select<SupplierNameRow[]>(
+        'suppliers',
+        new URLSearchParams({
+          select: 'id,name',
+          business_id: `eq.${context.principal.businessId}`,
+          order: 'name.asc,id.asc',
+        }),
+      ),
+    ]);
 
   const transferIds = transferRows.map((row) => row.id);
   const transferLineRows =
@@ -551,10 +572,21 @@ async function loadWorkspace(
     }),
   }));
 
-  const intelligence = await loadInventoryIntelligence(client, shopId, items);
+  const intelligenceResult = await loadInventoryIntelligence(client, shopId, items);
+  const supplierNames = new Map(supplierRows.map((row) => [row.id, row.name]));
+  const intelligence = {
+    ...intelligenceResult,
+    reorderSuggestions: intelligenceResult.reorderSuggestions.map((row) => ({
+      ...row,
+      preferredSupplierName: row.preferredSupplierId
+        ? (supplierNames.get(row.preferredSupplierId) ?? 'Supplier')
+        : null,
+    })),
+  };
 
   return {
     shopId,
+    shops: shopRows,
     items,
     reasonCodes: selectScopedReasons(reasonRows, shopId),
     transfers,

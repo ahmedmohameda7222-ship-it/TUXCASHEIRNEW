@@ -10,7 +10,7 @@ import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { AdminDialog } from '../components/overlay/AdminDialog';
 import { adminFetch } from '../lib/adminApi';
 import { useShopScope } from '../shops/ShopScopeProvider';
-import { AuditDetailPage, type AuditDetailViewModel } from './AuditDetailPage';
+import { AuditDetailPage, auditLabel, type AuditDetailViewModel } from './AuditDetailPage';
 import './audit.css';
 
 type AuditApiModel = Omit<AuditDetailViewModel, 'createdAtLabel'> & {
@@ -167,6 +167,19 @@ export function AuditPage() {
     [auditQuery.data],
   );
   const actorOptions = auditQuery.data?.pages[0]?.actorOptions ?? [];
+  const actionOptions = useMemo(
+    () => [...new Set(events.map((event) => event.actionType))].sort(),
+    [events],
+  );
+  const entityOptions = useMemo(
+    () =>
+      [
+        ...new Set(
+          events.map((event) => event.entityType).filter((value): value is string => !!value),
+        ),
+      ].sort(),
+    [events],
+  );
   const shopNames = useMemo(
     () =>
       new Map(events.flatMap((event) => (event.shopId ? [[event.shopId, event.shopName]] : []))),
@@ -218,9 +231,9 @@ export function AuditPage() {
         </select>
       </label>
       <label className="admin-field">
-        <span>Actor</span>
+        <span>Staff member</span>
         <select
-          aria-label="Actor"
+          aria-label="Staff member"
           value={actorEmployeeId}
           onChange={(event) => setActorEmployeeId(event.currentTarget.value)}
         >
@@ -233,12 +246,19 @@ export function AuditPage() {
         </select>
       </label>
       <label className="admin-field">
-        <span>Entity</span>
-        <input
-          aria-label="Entity"
+        <span>Activity type</span>
+        <select
+          aria-label="Activity type"
           value={entityType}
           onChange={(event) => setEntityType(event.currentTarget.value)}
-        />
+        >
+          <option value="">All activity types</option>
+          {entityOptions.map((value) => (
+            <option key={value} value={value}>
+              {auditLabel(value)}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="admin-field">
         <span>Approval status</span>
@@ -252,7 +272,7 @@ export function AuditPage() {
           <option value="">All approval statuses</option>
           {APPROVAL_STATUSES.map((status) => (
             <option key={status} value={status}>
-              {status.charAt(0) + status.slice(1).toLowerCase()}
+              {auditLabel(status)}
             </option>
           ))}
         </select>
@@ -268,12 +288,19 @@ export function AuditPage() {
     >
       <div className="admin-inventory-page-actions">
         <label className="admin-field">
-          <span>Search by action</span>
-          <input
+          <span>Action</span>
+          <select
+            aria-label="Action"
             value={actionType}
-            placeholder="e.g. order.cancel"
             onChange={(event) => setActionType(event.currentTarget.value)}
-          />
+          >
+            <option value="">All actions</option>
+            {actionOptions.map((value) => (
+              <option key={value} value={value}>
+                {auditLabel(value)}
+              </option>
+            ))}
+          </select>
         </label>
         <button
           className="admin-secondary-button"
@@ -325,7 +352,7 @@ export function AuditPage() {
                 type="button"
                 onClick={() => navigate(detailPath('/audit', event.id))}
               >
-                <strong>{event.actionType.replaceAll('_', ' ')}</strong>
+                <strong>{auditLabel(event.actionType)}</strong>
                 <span>{event.actorLabel}</span>
                 <span>{event.shopName}</span>
                 <span>{formatInstant(event.createdAt)}</span>

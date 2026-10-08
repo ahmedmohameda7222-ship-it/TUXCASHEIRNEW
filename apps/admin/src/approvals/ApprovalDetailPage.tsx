@@ -28,6 +28,19 @@ export function approvalDecisionDialogTitle(decision: ApprovalDecisionKind): str
   return decision === 'APPROVE' ? 'Enter PIN to approve' : 'Enter PIN to reject';
 }
 
+export function approvalStatusLabel(status: AdminApprovalStatus | 'EXPIRED'): string {
+  const labels: Record<AdminApprovalStatus | 'EXPIRED', string> = {
+    PENDING: 'Pending',
+    APPROVED: 'Approved',
+    REJECTED: 'Rejected',
+    EXECUTING: 'In progress',
+    EXECUTED: 'Completed',
+    FAILED: 'Needs attention',
+    EXPIRED: 'Expired',
+  };
+  return labels[status];
+}
+
 export function ApprovalDetailView({
   approval,
   deciding,
@@ -52,7 +65,7 @@ export function ApprovalDetailView({
         <span
           className={`admin-approval-status admin-approval-status--${displayStatus.toLowerCase()}`}
         >
-          {displayStatus}
+          {approvalStatusLabel(displayStatus)}
         </span>
       </header>
       <dl className="admin-approval-facts">
@@ -106,7 +119,7 @@ export function ApprovalDetailView({
             Approve
           </button>
           <button
-            className="admin-secondary-button"
+            className="admin-destructive-button"
             type="button"
             disabled={deciding}
             onClick={onReject}

@@ -107,7 +107,7 @@ function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
         aria-labelledby="settings-operations-summary"
       >
         <p className="admin-catalog-editor__eyebrow">Operations</p>
-        <h2 id="settings-operations-summary">Published configuration</h2>
+        <h2 id="settings-operations-summary">Order setup</h2>
         <p className="admin-field__help">
           {workspace.orderTypes.length} order types · {workspace.paymentMethods.length} payment
           methods · {workspace.deliveryZones.length} delivery zones
@@ -275,7 +275,7 @@ export function SettingsPage() {
       <PageScaffold
         eyebrow="Settings"
         title="Select a shop"
-        description="Settings changes require a concrete shop scope."
+        description="Select one shop before changing its settings."
       />
     );
   }
@@ -284,7 +284,7 @@ export function SettingsPage() {
       <PageScaffold
         eyebrow="Settings"
         title="Loading settings"
-        description="Loading the current published shop configuration."
+        description="Loading this shop's current settings."
       />
     );
   }

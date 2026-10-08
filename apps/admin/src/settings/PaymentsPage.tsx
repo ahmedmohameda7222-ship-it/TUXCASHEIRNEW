@@ -1,6 +1,7 @@
 import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
 import { useState, type FormEvent } from 'react';
 
+import { sortOrderAfterMove } from './settingsModel';
 import type { PaymentMethodUpdateDraft } from './useSettings';
 
 export type PaymentsPageProps = {
@@ -8,6 +9,14 @@ export type PaymentsPageProps = {
   updating: boolean;
   onUpdate(draft: PaymentMethodUpdateDraft): void | Promise<void>;
 };
+
+function channelLabel(
+  channel: AdminSettingsWorkspace['paymentMethods'][number]['channel'],
+): string {
+  if (channel === 'POS') return 'In-store';
+  if (channel === 'ONLINE') return 'Online';
+  return 'In-store & Online';
+}
 
 export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProps) {
   const [draft, setDraft] = useState<PaymentMethodUpdateDraft | null>(null);
@@ -40,26 +49,30 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
     <section className="admin-settings-section" aria-labelledby="settings-payments-title">
       <div className="admin-settings-section__header">
         <div>
-          <p className="admin-settings-kicker">Canonical tender configuration</p>
+          <p className="admin-settings-kicker">Customer payment choices</p>
           <h2 id="settings-payments-title">Payments</h2>
         </div>
         <span className="admin-status-pill">{workspace.paymentMethods.length} configured</span>
       </div>
       <p className="admin-settings-muted">
-        Configure display and channel policy here. Logic type and reconciliation behavior are
-        operational semantics and remain read-only.
+        Choose where each payment method is available and what staff must enter at checkout.
       </p>
       <div className="admin-callout" role="status">
         <strong>Refund policy editing is not available yet.</strong>
         <span>
-          The canonical refundAllowed policy is preserved in payment configuration and immutable
-          transaction snapshots. It becomes editable only when the trusted refund/return boundary
-          enforces that snapshot policy; active-order cancellation remains a separate operation.
+          Existing refund rules remain unchanged. Refund controls will appear here when that
+          workflow is available to staff.
         </span>
       </div>
       <div className="admin-settings-list">
         {workspace.paymentMethods.map((method) => {
           if (draft?.paymentMethodId === method.id) {
+            const ordered = [...workspace.paymentMethods].sort(
+              (left, right) => left.sortOrder - right.sortOrder,
+            );
+            const position = ordered.findIndex((item) => item.id === method.id);
+            const previous = position > 0 ? ordered[position - 1] : undefined;
+            const next = position < ordered.length - 1 ? ordered[position + 1] : undefined;
             return (
               <form
                 className="admin-settings-row admin-settings-row--stack"
@@ -81,7 +94,7 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
                     />
                   </label>
                   <label className="admin-field">
-                    <span>Payment channel</span>
+                    <span>Available for</span>
                     <select
                       value={draft.channel}
                       disabled={updating}
@@ -91,25 +104,58 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
                         setDraft((current) => (current ? { ...current, channel } : current));
                       }}
                     >
-                      <option value="POS">POS</option>
+                      <option value="POS">In-store</option>
                       <option value="ONLINE">Online</option>
-                      <option value="BOTH">Both</option>
+                      <option value="BOTH">In-store &amp; Online</option>
                     </select>
                   </label>
-                  <label className="admin-field">
-                    <span>Sort order</span>
-                    <input
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={draft.sortOrder}
-                      disabled={updating}
-                      onChange={(event) => {
-                        const sortOrder = Number(event.currentTarget.value);
-                        setDraft((current) => (current ? { ...current, sortOrder } : current));
-                      }}
-                    />
-                  </label>
+                  <div className="admin-field">
+                    <span>Display position</span>
+                    <div className="admin-settings-row__main">
+                      <button
+                        className="admin-secondary-button"
+                        type="button"
+                        disabled={updating || !previous}
+                        onClick={() =>
+                          setDraft((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  sortOrder: sortOrderAfterMove(
+                                    workspace.paymentMethods,
+                                    method.id,
+                                    'up',
+                                  ),
+                                }
+                              : current,
+                          )
+                        }
+                      >
+                        Move up
+                      </button>
+                      <button
+                        className="admin-secondary-button"
+                        type="button"
+                        disabled={updating || !next}
+                        onClick={() =>
+                          setDraft((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  sortOrder: sortOrderAfterMove(
+                                    workspace.paymentMethods,
+                                    method.id,
+                                    'down',
+                                  ),
+                                }
+                              : current,
+                          )
+                        }
+                      >
+                        Move down
+                      </button>
+                    </div>
+                  </div>
                   <label className="admin-check-field">
                     <input
                       type="checkbox"
@@ -151,12 +197,6 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
                     <span>Manual confirmation</span>
                   </label>
                 </div>
-                <p className="admin-field__help">
-                  Operational type: {method.logicType} ·{' '}
-                  {method.requiresReconciliation
-                    ? 'Reconciliation required'
-                    : 'No reconciliation required'}
-                </p>
                 <div className="admin-settings-row__main">
                   <button className="admin-primary-button" type="submit" disabled={updating}>
                     {updating ? 'Saving…' : 'Save payment method'}
@@ -179,9 +219,7 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
               <div className="admin-settings-row__main">
                 <div>
                   <strong>{method.displayName}</strong>
-                  <span>
-                    {method.logicType} · {method.channel} · sort {method.sortOrder}
-                  </span>
+                  <span>{channelLabel(method.channel)}</span>
                 </div>
                 <div className="admin-settings-row__main">
                   <span

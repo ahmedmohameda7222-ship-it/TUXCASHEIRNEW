@@ -2,13 +2,7 @@
 @import '../../../../packages/ui/src/tokens.css';
 
 :root {
-  font-family:
-    Inter,
-    ui-sans-serif,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   color: var(--tux-text-primary);
@@ -37,7 +31,7 @@ textarea {
 button,
 a,
 select {
-  min-height: var(--admin-touch-min, 44px);
+  min-height: var(--tux-touch-target);
 }
 a {
   color: inherit;
@@ -73,7 +67,7 @@ select {
   border-radius: 28px;
   background: color-mix(in srgb, var(--tux-surface-panel) 86%, transparent);
   box-shadow: var(--tux-shadow-md);
-  backdrop-filter: blur(var(--admin-nav-blur, 20px));
+  backdrop-filter: blur(var(--tux-backdrop-blur));
 }
 .admin-entry__mark,
 .admin-sidebar__mark {
@@ -97,8 +91,7 @@ select {
   color: var(--tux-text-secondary);
   font-size: 12px;
   font-weight: 750;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
 }
 .admin-entry h1 {
   margin: 0;
@@ -178,7 +171,7 @@ select {
   padding: env(safe-area-inset-top) 16px 0;
   border-bottom: 1px solid var(--tux-border-subtle);
   background: color-mix(in srgb, var(--tux-surface-canvas) 84%, transparent);
-  backdrop-filter: blur(var(--admin-nav-blur, 20px));
+  backdrop-filter: blur(var(--tux-backdrop-blur));
 }
 .admin-topbar__mobile-brand {
   display: flex;
@@ -212,7 +205,7 @@ select {
 }
 .shop-switcher select,
 .admin-icon-button {
-  min-height: var(--admin-touch-min, 44px);
+  min-height: var(--tux-touch-target);
   border: 1px solid var(--tux-border-subtle);
   border-radius: 12px;
   padding: 0 12px;
@@ -229,7 +222,7 @@ select {
   display: none;
 }
 .admin-shell__content {
-  width: min(100%, var(--admin-content-max, 1440px));
+  width: min(100%, var(--tux-content-max));
   margin: 0 auto;
   padding: 22px 16px calc(92px + env(safe-area-inset-bottom));
 }
@@ -248,7 +241,7 @@ select {
   border-radius: 20px;
   background: color-mix(in srgb, var(--tux-surface-panel) 86%, transparent);
   box-shadow: var(--tux-shadow-md);
-  backdrop-filter: blur(var(--admin-nav-blur, 20px));
+  backdrop-filter: blur(var(--tux-backdrop-blur));
 }
 .admin-mobile-tabs__item {
   flex: 1;
@@ -259,7 +252,7 @@ select {
   justify-content: center;
   gap: 3px;
   color: var(--tux-text-secondary);
-  font-size: 10px;
+  font-size: var(--tux-font-size-xs);
   font-weight: 700;
 }
 .admin-mobile-tabs__item:hover,
@@ -307,7 +300,7 @@ select {
   min-height: 64px;
   padding: 14px 16px;
   border: 1px solid var(--tux-border-subtle);
-  border-radius: var(--admin-radius-card, 16px);
+  border-radius: var(--tux-radius-lg);
   background: var(--tux-surface-panel);
 }
 .admin-more-card span {
@@ -320,14 +313,14 @@ select {
 }
 .admin-responsive-detail__panel {
   border: 1px solid var(--tux-border-subtle);
-  border-radius: var(--admin-radius-card, 16px);
+  border-radius: var(--tux-radius-lg);
   background: var(--tux-surface-panel);
 }
 
 @media (min-width: 768px) {
   .admin-shell {
     display: grid;
-    grid-template-columns: 80px minmax(0, 1fr);
+    grid-template-columns: clamp(200px, 27vw, 232px) minmax(0, 1fr);
   }
   .admin-sidebar {
     position: sticky;
@@ -338,17 +331,20 @@ select {
     flex-direction: column;
     border-right: 1px solid var(--tux-border-subtle);
     background: color-mix(in srgb, var(--tux-surface-panel) 92%, transparent);
-    backdrop-filter: blur(var(--admin-nav-blur, 20px));
+    backdrop-filter: blur(var(--tux-backdrop-blur));
   }
   .admin-sidebar__identity {
     min-height: 72px;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
+    gap: var(--tux-space-3);
     padding: 12px;
   }
   .admin-sidebar__brand {
-    display: none;
+    display: inline;
+    font-weight: 800;
+    letter-spacing: -0.02em;
   }
   .admin-sidebar__nav {
     display: flex;
@@ -362,12 +358,16 @@ select {
     min-height: 48px;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
+    gap: var(--tux-space-3);
+    padding: 0 var(--tux-space-3);
     border-radius: 12px;
     color: var(--tux-text-secondary);
   }
   .admin-sidebar__link span {
-    display: none;
+    display: inline;
+    font-size: var(--tux-font-size-sm);
+    font-weight: 650;
   }
   .admin-sidebar__link:hover,
   .admin-sidebar__link:focus-visible {

@@ -1,11 +1,15 @@
 import type { CatalogJsonObject, CatalogProductDetail } from '@tux/admin-contracts';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Link } from 'wouter';
 
 import {
   buildProductAdvancedDraft,
+  formatQuantityMicrosForInput,
   readProductAdvancedModel,
   type ProductAdvancedDraft,
 } from './catalogAdvancedDraft';
+
+export { formatQuantityMicrosForInput, parseQuantityToMicros } from './catalogAdvancedDraft';
 
 export type ProductEditorDraft = {
   product: CatalogProductDetail;
@@ -56,7 +60,6 @@ function changedPathsFor(original: CatalogProductDetail, next: CatalogProductDet
   if (original.name !== next.name) paths.push('products[].name');
   if (original.description !== next.description) paths.push('products[].description');
   if (original.priceMinor !== next.priceMinor) paths.push('products[].priceMinor');
-  if (original.imageKey !== next.imageKey) paths.push('products[].imageKey');
   if (original.active !== next.active) paths.push('products[].active');
   if (original.bestSeller !== next.bestSeller) paths.push('products[].bestSeller');
   return paths;
@@ -77,7 +80,6 @@ export function ProductEditor({
   const [name, setName] = useState(product.name);
   const [description, setDescription] = useState(product.description ?? '');
   const [price, setPrice] = useState(() => formatEgpMinor(product.priceMinor));
-  const [imageKey, setImageKey] = useState(product.imageKey ?? '');
   const [bestSeller, setBestSeller] = useState(product.bestSeller);
   const [visible, setVisible] = useState(product.active);
   const [modifierState, setModifierState] = useState<
@@ -120,7 +122,7 @@ export function ProductEditor({
       Object.fromEntries(
         advancedModel.inventoryItems.map((item) => [
           item.inventoryItemId,
-          item.quantityMicros === null ? '' : String(item.quantityMicros),
+          item.quantityMicros === null ? '' : formatQuantityMicrosForInput(item.quantityMicros),
         ]),
       ),
     );
@@ -138,11 +140,10 @@ export function ProductEditor({
       name: name.trim(),
       description: description.trim() || null,
       priceMinor,
-      imageKey: imageKey.trim() || null,
       bestSeller,
       active: visible,
     };
-  }, [bestSeller, canPrice, description, imageKey, name, price, product, visible]);
+  }, [bestSeller, canPrice, description, name, price, product, visible]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -279,23 +280,13 @@ export function ProductEditor({
         <div className="admin-catalog-editor__section-heading">
           <div>
             <p className="admin-catalog-editor__eyebrow">Images</p>
-            <h2 id="catalog-images-heading">Image metadata</h2>
+            <h2 id="catalog-images-heading">Product image</h2>
           </div>
         </div>
-        <label className="admin-field">
-          <span>Image object key</span>
-          <input
-            name="imageKey"
-            value={imageKey}
-            disabled={readOnly}
-            maxLength={500}
-            placeholder={`${product.shopId}/${product.id}.png`}
-            onChange={(event) => setImageKey(event.currentTarget.value)}
-          />
-        </label>
-        <p className="admin-field__help">
-          Image keys are validated against this shop&apos;s catalog image bucket before draft save.
-        </p>
+        <div className="admin-product-image-state" role="status">
+          <strong>{product.imageKey ? 'Image assigned' : 'No image assigned'}</strong>
+          <span>Product images are managed outside this screen.</span>
+        </div>
         <label className="admin-check-field">
           <input
             type="checkbox"
@@ -427,7 +418,9 @@ export function ProductEditor({
                   {advancedModel.inventoryItems.map((item) => {
                     const quantity =
                       recipeState[item.inventoryItemId] ??
-                      (item.quantityMicros === null ? '' : String(item.quantityMicros));
+                      (item.quantityMicros === null
+                        ? ''
+                        : formatQuantityMicrosForInput(item.quantityMicros));
                     return (
                       <label className="admin-field" key={item.inventoryItemId}>
                         <span>
@@ -435,13 +428,13 @@ export function ProductEditor({
                         </span>
                         <input
                           type="number"
-                          min="1"
-                          step="1"
-                          inputMode="numeric"
+                          min="0.000001"
+                          step="0.000001"
+                          inputMode="decimal"
                           value={quantity}
                           placeholder="Not in recipe"
                           disabled={readOnly || (!item.active && quantity === '')}
-                          aria-label={`${item.name} quantity micro-units`}
+                          aria-label={`${item.name} quantity in ${item.unitLabel}`}
                           onChange={(event) => {
                             const value = event.currentTarget.value;
                             if (!item.active && value !== '') return;
@@ -480,14 +473,14 @@ export function ProductEditor({
           <section className="admin-catalog-editor__section is-compact">
             <h2>History</h2>
             <p className="admin-field__help">
-              Published versions are immutable. Restore creates a new version.
+              Published releases stay in history. Restoring creates a new release.
             </p>
-            <a
+            <Link
               className="admin-secondary-button admin-catalog-history-link"
               href="/catalog/products/publishing"
             >
               Open version history
-            </a>
+            </Link>
           </section>
         </div>
       ) : null}

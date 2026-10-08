@@ -23,6 +23,7 @@ function money(minor: number): string {
 }
 
 export function RefundReturnPage({
+  mode,
   order,
   reasons,
   refunding,
@@ -31,6 +32,7 @@ export function RefundReturnPage({
   onRefund,
   onReturn,
 }: {
+  mode: 'refund' | 'return';
   order: AdminOrderDetail;
   reasons: readonly AdminReasonCodeConfiguration[];
   refunding: boolean;
@@ -108,8 +110,12 @@ export function RefundReturnPage({
     <AdminDialog
       open
       variant="sheet"
-      title="Refund or return"
-      description="Choose a reason and confirm the transaction with your Admin PIN."
+      title={mode === 'refund' ? 'Refund payment' : 'Return items'}
+      description={
+        mode === 'refund'
+          ? 'Choose the payment and amount to refund, then confirm with your Admin PIN.'
+          : 'Choose the items to return, then confirm with your Admin PIN.'
+      }
       onOpenChange={(open) => {
         if (!open && !refunding && !returning) onCancel();
       }}
@@ -149,85 +155,87 @@ export function RefundReturnPage({
         />
       </label>
 
-      <form
-        className="admin-catalog-editor__section is-compact"
-        onSubmit={(event) => void submitRefund(event)}
-      >
-        <h3>Refund payment</h3>
-        <label className="admin-field">
-          <span>Payment</span>
-          <select
-            value={paymentId}
-            disabled={refunding || returning}
-            onChange={(event) => {
-              setPaymentId(event.target.value);
-              const payment = order.payments.find(
-                (candidate) => candidate.id === event.target.value,
-              );
-              if (payment) setAmountMinor(String(payment.allocatedMinor));
-            }}
-          >
-            {order.payments.map((payment) => (
-              <option key={payment.id} value={payment.id}>
-                {payment.methodLabel} · {money(payment.allocatedMinor)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="admin-field">
-          <span>Refund amount (EGP)</span>
-          <input
-            type="number"
-            min={0.01}
-            step={0.01}
-            value={Number(amountMinor) / 100 || ''}
-            disabled={refunding || returning}
-            onChange={(event) =>
-              setAmountMinor(String(Math.round(Number(event.target.value) * 100)))
-            }
-          />
-        </label>
-        <button
-          className="admin-primary-button"
-          type="submit"
-          disabled={refunding || returning || !reasonCodeId || !paymentId || !pin}
+      {mode === 'refund' ? (
+        <form
+          className="admin-catalog-editor__section is-compact"
+          onSubmit={(event) => void submitRefund(event)}
         >
-          {refunding ? 'Refunding…' : 'Submit refund'}
-        </button>
-      </form>
-
-      <form
-        className="admin-catalog-editor__section is-compact"
-        onSubmit={(event) => void submitReturn(event)}
-      >
-        <h3>Return items</h3>
-        {order.items.map((item) => (
-          <label className="admin-field" key={item.id}>
-            <span>
-              {item.productName} · max {item.quantity}
-            </span>
+          <label className="admin-field">
+            <span>Payment</span>
+            <select
+              value={paymentId}
+              disabled={refunding || returning}
+              onChange={(event) => {
+                setPaymentId(event.target.value);
+                const payment = order.payments.find(
+                  (candidate) => candidate.id === event.target.value,
+                );
+                if (payment) setAmountMinor(String(payment.allocatedMinor));
+              }}
+            >
+              {order.payments.map((payment) => (
+                <option key={payment.id} value={payment.id}>
+                  {payment.methodLabel} · {money(payment.allocatedMinor)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="admin-field">
+            <span>Refund amount (EGP)</span>
             <input
-              aria-label={`Return quantity for ${item.productName}`}
               type="number"
-              min={0}
-              max={item.quantity}
-              step={1}
-              value={returnQuantities[item.id] ?? '0'}
+              min={0.01}
+              step={0.01}
+              value={Number(amountMinor) / 100 || ''}
               disabled={refunding || returning}
               onChange={(event) =>
-                setReturnQuantities((current) => ({ ...current, [item.id]: event.target.value }))
+                setAmountMinor(String(Math.round(Number(event.target.value) * 100)))
               }
             />
           </label>
-        ))}
-        <button
-          className="admin-primary-button"
-          type="submit"
-          disabled={refunding || returning || !reasonCodeId || !pin || returnItems.length === 0}
+          <button
+            className="admin-primary-button"
+            type="submit"
+            disabled={refunding || returning || !reasonCodeId || !paymentId || !pin}
+          >
+            {refunding ? 'Refunding…' : 'Submit refund'}
+          </button>
+        </form>
+      ) : null}
+
+      {mode === 'return' ? (
+        <form
+          className="admin-catalog-editor__section is-compact"
+          onSubmit={(event) => void submitReturn(event)}
         >
-          {returning ? 'Returning…' : 'Return selected items'}
-        </button>
-      </form>
+          {order.items.map((item) => (
+            <label className="admin-field" key={item.id}>
+              <span>
+                {item.productName} · max {item.quantity}
+              </span>
+              <input
+                aria-label={`Return quantity for ${item.productName}`}
+                type="number"
+                min={0}
+                max={item.quantity}
+                step={1}
+                value={returnQuantities[item.id] ?? '0'}
+                disabled={refunding || returning}
+                onChange={(event) =>
+                  setReturnQuantities((current) => ({ ...current, [item.id]: event.target.value }))
+                }
+              />
+            </label>
+          ))}
+          <button
+            className="admin-primary-button"
+            type="submit"
+            disabled={refunding || returning || !reasonCodeId || !pin || returnItems.length === 0}
+          >
+            {returning ? 'Returning…' : 'Return selected items'}
+          </button>
+        </form>
+      ) : null}
       <button
         className="admin-secondary-button"
         type="button"

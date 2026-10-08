@@ -87,7 +87,12 @@ const promotion: AdminPromotion = {
 describe('Plan 5 CRM and promotion controls', () => {
   it('renders canonical customer identity, overview, available detail tabs, and merge action', () => {
     const html = renderToStaticMarkup(
-      <CustomerDetailPage customer={customer} canMerge onMerge={vi.fn()} />,
+      <CustomerDetailPage
+        customer={customer}
+        loyalty={<p>Customer loyalty</p>}
+        canMerge
+        onMerge={vi.fn()}
+      />,
     );
 
     for (const value of [
@@ -98,7 +103,9 @@ describe('Plan 5 CRM and promotion controls', () => {
       'Top Spenders',
       'Frequent Delivery',
       'Addresses',
-      'Linked shops',
+      'History',
+      'Orders',
+      'Loyalty',
       'Merge customer',
     ]) {
       expect(html).toContain(value);
@@ -113,6 +120,17 @@ describe('Plan 5 CRM and promotion controls', () => {
       <LoyaltyPanel
         customer={customer}
         program={program}
+        reasons={[
+          {
+            id: '71000000-0000-4000-8000-000000000001',
+            scope: 'BUSINESS',
+            key: 'SERVICE_RECOVERY',
+            family: 'DISCOUNT_COMP',
+            label: 'Service recovery',
+            active: true,
+            version: 1,
+          },
+        ]}
         canManage
         saving={false}
         onAdjust={vi.fn()}
@@ -121,13 +139,13 @@ describe('Plan 5 CRM and promotion controls', () => {
 
     for (const value of [
       '120 points',
-      'EARN',
+      'Earn',
       '+20',
       'Minimum redemption',
       '50 points',
       'Point expiry',
       '365 days',
-      'Reason code',
+      'Service recovery',
       'Adjust points',
     ]) {
       expect(html).toContain(value);
@@ -139,6 +157,8 @@ describe('Plan 5 CRM and promotion controls', () => {
       <PromotionEditor
         shopId={shopId}
         promotion={promotion}
+        products={[{ id: 'a0000000-0000-4000-8000-000000000001', name: 'TUX Burger' }]}
+        categories={[{ id: 'b0000000-0000-4000-8000-000000000001', name: 'Burgers' }]}
         saving={false}
         onCancel={vi.fn()}
         onSave={vi.fn()}
@@ -146,18 +166,17 @@ describe('Plan 5 CRM and promotion controls', () => {
     );
 
     for (const value of [
-      'PERCENT',
-      'FIXED',
-      'FREE_ITEM',
-      'Minimum order',
-      'Start',
-      'End',
+      'Percentage discount',
+      'Fixed amount discount',
+      'Free item',
+      'Minimum order (EGP)',
+      'Starts',
+      'Ends',
       'Channel',
-      'Product restrictions',
-      'Category restrictions',
-      'Total usage limit',
-      'Per-customer usage limit',
-      'Stacking policy',
+      'Applies to',
+      'Total uses (optional)',
+      'Uses per customer (optional)',
+      'Can combine with other promotions?',
     ]) {
       expect(html).toContain(value);
     }

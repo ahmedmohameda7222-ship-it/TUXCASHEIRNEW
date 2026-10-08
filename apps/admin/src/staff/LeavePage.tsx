@@ -1,7 +1,22 @@
 import type { EmployeeDetail, StaffLeaveType } from '@tux/admin-contracts';
 import { useState } from 'react';
 
+import { AdminDialog } from '../components/overlay/AdminDialog';
 import type { StaffCommandDraft } from './SchedulePage';
+
+function leaveTypeLabel(type: StaffLeaveType): string {
+  return type === 'SICK'
+    ? 'Sick leave'
+    : type === 'UNPAID'
+      ? 'Unpaid leave'
+      : type === 'OTHER'
+        ? 'Other leave'
+        : 'Vacation';
+}
+
+function leaveStatusLabel(status: string): string {
+  return status === 'APPROVED' ? 'Approved' : status === 'REJECTED' ? 'Rejected' : 'Pending';
+}
 
 export function LeavePage({
   employee,
@@ -18,6 +33,7 @@ export function LeavePage({
   const [startsOn, setStartsOn] = useState('');
   const [endsOn, setEndsOn] = useState('');
   const [note, setNote] = useState('');
+  const [requestOpen, setRequestOpen] = useState(false);
 
   return (
     <section aria-label="Leave">
@@ -26,17 +42,17 @@ export function LeavePage({
       {employee.leaveRequests.map((request) => (
         <article className="admin-inventory-row" key={request.id}>
           <span>
-            <strong>{request.leaveType}</strong>
+            <strong>{leaveTypeLabel(request.leaveType)}</strong>
             <small>
               {request.startsOn} → {request.endsOn}
             </small>
           </span>
           <span>
-            {request.status}
+            {leaveStatusLabel(request.status)}
             {canManage && request.status === 'PENDING' ? (
               <>
                 <button
-                  className="admin-secondary-button"
+                  className="admin-destructive-button"
                   type="button"
                   onClick={() =>
                     onCommand({
@@ -74,55 +90,74 @@ export function LeavePage({
       ))}
 
       {canManage ? (
-        <section className="admin-catalog-editor__section is-compact">
-          <h4>New leave request</h4>
-          <label className="admin-field">
-            <span>Type</span>
-            <select
-              value={leaveType}
-              onChange={(event) => setLeaveType(event.target.value as StaffLeaveType)}
-            >
-              <option value="VACATION">Vacation</option>
-              <option value="SICK">Sick</option>
-              <option value="UNPAID">Unpaid</option>
-              <option value="OTHER">Other</option>
-            </select>
-          </label>
-          <label className="admin-field">
-            <span>Start date</span>
-            <input
-              type="date"
-              value={startsOn}
-              onChange={(event) => setStartsOn(event.target.value)}
-            />
-          </label>
-          <label className="admin-field">
-            <span>End date</span>
-            <input type="date" value={endsOn} onChange={(event) => setEndsOn(event.target.value)} />
-          </label>
-          <label className="admin-field">
-            <span>Note</span>
-            <textarea value={note} onChange={(event) => setNote(event.target.value)} />
-          </label>
+        <>
           <button
             className="admin-primary-button"
             type="button"
-            disabled={!startsOn || !endsOn}
-            onClick={() =>
-              onCommand({
-                type: 'leave.create',
-                employeeId: employee.id,
-                shopId,
-                leaveType,
-                startsOn,
-                endsOn,
-                note: note.trim() || null,
-              })
-            }
+            onClick={() => setRequestOpen(true)}
           >
-            Request leave
+            New leave request
           </button>
-        </section>
+          <AdminDialog
+            open={requestOpen}
+            variant="sheet"
+            title="New leave request"
+            description="Record the requested dates and leave type."
+            onOpenChange={setRequestOpen}
+          >
+            <label className="admin-field">
+              <span>Type</span>
+              <select
+                value={leaveType}
+                onChange={(event) => setLeaveType(event.target.value as StaffLeaveType)}
+              >
+                <option value="VACATION">Vacation</option>
+                <option value="SICK">Sick</option>
+                <option value="UNPAID">Unpaid</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </label>
+            <label className="admin-field">
+              <span>Start date</span>
+              <input
+                type="date"
+                value={startsOn}
+                onChange={(event) => setStartsOn(event.target.value)}
+              />
+            </label>
+            <label className="admin-field">
+              <span>End date</span>
+              <input
+                type="date"
+                value={endsOn}
+                onChange={(event) => setEndsOn(event.target.value)}
+              />
+            </label>
+            <label className="admin-field">
+              <span>Note</span>
+              <textarea value={note} onChange={(event) => setNote(event.target.value)} />
+            </label>
+            <button
+              className="admin-primary-button"
+              type="button"
+              disabled={!startsOn || !endsOn}
+              onClick={() => {
+                onCommand({
+                  type: 'leave.create',
+                  employeeId: employee.id,
+                  shopId,
+                  leaveType,
+                  startsOn,
+                  endsOn,
+                  note: note.trim() || null,
+                });
+                setRequestOpen(false);
+              }}
+            >
+              Request leave
+            </button>
+          </AdminDialog>
+        </>
       ) : null}
     </section>
   );

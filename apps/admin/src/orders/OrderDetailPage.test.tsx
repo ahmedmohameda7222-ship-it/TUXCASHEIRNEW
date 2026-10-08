@@ -112,16 +112,17 @@ function render(order: AdminOrderDetail): string {
 }
 
 describe('OrderDetailPage', () => {
-  it('offers cancel for ACTIVE and refund / return for DONE', () => {
+  it('offers cancel for active orders and separate refund and return actions for completed orders', () => {
     expect(render({ ...fixture, status: 'ACTIVE' })).toContain('Cancel order');
     const done = render({ ...fixture, status: 'DONE' });
-    expect(done).toContain('Refund / return');
+    expect(done).toContain('Refund payment');
+    expect(done).toContain('Return items');
     expect(done).not.toContain('Cancel order');
   });
 
   it('does not expose refund or return actions for cancelled orders', () => {
     const cancelled = render({ ...fixture, status: 'CANCELLED' });
-    expect(cancelled).not.toContain('Refund / return');
+    expect(cancelled).not.toContain('Refund payment');
     expect(cancelled).not.toContain('Return items');
   });
 
@@ -165,14 +166,12 @@ describe('OrderDetailPage', () => {
 
     for (const value of [
       'Financial corrections',
-      'REFUND',
-      'PENDING APPROVAL',
+      'Refund',
+      'Pending Approval',
       'Customer requested refund',
-      'reason v3',
-      'RETURN',
-      'POSTED',
+      'Return',
+      'Posted',
       'Quality issue',
-      'reason v5',
     ]) {
       expect(html).toContain(value);
     }
@@ -216,9 +215,9 @@ describe('OrderDetailPage', () => {
       ],
     });
 
-    expect(html).toContain('REJECTED');
-    expect(html).toContain('FAILED');
-    expect(html).not.toContain('PENDING APPROVAL');
+    expect(html).toContain('Rejected');
+    expect(html).toContain('Failed');
+    expect(html).not.toContain('Pending Approval');
   });
 
   it('renders immutable order context needed to investigate a lifecycle action', () => {
@@ -232,10 +231,10 @@ describe('OrderDetailPage', () => {
       '+201000000000',
       'Road 9, Maadi',
       'Cash',
-      'ORDER RESERVATION',
-      'PLACED',
+      'Order Reservation',
+      'Placed',
       'Ahmed',
-      'ORDER VIEWED',
+      'Order Viewed',
     ]) {
       expect(html).toContain(value);
     }

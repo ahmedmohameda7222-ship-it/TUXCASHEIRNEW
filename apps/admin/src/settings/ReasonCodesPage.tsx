@@ -18,6 +18,29 @@ const families: readonly AdminReasonFamily[] = [
   'PAY_OUT',
 ];
 
+function familyLabel(family: AdminReasonFamily): string {
+  const labels: Record<AdminReasonFamily, string> = {
+    CANCELLATION: 'Order cancellation',
+    REFUND_RETURN: 'Refund or return',
+    DISCOUNT_COMP: 'Discount or complimentary item',
+    WASTE: 'Waste',
+    STOCK_ADJUSTMENT: 'Stock adjustment',
+    CASH_VARIANCE: 'Cash difference',
+    PAY_IN: 'Cash paid in',
+    PAY_OUT: 'Cash paid out',
+  };
+  return labels[family];
+}
+
+function keyFromLabel(label: string): string {
+  return label
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 120);
+}
+
 type ReasonCodesPageProps = {
   workspace: AdminSettingsWorkspace;
   onUpsert(draft: ReasonCodeUpdateDraft): void | Promise<void>;
@@ -67,8 +90,8 @@ function EditableReasonCode({
     >
       <div className="admin-catalog-editor__section-heading">
         <div>
-          <p className="admin-catalog-editor__eyebrow">{reason.family}</p>
-          <h3>{reason.key}</h3>
+          <p className="admin-catalog-editor__eyebrow">{familyLabel(reason.family)}</p>
+          <h3>{reason.label}</h3>
         </div>
         <span className={active ? 'admin-status-pill' : 'admin-status-pill is-muted'}>
           {active ? 'Active' : 'Inactive'}
@@ -102,22 +125,8 @@ function EditableReasonCode({
           <option value="inactive">Inactive</option>
         </select>
       </label>
-      <dl>
-        <div>
-          <dt>Stable key</dt>
-          <dd>{reason.key}</dd>
-        </div>
-        <div>
-          <dt>Scope</dt>
-          <dd>{reason.scope}</dd>
-        </div>
-        <div>
-          <dt>Version</dt>
-          <dd>v{reason.version}</dd>
-        </div>
-      </dl>
       <button className="admin-secondary-button" type="submit" disabled={updating || !label.trim()}>
-        {updating ? 'Saving…' : `Save ${reason.key}`}
+        {updating ? 'Saving…' : `Save ${reason.label}`}
       </button>
     </form>
   );
@@ -132,29 +141,17 @@ function InheritedReasonCode({ reason }: { reason: AdminReasonCodeConfiguration 
     >
       <div className="admin-catalog-editor__section-heading">
         <div>
-          <p className="admin-catalog-editor__eyebrow">{reason.family} · Business default</p>
+          <p className="admin-catalog-editor__eyebrow">
+            {familyLabel(reason.family)} · Business setting
+          </p>
           <h3>{reason.label}</h3>
         </div>
         <span className={reason.active ? 'admin-status-pill' : 'admin-status-pill is-muted'}>
           {reason.active ? 'Active' : 'Inactive'}
         </span>
       </div>
-      <dl>
-        <div>
-          <dt>Stable key</dt>
-          <dd>{reason.key}</dd>
-        </div>
-        <div>
-          <dt>Scope</dt>
-          <dd>{reason.scope}</dd>
-        </div>
-        <div>
-          <dt>Version</dt>
-          <dd>v{reason.version}</dd>
-        </div>
-      </dl>
       <p className="admin-field__help">
-        Business-level reason identity is inherited here and cannot be reclassified from one shop.
+        This reason is shared by the business and cannot be changed from one shop.
       </p>
     </article>
   );
@@ -164,7 +161,6 @@ function NewReasonCode({
   onUpsert,
   updating,
 }: Pick<ReasonCodesPageProps, 'onUpsert' | 'updating'>) {
-  const [key, setKey] = useState('');
   const [family, setFamily] = useState<AdminReasonFamily>('CANCELLATION');
   const [label, setLabel] = useState('');
 
@@ -172,13 +168,12 @@ function NewReasonCode({
     event.preventDefault();
     await onUpsert({
       reasonCodeId: null,
-      key: key.trim().toUpperCase(),
+      key: keyFromLabel(label),
       family,
       label: label.trim(),
       active: true,
       expectedVersion: null,
     });
-    setKey('');
     setLabel('');
   }
 
@@ -191,18 +186,6 @@ function NewReasonCode({
         </div>
       </div>
       <label className="admin-field">
-        <span>Stable key</span>
-        <input
-          aria-label="New reason stable key"
-          value={key}
-          maxLength={120}
-          pattern="[A-Za-z][A-Za-z0-9_-]*"
-          placeholder="CUSTOMER_CHANGED_MIND"
-          disabled={updating}
-          onChange={(event) => setKey(event.target.value.toUpperCase())}
-        />
-      </label>
-      <label className="admin-field">
         <span>Family</span>
         <select
           aria-label="New reason family"
@@ -212,7 +195,7 @@ function NewReasonCode({
         >
           {families.map((candidate) => (
             <option key={candidate} value={candidate}>
-              {candidate}
+              {familyLabel(candidate)}
             </option>
           ))}
         </select>
@@ -227,11 +210,7 @@ function NewReasonCode({
           onChange={(event) => setLabel(event.target.value)}
         />
       </label>
-      <button
-        className="admin-primary-button"
-        type="submit"
-        disabled={updating || !key.trim() || !label.trim()}
-      >
+      <button className="admin-primary-button" type="submit" disabled={updating || !label.trim()}>
         {updating ? 'Saving…' : 'Add reason code'}
       </button>
     </form>
@@ -248,8 +227,8 @@ export function ReasonCodesPage({ workspace, onUpsert, updating }: ReasonCodesPa
         </div>
       </div>
       <p className="admin-field__help">
-        Operational actions persist the configured reason identity and version. Stable keys and
-        families are immutable after creation; deactivate a code instead of deleting history.
+        Give staff clear reasons to choose from during cancellations, refunds, stock changes, and
+        cash actions. Deactivate old reasons to preserve past records.
       </p>
 
       <NewReasonCode onUpsert={onUpsert} updating={updating} />

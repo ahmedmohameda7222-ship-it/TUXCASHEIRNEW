@@ -120,7 +120,7 @@ export function RecurringAvailabilityEditor({
 
       <p className="admin-publish-card__copy">
         Define weekly Cairo-local availability windows. Overnight windows end on the next local day,
-        and every rule change is version-fenced by the trusted catalog service.
+        so customers see the correct availability throughout the week.
       </p>
 
       {isLoading ? <div className="admin-catalog-loading">Loading recurring rules…</div> : null}
@@ -234,7 +234,6 @@ export function RecurringAvailabilityEditor({
                           : ''}
                       </span>
                       <span>{rule.available ? 'Available' : 'Sold out'} during window</span>
-                      <span>Rule version {rule.version}</span>
                       {product ? (
                         <span>
                           Manual baseline: {product.manualSoldOut ? 'Sold out' : 'Available'}

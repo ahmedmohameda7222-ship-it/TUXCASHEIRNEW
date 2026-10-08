@@ -1,4 +1,8 @@
-import type { AdminPromotion, AdminPromotionUpsertInput } from '@tux/admin-contracts';
+import type {
+  AdminPromotion,
+  AdminPromotionUpsertInput,
+  CatalogWorkspace,
+} from '@tux/admin-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
@@ -31,6 +35,12 @@ export function PromotionsPage({ shopId }: { shopId: string }) {
       adminFetch<{ promotions: AdminPromotion[] }>(
         `/api/admin/customers?shopId=${encodeURIComponent(shopId)}&view=promotions`,
       ),
+  });
+
+  const catalogQuery = useQuery({
+    queryKey: ['admin', 'catalog', shopId, 'promotion-options'],
+    queryFn: () =>
+      adminFetch<CatalogWorkspace>(`/api/admin/catalog?shopId=${encodeURIComponent(shopId)}`),
   });
 
   const savePromotion = useMutation({
@@ -73,7 +83,7 @@ export function PromotionsPage({ shopId }: { shopId: string }) {
       <header>
         <p className="admin-entry__eyebrow">CRM</p>
         <h2>Promotions</h2>
-        <p>Server-validated promotion rules with immutable historical order snapshots.</p>
+        <p>Create customer offers while checkout keeps final eligibility and stacking authority.</p>
       </header>
 
       <button
@@ -104,7 +114,13 @@ export function PromotionsPage({ shopId }: { shopId: string }) {
                   setEditing(promotion);
                 }}
               >
-                {promotion.name} · {promotion.kind} · {promotion.active ? 'Active' : 'Inactive'}
+                {promotion.name} ·{' '}
+                {promotion.kind === 'PERCENT'
+                  ? 'Percentage discount'
+                  : promotion.kind === 'FIXED'
+                    ? 'Fixed amount discount'
+                    : 'Free item'}{' '}
+                · {promotion.active ? 'Active' : 'Inactive'}
               </button>
             </li>
           ))}
@@ -115,6 +131,8 @@ export function PromotionsPage({ shopId }: { shopId: string }) {
         <PromotionEditor
           shopId={shopId}
           promotion={editing}
+          products={catalogQuery.data?.products ?? []}
+          categories={catalogQuery.data?.categories ?? []}
           saving={savePromotion.isPending}
           onCancel={() => {
             setCreating(false);

@@ -2,6 +2,7 @@ import type { AdminDeliveryRider } from '@tux/admin-contracts';
 import { useState, type FormEvent } from 'react';
 
 import { EmptyState } from '../components/feedback/AdminStates';
+import { AdminDialog } from '../components/overlay/AdminDialog';
 
 export type DeliveryRiderDraft = {
   riderId: string | null;
@@ -87,11 +88,15 @@ export function RidersPage({
                   type="button"
                   onClick={() => begin(rider)}
                 >
-                  {rider.displayName} · {rider.state} · {rider.active ? 'Active' : 'Inactive'}
+                  {rider.displayName} ·{' '}
+                  {rider.state === 'AVAILABLE' ? 'Available for delivery' : 'Not available'} ·{' '}
+                  {rider.active ? 'Active' : 'Inactive'}
                 </button>
               ) : (
                 <span className="admin-secondary-button" aria-disabled="true">
-                  {rider.displayName} · {rider.state} · {rider.active ? 'Active' : 'Inactive'}
+                  {rider.displayName} ·{' '}
+                  {rider.state === 'AVAILABLE' ? 'Available for delivery' : 'Not available'} ·{' '}
+                  {rider.active ? 'Active' : 'Inactive'}
                 </span>
               )}
             </li>
@@ -100,47 +105,56 @@ export function RidersPage({
       )}
 
       {formOpen ? (
-        <form onSubmit={submit} aria-label="Delivery rider editor">
-          <h3>{editing ? 'Edit rider' : 'New rider'}</h3>
-          <label className="admin-field">
-            <span>Name</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} required />
-          </label>
-          <label className="admin-field">
-            <span>Phone</span>
-            <input value={phone} onChange={(event) => setPhone(event.target.value)} />
-          </label>
-          <label className="admin-field">
-            <span>Availability</span>
-            <select
-              value={state}
-              onChange={(event) => setState(event.target.value as AdminDeliveryRider['state'])}
-            >
-              <option value="AVAILABLE">AVAILABLE</option>
-              <option value="UNAVAILABLE">UNAVAILABLE</option>
-            </select>
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={active}
-              onChange={(event) => setActive(event.target.checked)}
-            />
-            Active
-          </label>
-          <div className="admin-actions">
-            <button className="admin-primary-button" type="submit" disabled={saving}>
-              {saving ? 'Saving…' : 'Save rider'}
-            </button>
-            <button
-              className="admin-secondary-button"
-              type="button"
-              onClick={() => setEditingId(null)}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+        <AdminDialog
+          open
+          variant="sheet"
+          title={editing ? 'Edit rider' : 'New rider'}
+          description="Manage the rider's contact details and current availability."
+          onOpenChange={(open) => {
+            if (!open && !saving) setEditingId(null);
+          }}
+        >
+          <form onSubmit={submit} aria-label="Delivery rider editor">
+            <label className="admin-field">
+              <span>Name</span>
+              <input value={name} onChange={(event) => setName(event.target.value)} required />
+            </label>
+            <label className="admin-field">
+              <span>Phone</span>
+              <input value={phone} onChange={(event) => setPhone(event.target.value)} />
+            </label>
+            <label className="admin-field">
+              <span>Availability</span>
+              <select
+                value={state}
+                onChange={(event) => setState(event.target.value as AdminDeliveryRider['state'])}
+              >
+                <option value="AVAILABLE">Available for delivery</option>
+                <option value="UNAVAILABLE">Not available</option>
+              </select>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={active}
+                onChange={(event) => setActive(event.target.checked)}
+              />
+              Active
+            </label>
+            <div className="admin-actions">
+              <button className="admin-primary-button" type="submit" disabled={saving}>
+                {saving ? 'Saving…' : 'Save rider'}
+              </button>
+              <button
+                className="admin-secondary-button"
+                type="button"
+                onClick={() => setEditingId(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </AdminDialog>
       ) : null}
     </section>
   );

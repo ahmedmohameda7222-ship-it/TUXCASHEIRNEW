@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { AdminDeliveryWorkspace } from '@tux/admin-contracts';
+import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const backupShopId = 'abababab-abab-4bab-8bab-abababababab';
@@ -24,6 +25,10 @@ type DeliveryCommand = Record<string, unknown>;
 function workspace(): AdminDeliveryWorkspace {
   return {
     shopId,
+    shops: [
+      { id: shopId, name: 'TUX Maadi' },
+      { id: backupShopId, name: 'TUX Zamalek' },
+    ],
     zones: [
       {
         id: zoneId,
@@ -59,6 +64,8 @@ function workspace(): AdminDeliveryWorkspace {
     orders: [
       {
         orderId,
+        displayOrderNo: 1042,
+        displayOrderLabel: '#1042',
         shopId,
         riderId,
         state: 'ASSIGNED',
@@ -125,16 +132,18 @@ async function mockDelivery(
   return { commands };
 }
 
-test('renders delivery zones, riders, and delivery-order state', async ({ page }) => {
+test('renders separate delivery, zone, and rider workspaces', async ({ page }) => {
   await mockDelivery(page);
   await page.goto('/delivery');
 
   await expect(page.getByRole('heading', { name: 'Delivery', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Delivery order #1042')).toContainText('Rider assigned');
+  await page.getByRole('button', { name: 'Zones' }).click();
   await expect(page.getByText('Maadi Core')).toBeVisible();
   await expect(page.getByText('25.00 EGP')).toBeVisible();
   await expect(page.getByText('120.00 EGP minimum')).toBeVisible();
-  await expect(page.getByText('Omar Rider')).toBeVisible();
-  await expect(page.getByLabel(`Delivery order ${orderId}`)).toContainText('ASSIGNED');
+  await page.getByRole('button', { name: 'Riders' }).click();
+  await expect(page.getByText(/Omar Rider/)).toBeVisible();
 });
 
 test('routes delivery mutations through the trusted BFF and clears rider on unassign', async ({
@@ -143,6 +152,7 @@ test('routes delivery mutations through the trusted BFF and clears rider on unas
   const { commands } = await mockDelivery(page);
   await page.goto('/delivery');
 
+  await page.getByRole('button', { name: 'Zones' }).click();
   await page.getByRole('button', { name: /Maadi Core/ }).click();
   await page.getByLabel('Delivery fee (EGP)').fill('30.00');
   await page.getByRole('button', { name: 'Save delivery zone' }).click();
@@ -158,10 +168,11 @@ test('routes delivery mutations through the trusted BFF and clears rider on unas
     priority: 20,
   });
 
+  await page.getByRole('button', { name: 'Active deliveries' }).click();
   await page
-    .getByLabel(`Delivery order ${orderId}`)
+    .getByLabel('Delivery order #1042')
     .getByRole('button', {
-      name: 'UNASSIGNED',
+      name: 'Unassign rider',
     })
     .click();
 
@@ -182,16 +193,15 @@ test('delivery uses business-facing copy and stays usable across phone, tablet, 
 }) => {
   await mockDelivery(page);
 
-  for (const viewport of [
-    { width: 390, height: 844 },
-    { width: 768, height: 1024 },
-    { width: 1440, height: 960 },
-  ]) {
+  for (const viewport of ADMIN_CORE_VIEWPORTS) {
     await page.setViewportSize(viewport);
     await page.goto('/delivery');
 
     await expect(page.getByRole('heading', { name: 'Delivery', exact: true })).toBeVisible();
+    await expect(page.getByText('#1042')).toBeVisible();
+    await page.getByRole('button', { name: 'Zones' }).click();
     await expect(page.getByText('Maadi Core')).toBeVisible();
+    await page.getByRole('button', { name: 'Riders' }).click();
     await expect(page.getByText('Omar Rider')).toBeVisible();
     await expect(page.getByText(/server-authoritative/i)).toHaveCount(0);
     await expect(page.getByText(/append-only/i)).toHaveCount(0);
@@ -208,25 +218,32 @@ test('delivery view-only users do not receive mutation controls', async ({ page 
   await mockDelivery(page, ['delivery.view']);
   await page.goto('/delivery');
 
+  await expect(page.getByText('#1042')).toBeVisible();
+  await page.getByRole('button', { name: 'Zones' }).click();
   await expect(page.getByText('Maadi Core')).toBeVisible();
+  await page.getByRole('button', { name: 'Riders' }).click();
   await expect(page.getByText('Omar Rider')).toBeVisible();
   await expect(page.getByRole('button', { name: 'New delivery zone' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'New rider' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Save rider' })).toHaveCount(0);
-  await expect(page.getByLabel(`Delivery order ${orderId}`)).toContainText('ASSIGNED');
+  await page.getByRole('button', { name: 'Active deliveries' }).click();
+  await expect(page.getByLabel('Delivery order')).toContainText('Rider assigned');
 });
 
 test('delivery zone editor uses EGP amounts and named fallback choices', async ({ page }) => {
   const { commands } = await mockDelivery(page);
   await page.goto('/delivery');
 
+  await page.getByRole('button', { name: 'Zones' }).click();
   await page.getByRole('button', { name: /Maadi Core/ }).click();
   await expect(page.getByLabel('Delivery fee (EGP)')).toHaveValue('25.00');
   await expect(page.getByLabel('Minimum order (EGP)')).toHaveValue('120.00');
   await expect(page.getByLabel(/fallback shop id/i)).toHaveCount(0);
 
   await page.getByLabel('Use fallback shop').check();
-  await page.getByRole('combobox', { name: 'Fallback shop' }).selectOption({ label: 'Shop 2' });
+  await page
+    .getByRole('combobox', { name: 'Fallback shop' })
+    .selectOption({ label: 'TUX Zamalek' });
   await page.getByRole('button', { name: 'Save delivery zone' }).click();
 
   await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);

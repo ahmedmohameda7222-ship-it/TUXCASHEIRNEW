@@ -29,9 +29,14 @@ function latestMutationError(
 
 function mutationErrorMessage(error: unknown): string | null {
   if (error === null || error === undefined) return null;
-  const raw = error instanceof Error ? error.message : String(error);
-  const normalized = raw.trim().replaceAll('_', ' ').replaceAll('-', ' ');
-  return normalized || 'Purchasing action failed';
+  const code = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  if (code.includes('duplicate_supplier') || code.includes('supplier_name_conflict'))
+    return 'A supplier with these details already exists.';
+  if (code.includes('conflict') || code.includes('stale_purchase_order_version'))
+    return 'This purchase order changed. Reload and try again.';
+  if (code.includes('forbidden') || code.includes('permission'))
+    return 'You do not have permission to complete this purchasing action.';
+  return 'The purchasing action could not be completed. Reload and try again.';
 }
 
 export function PurchasingPage() {
@@ -141,7 +146,9 @@ export function PurchasingPage() {
                       navigate(detailPath('/purchasing', id));
                       setAction(null);
                     }}
-                    onCreate={(input) => purchasing.createPurchaseOrder.mutate(input)}
+                    onCreate={(input, onSuccess) =>
+                      purchasing.createPurchaseOrder.mutate(input, { onSuccess })
+                    }
                   />
                 ),
               },

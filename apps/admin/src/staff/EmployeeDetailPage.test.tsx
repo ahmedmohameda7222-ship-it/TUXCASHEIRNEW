@@ -59,12 +59,12 @@ function render(
 }
 
 describe('EmployeeDetailPage', () => {
-  it('shows profile facts and Operations setup guidance without exposing shop IDs', () => {
+  it('keeps Profile focused and moves access work into its own tab', () => {
     const html = render(employee());
     expect(html).toContain('Mona Ali');
-    expect(html).toContain('Operations setup required');
     expect(html).toContain('Current shop');
-    expect(html).toContain('No unlinked active Operations worker is available for this shop.');
+    expect(html).toContain('Access &amp; Permissions');
+    expect(html).not.toContain('Operations setup required');
     expect(html).not.toContain(SHOP_ID);
   });
 
@@ -83,8 +83,8 @@ describe('EmployeeDetailPage', () => {
         ],
       }),
     );
-    expect(html).toContain('Operations access disabled');
-    expect(html).toContain('Restore Operations access');
+    expect(html).toContain('Access &amp; Permissions');
+    expect(html).not.toContain('Operations access disabled');
     expect(html).not.toContain('Operations access: Ready');
   });
 
@@ -104,7 +104,7 @@ describe('EmployeeDetailPage', () => {
       }),
       false,
     );
-    expect(html).toContain('Operations access disabled');
+    expect(html).toContain('Access &amp; Permissions');
     expect(html).not.toContain('Restore Operations access');
   });
 
@@ -139,7 +139,7 @@ describe('EmployeeDetailPage', () => {
     );
 
     expect(html).toContain('Other shop');
-    expect(html).toContain('Switch to that shop to complete Operations setup.');
+    expect(html).toContain('Access &amp; Permissions');
     expect(html).not.toContain('Complete Operations setup');
   });
 });

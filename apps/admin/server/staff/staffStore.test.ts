@@ -32,6 +32,10 @@ describe('staffStore', () => {
         return [{ employee_id: EMPLOYEE_ID, shop_id: SHOP_ID }];
       if (table === 'employee_worker_links') return [];
       if (table === 'workers') return [];
+      if (table === 'shops') {
+        expect(params.get('business_id')).toBe(`eq.${BUSINESS_ID}`);
+        return [{ id: SHOP_ID, name: 'Downtown' }];
+      }
       if (table === 'finance_accounts') {
         expect(params.get('business_id')).toBe(`eq.${BUSINESS_ID}`);
         expect(params.get('active')).toBe('eq.true');
@@ -42,6 +46,7 @@ describe('staffStore', () => {
     const store = createSupabaseStaffStore({ select } as unknown as AdminSupabaseClient);
     const workspace = await store.loadWorkspace(SHOP_ID, BUSINESS_ID, [SHOP_ID]);
     expect(workspace.employees.rows[0]?.operationsSetupRequiredShopIds).toEqual([SHOP_ID]);
+    expect(workspace.shops).toEqual([{ id: SHOP_ID, name: 'Downtown' }]);
   });
 
   it('marks a preserved inactive linked worker as Operations action required', async () => {
@@ -62,6 +67,7 @@ describe('staffStore', () => {
           },
         ];
       if (table === 'finance_accounts') return [];
+      if (table === 'shops') return [{ id: SHOP_ID, name: 'Downtown' }];
       throw new Error(`unexpected_table:${table}`);
     });
     const store = createSupabaseStaffStore({ select } as unknown as AdminSupabaseClient);

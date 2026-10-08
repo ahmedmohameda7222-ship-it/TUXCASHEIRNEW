@@ -152,6 +152,8 @@ type DeliveryOrderRow = {
 type CanonicalDeliveryOrderRow = {
   id: string;
   shop_id: string;
+  display_order_no?: number | string;
+  display_order_label?: string | null;
   updated_at: string;
 };
 
@@ -168,6 +170,8 @@ type ShopRow = {
   lifecycle_state: string;
   temporary_closed: boolean;
 };
+
+type ShopNameRow = { id: string; name: string };
 
 function safeInteger(value: number | string): number {
   const parsed = typeof value === 'number' ? value : Number(value);
@@ -273,67 +277,100 @@ async function selectAllPages<Row>(
 export function createDeliveryStore(client: AdminSupabaseClient): DeliveryStore {
   return {
     async loadWorkspace(input): Promise<AdminDeliveryWorkspace> {
-      const [zones, riderRows, actionableOrderRows, terminalOrderRows, canonicalOrderRows] =
-        await Promise.all([
-          loadZones(client, input.shopId),
-          client.select<RiderRow[]>(
-            'delivery_riders',
-            new URLSearchParams({
-              select: 'id,shop_id,display_name,phone,active,state,version',
-              business_id: `eq.${input.businessId}`,
-              shop_id: `eq.${input.shopId}`,
-              order: 'display_name.asc,id.asc',
-            }),
-          ),
-          selectAllPages<DeliveryOrderRow>(
-            client,
-            'delivery_order_states',
-            new URLSearchParams({
-              select: 'order_id,shop_id,rider_id,state,version,updated_at',
-              business_id: `eq.${input.businessId}`,
-              shop_id: `eq.${input.shopId}`,
-              state: 'in.(UNASSIGNED,ASSIGNED,OUT_FOR_DELIVERY)',
-              order: 'updated_at.desc,order_id.desc',
-            }),
-          ),
-          client.select<DeliveryOrderRow[]>(
-            'delivery_order_states',
-            new URLSearchParams({
-              select: 'order_id,shop_id,rider_id,state,version,updated_at',
-              business_id: `eq.${input.businessId}`,
-              shop_id: `eq.${input.shopId}`,
-              state: 'in.(DELIVERED,FAILED,RETURNED)',
-              order: 'updated_at.desc,order_id.desc',
-              limit: '500',
-            }),
-          ),
-          selectAllPages<CanonicalDeliveryOrderRow>(
-            client,
-            'orders',
-            new URLSearchParams({
-              select: 'id,shop_id,updated_at',
-              shop_id: `eq.${input.shopId}`,
-              order_type_behavior_snapshot: 'eq.DELIVERY',
-              status: 'in.(ACTIVE,DONE)',
-              order: 'updated_at.desc,id.desc',
-            }),
-          ),
-        ]);
+      const [
+        zones,
+        riderRows,
+        actionableOrderRows,
+        terminalOrderRows,
+        canonicalOrderRows,
+        shopNameRows,
+      ] = await Promise.all([
+        loadZones(client, input.shopId),
+        client.select<RiderRow[]>(
+          'delivery_riders',
+          new URLSearchParams({
+            select: 'id,shop_id,display_name,phone,active,state,version',
+            business_id: `eq.${input.businessId}`,
+            shop_id: `eq.${input.shopId}`,
+            order: 'display_name.asc,id.asc',
+          }),
+        ),
+        selectAllPages<DeliveryOrderRow>(
+          client,
+          'delivery_order_states',
+          new URLSearchParams({
+            select: 'order_id,shop_id,rider_id,state,version,updated_at',
+            business_id: `eq.${input.businessId}`,
+            shop_id: `eq.${input.shopId}`,
+            state: 'in.(UNASSIGNED,ASSIGNED,OUT_FOR_DELIVERY)',
+            order: 'updated_at.desc,order_id.desc',
+          }),
+        ),
+        client.select<DeliveryOrderRow[]>(
+          'delivery_order_states',
+          new URLSearchParams({
+            select: 'order_id,shop_id,rider_id,state,version,updated_at',
+            business_id: `eq.${input.businessId}`,
+            shop_id: `eq.${input.shopId}`,
+            state: 'in.(DELIVERED,FAILED,RETURNED)',
+            order: 'updated_at.desc,order_id.desc',
+            limit: '500',
+          }),
+        ),
+        selectAllPages<CanonicalDeliveryOrderRow>(
+          client,
+          'orders',
+          new URLSearchParams({
+            select: 'id,shop_id,display_order_no,display_order_label,updated_at',
+            shop_id: `eq.${input.shopId}`,
+            order_type_behavior_snapshot: 'eq.DELIVERY',
+            status: 'in.(ACTIVE,DONE)',
+            order: 'updated_at.desc,id.desc',
+          }),
+        ),
+        input.shopIds
+          ? client.select<ShopNameRow[]>(
+              'shops',
+              new URLSearchParams({
+                select: 'id,name',
+                business_id: `eq.${input.businessId}`,
+                id: `in.(${input.shopIds.join(',')})`,
+                order: 'name.asc,id.asc',
+              }),
+            )
+          : Promise.resolve([]),
+      ]);
 
       const orderRows = [...actionableOrderRows, ...terminalOrderRows];
-      const orders: AdminDeliveryOrder[] = orderRows.map((row) => ({
-        orderId: row.order_id,
-        shopId: row.shop_id,
-        riderId: row.rider_id,
-        state: row.state,
-        version: safeInteger(row.version),
-        updatedAt: row.updated_at,
-      }));
+      const canonicalOrdersById = new Map(canonicalOrderRows.map((row) => [row.id, row]));
+      const orders: AdminDeliveryOrder[] = orderRows.map((row) => {
+        const canonical = canonicalOrdersById.get(row.order_id);
+        return {
+          orderId: row.order_id,
+          ...(canonical?.display_order_no === undefined
+            ? {}
+            : { displayOrderNo: safeInteger(canonical.display_order_no) }),
+          ...(canonical?.display_order_label === undefined
+            ? {}
+            : { displayOrderLabel: canonical.display_order_label }),
+          shopId: row.shop_id,
+          riderId: row.rider_id,
+          state: row.state,
+          version: safeInteger(row.version),
+          updatedAt: row.updated_at,
+        };
+      });
       const initializedOrderIds = new Set(orders.map((order) => order.orderId));
       for (const row of canonicalOrderRows) {
         if (!initializedOrderIds.has(row.id)) {
           orders.push({
             orderId: row.id,
+            ...(row.display_order_no === undefined
+              ? {}
+              : { displayOrderNo: safeInteger(row.display_order_no) }),
+            ...(row.display_order_label === undefined
+              ? {}
+              : { displayOrderLabel: row.display_order_label }),
             shopId: row.shop_id,
             riderId: null,
             state: 'UNASSIGNED',
@@ -350,6 +387,7 @@ export function createDeliveryStore(client: AdminSupabaseClient): DeliveryStore 
 
       return {
         shopId: input.shopId,
+        shops: shopNameRows,
         zones,
         riders: riderRows.map((row) => ({
           id: row.id,

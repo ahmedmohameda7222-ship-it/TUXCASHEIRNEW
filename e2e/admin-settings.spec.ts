@@ -1,5 +1,6 @@
 import type { AdminPaymentMethodDetail } from '@tux/admin-contracts';
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const orderTypeId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -241,14 +242,32 @@ async function mockSettings(page: Page) {
   return { commands };
 }
 
+for (const viewport of ADMIN_CORE_VIEWPORTS) {
+  test(`keeps Settings navigation and primary actions usable on ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await mockSettings(page);
+    await page.goto('/settings/shop');
+
+    await expect(page.getByRole('heading', { name: 'TUX Maadi', level: 1 })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Publish settings' })).toBeVisible();
+    await page.getByRole('button', { name: 'Checkout' }).click();
+    await expect(page.getByRole('heading', { name: 'Checkout' })).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+      .toBe(true);
+  });
+}
+
 test('edits checkout and receipt overrides with CAS, then publishes settings', async ({ page }) => {
   const { commands } = await mockSettings(page);
 
   await page.goto('/settings/checkout');
   await expect(page.getByRole('heading', { name: 'Checkout' })).toBeVisible();
 
-  await page.getByLabel('Tax / VAT (bps)').fill('1600');
-  await page.getByRole('button', { name: 'Save Tax / VAT (bps)' }).click();
+  await page.getByLabel('Tax / VAT (%)').fill('16.00');
+  await page.getByRole('button', { name: 'Save Tax / VAT (%)' }).click();
 
   await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);
   expect(commands[0]).toMatchObject({
@@ -312,7 +331,7 @@ test('deactivates an existing reason code through the trusted settings command',
   await page.goto('/settings/reason-codes');
   await expect(page.getByRole('heading', { name: 'Configured operational reasons' })).toBeVisible();
   await page.getByLabel('CUSTOMER_CHANGED_MIND reason status').selectOption('inactive');
-  await page.getByRole('button', { name: 'Save CUSTOMER_CHANGED_MIND' }).click();
+  await page.getByRole('button', { name: 'Save Customer changed mind' }).click();
 
   await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);
   expect(commands[0]).toMatchObject({

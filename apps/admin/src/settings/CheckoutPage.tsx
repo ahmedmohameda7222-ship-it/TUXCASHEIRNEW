@@ -1,6 +1,12 @@
 import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
 
 import { SettingOverrideEditor } from './SettingOverrideEditor';
+import {
+  formatBasisPointsAsPercent,
+  formatMinorAsEgp,
+  parseEgpToMinor,
+  parsePercentToBasisPoints,
+} from './settingsModel';
 import type { SettingOverrideUpdateDraft } from './useSettings';
 
 export function CheckoutPage({
@@ -16,47 +22,55 @@ export function CheckoutPage({
     <section className="admin-settings-section" aria-labelledby="settings-checkout-title">
       <div className="admin-settings-section__header">
         <div>
-          <p className="admin-settings-kicker">Published checkout rules</p>
+          <p className="admin-settings-kicker">Order totals and requirements</p>
           <h2 id="settings-checkout-title">Checkout</h2>
         </div>
-        <span className="admin-status-pill">v{workspace.settingsVersion}</span>
       </div>
 
       <p className="admin-field__help">
-        Save creates or updates this shop&apos;s override. Publish settings makes the saved rules
-        live for future Menu and Operations checkouts.
+        Save each change, then publish settings when you are ready to use it for future orders.
       </p>
 
       <div className="admin-settings-grid">
         <SettingOverrideEditor
           workspace={workspace}
           settingKey="checkout.minimumOrderMinor"
-          label="Minimum order (minor units)"
+          label="Minimum order (EGP)"
           kind="integer"
           min={0}
-          max={Number.MAX_SAFE_INTEGER}
+          step={0.01}
+          inputMode="decimal"
+          formatValue={formatMinorAsEgp}
+          parseInput={parseEgpToMinor}
           updating={updating}
           onUpdate={onUpdate}
         />
         <SettingOverrideEditor
           workspace={workspace}
           settingKey="checkout.serviceChargeBps"
-          label="Service charge (bps)"
+          label="Service charge (%)"
           kind="integer"
           min={0}
-          max={10_000}
-          help="100 basis points = 1%."
+          max={100}
+          step={0.01}
+          inputMode="decimal"
+          formatValue={formatBasisPointsAsPercent}
+          parseInput={parsePercentToBasisPoints}
           updating={updating}
           onUpdate={onUpdate}
         />
         <SettingOverrideEditor
           workspace={workspace}
           settingKey="checkout.taxBps"
-          label="Tax / VAT (bps)"
+          label="Tax / VAT (%)"
           kind="integer"
           min={0}
-          max={10_000}
-          help="Applied by the trusted checkout pricing boundary; browser totals are estimates only."
+          max={100}
+          step={0.01}
+          inputMode="decimal"
+          formatValue={formatBasisPointsAsPercent}
+          parseInput={parsePercentToBasisPoints}
+          help="Used for future order totals after settings are published."
           updating={updating}
           onUpdate={onUpdate}
         />
@@ -73,7 +87,7 @@ export function CheckoutPage({
           settingKey="checkout.allowDiscountStacking"
           label="Allow discount stacking"
           kind="boolean"
-          help="Future promotion and loyalty calculations use this published policy; existing orders keep their checkout snapshot."
+          help="Applies to future orders; existing orders keep their original total."
           updating={updating}
           onUpdate={onUpdate}
         />
@@ -82,7 +96,7 @@ export function CheckoutPage({
           settingKey="checkout.allowDeliveryFeeOverride"
           label="Allow delivery fee override"
           kind="boolean"
-          help="When off, Delivery orders must use the published zone fee. Existing orders keep their checkout snapshot."
+          help="When off, delivery orders use the configured zone fee."
           updating={updating}
           onUpdate={onUpdate}
         />
@@ -98,7 +112,7 @@ export function CheckoutPage({
               <div className="admin-settings-row" key={zone.id}>
                 <div>
                   <strong>{zone.name}</strong>
-                  <span>Sort {zone.sortOrder}</span>
+                  <span>{zone.active ? 'Available for delivery' : 'Not currently available'}</span>
                 </div>
                 <span>{zone.active ? `${(zone.feeMinor / 100).toFixed(2)} EGP` : 'Inactive'}</span>
               </div>

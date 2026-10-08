@@ -86,7 +86,7 @@ export function VarianceReport({
             {row.largestContributor ? (
               <p>
                 Largest ingredient cost: {row.largestContributor.itemName} (
-                {row.largestContributor.costMinor.toFixed(0)} minor units)
+                {(row.largestContributor.costMinor / 100).toFixed(2)} EGP)
               </p>
             ) : null}
           </article>

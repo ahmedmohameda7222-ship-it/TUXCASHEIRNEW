@@ -1,8 +1,16 @@
 import type { CatalogJsonObject, CatalogProductDetail } from '@tux/admin-contracts';
+import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
+import { Router } from 'wouter';
 
-import { ProductEditor, formatEgpMinor, parseEgpToMinor } from './ProductEditor';
+import {
+  ProductEditor,
+  formatEgpMinor,
+  formatQuantityMicrosForInput,
+  parseEgpToMinor,
+  parseQuantityToMicros,
+} from './ProductEditor';
 import {
   applyProductAdvancedDraft,
   buildProductAdvancedDraft,
@@ -91,9 +99,13 @@ const advancedBundle: CatalogJsonObject = {
   ],
 };
 
+function renderEditor(element: ReactElement): string {
+  return renderToStaticMarkup(<Router ssrPath="/catalog/products">{element}</Router>);
+}
+
 describe('ProductEditor', () => {
   it('keeps advanced fields behind progressive disclosure and renders real controls when loaded', () => {
-    const collapsed = renderToStaticMarkup(
+    const collapsed = renderEditor(
       <ProductEditor
         product={fixtureProduct}
         canEdit
@@ -106,7 +118,7 @@ describe('ProductEditor', () => {
     expect(collapsed).toContain('More');
     expect(collapsed).not.toContain('Recipe / Inventory');
 
-    const expanded = renderToStaticMarkup(
+    const expanded = renderEditor(
       <ProductEditor
         product={fixtureProduct}
         canEdit
@@ -131,7 +143,7 @@ describe('ProductEditor', () => {
   });
 
   it('keeps pricing read-only without catalog.pricing', () => {
-    const html = renderToStaticMarkup(
+    const html = renderEditor(
       <ProductEditor
         product={fixtureProduct}
         canEdit
@@ -145,7 +157,7 @@ describe('ProductEditor', () => {
   });
 
   it('labels normal removal as archive and immediate availability as live', () => {
-    const html = renderToStaticMarkup(
+    const html = renderEditor(
       <ProductEditor
         product={fixtureProduct}
         canEdit
@@ -160,12 +172,39 @@ describe('ProductEditor', () => {
     expect(html).toContain('Mark sold out');
   });
 
+  it('hides storage implementation details and presents a business image state', () => {
+    const html = renderEditor(
+      <ProductEditor
+        product={fixtureProduct}
+        canEdit
+        canPrice
+        onSaveDraft={vi.fn()}
+        onSetAvailability={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain('Product image');
+    expect(html).toContain('managed outside this screen');
+    expect(html).not.toContain('Image object key');
+    expect(html).not.toContain(fixtureProduct.shopId);
+    expect(html).not.toContain(fixtureProduct.id);
+  });
+
   it('converts displayed EGP values to integer minor units without float drift', () => {
     expect(formatEgpMinor(1550)).toBe('15.50');
     expect(parseEgpToMinor('15.50')).toBe(1550);
     expect(parseEgpToMinor('15.5')).toBe(1550);
     expect(() => parseEgpToMinor('-1')).toThrow(/invalid_price/);
     expect(() => parseEgpToMinor('12.345')).toThrow(/invalid_price/);
+  });
+
+  it('converts recipe quantities at the storage boundary without exposing micros', () => {
+    expect(formatQuantityMicrosForInput(250_000)).toBe('0.25');
+    expect(formatQuantityMicrosForInput(1_250_000)).toBe('1.25');
+    expect(parseQuantityToMicros('0.250')).toBe(250_000);
+    expect(parseQuantityToMicros('1.25')).toBe(1_250_000);
+    expect(() => parseQuantityToMicros('0')).toThrow(/invalid_recipe_quantity/);
+    expect(() => parseQuantityToMicros('0.0000001')).toThrow(/invalid_recipe_quantity/);
   });
 
   it('serializes advanced control state into canonical catalog relations', () => {
@@ -179,7 +218,7 @@ describe('ProductEditor', () => {
           '44444444-4444-4444-8444-444444444444': { linked: true, maxQuantity: '3' },
         },
         comboState: { '55555555-5555-4555-8555-555555555555': true },
-        recipeState: { '66666666-6666-4666-8666-666666666666': '500000' },
+        recipeState: { '66666666-6666-4666-8666-666666666666': '0.5' },
       }),
     ).toEqual({
       modifierLinks: [
@@ -219,7 +258,7 @@ describe('ProductEditor', () => {
         '44444444-4444-4444-8444-444444444444': { linked: true, maxQuantity: '4' },
       },
       comboState: { '55555555-5555-4555-8555-555555555555': true },
-      recipeState: { '66666666-6666-4666-8666-666666666666': '750000' },
+      recipeState: { '66666666-6666-4666-8666-666666666666': '0.75' },
     });
     const result = buildProductDraftBundle(advancedBundle, {
       product: { ...fixtureProduct, name: 'Classic Smash XL' },

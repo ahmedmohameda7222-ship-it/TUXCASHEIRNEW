@@ -1,6 +1,7 @@
 import type { EmployeeDetail } from '@tux/admin-contracts';
 import { useState } from 'react';
 
+import { AdminDialog } from '../components/overlay/AdminDialog';
 import {
   businessDateTimeInputValue,
   businessLocalDateTimeToIso,
@@ -8,6 +9,19 @@ import {
 } from './businessTime';
 
 export type StaffCommandDraft = Readonly<Record<string, unknown>> & { readonly type: string };
+
+function shiftStatusLabel(status: string): string {
+  if (status === 'CANCELLED') return 'Cancelled';
+  if (status === 'COMPLETED') return 'Completed';
+  return 'Scheduled';
+}
+
+function formatDuration(minutes: number): string {
+  if (minutes === 0) return 'No break';
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours > 0 ? `${hours}h ${remainder}m break` : `${remainder}m break`;
+}
 
 export function SchedulePage({
   employee,
@@ -25,6 +39,7 @@ export function SchedulePage({
   const [breakMinutes, setBreakMinutes] = useState('0');
   const [targetWeekStart, setTargetWeekStart] = useState('');
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
+  const [shiftOpen, setShiftOpen] = useState(false);
 
   const shifts = employee.shifts.filter((shift) => shift.shopId === shopId);
 
@@ -37,11 +52,11 @@ export function SchedulePage({
           <span>
             <strong>{formatBusinessDateTime(shift.startsAt)}</strong>
             <small>
-              {formatBusinessDateTime(shift.endsAt)} · {shift.plannedBreakMinutes} min break
+              {formatBusinessDateTime(shift.endsAt)} · {formatDuration(shift.plannedBreakMinutes)}
             </small>
           </span>
           <span>
-            {shift.status}
+            {shiftStatusLabel(shift.status)}
             {canManage && shift.status !== 'CANCELLED' ? (
               <>
                 <button
@@ -52,6 +67,7 @@ export function SchedulePage({
                     setStartsAt(businessDateTimeInputValue(shift.startsAt));
                     setEndsAt(businessDateTimeInputValue(shift.endsAt));
                     setBreakMinutes(String(shift.plannedBreakMinutes));
+                    setShiftOpen(true);
                   }}
                 >
                   Edit
@@ -78,8 +94,29 @@ export function SchedulePage({
 
       {canManage ? (
         <>
-          <section className="admin-catalog-editor__section is-compact">
-            <h4>{editingShiftId ? 'Edit shift' : 'Add shift'}</h4>
+          <button
+            className="admin-primary-button"
+            type="button"
+            onClick={() => {
+              setEditingShiftId(null);
+              setStartsAt('');
+              setEndsAt('');
+              setBreakMinutes('0');
+              setShiftOpen(true);
+            }}
+          >
+            Add shift
+          </button>
+          <AdminDialog
+            open={shiftOpen}
+            variant="sheet"
+            title={editingShiftId ? 'Edit shift' : 'Add shift'}
+            description="Set the employee's working time and planned break."
+            onOpenChange={(open) => {
+              setShiftOpen(open);
+              if (!open) setEditingShiftId(null);
+            }}
+          >
             <label className="admin-field">
               <span>Starts</span>
               <input
@@ -120,7 +157,6 @@ export function SchedulePage({
                     endsAt: businessLocalDateTimeToIso(endsAt),
                     plannedBreakMinutes: Number(breakMinutes) || 0,
                   });
-                  setEditingShiftId(null);
                 } else {
                   onCommand({
                     type: 'shift.create',
@@ -131,25 +167,13 @@ export function SchedulePage({
                     plannedBreakMinutes: Number(breakMinutes) || 0,
                   });
                 }
+                setEditingShiftId(null);
+                setShiftOpen(false);
               }}
             >
               {editingShiftId ? 'Save shift' : 'Add shift'}
             </button>
-            {editingShiftId ? (
-              <button
-                className="admin-secondary-button"
-                type="button"
-                onClick={() => {
-                  setEditingShiftId(null);
-                  setStartsAt('');
-                  setEndsAt('');
-                  setBreakMinutes('0');
-                }}
-              >
-                Cancel edit
-              </button>
-            ) : null}
-          </section>
+          </AdminDialog>
 
           <section className="admin-catalog-editor__section is-compact">
             <h4>Copy Previous Week</h4>

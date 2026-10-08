@@ -1,6 +1,8 @@
 import type { AdminInventoryItem, AdminInventoryReasonCode } from '@tux/admin-contracts';
 import { useMemo, useState } from 'react';
 
+import { AdminDialog } from '../components/overlay/AdminDialog';
+
 function toMicros(value: string): number | null {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric === 0) return null;
@@ -39,18 +41,17 @@ export function AdjustStockSheet({
   const micros = toMicros(quantity);
 
   return (
-    <section className="admin-inventory-sheet" aria-label="Adjust stock">
-      <div className="admin-inventory-sheet__heading">
-        <div>
-          <p className="admin-page__eyebrow">Ledger command</p>
-          <h3>Adjust stock</h3>
-        </div>
-        <button className="admin-secondary-button" type="button" onClick={onCancel}>
-          Close
-        </button>
-      </div>
+    <AdminDialog
+      open
+      variant="sheet"
+      title={`Adjust ${item.name}`}
+      description="Record the quantity change and why it is needed."
+      onOpenChange={(open) => {
+        if (!open && !pending) onCancel();
+      }}
+    >
       <label className="admin-field">
-        <span>Quantity change</span>
+        <span>Quantity change ({item.unitLabel})</span>
         <input
           aria-label="Quantity change"
           inputMode="decimal"
@@ -84,7 +85,7 @@ export function AdjustStockSheet({
             checked={override}
             onChange={(event) => setOverride(event.target.checked)}
           />
-          <span>Emergency negative-stock override (OWNER only)</span>
+          <span>Allow stock to go below zero</span>
         </label>
       ) : null}
       <button
@@ -105,6 +106,14 @@ export function AdjustStockSheet({
       >
         Post adjustment
       </button>
-    </section>
+      <button
+        className="admin-secondary-button"
+        type="button"
+        disabled={pending}
+        onClick={onCancel}
+      >
+        Cancel
+      </button>
+    </AdminDialog>
   );
 }

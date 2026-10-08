@@ -1,5 +1,6 @@
 import type { EmployeeDetail, StaffWorkspace } from '@tux/admin-contracts';
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
 
 const shopId = '11111111-1111-4111-8111-111111111111';
 const employeeId = '22222222-2222-4222-8222-222222222222';
@@ -34,6 +35,7 @@ function workspace(withAccount = true): StaffWorkspace {
       nextCursor: null,
     },
     workers: [],
+    shops: [{ id: shopId, name: 'Downtown' }],
     financeAccounts: withAccount
       ? [
           {
@@ -154,9 +156,10 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
   await expect(page.getByRole('heading', { name: 'Staff' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
   await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Access & Permissions' }).click();
   await expect(page.getByText('Operations setup required', { exact: true })).toBeVisible();
 
-  await page.getByRole('tab', { name: 'Pay' }).click();
+  await page.getByRole('tab', { name: 'Pay / Compensation' }).click();
   await expect(page.getByLabel('Payment account')).toHaveValue(accountId);
   await expect(page.getByRole('option', { name: /Payroll Cash/ })).toHaveCount(1);
   await page.getByLabel('Pay period start').fill('2026-09-01');
@@ -184,7 +187,7 @@ test('staff payment shows a clear no-account state instead of inventing an accou
   await mockWorkforce(page, false);
   await page.goto('/staff');
   await selectEmployee(page, 'Mona Ali');
-  await page.getByRole('tab', { name: 'Pay' }).click();
+  await page.getByRole('tab', { name: 'Pay / Compensation' }).click();
 
   await expect(page.getByText('No active payment account')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Record payment' })).toHaveCount(0);
@@ -196,6 +199,7 @@ test('attendance correction posts a separate audited correction command', async 
   await selectEmployee(page, 'Mona Ali');
   await page.getByRole('tab', { name: 'Attendance' }).click();
 
+  await page.getByRole('button', { name: 'Correct attendance' }).click();
   await page.getByLabel('Corrected time').fill('2026-09-27T09:15');
   await page.getByLabel('Reason').fill('Forgot to clock in');
   await page.getByRole('button', { name: 'Record correction' }).click();
@@ -209,6 +213,32 @@ test('attendance correction posts a separate audited correction command', async 
   });
   expect(commands[0]).not.toHaveProperty('originalOccurredAt');
 });
+
+for (const viewport of ADMIN_CORE_VIEWPORTS) {
+  test(`staff keeps focused tasks reachable without horizontal overflow on ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await mockWorkforce(page);
+    await page.goto('/staff');
+
+    await expect(page.getByRole('button', { name: 'Add employee' })).toBeVisible();
+    await selectEmployee(page, 'Mona Ali');
+    await expect(page.getByRole('tablist', { name: 'Employee detail sections' })).toBeVisible();
+    await page.getByRole('tab', { name: 'Schedule' }).click();
+    await page.getByRole('button', { name: 'Add shift' }).click();
+    await expect(page.getByRole('dialog', { name: 'Add shift' })).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+      .toBe(true);
+
+    if (viewport.name === 'phone') {
+      await page.keyboard.press('Escape');
+      await page.getByRole('link', { name: /back/i }).click();
+      await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
+    }
+  });
+}
 
 test('switching employees resets local profile editor state to the selected employee', async ({
   page,

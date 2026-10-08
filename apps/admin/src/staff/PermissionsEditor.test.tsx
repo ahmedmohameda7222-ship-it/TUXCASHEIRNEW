@@ -35,12 +35,13 @@ describe('PermissionsEditor', () => {
         employee={employee}
         shopId="11111111-1111-4111-8111-111111111111"
         canManage
-        actorPin="123456"
         onSensitiveCommand={() => undefined}
       />,
     );
-    expect(html).toContain('Explicit allow');
-    expect(html).toContain('Role default · no explicit override');
-    expect(html).toContain('Use role default');
+    expect(html).toContain('Access &amp; Permissions');
+    expect(html).toContain('Role default');
+    expect(html).toContain('Allowed');
+    expect(html).toContain('Not allowed');
+    expect(html).not.toContain('staff.manage');
   });
 });

@@ -219,8 +219,9 @@ test('loads audit events beyond the first bounded page using the continuation cu
   });
 
   await page.goto('/audit');
-  await expect(page.getByText('NEWEST INVENTORY ADJUSTMENT').first()).toBeVisible();
-  await expect(page.getByText('OLDER INVENTORY ADJUSTMENT')).toHaveCount(0);
+  const events = page.getByLabel('Audit events');
+  await expect(events.getByRole('button', { name: /Newest inventory adjustment/ })).toBeVisible();
+  await expect(events.getByRole('button', { name: /Older inventory adjustment/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Load more', exact: true }).click();
-  await expect(page.getByText('OLDER INVENTORY ADJUSTMENT').first()).toBeVisible();
+  await expect(events.getByRole('button', { name: /Older inventory adjustment/ })).toBeVisible();
 });

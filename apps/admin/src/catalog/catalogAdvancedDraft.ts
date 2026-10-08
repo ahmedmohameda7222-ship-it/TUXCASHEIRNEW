@@ -110,6 +110,22 @@ function positiveControlInteger(value: string, code: string): number {
   return parsed;
 }
 
+export function formatQuantityMicrosForInput(value: number): string {
+  if (!Number.isSafeInteger(value) || value < 1) throw new Error('invalid_recipe_quantity');
+  return (value / 1_000_000).toFixed(6).replace(/\.?0+$/, '');
+}
+
+export function parseQuantityToMicros(value: string): number {
+  const normalized = value.trim();
+  const match = /^(0|[1-9]\d*)(?:\.(\d{1,6}))?$/.exec(normalized);
+  if (!match) throw new Error('invalid_recipe_quantity');
+  const whole = Number(match[1]);
+  const fraction = Number((match[2] ?? '').padEnd(6, '0'));
+  const micros = whole * 1_000_000 + fraction;
+  if (!Number.isSafeInteger(micros) || micros < 1) throw new Error('invalid_recipe_quantity');
+  return micros;
+}
+
 function belongsToProduct(value: CatalogJsonValue, key: string, productId: string): boolean {
   return isJsonObject(value) && value[key] === productId;
 }
@@ -297,7 +313,7 @@ export function buildProductAdvancedDraft(
         shopId: input.shopId,
         productId: input.productId,
         inventoryItemId: item.inventoryItemId,
-        quantityMicros: positiveControlInteger(rawQuantity, 'invalid_recipe_quantity'),
+        quantityMicros: parseQuantityToMicros(rawQuantity),
       },
     ];
   });

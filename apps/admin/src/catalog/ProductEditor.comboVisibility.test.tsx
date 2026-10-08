@@ -1,6 +1,7 @@
 import type { CatalogJsonObject, CatalogProductDetail } from '@tux/admin-contracts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
+import { Router } from 'wouter';
 
 import { ProductEditor } from './ProductEditor';
 
@@ -50,15 +51,17 @@ const advancedBundle: CatalogJsonObject = {
 describe('ProductEditor combo controls', () => {
   it('does not advertise combo options for a non-combo product', () => {
     const html = renderToStaticMarkup(
-      <ProductEditor
-        product={product}
-        canEdit
-        canPrice
-        initialAdvancedOpen
-        advancedBundle={advancedBundle}
-        onSaveDraft={vi.fn()}
-        onSetAvailability={vi.fn()}
-      />,
+      <Router ssrPath="/catalog/products">
+        <ProductEditor
+          product={product}
+          canEdit
+          canPrice
+          initialAdvancedOpen
+          advancedBundle={advancedBundle}
+          onSaveDraft={vi.fn()}
+          onSetAvailability={vi.fn()}
+        />
+      </Router>,
     );
 
     expect(html).not.toContain('Combo Options');
@@ -67,15 +70,17 @@ describe('ProductEditor combo controls', () => {
 
   it('shows combo options for a combo product', () => {
     const html = renderToStaticMarkup(
-      <ProductEditor
-        product={{ ...product, isCombo: true }}
-        canEdit
-        canPrice
-        initialAdvancedOpen
-        advancedBundle={advancedBundle}
-        onSaveDraft={vi.fn()}
-        onSetAvailability={vi.fn()}
-      />,
+      <Router ssrPath="/catalog/products">
+        <ProductEditor
+          product={{ ...product, isCombo: true }}
+          canEdit
+          canPrice
+          initialAdvancedOpen
+          advancedBundle={advancedBundle}
+          onSaveDraft={vi.fn()}
+          onSetAvailability={vi.fn()}
+        />
+      </Router>,
     );
 
     expect(html).toContain('Combo Options');

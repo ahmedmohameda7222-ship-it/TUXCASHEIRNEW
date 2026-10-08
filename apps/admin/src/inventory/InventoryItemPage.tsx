@@ -22,7 +22,10 @@ export function formatInventoryQuantity(micros: number, unitLabel: string): stri
 }
 
 function movementLabel(value: string): string {
-  return value.replaceAll('_', ' ');
+  return value
+    .replaceAll('_', ' ')
+    .toLowerCase()
+    .replace(/^./, (letter) => letter.toUpperCase());
 }
 
 export function InventoryItemPage({
@@ -63,7 +66,7 @@ export function InventoryItemPage({
       <section className="admin-inventory-history" aria-label="Inventory history">
         <div className="admin-inventory-history__header">
           <h3>History</h3>
-          <span>Immutable ledger</span>
+          <span>Recent stock movements</span>
         </div>
         {(item.history ?? []).length === 0 ? (
           <p className="admin-inventory-muted">No movements recorded for this item yet.</p>

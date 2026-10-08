@@ -70,6 +70,8 @@ type WorkerRow = {
   credential_version: number | string;
 };
 
+type ShopNameRow = { id: string; name: string };
+
 type PermissionRow = {
   permission_key: string;
   effect: 'ALLOW' | 'DENY';
@@ -442,7 +444,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
         };
       });
 
-      const [financeAccounts, workerChoices] = await Promise.all([
+      const [financeAccounts, workerChoices, shops] = await Promise.all([
         client.select<FinanceAccountRow[]>(
           'finance_accounts',
           new URLSearchParams({
@@ -462,6 +464,15 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
             order: 'display_name.asc,id.asc',
           }),
         ),
+        client.select<ShopNameRow[]>(
+          'shops',
+          new URLSearchParams({
+            select: 'id,name',
+            business_id: `eq.${businessId}`,
+            id: inFilter(authorizedShopIds),
+            order: 'name.asc,id.asc',
+          }),
+        ),
       ]);
 
       const linkedEmployeeByWorker = new Map(
@@ -479,6 +490,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
       const employeesResult: StaffListResult = { rows, nextCursor: null };
       return {
         employees: employeesResult,
+        shops,
         financeAccounts: financeAccounts.map((account) => ({
           id: account.id,
           shopId: account.shop_id,

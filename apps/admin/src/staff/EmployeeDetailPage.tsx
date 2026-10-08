@@ -7,6 +7,7 @@ import type {
 import { useState } from 'react';
 
 import { AdminTabs } from '../components/navigation/AdminTabs';
+import { AdminDialog } from '../components/overlay/AdminDialog';
 import { AttendancePage } from './AttendancePage';
 import { LeavePage } from './LeavePage';
 import { PermissionsEditor } from './PermissionsEditor';
@@ -22,10 +23,27 @@ type LinkedOperationsIdentity = Extract<
   { kind: 'LINKED' }
 >;
 
+type SensitiveAction =
+  | { kind: 'role' }
+  | { kind: 'pin' }
+  | { kind: 'status' }
+  | { kind: 'restore'; identity: LinkedOperationsIdentity }
+  | null;
+
 function isInactiveLinkedOperationsIdentity(
   identity: EmployeeDetail['operationsIdentities'][number],
 ): identity is LinkedOperationsIdentity {
   return identity.kind === 'LINKED' && !identity.workerActive;
+}
+
+function roleLabel(role: AdminRole): string {
+  return role === 'OWNER'
+    ? 'Owner'
+    : role === 'ADMIN'
+      ? 'Administrator'
+      : role === 'MANAGER'
+        ? 'Manager'
+        : 'Staff';
 }
 
 export function EmployeeDetailPage({
@@ -50,6 +68,7 @@ export function EmployeeDetailPage({
   onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
 }) {
   const [tab, setTab] = useState<DetailTab>('profile');
+  const [sensitiveAction, setSensitiveAction] = useState<SensitiveAction>(null);
   const [actorPin, setActorPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [pinCommandId, setPinCommandId] = useState(() => crypto.randomUUID());
@@ -180,19 +199,25 @@ export function EmployeeDetailPage({
             </button>
           </section>
         ) : null}
+      </section>
+    </>
+  );
 
+  const compensationContent = (
+    <>
+      <section className="admin-catalog-editor__section is-compact">
+        <h3>Compensation</h3>
+        {latestCompensation ? (
+          <p>
+            Current: {latestCompensation.compensationType === 'HOURLY' ? 'Hourly' : 'Monthly'} ·{' '}
+            {(latestCompensation.rateMinor / 100).toFixed(2)} EGP · effective{' '}
+            {latestCompensation.effectiveFrom}
+          </p>
+        ) : (
+          <p>No compensation record yet.</p>
+        )}
         {canManage ? (
-          <section className="admin-catalog-editor__section is-compact">
-            <h4>Compensation</h4>
-            {latestCompensation ? (
-              <p>
-                Current: {latestCompensation.compensationType} ·{' '}
-                {(latestCompensation.rateMinor / 100).toFixed(2)} EGP · effective{' '}
-                {latestCompensation.effectiveFrom}
-              </p>
-            ) : (
-              <p>No compensation record yet.</p>
-            )}
+          <>
             <label className="admin-field">
               <span>Compensation type</span>
               <select
@@ -242,10 +267,21 @@ export function EmployeeDetailPage({
             >
               Record compensation
             </button>
-          </section>
+          </>
         ) : null}
       </section>
+      <StaffPaymentPage
+        employee={employee}
+        shopId={shopId}
+        canPay={canPay}
+        financeAccounts={financeAccounts}
+        onCommand={onCommand}
+      />
+    </>
+  );
 
+  const accessContent = (
+    <>
       <section className="admin-catalog-editor__section" aria-labelledby="staff-operations-access">
         <h3 id="staff-operations-access">Operations access</h3>
         {setupRequired.length > 0 ? (
@@ -306,20 +342,7 @@ export function EmployeeDetailPage({
                   <button
                     className="admin-secondary-button"
                     type="button"
-                    disabled={!actorPin}
-                    onClick={() =>
-                      onSensitiveCommand(
-                        {
-                          type: 'employee.reactivate-worker',
-                          employeeId: employee.id,
-                          shopId: identity.shopId,
-                          workerId: identity.workerId,
-                          expectedEmployeeCredentialVersion: employee.credentialVersion,
-                          expectedWorkerCredentialVersion: identity.credentialVersion,
-                        },
-                        actorPin,
-                      )
-                    }
+                    onClick={() => setSensitiveAction({ kind: 'restore', identity })}
                   >
                     Restore Operations access
                   </button>
@@ -342,112 +365,38 @@ export function EmployeeDetailPage({
           aria-labelledby="staff-sensitive-actions"
         >
           <h3 id="staff-sensitive-actions">Sensitive access actions</h3>
-          <p>These actions change employee access. Confirm them with your own Admin PIN.</p>
-          <label className="admin-field">
-            <span>Your Admin PIN</span>
-            <input
-              aria-label="Admin PIN for staff changes"
-              inputMode="numeric"
-              type="password"
-              value={actorPin}
-              onChange={(event) => setActorPin(event.target.value)}
-            />
-          </label>
-          <label className="admin-field">
-            <span>Role</span>
-            <select
-              value={roleDraft}
-              onChange={(event) => setRoleDraft(event.target.value as AdminRole)}
+          <p>Each access change opens its own confirmation and asks for your Admin PIN.</p>
+          <div className="admin-actions">
+            <button
+              className="admin-secondary-button"
+              type="button"
+              onClick={() => setSensitiveAction({ kind: 'role' })}
             >
-              <option value="OWNER">OWNER</option>
-              <option value="ADMIN">ADMIN</option>
-              <option value="MANAGER">MANAGER</option>
-              <option value="STAFF">STAFF</option>
-            </select>
-          </label>
-          <button
-            className="admin-secondary-button"
-            type="button"
-            disabled={!actorPin || roleDraft === employee.role}
-            onClick={() =>
-              onSensitiveCommand(
-                {
-                  type: 'employee.role',
-                  employeeId: employee.id,
-                  shopId,
-                  role: roleDraft,
-                  expectedVersion: employee.profileVersion,
-                },
-                actorPin,
-              )
-            }
-          >
-            Change role
-          </button>
-
-          <label className="admin-field">
-            <span>New employee PIN</span>
-            <input
-              aria-label="New employee PIN"
-              inputMode="numeric"
-              type="password"
-              value={newPin}
-              onChange={(event) => {
-                setNewPin(event.target.value);
-                setPinCommandId(crypto.randomUUID());
-              }}
-            />
-          </label>
-          <button
-            className="admin-secondary-button"
-            type="button"
-            disabled={!actorPin || !/^\d{4,12}$/.test(newPin)}
-            onClick={() =>
-              onSensitiveCommand(
-                {
-                  type: 'employee.pin',
-                  employeeId: employee.id,
-                  shopId,
-                  newPin,
-                  commandId: pinCommandId,
-                },
-                actorPin,
-              )
-            }
-          >
-            Reset PIN
-          </button>
-
-          <button
-            className={employee.active ? 'admin-destructive-button' : 'admin-secondary-button'}
-            type="button"
-            disabled={!actorPin}
-            onClick={() =>
-              employee.active
-                ? onSensitiveCommand(
-                    {
-                      type: 'employee.suspend',
-                      employeeId: employee.id,
-                      shopId,
-                      expectedVersion: employee.profileVersion,
-                    },
-                    actorPin,
-                  )
-                : onSensitiveCommand(
-                    {
-                      type: 'employee.reactivate',
-                      employeeId: employee.id,
-                      shopId,
-                      expectedVersion: employee.profileVersion,
-                    },
-                    actorPin,
-                  )
-            }
-          >
-            {employee.active ? 'Suspend employee' : 'Reactivate employee'}
-          </button>
+              Change role
+            </button>
+            <button
+              className="admin-secondary-button"
+              type="button"
+              onClick={() => setSensitiveAction({ kind: 'pin' })}
+            >
+              Reset employee PIN
+            </button>
+            <button
+              className={employee.active ? 'admin-destructive-button' : 'admin-secondary-button'}
+              type="button"
+              onClick={() => setSensitiveAction({ kind: 'status' })}
+            >
+              {employee.active ? 'Suspend employee' : 'Reactivate employee'}
+            </button>
+          </div>
         </section>
       ) : null}
+      <PermissionsEditor
+        employee={employee}
+        canManage={canManage}
+        onCommand={onCommand}
+        onSensitiveCommand={onSensitiveCommand}
+      />
     </>
   );
 
@@ -458,7 +407,7 @@ export function EmployeeDetailPage({
           <p className="admin-page__eyebrow">Staff profile</p>
           <h2>{employee.displayName}</h2>
           <p className="admin-page__description">
-            {employee.role} · {employee.active ? 'Active' : 'Suspended'}
+            {roleLabel(employee.role)} · {employee.active ? 'Active' : 'Suspended'}
           </p>
         </div>
       </header>
@@ -507,26 +456,159 @@ export function EmployeeDetailPage({
           },
           {
             id: 'pay',
-            label: 'Pay',
-            content: (
-              <StaffPaymentPage
-                employee={employee}
-                shopId={shopId}
-                canPay={canPay}
-                financeAccounts={financeAccounts}
-                onCommand={onCommand}
-              />
-            ),
+            label: 'Pay / Compensation',
+            content: compensationContent,
           },
           {
             id: 'permissions',
-            label: 'Permissions',
-            content: (
-              <PermissionsEditor employee={employee} canManage={canManage} onCommand={onCommand} />
-            ),
+            label: 'Access & Permissions',
+            content: accessContent,
           },
         ]}
       />
+
+      <AdminDialog
+        open={sensitiveAction !== null}
+        variant="sheet"
+        title={
+          sensitiveAction?.kind === 'role'
+            ? 'Change role'
+            : sensitiveAction?.kind === 'pin'
+              ? 'Reset employee PIN'
+              : sensitiveAction?.kind === 'restore'
+                ? 'Restore Operations access'
+                : employee.active
+                  ? 'Suspend employee'
+                  : 'Reactivate employee'
+        }
+        description="Confirm this access change with your own Admin PIN."
+        onOpenChange={(open) => {
+          if (!open) {
+            setSensitiveAction(null);
+            setActorPin('');
+          }
+        }}
+      >
+        {sensitiveAction?.kind === 'role' ? (
+          <label className="admin-field">
+            <span>New role</span>
+            <select
+              value={roleDraft}
+              onChange={(event) => setRoleDraft(event.target.value as AdminRole)}
+            >
+              <option value="OWNER">Owner</option>
+              <option value="ADMIN">Administrator</option>
+              <option value="MANAGER">Manager</option>
+              <option value="STAFF">Staff</option>
+            </select>
+          </label>
+        ) : null}
+        {sensitiveAction?.kind === 'pin' ? (
+          <label className="admin-field">
+            <span>New employee PIN</span>
+            <input
+              inputMode="numeric"
+              type="password"
+              value={newPin}
+              onChange={(event) => {
+                setNewPin(event.target.value);
+                setPinCommandId(crypto.randomUUID());
+              }}
+            />
+          </label>
+        ) : null}
+        <label className="admin-field">
+          <span>Confirm with your Admin PIN</span>
+          <input
+            aria-label="Admin PIN for staff changes"
+            inputMode="numeric"
+            type="password"
+            value={actorPin}
+            onChange={(event) => setActorPin(event.target.value)}
+          />
+        </label>
+        <div className="admin-dialog__actions">
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={() => setSensitiveAction(null)}
+          >
+            Cancel
+          </button>
+          <button
+            className={
+              sensitiveAction?.kind === 'status' && employee.active
+                ? 'admin-destructive-button'
+                : 'admin-primary-button'
+            }
+            type="button"
+            disabled={
+              !actorPin ||
+              (sensitiveAction?.kind === 'role' && roleDraft === employee.role) ||
+              (sensitiveAction?.kind === 'pin' && !/^\d{4,12}$/.test(newPin))
+            }
+            onClick={() => {
+              if (!sensitiveAction) return;
+              if (sensitiveAction.kind === 'role')
+                onSensitiveCommand(
+                  {
+                    type: 'employee.role',
+                    employeeId: employee.id,
+                    shopId,
+                    role: roleDraft,
+                    expectedVersion: employee.profileVersion,
+                  },
+                  actorPin,
+                );
+              if (sensitiveAction.kind === 'pin')
+                onSensitiveCommand(
+                  {
+                    type: 'employee.pin',
+                    employeeId: employee.id,
+                    shopId,
+                    newPin,
+                    commandId: pinCommandId,
+                  },
+                  actorPin,
+                );
+              if (sensitiveAction.kind === 'status')
+                onSensitiveCommand(
+                  employee.active
+                    ? {
+                        type: 'employee.suspend',
+                        employeeId: employee.id,
+                        shopId,
+                        expectedVersion: employee.profileVersion,
+                      }
+                    : {
+                        type: 'employee.reactivate',
+                        employeeId: employee.id,
+                        shopId,
+                        expectedVersion: employee.profileVersion,
+                      },
+                  actorPin,
+                );
+              if (sensitiveAction.kind === 'restore')
+                onSensitiveCommand(
+                  {
+                    type: 'employee.reactivate-worker',
+                    employeeId: employee.id,
+                    shopId: sensitiveAction.identity.shopId,
+                    workerId: sensitiveAction.identity.workerId,
+                    expectedEmployeeCredentialVersion: employee.credentialVersion,
+                    expectedWorkerCredentialVersion: sensitiveAction.identity.credentialVersion,
+                  },
+                  actorPin,
+                );
+              setSensitiveAction(null);
+              setActorPin('');
+              setNewPin('');
+            }}
+          >
+            Confirm change
+          </button>
+        </div>
+      </AdminDialog>
     </article>
   );
 }

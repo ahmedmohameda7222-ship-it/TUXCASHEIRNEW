@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const otherShopId = '99999999-9999-4999-8999-999999999999';
@@ -183,13 +184,66 @@ test.beforeEach(async ({ page }) => {
                     },
                   ],
                 }
-              : { reasons: [] };
+              : {
+                  reasons: [
+                    {
+                      id: '55555555-5555-4555-8555-555555555555',
+                      scope: 'BUSINESS',
+                      key: 'SERVICE_RECOVERY',
+                      family: 'DISCOUNT_COMP',
+                      label: 'Service recovery',
+                      active: true,
+                      version: 1,
+                    },
+                  ],
+                };
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(payload),
     });
   });
+
+  await page.route('**/api/admin/catalog**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        shopId,
+        currentPublishVersion: 1,
+        categories: [
+          {
+            id: '66666666-6666-4666-8666-666666666666',
+            shopId,
+            name: 'Burgers',
+            active: true,
+            sortOrder: 1,
+            slug: 'burgers',
+            description: null,
+          },
+        ],
+        products: [
+          {
+            id: '77777777-7777-4777-8777-777777777777',
+            shopId,
+            categoryId: '66666666-6666-4666-8666-666666666666',
+            name: 'TUX Burger',
+            active: true,
+            sortOrder: 1,
+            slug: 'tux-burger',
+            description: null,
+            priceMinor: 12000,
+            imageKey: null,
+            family: null,
+            bestSeller: true,
+            soldOut: false,
+            isCombo: false,
+          },
+        ],
+        drafts: [],
+      }),
+    }),
+  );
 });
 
 async function openCustomer(page: Page) {
@@ -209,15 +263,17 @@ test('renders canonical CRM identity, loyalty history and automatic segments', a
   await page.getByRole('tab', { name: 'Addresses' }).click();
   await expect(page.getByText('Road 9, Maadi')).toBeVisible();
 
-  await page.getByRole('tab', { name: 'Linked shops' }).click();
+  await page.getByRole('tab', { name: 'History' }).click();
   await expect(page.getByText('Maadi', { exact: true })).toBeVisible();
 
+  await page.getByRole('tab', { name: 'Loyalty' }).click();
   await expect(page.getByLabel('Customer loyalty').getByText('120 points')).toBeVisible();
   await expect(
-    page.getByLabel('Customer loyalty').getByText('EARN', { exact: true }),
+    page.getByLabel('Customer loyalty').getByText('Points earned', { exact: true }),
   ).toBeVisible();
 
   await page.getByRole('tab', { name: 'CRM settings' }).click();
+  await expect(page).toHaveURL(/\/customers\/settings$/);
   await expect(page.getByRole('heading', { name: 'Promotions' })).toBeVisible();
   await expect(page.getByText(/Lunch 10%/)).toBeVisible();
 });
@@ -243,16 +299,18 @@ test('exposes controlled merge, loyalty configuration and full promotion editor'
   await expect(page.getByLabel('Point expiry (days)')).toBeVisible();
 
   await page.getByRole('button', { name: 'New promotion' }).click();
-  await expect(page.getByLabel('Type')).toContainText('PERCENT');
-  await expect(page.getByLabel('Type')).toContainText('FIXED');
-  await expect(page.getByLabel('Type')).toContainText('FREE_ITEM');
-  await expect(page.getByLabel('Minimum order')).toBeVisible();
+  await expect(page.getByLabel('Type')).toContainText('Percentage discount');
+  await expect(page.getByLabel('Type')).toContainText('Fixed amount discount');
+  await expect(page.getByLabel('Type')).toContainText('Free item');
+  await expect(page.getByLabel('Minimum order (EGP)')).toBeVisible();
   await expect(page.getByLabel('Channel')).toBeVisible();
-  await expect(page.getByLabel('Product restrictions')).toBeVisible();
-  await expect(page.getByLabel('Category restrictions')).toBeVisible();
-  await expect(page.getByLabel('Total usage limit')).toBeVisible();
-  await expect(page.getByLabel('Per-customer usage limit')).toBeVisible();
-  await expect(page.getByLabel('Stacking policy')).toBeVisible();
+  await page.getByLabel('Applies to').selectOption('products');
+  await expect(page.getByLabel('TUX Burger')).toBeVisible();
+  await page.getByLabel('Applies to').selectOption('categories');
+  await expect(page.getByLabel('Burgers')).toBeVisible();
+  await expect(page.getByLabel('Total uses (optional)')).toBeVisible();
+  await expect(page.getByLabel('Uses per customer (optional)')).toBeVisible();
+  await expect(page.getByLabel('Can combine with other promotions?')).toBeVisible();
 });
 
 test('hydrates canonical loyalty values and preserves hidden multi-shop scopes on save', async ({
@@ -304,3 +362,22 @@ test('hydrates canonical loyalty values and preserves hidden multi-shop scopes o
     },
   });
 });
+
+for (const viewport of ADMIN_CORE_VIEWPORTS) {
+  test(`customer CRM remains usable at ${viewport.name} width`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/customers');
+    const list = page.locator('.admin-master-detail__list');
+    await list.getByRole('button', { name: /Mona/ }).click();
+    await expect(page.locator('.admin-master-detail__detail')).toBeVisible();
+    if (viewport.name === 'phone') {
+      await expect(list).toBeHidden();
+      await expect(page.getByRole('link', { name: /back to customers/i })).toBeVisible();
+    } else {
+      await expect(list).toBeVisible();
+    }
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+  });
+}

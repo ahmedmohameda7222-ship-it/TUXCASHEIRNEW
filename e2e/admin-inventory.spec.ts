@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const otherShopId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -80,6 +81,10 @@ async function mockInventory(
         contentType: 'application/json',
         body: JSON.stringify({
           shopId,
+          shops: [
+            { id: shopId, name: 'TUX Maadi' },
+            { id: otherShopId, name: 'TUX Zamalek' },
+          ],
           items: [
             {
               id: itemId,
@@ -235,6 +240,7 @@ test('inventory renders on-hand, reserved, available, history, and action entry 
   await expect(page.getByRole('button', { name: 'Adjust stock' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Record waste' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Stock count' })).toBeVisible();
+  await page.getByText('More actions', { exact: true }).click();
   await expect(page.getByRole('button', { name: 'Transfer stock' })).toBeVisible();
 });
 
@@ -263,7 +269,7 @@ test('inventory surfaces ordinary mutation conflicts to the operator', async ({ 
   await page.getByLabel('Adjustment reason').selectOption(adjustmentReasonId);
   await page.getByRole('button', { name: 'Post adjustment' }).click();
 
-  await expect(page.getByRole('alert')).toContainText(/insufficient stock/i);
+  await expect(page.getByRole('alert')).toContainText(/not enough available stock/i);
 });
 
 test('inventory replaces an older mutation error with the most recent failure', async ({
@@ -282,14 +288,14 @@ test('inventory replaces an older mutation error with the most recent failure', 
   await page.getByLabel('Quantity change').fill('-5');
   await page.getByLabel('Adjustment reason').selectOption(adjustmentReasonId);
   await page.getByRole('button', { name: 'Post adjustment' }).click();
-  await expect(page.getByRole('alert')).toContainText(/insufficient stock/i);
+  await expect(page.getByRole('alert')).toContainText(/not enough available stock/i);
 
-  await page.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Cancel' }).click();
   await page.getByRole('button', { name: 'Record waste' }).click();
   await page.getByLabel('Waste quantity').fill('0.25');
   await page.getByLabel('Waste reason').selectOption(wasteReasonId);
   await page.getByRole('button', { name: 'Post waste' }).click();
-  await expect(page.getByRole('alert')).toContainText(/waste conflict/i);
+  await expect(page.getByRole('alert')).toContainText(/inventory changed/i);
 });
 
 test('inventory clears an older mutation error after a later action succeeds', async ({ page }) => {
@@ -304,9 +310,9 @@ test('inventory clears an older mutation error after a later action succeeds', a
   await page.getByLabel('Quantity change').fill('-5');
   await page.getByLabel('Adjustment reason').selectOption(adjustmentReasonId);
   await page.getByRole('button', { name: 'Post adjustment' }).click();
-  await expect(page.getByRole('alert')).toContainText(/insufficient stock/i);
+  await expect(page.getByRole('alert')).toContainText(/not enough available stock/i);
 
-  await page.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Cancel' }).click();
   await page.getByRole('button', { name: 'Record waste' }).click();
   await page.getByLabel('Waste quantity').fill('0.25');
   await page.getByLabel('Waste reason').selectOption(wasteReasonId);
@@ -321,8 +327,9 @@ test('replenishment save submits the workspace version the admin actually edited
   const fixture = await mockInventory(page);
   await page.goto('/inventory');
 
-  await page.getByRole('button', { name: 'Reorder' }).click();
-  await page.getByLabel('Par micros').fill('3500000');
+  await page.getByText('More actions', { exact: true }).click();
+  await page.getByRole('button', { name: 'Reorder suggestions' }).click();
+  await page.getByLabel('Par level (kg)').fill('3.5');
   await page.getByRole('button', { name: 'Save policy' }).click();
 
   await expect.poll(() => fixture.commands.length).toBe(1);
@@ -371,19 +378,20 @@ test('inventory adjustment and waste use structured reasons through the trusted 
   });
 });
 
-test('inventory stocktake uses a frozen count boundary and posts immutable count input', async ({
+test('inventory stocktake shows business quantities and preserves count authority', async ({
   page,
 }) => {
   const fixture = await mockInventory(page);
   await page.goto('/inventory');
   await page.getByRole('button', { name: 'Stock count' }).click();
 
-  await expect(page.getByText('Snapshot on hand')).toBeVisible();
-  await expect(page.getByText('Captured before counting')).toBeVisible();
-  await expect(page.getByText('Preserved after the snapshot')).toBeVisible();
+  await expect(page.getByText('Expected stock')).toBeVisible();
+  await expect(page.getByText('Captured when this count started')).toBeVisible();
+  await expect(page.getByText('0 / 1 counted')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Post stock count' })).toBeDisabled();
 
   await page.getByLabel('Actual count for Beef').fill('3.0');
+  await expect(page.getByText('1 / 1 counted')).toBeVisible();
   await expect(page.getByText('-0.2 kg')).toBeVisible();
   await page.getByRole('button', { name: 'Post stock count' }).click();
 
@@ -406,10 +414,12 @@ test('inventory can receive a sent inter-shop transfer without using purchasing 
 }) => {
   const fixture = await mockInventory(page);
   await page.goto('/inventory');
+  await page.getByText('More actions', { exact: true }).click();
   await page.getByRole('button', { name: 'Transfer stock' }).click();
 
   await expect(page.getByText('Incoming sent transfers')).toBeVisible();
   await expect(page.getByText('0.4 kg Beef')).toBeVisible();
+  await expect(page.getByText('From TUX Zamalek')).toBeVisible();
   await page.getByRole('button', { name: 'Receive transfer' }).click();
 
   await expect.poll(() => fixture.commands.length).toBe(1);
@@ -418,3 +428,26 @@ test('inventory can receive a sent inter-shop transfer without using purchasing 
     transferId: '77777777-7777-4777-8777-777777777777',
   });
 });
+
+for (const viewport of ADMIN_CORE_VIEWPORTS) {
+  test(`inventory master-detail remains usable at ${viewport.name} width`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await mockInventory(page);
+    await page.goto('/inventory');
+
+    const list = page.getByRole('region', { name: 'Inventory items' });
+    await list.getByRole('button', { name: /Beef/ }).click();
+    await expect(page.getByLabel('Inventory item detail')).toBeVisible();
+
+    if (viewport.name === 'phone') {
+      await expect(list).toBeHidden();
+      await expect(page.getByRole('link', { name: /back to inventory/i })).toBeVisible();
+    } else {
+      await expect(list).toBeVisible();
+    }
+
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+  });
+}
