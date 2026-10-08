@@ -129,10 +129,20 @@ insert into public.inventory_movements(id,shop_id,business_day_id,inventory_item
 values
  ('38000000-0000-4000-8000-000000000001','${s}','${day}',
   '37000000-0000-4000-8000-000000000001','BULK_STOCK_RECEIVED',2000000,
-  '${w}','plan7-profit-stock',now(),400),
- ('38000000-0000-4000-8000-000000000002','${s}','${day}',
-  '37000000-0000-4000-8000-000000000001','ORDER_CONSUMPTION',-1000000,
-  '${w}','plan7-profit-consumption',now(),400);`,'real canonical ingredient consumption');
+  '${w}','plan7-profit-stock',now(),400);`,'seed two units of ingredient');
+
+sql(`insert into public.inventory_cost_state(
+  shop_id,inventory_item_id,weighted_unit_cost_minor,version)
+values('${s}','37000000-0000-4000-8000-000000000001',400,1);
+insert into public.inventory_movements(id,shop_id,business_day_id,inventory_item_id,
+ movement_type,quantity_delta_micros,worker_id,idempotency_key,created_at,unit_cost_minor)
+values('38000000-0000-4000-8000-000000000002','${s}','${day}',
+ '37000000-0000-4000-8000-000000000001','ORDER_CONSUMPTION',-1000000,
+ '${w}','plan7-profit-consumption',now(),0);`,'materialize consumption from canonical weighted cost');
+assert.equal(sql(`select unit_cost_minor from public.inventory_movements
+  where id='38000000-0000-4000-8000-000000000002'`,
+  'immutable consumption cost snapshot'),'400.000000',
+  'server cost binding ignores client supplied zero and uses trusted weighted state');
 
 const nowReport=rpc(`public.admin_finance_report_query_v1(
   '${e}'::uuid,array['${s}'::uuid],'expenses',
@@ -146,14 +156,6 @@ const profitReport=rpc(`public.admin_finance_report_query_v1(
   '${e}'::uuid,array['${s}'::uuid],'profit',
   '${today}'::date,'${today}'::date,50,0,null::text)`,'costed operating profit');
 assert.equal(profitReport.ok,true);
-const inventoryDebug=sql(`select id::text||':'||movement_type||':'||quantity_delta_micros::text||
-  ':'||coalesce(unit_cost_minor::text,'null')||':'||
-  (created_at at time zone 'Africa/Cairo')::date::text
-  from public.inventory_movements where shop_id='${s}' order by created_at,id`,
-  'inventory cost debug');
-console.log('PLAN7_PROFIT_DIAGNOSTIC',JSON.stringify({
-  today,inventoryDebug,profitSummary:profitReport.summary,profitRows:profitReport.rows,
-}));
 assert.equal(profitReport.summary.totalAmountMinor,-2150,
   'zero sales minus 1450 manual expenses, 300 provider fee and 400 COGS');
 const consumptionReport=rpc(`public.admin_finance_report_query_v1(
