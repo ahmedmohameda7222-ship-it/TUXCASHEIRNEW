@@ -107,7 +107,12 @@ export function HomeDashboard() {
     ['Orders today', metric(current?.orderCount)],
     ['Average order value', metric(current?.averageOrderMinor, true)],
     ...(canFinance
-      ? [['Estimated operating profit', metric(current?.estimatedOperatingProfitMinor, true)] as const]
+      ? [
+          [
+            'Estimated operating profit',
+            metric(current?.estimatedOperatingProfitMinor, true),
+          ] as const,
+        ]
       : []),
     ...(canInventory
       ? [
@@ -117,7 +122,9 @@ export function HomeDashboard() {
       : []),
     ...(canStaff ? [['Staff clocked in', metric(current?.staffOnShiftCount)] as const] : []),
     ...(canDelivery ? [['Active deliveries', metric(current?.deliveryOpenCount)] as const] : []),
-    ...(canApprovals ? [['Pending approvals', metric(current?.pendingApprovalCount)] as const] : []),
+    ...(canApprovals
+      ? [['Pending approvals', metric(current?.pendingApprovalCount)] as const]
+      : []),
     ['Failed online orders', metric(current?.failedOnlineOrderCount)],
   ];
   return (
@@ -168,21 +175,23 @@ export function HomeDashboard() {
                   ))}
                 </ul>
               </section>
-              {canCatalog ? <section aria-label="Top recorded products">
-                <h2>Top products · 7 days</h2>
-                {historic.topProducts.length === 0 ? (
-                  <p>No recorded products this week.</p>
-                ) : (
-                  <ol className="tux-home-insight-list">
-                    {historic.topProducts.map((item, index) => (
-                      <li key={`${index}:${item.name}`}>
-                        <span>{item.name}</span>
-                        <strong>{metric(item.quantity)} sold</strong>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </section> : null}
+              {canCatalog ? (
+                <section aria-label="Top recorded products">
+                  <h2>Top products · 7 days</h2>
+                  {historic.topProducts.length === 0 ? (
+                    <p>No recorded products this week.</p>
+                  ) : (
+                    <ol className="tux-home-insight-list">
+                      {historic.topProducts.map((item, index) => (
+                        <li key={`${index}:${item.name}`}>
+                          <span>{item.name}</span>
+                          <strong>{metric(item.quantity)} sold</strong>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </section>
+              ) : null}
               <section aria-label="Sales channels">
                 <h2>POS vs online · 7 days</h2>
                 {historic.sourceMix.length === 0 ? (
