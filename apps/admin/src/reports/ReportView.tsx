@@ -1,4 +1,5 @@
 import { Link } from 'wouter';
+import type { ReportDrilldown } from '@tux/admin-contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
 import { formatEgp } from '../finance/money';
@@ -8,24 +9,28 @@ import type { ReportFilters, ReportResponse } from './useReports';
 function amountLabel(amount: number | null): string {
   return amount === null ? 'Cost data incomplete' : formatEgp(amount);
 }
-function sourceLink(kind: string, id: string): string | null {
-  if (['customer-order', 'delivery-order', 'tax-service'].includes(kind)) {
-    return `/orders/${id}`;
+export function reportDrilldownHref(target: ReportDrilldown | null): string | null {
+  if (!target) return null;
+  switch (target.type) {
+    case 'ORDER':
+      return `/orders/${encodeURIComponent(target.orderId)}`;
+    case 'PURCHASE_ORDER':
+      return `/purchasing/${encodeURIComponent(target.purchaseOrderId)}`;
+    case 'CUSTOMER':
+      return `/customers/${encodeURIComponent(target.customerId)}`;
+    case 'STAFF':
+      return `/staff/${encodeURIComponent(target.employeeId)}`;
+    case 'INVENTORY_ITEM':
+      return `/inventory/${encodeURIComponent(target.inventoryItemId)}`;
+    case 'FINANCE_ACCOUNT':
+      return `/finance/${encodeURIComponent(target.accountId)}`;
+    case 'FINANCIAL_DAY':
+      return `/finance/end-day?businessDayId=${encodeURIComponent(target.businessDayId)}`;
+    case 'EXPENSE':
+      return `/finance/expenses?expenseId=${encodeURIComponent(target.expenseId)}`;
+    default:
+      return null;
   }
-  if (kind === 'financial-z') return '/finance/end-day';
-  if (kind === 'staff-payment') return '/staff';
-  if (kind === 'expense') return '/finance/expenses';
-  if (kind === 'finance-movement') return '/finance';
-  if (kind === 'payment') return '/finance';
-  if (kind === 'purchase-order') return `/purchasing/${id}`;
-  if (kind === 'attendance-event') return '/staff';
-  if (kind === 'inventory-movement') return '/inventory';
-  if (kind === 'order-item') return '/catalog/products';
-  if (kind === 'loyalty-event' || kind === 'promotion-use' || kind === 'customer-segment')
-    return '/customers';
-  if (kind === 'return' || kind === 'refund') return '/orders';
-  if (kind === 'bank-fee') return '/finance/settlements';
-  return null;
 }
 export function ReportView({
   data,
@@ -91,7 +96,7 @@ export function ReportView({
         <div className="tux-report-results">
           <ul className="tux-report-mobile-entries" aria-label="Report entries">
             {data.rows.map((fact) => {
-              const href = sourceLink(fact.sourceKind, fact.id);
+              const href = reportDrilldownHref(fact.drilldown);
               return (
                 <li key={`mobile:${fact.sourceKind}:${fact.id}`}>
                   <div className="tux-report-mobile-entries__top">
@@ -122,7 +127,7 @@ export function ReportView({
               </thead>
               <tbody>
                 {data.rows.map((fact) => {
-                  const href = sourceLink(fact.sourceKind, fact.id);
+                  const href = reportDrilldownHref(fact.drilldown);
                   return (
                     <tr key={`${fact.sourceKind}:${fact.id}`}>
                       <td>
