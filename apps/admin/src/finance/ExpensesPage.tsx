@@ -21,6 +21,8 @@ export function ExpensesPage() {
   const {scope,principal}=useShopScope();
   const shopId=scope.kind==='shop'?scope.shopId:undefined;
   const [open,setOpen]=useState(false);
+  const [categoryOpen,setCategoryOpen]=useState(false);
+  const [newCategory,setNewCategory]=useState('');
   const [dayId,setDayId]=useState('');
   const [amount,setAmount]=useState('');
   const [description,setDescription]=useState('');
@@ -96,6 +98,30 @@ export function ExpensesPage() {
           <strong>{formatEgp(expense.amount_minor)}</strong>
         </li>)}
     </ul>
+    {canPost?<button className="admin-secondary-button" type="button"
+      onClick={()=>setCategoryOpen(true)}>Add expense category</button>:null}
+    <AdminDialog open={categoryOpen} onOpenChange={setCategoryOpen}
+      title="New expense category" variant="sheet"
+      description="Creates a named category for this shop without adding an expense."
+      footer={<>
+        <button type="button" className="admin-secondary-button"
+          onClick={()=>setCategoryOpen(false)}>Cancel</button>
+        <button type="button" className="admin-primary-button"
+          disabled={operations.command.isPending||!newCategory.trim()}
+          onClick={()=>operations.command.mutate({draft:{
+            type:'finance.category.create',shopId,scope:'SHOP',name:newCategory.trim(),
+          }},{onSuccess:()=>{setCategoryOpen(false);setNewCategory('');}})}>
+          Create category
+        </button>
+      </>}
+    >
+      <div className="tux-finance-form">
+        <label>Category name
+          <input maxLength={100} value={newCategory}
+            onChange={(e)=>setNewCategory(e.target.value)} />
+        </label>
+      </div>
+    </AdminDialog>
     <RecurringExpenses shopId={shopId} accounts={accounts}
       openBusinessDayId={availableDays[0]?.id??null} categories={categories}
       canManage={canPost} />
