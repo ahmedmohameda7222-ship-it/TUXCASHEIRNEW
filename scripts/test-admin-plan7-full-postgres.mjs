@@ -206,6 +206,27 @@ assert.equal(consumptionReport.summary.totalAmountMinor,400,
   'consumption report remains a positive cost measure');
 
 
+for (const area of ['loyalty','promotions','segments','attendance','refunds','staff','purchasing']) {
+  const expanded=rpc(`public.admin_finance_report_query_v2(
+    '${e}'::uuid,array['${s}'::uuid],'${area}',
+    '${today}'::date,'${today}'::date,50,0,null::text,'{}'::jsonb)`,
+    'expanded area '+area);
+  assert.equal(expanded.ok,true, 'canonical area '+area+' must return an authorized report');
+}
+const v2Expense=rpc(`public.admin_finance_report_query_v2(
+  '${e}'::uuid,array['${s}'::uuid],'expenses',
+  '${today}'::date,'${today}'::date,50,0,null::text,'{}'::jsonb)`,
+  'v2 expense totals');
+assert.equal(v2Expense.summary.totalAmountMinor,nowReport.summary.totalAmountMinor,
+  'context v2 does not alter unfiltered finance totals');
+const deniedContext=rpc(`public.admin_finance_report_query_v2(
+  '${e}'::uuid,array['${s}'::uuid],'expenses',
+  '${today}'::date,'${today}'::date,50,0,null::text,
+  '{"orderTypeId":"00000000-0000-4000-8000-000000000001"}'::jsonb)`,
+  'unsupported contextual filter');
+assert.equal(deniedContext.code,'report_context_invalid',
+  'unapplicable context cannot return misleading unfiltered results');
+
 const targets=rpc(`public.admin_report_config_command_v1(
   '${e}'::uuid,'${s}'::uuid,'SET_TARGET',
   '{"metric":"NET_SALES","periodStart":"${today}","periodEnd":"${today}","targetValue":4000,"expectedVersion":0}'::jsonb,
