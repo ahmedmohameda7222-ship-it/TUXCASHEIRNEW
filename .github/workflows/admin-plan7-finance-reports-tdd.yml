@@ -17,6 +17,22 @@ on:
       - '.github/workflows/admin-plan7-finance-reports-tdd.yml'
 
 jobs:
+  format-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - name: Capture deterministic formatter output
+        run: |
+          for file in apps/admin/server/finance/calculations.ts apps/admin/server/finance/calculations.test.ts apps/admin/server/finance/financeApi.ts apps/admin/src/finance/useFinance.ts apps/admin/src/finance/money.ts apps/admin/src/finance/money.test.ts apps/admin/src/finance/FinancePage.tsx packages/admin-contracts/src/finance.ts packages/admin-contracts/src/endDay.ts packages/admin-contracts/src/reports.ts; do
+            echo "FORMAT_BEGIN_${file}"
+            npx prettier "$file" | base64 -w0
+            echo
+            echo "FORMAT_END_${file}"
+          done
+
   schema-invariants:
     runs-on: ubuntu-latest
     steps:
