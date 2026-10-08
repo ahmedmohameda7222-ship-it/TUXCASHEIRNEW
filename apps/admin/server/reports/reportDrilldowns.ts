@@ -20,63 +20,94 @@ type SourceMap = {
 
 const PARENTS: Readonly<Record<string, SourceMap>> = {
   payment: {
-    table: 'payments', key: 'id', selected: 'id,shop_id,order_id',
-    targetColumn: 'order_id', permission: 'orders.view',
+    table: 'payments',
+    key: 'id',
+    selected: 'id,shop_id,order_id',
+    targetColumn: 'order_id',
+    permission: 'orders.view',
     target: (id) => ({ type: 'ORDER', orderId: id }),
   },
   refund: {
-    table: 'admin_order_refunds', key: 'id', selected: 'id,shop_id,order_id',
-    targetColumn: 'order_id', permission: 'orders.view',
+    table: 'admin_order_refunds',
+    key: 'id',
+    selected: 'id,shop_id,order_id',
+    targetColumn: 'order_id',
+    permission: 'orders.view',
     target: (id) => ({ type: 'ORDER', orderId: id }),
   },
   return: {
-    table: 'admin_order_returns', key: 'id', selected: 'id,shop_id,order_id',
-    targetColumn: 'order_id', permission: 'orders.view',
+    table: 'admin_order_returns',
+    key: 'id',
+    selected: 'id,shop_id,order_id',
+    targetColumn: 'order_id',
+    permission: 'orders.view',
     target: (id) => ({ type: 'ORDER', orderId: id }),
   },
   'order-item': {
-    table: 'order_items', key: 'id', selected: 'id,shop_id,order_id',
-    targetColumn: 'order_id', permission: 'orders.view',
+    table: 'order_items',
+    key: 'id',
+    selected: 'id,shop_id,order_id',
+    targetColumn: 'order_id',
+    permission: 'orders.view',
     target: (id) => ({ type: 'ORDER', orderId: id }),
   },
   'inventory-movement': {
-    table: 'inventory_movements', key: 'id', selected: 'id,shop_id,inventory_item_id',
-    targetColumn: 'inventory_item_id', permission: 'inventory.view',
+    table: 'inventory_movements',
+    key: 'id',
+    selected: 'id,shop_id,inventory_item_id',
+    targetColumn: 'inventory_item_id',
+    permission: 'inventory.view',
     target: (id) => ({ type: 'INVENTORY_ITEM', inventoryItemId: id }),
   },
   'attendance-event': {
-    table: 'attendance_events', key: 'id', selected: 'id,shop_id,employee_id',
-    targetColumn: 'employee_id', permission: 'staff.view',
+    table: 'attendance_events',
+    key: 'id',
+    selected: 'id,shop_id,employee_id',
+    targetColumn: 'employee_id',
+    permission: 'staff.view',
     target: (id) => ({ type: 'STAFF', employeeId: id, section: 'attendance' }),
   },
   'staff-payment': {
-    table: 'staff_payment_expense_events', key: 'staff_payment_record_id',
+    table: 'staff_payment_expense_events',
+    key: 'staff_payment_record_id',
     selected: 'staff_payment_record_id,shop_id,employee_id',
-    targetColumn: 'employee_id', permission: 'staff.view',
+    targetColumn: 'employee_id',
+    permission: 'staff.view',
     target: (id) => ({ type: 'STAFF', employeeId: id, section: 'pay' }),
   },
   'finance-movement': {
-    table: 'finance_movements', key: 'id', selected: 'id,shop_id,finance_account_id',
-    targetColumn: 'finance_account_id', permission: 'finance.view',
+    table: 'finance_movements',
+    key: 'id',
+    selected: 'id,shop_id,finance_account_id',
+    targetColumn: 'finance_account_id',
+    permission: 'finance.view',
     target: (id, sourceId) => ({ type: 'FINANCE_ACCOUNT', accountId: id, movementId: sourceId }),
   },
   'bank-fee': {
-    table: 'finance_movements', key: 'id', selected: 'id,shop_id,finance_account_id',
-    targetColumn: 'finance_account_id', permission: 'finance.view',
+    table: 'finance_movements',
+    key: 'id',
+    selected: 'id,shop_id,finance_account_id',
+    targetColumn: 'finance_account_id',
+    permission: 'finance.view',
     target: (id, sourceId) => ({ type: 'FINANCE_ACCOUNT', accountId: id, movementId: sourceId }),
   },
   'financial-z': {
-    table: 'end_day_financial_snapshots', key: 'id',
+    table: 'end_day_financial_snapshots',
+    key: 'id',
     selected: 'id,shop_id,business_day_id',
-    targetColumn: 'business_day_id', permission: 'finance.view',
+    targetColumn: 'business_day_id',
+    permission: 'finance.view',
     target: (id) => ({ type: 'FINANCIAL_DAY', businessDayId: id }),
   },
 };
 
 function directTarget(row: SourceRow, principal: AdminSessionPrincipal): ReportDrilldown | null {
   const permission = principal.permissions;
-  if (['customer-order', 'delivery-order', 'tax-service'].includes(row.sourceKind) &&
-    permission.includes('orders.view')) return { type: 'ORDER', orderId: row.id };
+  if (
+    ['customer-order', 'delivery-order', 'tax-service'].includes(row.sourceKind) &&
+    permission.includes('orders.view')
+  )
+    return { type: 'ORDER', orderId: row.id };
   if (row.sourceKind === 'purchase-order' && permission.includes('purchasing.view'))
     return { type: 'PURCHASE_ORDER', purchaseOrderId: row.id };
   if (row.sourceKind === 'expense' && permission.includes('finance.view'))
@@ -123,7 +154,7 @@ export async function enrichReportDrilldowns(
   return rows.map((row) => ({
     ...row,
     drilldown: principal.shopIds.includes(row.shopId)
-      ? parents.get(`${row.shopId}:${row.id}`) ?? directTarget(row, principal)
+      ? (parents.get(`${row.shopId}:${row.id}`) ?? directTarget(row, principal))
       : null,
   }));
 }
