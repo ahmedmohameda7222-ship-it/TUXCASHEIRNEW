@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 const read = (file) => readFileSync(file, 'utf8');
 const bff = read('apps/admin/server/reports/reportApi.ts');
 const policy = read('apps/admin/server/reports/reportAuthorization.ts');
-const migration = read('supabase/migrations/20261008139000_admin_plan7_report_domain_authorization.sql');
+const migration = read('supabase/migrations/20261008232110_20261008139000_admin_plan7_report_domain_authorization.sql');
 const dashboard = migration.slice(migration.indexOf('create or replace function public.admin_plan7_dashboard_metrics_v1('));
 
 for (const [area, permission] of [
