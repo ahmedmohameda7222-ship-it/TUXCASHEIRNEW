@@ -93,7 +93,12 @@ assert.equal(rpc(callMap(accountId, 0, 'map-1'), 'mapping replay').replayed, tru
 assert.equal(rpc(callMap(accountId, 0, 'stale-map'), 'stale version conflict').code, 'finance_mapping_version_conflict');
 assert.equal(psql('select count(*) from public.payment_method_finance_accounts where active', 'one active mapping'), '1');
 
-psql(`select public.set_finance_account_active_v1('${e}'::uuid,'${s}'::uuid,'${accountId}'::uuid,1,false,'deactivate-before-unmap')`, 'active mapping prevents account deactivation', true);
+const stillMapped = rpc(
+  `public.set_finance_account_active_v1('${e}'::uuid,'${s}'::uuid,'${accountId}'::uuid,1,false,'deactivate-before-unmap')`,
+  'active mapping prevents account deactivation',
+);
+assert.equal(stillMapped.ok, false);
+assert.equal(stillMapped.code, 'finance_account_has_active_mapping');
 const unmapped = rpc(callMap(null, 1, 'unmap-2'), 'intentionally unmapped');
 assert.equal(unmapped.ok, true);
 assert.equal(unmapped.mapped, false);
