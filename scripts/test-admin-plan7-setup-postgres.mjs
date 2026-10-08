@@ -40,7 +40,7 @@ create function auth.uid() returns uuid language sql stable as $$ select nullif(
 const migrations = readdirSync(resolve('supabase/migrations'))
   .filter((name) => /^\d+_.+\.sql$/.test(name))
   .sort();
-const target = '20261008137000_admin_plan7_cash_only_cashier_z_gate.sql';
+const target = '20261008138000_admin_plan7_dashboard_paid_order_aov.sql';
 assert(migrations.includes(target), 'setup migration missing');
 for (const name of migrations.slice(0, migrations.indexOf(target) + 1)) {
   const result = spawnSync('psql', [databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', '-f', resolve('supabase/migrations', name)], {
