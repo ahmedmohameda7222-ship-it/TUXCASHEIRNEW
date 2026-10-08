@@ -25,6 +25,7 @@ jobs:
         with: { node-version: 24 }
       - run: node scripts/test-admin-plan7-migration.mjs
       - run: node scripts/test-admin-plan7-materialization-migration.mjs
+      - run: node scripts/test-admin-plan7-finance-setup-migration.mjs
 
   schema-postgres:
     needs: schema-invariants
@@ -44,6 +45,7 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - run: node scripts/test-admin-plan7-postgres.mjs
       - run: node scripts/test-admin-plan7-materialization-postgres.mjs
+      - run: node scripts/test-admin-plan7-setup-postgres.mjs
 
   regression:
     needs: schema-postgres
