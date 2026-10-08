@@ -559,6 +559,7 @@ export function FinancePage() {
       <MoneyMovementSheet
         shopId={shopId}
         accounts={accounts}
+        canManageCapital={principal.role === 'OWNER' || principal.role === 'ADMIN'}
         open={moneyMovementOpen}
         onClose={() => setMoneyMovementOpen(false)}
       />
