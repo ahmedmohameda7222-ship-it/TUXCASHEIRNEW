@@ -393,6 +393,34 @@ assert.equal(average.netSalesMinor,10000,'only actual paid cash is net sales');
 assert.equal(average.averageOrderMinor,10000,
   'average order value must divide by paid orders, not by all operational orders');
 
+const unpaid='40000000-0000-4000-8000-000000000003';
+const category='46000000-0000-4000-8000-000000000001';
+const espresso='47000000-0000-4000-8000-000000000001';
+const latte='47000000-0000-4000-8000-000000000002';
+sql(`insert into public.menu_categories(id,shop_id,name,sort_order) values
+ ('${category}','${s}','Daily sales',0);
+insert into public.products(id,shop_id,category_id,name,price_minor,sort_order) values
+ ('${espresso}','${s}','${category}','Espresso',500,0),
+ ('${latte}','${s}','${category}','Latte',1000,1);
+insert into public.orders(id,shop_id,business_day_id,display_order_no,idempotency_key,source,status,
+ operator_worker_id,operator_name_snapshot,order_type_id,order_type_label_snapshot,
+ order_type_behavior_snapshot,configured_delivery_fee_minor,final_delivery_fee_minor,
+ items_subtotal_minor,discount_minor,total_minor,created_at,updated_at,
+ operational_revision,service_charge_minor,tax_minor) values
+ ('${unpaid}','${s}','${newDay}',3,'unpaid-active','POS','ACTIVE',
+ '${w}','Cashier','${orderType}','Takeaway','TAKE_AWAY',0,0,2500,0,2500,
+ now(),now(),0,0,0);
+insert into public.order_items(id,shop_id,order_id,product_id,product_name_snapshot,
+ unit_price_minor,quantity,line_position) values
+ (gen_random_uuid(),'${s}','${unpaid}','${espresso}','Espresso',500,5,1),
+ (gen_random_uuid(),'${s}','${paidOrder}','${latte}','Latte',1000,2,1),
+ (gen_random_uuid(),'${s}','${cancelledOrder}','${espresso}','Espresso',500,1,1);`,
+ 'paid and unpaid top-product fixture');
+const products=rpc(`public.admin_plan7_dashboard_metrics_v1(
+ '${e}'::uuid,array['${s}'::uuid],'${today}'::date,'${today}'::date)`,
+ 'paid-only Top Products');
+assert.deepEqual(products.topProducts.map(p=>[p.name,p.quantity]),[['Latte',2]]);
+
 const limited='45000000-0000-4000-8000-000000000001';
 sql(`insert into public.business_employees(id,business_id,display_name,role,active)
 values ('${limited}','${b}','Custom permission staff','STAFF',true);
