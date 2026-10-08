@@ -1,8 +1,4 @@
-import type {
-  AdminPermission,
-  AdminReportArea,
-  AdminSessionPrincipal,
-} from '@tux/admin-contracts';
+import type { AdminPermission, AdminReportArea, AdminSessionPrincipal } from '@tux/admin-contracts';
 
 import { requirePermission } from '../authorization.js';
 
