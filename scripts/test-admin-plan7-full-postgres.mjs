@@ -35,6 +35,13 @@ const activated=rpc(`public.set_finance_account_active_v1(
   '${e}'::uuid,'${s}'::uuid,'${cashId}'::uuid,2,true,'reenable-finance-cash')`,'reactivate cash');
 assert.equal(activated.ok,true);
 
+const manager='33000000-0000-4000-8000-000000000002';
+sql(`insert into public.business_employees(id,business_id,display_name,role,active)
+  values ('${manager}','${b}','Finance manager','MANAGER',true);
+insert into public.employee_shop_assignments(business_id,employee_id,shop_id)
+  values ('${b}','${manager}','${s}');
+insert into public.admin_employee_permissions(business_id,employee_id,permission_key,effect)
+  values ('${b}','${manager}','finance.adjust','ALLOW');`,'shop-scoped finance manager');
 const bank=rpc(`public.create_finance_account_v1(
   '${e}'::uuid,'${s}'::uuid,'${s}'::uuid,'BANK','Financial Test Bank',0,'new-bank')`,'create bank');
 assert.equal(bank.ok,true);
@@ -48,6 +55,23 @@ function movement(action,payload,commandId) {
     '${e}'::uuid,'${s}'::uuid,'${action}',
     '${JSON.stringify(payload)}'::jsonb,'${commandId}')`,action);
 }
+const globalBank=rpc(`public.create_finance_account_v1(
+  '${e}'::uuid,'${s}'::uuid,null::uuid,'BANK',
+  'Global treasury',0,'new-global-bank')`,'owner creates business treasury');
+assert.equal(globalBank.ok,true);
+const managerCommand=(action,payload,commandId)=>rpc(`public.execute_finance_management_v1(
+  '${manager}'::uuid,'${s}'::uuid,'${action}',
+  '${JSON.stringify(payload)}'::jsonb,'${commandId}')`, 'manager financial command');
+assert.equal(managerCommand('TRANSFER',{
+  fromAccountId:cashId,toAccountId:globalBank.accountId,
+  amountMinor:250,reason:'Manager transfer into global treasury',
+},'manager-global-transfer').code,'permission_forbidden',
+  'a shop-scoped manager cannot move funds into/out of business treasury');
+assert.equal(managerCommand('OWNER_WITHDRAWAL',{
+  fromAccountId:cashId,amountMinor:250,reason:'Unauthorized owner capital withdrawal',
+},'manager-owner-withdraw').code,'permission_forbidden',
+  'owner capital movements require OWNER or ADMIN role');
+
 const owner=movement('OWNER_CONTRIBUTION',{
   fromAccountId:cashId,amountMinor:50000,reason:'Owner investment, not sales',
 },'test-owner-deposit');
