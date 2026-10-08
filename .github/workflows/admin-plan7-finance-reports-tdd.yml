@@ -44,6 +44,8 @@ jobs:
       - run: node scripts/test-admin-plan7-materialization-migration.mjs
       - run: node scripts/test-admin-plan7-finance-setup-migration.mjs
       - run: node scripts/test-admin-plan7-workspace-migration.mjs
+      - run: node scripts/test-admin-plan7-coverage-migration.mjs
+      - run: node scripts/test-admin-plan7-report-filters.mjs
 
   schema-postgres:
     needs: schema-invariants
