@@ -48,8 +48,16 @@ export function ReportFilters({
       offset: 0,
     });
   const isOrderReport = [
-    'sales','payments','products','customers','delivery','tax','refunds',
-    'shop-comparison','loyalty','promotions',
+    'sales',
+    'payments',
+    'products',
+    'customers',
+    'delivery',
+    'tax',
+    'refunds',
+    'shop-comparison',
+    'loyalty',
+    'promotions',
   ].includes(value.area);
   const extraFields: Array<{ key: keyof ReportContext; label: string; optionsKey: string }> =
     value.area === 'purchasing'
@@ -75,12 +83,25 @@ export function ReportFilters({
             : [];
   const statuses =
     value.area === 'purchasing'
-      ? [['DRAFT','Draft'],['ORDERED','Ordered'],['PARTIALLY_RECEIVED','Partially received'],
-         ['RECEIVED','Received'],['CANCELLED','Cancelled']]
+      ? [
+          ['DRAFT', 'Draft'],
+          ['ORDERED', 'Ordered'],
+          ['PARTIALLY_RECEIVED', 'Partially received'],
+          ['RECEIVED', 'Received'],
+          ['CANCELLED', 'Cancelled'],
+        ]
       : value.area === 'staff' || value.area === 'attendance'
-        ? [['SESSION_START','Clock in'],['SESSION_END','Clock out']]
+        ? [
+            ['SESSION_START', 'Clock in'],
+            ['SESSION_END', 'Clock out'],
+          ]
         : isOrderReport
-          ? [['ACTIVE','Active'],['DONE','Completed'],['CANCELLED','Cancelled'],['RETURNED','Returned']]
+          ? [
+              ['ACTIVE', 'Active'],
+              ['DONE', 'Completed'],
+              ['CANCELLED', 'Cancelled'],
+              ['RETURNED', 'Returned'],
+            ]
           : [];
   return (
     <section className="tux-report-filters" aria-label="Report filters">
@@ -198,7 +219,9 @@ export function ReportFilters({
                 >
                   <option value="">All statuses</option>
                   {statuses.map(([code, label]) => (
-                    <option key={code} value={code}>{label}</option>
+                    <option key={code} value={code}>
+                      {label}
+                    </option>
                   ))}
                 </select>
               </label>
