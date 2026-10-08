@@ -18,6 +18,7 @@ import {
   requireReportContextPermissions,
   REPORT_AREA_PERMISSION as reportDomainPermissions,
 } from './reportAuthorization.js';
+import { maskDashboardMetrics } from './dashboardAuthorization.js';
 import { enrichReportDrilldowns } from './reportDrilldowns.js';
 
 const uuid = z.string().uuid();
@@ -254,7 +255,7 @@ export async function handleReportsRequest(
           rpcFailure(response, result);
           return;
         }
-        sendJson(response, 200, result);
+        sendJson(response, 200, maskDashboardMetrics(principal, result));
         return;
       }
       const selectedArea = area.parse(query.get('area') ?? 'sales');
