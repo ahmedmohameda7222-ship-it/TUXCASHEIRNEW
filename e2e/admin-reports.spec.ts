@@ -138,9 +138,13 @@ test('contextual payment-method filter and comparison presets reach server', asy
   await page.goto('/reports');
   await page.getByText('More filters').click();
   await page.getByLabel('Payment method').selectOption('66666666-6666-4666-8666-666666666666');
-  await expect.poll(() =>
-    queries.some((query) => query.get('paymentMethodId') === '66666666-6666-4666-8666-666666666666')
-  ).toBe(true);
+  await expect
+    .poll(() =>
+      queries.some(
+        (query) => query.get('paymentMethodId') === '66666666-6666-4666-8666-666666666666',
+      ),
+    )
+    .toBe(true);
   await page.getByLabel('Compare previous period').check();
   await page.getByLabel('Comparison range').selectOption('week');
   await expect.poll(() => queries.some((query) => query.get('compare') === 'week')).toBe(true);
@@ -174,7 +178,9 @@ test('phone report presentation', async ({ page }) => {
   await mockReports(page);
   await page.goto('/reports');
   await expect(page.getByRole('list', { name: 'Report entries' })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
 });
 
 for (const vp of [
@@ -186,6 +192,8 @@ for (const vp of [
     await mockReports(page);
     await page.goto('/reports');
     await expect(page.getByRole('table')).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
   });
 }
