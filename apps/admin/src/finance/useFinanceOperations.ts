@@ -12,34 +12,8 @@ export type FinanceDayRow = {
   readonly started_at: string;
   readonly ended_at: string | null;
 };
-export type FinanceDayReport = {
-  readonly ok: true;
-  readonly shopId: string;
-  readonly businessDayId: string;
-  readonly businessDayStatus: 'OPEN' | 'CLOSED';
-  readonly startedAt: string;
-  readonly endedAt: string | null;
-  readonly orderCount: number;
-  readonly netSalesMinor: number;
-  readonly postedRefundsMinor: number;
-  readonly cashSalesNetMinor: number;
-  readonly totalExpensesMinor: number;
-  readonly cogsMinor: number | null;
-  readonly estimatedOperatingProfitMinor: number | null;
-  readonly missingInventoryCostCount: number;
-  readonly unattributedPaymentCount: number;
-  readonly missingCashierReconciliationCount: number;
-  readonly paymentBreakdown: Readonly<Record<string, number>>;
-  readonly cashierReconciliations: readonly {
-    cashierWorkerId: string;
-    expectedMinor: number;
-    actualMinor: number;
-    varianceMinor: number;
-    reason: string | null;
-    postedAt: string;
-  }[];
-  readonly financialFinalized: boolean;
-};
+export type { FinanceDayReport } from '@tux/admin-contracts';
+import type { FinanceDayReport } from '@tux/admin-contracts';
 export type FinanceOperationDraft = Readonly<Record<string, unknown>> & {
   readonly type: string;
   readonly shopId: string;
