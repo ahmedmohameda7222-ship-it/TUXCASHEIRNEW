@@ -94,7 +94,7 @@ jobs:
           echo PRETTIER_TEST_END
       - run: npm run format:check
       - run: npm run lint
-      - run: npx vitest run apps/admin/server/finance/calculations.test.ts apps/admin/src/finance/money.test.ts apps/admin/server/reports/reportAuthorization.test.ts
+      - run: npx vitest run apps/admin/server/finance/calculations.test.ts apps/admin/src/finance/money.test.ts apps/admin/server/reports/reportAuthorization.test.ts apps/admin/server/reports/reportDrilldowns.test.ts
       - run: npm run typecheck
       - run: npm run test:admin-security
       - run: npm run test:admin-deployment
