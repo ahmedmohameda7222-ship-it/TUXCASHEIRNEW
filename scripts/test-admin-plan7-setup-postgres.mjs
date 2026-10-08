@@ -123,6 +123,24 @@ assert.equal(deactivated.active, false);
 assert.equal(psql('select count(*) from public.finance_accounts', 'deactivation never deletes'), '1');
 assert.equal(psql(`select opening_balance_minor from public.finance_accounts where id='${accountId}'`, 'opening balance immutable in setup'), '12500');
 
+const manager='33000000-0000-4000-8000-000000000002';
+psql(`insert into public.business_employees(id,business_id,display_name,role,active)
+values ('${manager}','${b}','Shop finance manager','MANAGER',true);
+insert into public.employee_shop_assignments(business_id,employee_id,shop_id)
+values ('${b}','${manager}','${s}');
+insert into public.admin_employee_permissions(business_id,employee_id,permission_key,effect)
+values ('${b}','${manager}','finance.manage_accounts','ALLOW');`,
+'permitted shop finance manager');
+const globalAccount=rpc(`public.create_finance_account_v1(
+  '${e}'::uuid,'${s}'::uuid,null::uuid,'BANK','Global treasury',0,'global-setup')`,
+'owner creates business-wide treasury');
+assert.equal(globalAccount.ok,true);
+const unauthorizedMapping=rpc(`public.set_payment_method_finance_account_v1(
+  '${manager}'::uuid,'${s}'::uuid,'${pm}'::uuid,'${globalAccount.accountId}'::uuid,
+  2,'manager-global-map')`,'manager cannot map global account');
+assert.equal(unauthorizedMapping.code,'permission_forbidden',
+  'shop-scoped manage_accounts cannot access business treasury');
+
 const crossShop = rpc(
   `public.create_finance_account_v1('${e}'::uuid,'${s}'::uuid,'${s2}'::uuid,'BANK','Wrong shop',0,'bad-scope')`,
   'reject another shop',
