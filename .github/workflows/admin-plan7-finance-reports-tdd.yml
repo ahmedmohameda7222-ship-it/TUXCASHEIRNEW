@@ -108,4 +108,4 @@ jobs:
         with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e:admin -- e2e/admin-finance.spec.ts e2e/admin-reports.spec.ts
+      - run: npm run test:e2e:admin -- e2e/admin-finance.spec.ts e2e/admin-reports.spec.ts e2e/admin-reports-drilldown.spec.ts e2e/admin-dashboard.spec.ts
