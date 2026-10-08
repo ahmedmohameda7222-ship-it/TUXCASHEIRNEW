@@ -249,6 +249,35 @@ create table public.daily_owner_summaries (
     unique (business_id, shop_id, business_day_id)
 );
 
+-- An OPEN Operations day is never eligible for Admin financial finalization.
+-- Row locking is read-only with respect to Operations close metadata.
+create or replace function private.require_plan7_closed_business_day_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $
+declare
+  v_status text;
+begin
+  select status into v_status
+  from public.business_days
+  where shop_id = new.shop_id and id = new.business_day_id
+  for update;
+  if v_status is distinct from 'CLOSED' then
+    raise exception using errcode = '23514', message = 'TUX_FINANCE_DAY_MUST_BE_CLOSED';
+  end if;
+  return new;
+end;
+$;
+
+create trigger end_day_financial_snapshots_closed_guard
+before insert on public.end_day_financial_snapshots
+for each row execute function private.require_plan7_closed_business_day_v1();
+create trigger daily_owner_summaries_closed_guard
+before insert on public.daily_owner_summaries
+for each row execute function private.require_plan7_closed_business_day_v1();
+
 -- Immutable posted records; corrections are separate financial_adjustments, never snapshot rewrites.
 create or replace function private.prevent_plan7_immutable_fact_mutation()
 returns trigger
@@ -309,6 +338,8 @@ grant select, insert, update, delete on public.saved_report_views to service_rol
 grant select, insert, update on public.report_targets to service_role;
 grant select, insert on public.daily_owner_summaries to service_role;
 
+revoke all on function private.require_plan7_closed_business_day_v1()
+  from public, anon, authenticated;
 revoke all on function private.enforce_plan7_expense_employee_scope_v1()
   from public, anon, authenticated;
 revoke all on function private.prevent_plan7_immutable_fact_mutation()
