@@ -306,7 +306,7 @@ assert.equal(cashOnlyX.openingFloatMinor,2500,'cash float is distinct from sales
 assert.equal(cashOnlyX.cashPayInsMinor,1000,'pay-ins are a separate ledger class');
 assert.equal(cashOnlyX.cashPayOutsMinor,300,'pay-outs are a separate ledger class');
 assert.equal(cashOnlyX.bankDepositsMinor,0,'normal transfers are not bank deposits');
-assert.equal(cashOnlyX.cashExpensesMinor,1200,'cash account expenses are separate');
+assert.equal(cashOnlyX.cashExpensesMinor,1450,'cash includes recorded recurring expense');
 assert.equal(cashOnlyX.transfersOutMinor,10100,'transfers are directional, not revenue');
 assert.equal(cashOnlyX.transfersInMinor,10100,'internal transfers conserve funds');
 assert.equal(cashOnlyX.missingCashierReconciliationCount,1,
