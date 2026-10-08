@@ -91,3 +91,4 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:admin-security
       - run: npm run test:admin-deployment
+      - run: node scripts/test-admin-plan7-gateway.mjs
