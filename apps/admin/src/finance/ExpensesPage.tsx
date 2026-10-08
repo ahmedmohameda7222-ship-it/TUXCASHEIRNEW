@@ -155,8 +155,11 @@ export function ExpensesPage() {
       ) : null}
       <ul className="tux-finance-ledger-list">
         {(operations.expensesQuery.data?.expenses ?? []).map((expense) => (
-          <li key={expense.id} aria-current={expense.id === requestedExpenseId ? 'true' : undefined}
-            className={expense.id === requestedExpenseId ? 'is-selected' : undefined}>
+          <li
+            key={expense.id}
+            aria-current={expense.id === requestedExpenseId ? 'true' : undefined}
+            className={expense.id === requestedExpenseId ? 'is-selected' : undefined}
+          >
             <div>
               <strong>{expense.description}</strong>
               <small>
