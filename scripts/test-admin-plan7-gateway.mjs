@@ -24,6 +24,12 @@ assert.match(financeApi,/account\.shop_id === null && role !== 'OWNER'/,
   'business-wide account history must require elevated authority');
 assert.match(financeApi,/if \(account\.shop_id !== null\) movementQuery\.set\('shop_id'/,
   'shop-scoped histories must be filtered without hiding business-wide movements');
+const playwrightConfig=fs.readFileSync('playwright.admin.config.ts','utf8');
+const plan7Workflow=fs.readFileSync('.github/workflows/admin-plan7-finance-reports-tdd.yml','utf8');
+assert.match(playwrightConfig,/\\.spec\\.ts|finance\\|reports/,
+  'Finance and Reports must be included in permanent Admin Playwright testMatch');
+assert.match(plan7Workflow,/test:e2e:admin/,
+  'Plan 7 permanent workflow must execute real browser E2E, not only static gates');
 assert.match(cron,/timingSafeEqual/);
 assert.match(cron,/CRON_SECRET/);
 assert.match(cron,/require|Bearer|unauthorized/);
