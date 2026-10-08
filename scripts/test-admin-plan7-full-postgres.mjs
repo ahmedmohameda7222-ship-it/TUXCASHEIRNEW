@@ -156,7 +156,7 @@ const correction=rpc(`public.finance_adjust_snapshot_v1(
   'Explicit correction event','test-correction')`,'append correction');
 assert.equal(correction.ok,true);
 sql(`update public.end_day_financial_snapshots set snapshot='{}' where id='${z.snapshotId}'`,'Z immutable',true);
-assert.equal(sql(`select status from public.business_days where id='${day}'`,'Admin never reopens','CLOSED');
+assert.equal(sql(`select status from public.business_days where id='${day}'`,'Admin never reopens'),'CLOSED');
 
 for (const signature of [
   'public.finance_day_report_v1(uuid,uuid,uuid)',
