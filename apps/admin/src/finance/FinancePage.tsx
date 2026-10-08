@@ -4,7 +4,7 @@ import type {
   FinancePaymentMethod,
 } from '@tux/admin-contracts';
 import { useState } from 'react';
-import { useLocation } from 'wouter';
+import { Link, useLocation } from 'wouter';
 
 import { EmptyState, ErrorState, InlineError, LoadingState } from '../components/feedback/AdminStates';
 import { PageScaffold } from '../components/layout/PageScaffold';
@@ -14,6 +14,7 @@ import { AdminDialog, ConfirmationDialog } from '../components/overlay/AdminDial
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { formatEgp, parseEgpMinor } from './money';
 import { useFinance } from './useFinance';
+import { MoneyMovementSheet } from './MoneyMovementSheet';
 import './finance.css';
 
 const accountTypeLabels: Record<FinanceAccountType, string> = {
@@ -139,6 +140,7 @@ export function FinancePage() {
   const canManage = principal.permissions.includes('finance.manage_accounts');
 
   const [accountFormOpen, setAccountFormOpen] = useState(false);
+  const [moneyMovementOpen, setMoneyMovementOpen] = useState(false);
   const [mappingFormOpen, setMappingFormOpen] = useState(false);
   const [deactivateAccount, setDeactivateAccount] = useState<FinanceAccountBalance | null>(null);
   const [accountName, setAccountName] = useState('');
@@ -218,6 +220,7 @@ export function FinancePage() {
       description="Accounts and payment method links for this shop."
       primaryAction={
         canManage ? (
+          <div className="tux-finance-toolbar">
           <button
             type="button"
             className="admin-primary-button"
@@ -225,9 +228,20 @@ export function FinancePage() {
           >
             Add account
           </button>
+          {principal.permissions.includes('finance.adjust') ? (
+            <button type="button" className="admin-secondary-button"
+              onClick={() => setMoneyMovementOpen(true)}>Money movement</button>
+          ) : null}
+          </div>
         ) : undefined
       }
     >
+      <nav className="tux-finance-toolbar" aria-label="Finance sections">
+        <Link className="admin-secondary-button" href="/finance">Bank & Cash</Link>
+        <Link className="admin-secondary-button" href="/finance/expenses">Expenses</Link>
+        <Link className="admin-secondary-button" href="/finance/settlements">Settlements</Link>
+        <Link className="admin-secondary-button" href="/finance/end-day">End Day</Link>
+      </nav>
       {actionError ? <InlineError>{actionError}</InlineError> : null}
       {finance.workspaceQuery.isLoading ? <LoadingState title="Loading finance" /> : null}
       {finance.workspaceQuery.isError ? (
@@ -479,6 +493,8 @@ export function FinancePage() {
         </div>
       </AdminDialog>
 
+      <MoneyMovementSheet shopId={shopId} accounts={accounts}
+        open={moneyMovementOpen} onClose={() => setMoneyMovementOpen(false)} />
       <ConfirmationDialog
         open={deactivateAccount !== null}
         title="Deactivate account?"
