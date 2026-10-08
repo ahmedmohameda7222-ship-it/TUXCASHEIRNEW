@@ -187,6 +187,34 @@ export async function handleReportsRequest(
         return;
       }
       for (const id of selected) requirePermission(principal, 'reports.view', id);
+      if (query.get('view') === 'dashboard') {
+        const dateToday = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit',
+        }).format(new Date());
+        const from = isoDate.parse(query.get('from') ?? dateToday);
+        const to = isoDate.parse(query.get('to') ?? dateToday);
+        const fromMs = safeDate(from);
+        const toMs = safeDate(to);
+        if (fromMs > toMs || toMs - fromMs > 31 * 86400000) {
+          sendJson(response,400,{ error:'dashboard_range_invalid' });
+          return;
+        }
+        const result = await client.rpc<Record<string, unknown>>(
+          'admin_plan7_dashboard_metrics_v1',
+          {
+            p_actor_employee_id: principal.employeeId,
+            p_shop_ids: selected,
+            p_start_date: from,
+            p_end_date: to,
+          },
+        );
+        if (result['ok'] !== true) {
+          rpcFailure(response,result);
+          return;
+        }
+        sendJson(response,200,result);
+        return;
+      }
       const selectedArea = area.parse(query.get('area') ?? 'sales');
       const dateNow = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Africa/Cairo',
