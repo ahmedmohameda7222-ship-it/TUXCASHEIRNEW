@@ -35,10 +35,6 @@
       "dest": "/api/admin/orders?__adminResource=reports"
     },
     {
-      "src": "/api/cron/admin-recurring-expenses",
-      "dest": "/api/admin/orders?__adminResource=recurring-due"
-    },
-    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
