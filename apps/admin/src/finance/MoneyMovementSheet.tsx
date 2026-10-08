@@ -121,11 +121,13 @@ export function MoneyMovementSheet({
         <label>
           Movement type
           <select value={action} onChange={(e) => setAction(e.target.value as MovementAction)}>
-            {Object.entries(movementTypes).filter(([key]) => canManageCapital || !key.startsWith('OWNER_')).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
+            {Object.entries(movementTypes)
+              .filter(([key]) => canManageCapital || !key.startsWith('OWNER_'))
+              .map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
           </select>
         </label>
         <label>
