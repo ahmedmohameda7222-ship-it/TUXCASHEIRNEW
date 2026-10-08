@@ -137,8 +137,10 @@ const createdRule=rpc(`public.upsert_recurring_expense_rule_v1(
   '${e}'::uuid,'${s}'::uuid,null::uuid,0,null::uuid,
   'Recurring utilities',250,'MONTHLY','${today}'::date,true,'new-utilities-rule')`,'recurring definition');
 assert.equal(createdRule.ok,true);
-const generated=Number(sql(`select public.generate_due_recurring_expenses_v1('${today}'::date)`,'generate due expense'));
-assert.equal(generated,1);
+const generated=rpc(`public.process_due_recurring_expenses_v2('${e}'::uuid,'${s}'::uuid,'${today}'::date,25)`,'scoped due processing');
+assert.equal(generated.ok,true);
+assert.equal(generated.dueOccurrencesGenerated,1);
+assert.equal(rpc(`public.process_due_recurring_expenses_v2('${e}'::uuid,'${s}'::uuid,'${today}'::date,25)`,'due replay').dueOccurrencesGenerated,0);
 const due=rpc(`public.finance_recurring_workspace_v1('${e}'::uuid,'${s}'::uuid)`,'recurring due read');
 assert.equal(due.due.length,1);
 const occurrenceId=due.due[0].id;
