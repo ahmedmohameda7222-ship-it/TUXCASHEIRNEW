@@ -255,7 +255,7 @@ create or replace function public.post_recurring_expense_occurrence_v1(
   p_business_day_id uuid,p_finance_account_id uuid,p_reason text,
   p_command_id text
 ) returns jsonb language plpgsql security definer
-set search_path=pg_catalog,public,private as $
+set search_path=pg_catalog,public,private as $$
 declare
   v_business_id uuid;v_authorized boolean;
   v_occ public.recurring_expense_occurrences%rowtype;
@@ -293,7 +293,7 @@ begin
   where id=v_occ.id;
   return v_result||jsonb_build_object('occurrenceId',v_occ.id);
 end;
-$;
+$$;
 revoke all on function public.post_recurring_expense_occurrence_v1(uuid,uuid,uuid,uuid,uuid,text,text)
  from public,anon,authenticated;
 grant execute on function public.post_recurring_expense_occurrence_v1(uuid,uuid,uuid,uuid,uuid,text,text)
