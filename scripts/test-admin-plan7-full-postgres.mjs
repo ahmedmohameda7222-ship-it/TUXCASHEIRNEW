@@ -352,14 +352,17 @@ insert into public.orders(
  order_type_label_snapshot,order_type_behavior_snapshot,
  configured_delivery_fee_minor,final_delivery_fee_minor,
  items_subtotal_minor,discount_minor,total_minor,
- created_at,updated_at,operational_revision,service_charge_minor,tax_minor
+ created_at,updated_at,operational_revision,service_charge_minor,tax_minor,
+ cancelled_at,cancelled_by_worker_id,cancelled_by_worker_name_snapshot,
+ cancellation_reason,cancellation_food_prepared,cancellation_stock_restored
 ) values
  ('${paidOrder}','${s}','${newDay}',1,'aov-paid','POS','DONE',
  '${w}','Cashier','${orderType}','Takeaway','TAKE_AWAY',
- 0,0,10000,0,10000,now(),now(),0,0,0),
+ 0,0,10000,0,10000,now(),now(),0,0,0,null,null,null,null,null,null),
  ('${cancelledOrder}','${s}','${newDay}',2,'aov-cancelled','POS','CANCELLED',
  '${w}','Cashier','${orderType}','Takeaway','TAKE_AWAY',
- 0,0,5000,0,5000,now(),now(),0,0,0);
+ 0,0,5000,0,5000,now(),now(),0,0,0,
+ now(),'${w}','Cashier','AOV test cancellation',false,false);
 insert into public.payments(
  id,shop_id,order_id,part_index,payment_method_id,
  payment_method_label_snapshot,logic_type_snapshot,
