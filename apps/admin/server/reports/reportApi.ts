@@ -18,6 +18,7 @@ import {
   requireReportContextPermissions,
   REPORT_AREA_PERMISSION as reportDomainPermissions,
 } from './reportAuthorization.js';
+import { enrichReportDrilldowns } from './reportDrilldowns.js';
 
 const uuid = z.string().uuid();
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -336,12 +337,26 @@ export async function handleReportsRequest(
         rpcFailure(response, current);
         return;
       }
+      const canonicalRows = Array.isArray(current['rows'])
+        ? current['rows'].filter(
+            (row): row is { id: string; shopId: string; sourceKind: string } =>
+              row !== null &&
+              typeof row === 'object' &&
+              typeof row['id'] === 'string' &&
+              typeof row['shopId'] === 'string' &&
+              typeof row['sourceKind'] === 'string',
+          )
+        : [];
+      const currentWithDrilldowns = {
+        ...current,
+        rows: await enrichReportDrilldowns(canonicalRows, principal, client),
+      };
       const comparison = z
         .enum(['previous', 'week', 'month', 'year'])
         .nullable()
         .parse(query.get('compare'));
       if (comparison === null) {
-        sendJson(response, 200, current);
+        sendJson(response, 200, currentWithDrilldowns);
         return;
       }
       const days = Math.round((toUtc - fromUtc) / 86400000) + 1;
@@ -372,7 +387,7 @@ export async function handleReportsRequest(
         return;
       }
       sendJson(response, 200, {
-        ...current,
+        ...currentWithDrilldowns,
         comparison: {
           periodStart: previousFrom,
           periodEnd: previousTo,
