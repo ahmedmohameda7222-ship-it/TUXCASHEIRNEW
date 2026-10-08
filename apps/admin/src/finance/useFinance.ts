@@ -37,7 +37,11 @@ export type FinanceCommandResult = {
   readonly version?: number;
 };
 
-export function useFinance(shopId: string | undefined, accountId: string | null, movementId: string | null = null) {
+export function useFinance(
+  shopId: string | undefined,
+  accountId: string | null,
+  movementId: string | null = null,
+) {
   const session = useAdminSession();
   const client = useQueryClient();
   const namespace =
