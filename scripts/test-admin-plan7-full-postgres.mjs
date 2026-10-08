@@ -223,7 +223,7 @@ assert.equal(reportConfig.savedViews.length,1);
 sql(`update public.business_days set status='CLOSED',ended_at=now(),
   ended_by_worker_id='${w}' where id='${day}';`,'fixture Operations close');
 const cashier=rpc(`public.finance_reconcile_cashier_v1(
-  '${e}'::uuid,'${s}'::uuid,'${day}'::uuid,'${w}'::uuid,0,null::text,'count-zero')`,'cashier count');
+  '${e}'::uuid,'${s}'::uuid,'${day}'::uuid,'${w}'::uuid,750,'Documented cash overage','count-positive')`,'cashier count');
 assert.equal(cashier.ok,true);
 const z=rpc(`public.finance_finalize_day_v1(
   '${e}'::uuid,'${s}'::uuid,'${day}'::uuid,'finalize-after-ops')`,'finalize financial Z');
