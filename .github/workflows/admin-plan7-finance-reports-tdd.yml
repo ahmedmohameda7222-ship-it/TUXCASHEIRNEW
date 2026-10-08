@@ -1,0 +1,41 @@
+name: Admin Plan 7 Finance & Reports TDD
+
+concurrency:
+  group: admin-plan7-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/admin-07-finance-reports]
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'scripts/test-admin-plan7-**'
+      - 'apps/admin/**'
+      - 'packages/admin-contracts/**'
+      - '.github/workflows/admin-plan7-finance-reports-tdd.yml'
+
+jobs:
+  schema-invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24 }
+      - run: node scripts/test-admin-plan7-migration.mjs
+
+  regression:
+    needs: schema-invariants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:admin-security
+      - run: npm run test:admin-deployment
+      - run: npm run test:migrations
