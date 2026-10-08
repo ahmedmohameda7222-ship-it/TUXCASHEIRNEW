@@ -78,9 +78,7 @@ type MovementRow = {
   id: string;
   movement_type: string;
   amount_minor: string | number;
-  occurred_at: string;
-  note: string | null;
-  reference: string | null;
+  created_at: string;
 };
 
 function safeMinor(raw: string | number): number {
@@ -116,11 +114,11 @@ async function readAccountHistory(
   const rows = await client.select<MovementRow[]>(
     'finance_movements',
     new URLSearchParams({
-      select: 'id,movement_type,amount_minor,occurred_at,note,reference',
+      select: 'id,movement_type,amount_minor,created_at',
       business_id: `eq.${businessId}`,
       shop_id: `eq.${shopId}`,
       finance_account_id: `eq.${accountId}`,
-      order: 'occurred_at.desc,id.desc',
+      order: 'created_at.desc,id.desc',
       limit: '50',
     }),
   );
@@ -130,9 +128,7 @@ async function readAccountHistory(
       id: movement.id,
       label: movementLabels[movement.movement_type] ?? 'Account activity',
       amountMinor: safeMinor(movement.amount_minor),
-      occurredAt: movement.occurred_at,
-      note: movement.note,
-      reference: movement.reference,
+      occurredAt: movement.created_at,
     })),
   };
 }
