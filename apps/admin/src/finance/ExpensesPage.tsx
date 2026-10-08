@@ -8,6 +8,7 @@ import { useShopScope } from '../shops/ShopScopeProvider';
 import { formatEgp, parseEgpMinor } from './money';
 import { useFinance } from './useFinance';
 import { useFinanceOperations } from './useFinanceOperations';
+import { RecurringExpenses } from './RecurringExpenses';
 
 function cairoToday():string {
   const parts=new Intl.DateTimeFormat('en-US',{year:'numeric',month:'2-digit',
@@ -95,6 +96,9 @@ export function ExpensesPage() {
           <strong>{formatEgp(expense.amount_minor)}</strong>
         </li>)}
     </ul>
+    <RecurringExpenses shopId={shopId} accounts={accounts}
+      openBusinessDayId={availableDays[0]?.id??null} categories={categories}
+      canManage={canPost} />
     <AdminDialog open={open} onOpenChange={setOpen} variant="sheet"
       title="Record expense"
       description="This is a posted management expense. Historical records cannot be edited after posting."
