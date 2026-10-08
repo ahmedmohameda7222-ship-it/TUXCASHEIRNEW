@@ -169,6 +169,27 @@ export async function handleReportsRequest(
         .max(20000)
         .parse(query.get('offset') ?? '0');
       const source = z.enum(['POS', 'ONLINE']).nullable().parse(query.get('source'));
+      const contextSchema = z.object({
+        orderTypeId: uuid.optional(),
+        paymentMethodId: uuid.optional(),
+        workerId: uuid.optional(),
+        employeeId: uuid.optional(),
+        customerId: uuid.optional(),
+        productId: uuid.optional(),
+        categoryId: uuid.optional(),
+        promotionId: uuid.optional(),
+        supplierId: uuid.optional(),
+        deliveryZoneId: uuid.optional(),
+        status: z.string().regex(/^[A-Z_]{2,40}$/).optional(),
+      }).strict();
+      const context = contextSchema.parse(
+        Object.fromEntries(
+          ['orderTypeId','paymentMethodId','workerId','employeeId','customerId',
+           'productId','categoryId','promotionId','supplierId','deliveryZoneId','status']
+            .filter((key) => query.has(key))
+            .map((key) => [key, query.get(key)]),
+        ),
+      );
       const args = {
         p_actor_employee_id: principal.employeeId,
         p_shop_ids: selected,
@@ -178,23 +199,38 @@ export async function handleReportsRequest(
         p_page_limit: pageSize,
         p_offset: offset,
         p_source: source,
+        p_context: context,
       };
       const current = await client.rpc<Record<string, unknown>>(
-        'admin_finance_report_query_v1',
+        'admin_finance_report_query_v2',
         args,
       );
       if (current['ok'] !== true) {
         rpcFailure(response, current);
         return;
       }
-      if (query.get('compare') !== 'previous') {
+      const comparison = z.enum(['previous','week','month','year']).nullable().parse(query.get('compare'));
+      if (comparison === null) {
         sendJson(response, 200, current);
         return;
       }
       const days = Math.round((toUtc - fromUtc) / 86400000) + 1;
-      const previousTo = dateLabel(fromUtc - 86400000);
-      const previousFrom = dateLabel(fromUtc - days * 86400000);
-      const previous = await client.rpc<Record<string, unknown>>('admin_finance_report_query_v1', {
+      let previousTo = dateLabel(fromUtc - 86400000);
+      let previousFrom = dateLabel(fromUtc - days * 86400000);
+      if (comparison === 'week') {
+        previousFrom = dateLabel(fromUtc - 7 * 86400000);
+      } else if (comparison === 'month') {
+        const firstDay = new Date(fromUtc);
+        const start = Date.UTC(firstDay.getUTCFullYear(), firstDay.getUTCMonth() - 1, 1);
+        const end = Date.UTC(firstDay.getUTCFullYear(), firstDay.getUTCMonth(), 1) - 86400000;
+        previousFrom = dateLabel(start);
+        previousTo = dateLabel(end);
+      } else if (comparison === 'year') {
+        const y = new Date(fromUtc).getUTCFullYear() - 1;
+        previousFrom = dateLabel(Date.UTC(y,0,1));
+        previousTo = dateLabel(Date.UTC(y,11,31));
+      }
+      const previous = await client.rpc<Record<string, unknown>>('admin_finance_report_query_v2', {
         ...args,
         p_start_date: previousFrom,
         p_end_date: previousTo,
