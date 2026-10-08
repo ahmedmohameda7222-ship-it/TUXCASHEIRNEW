@@ -16,6 +16,16 @@ function readableError(error: unknown): string | null {
   return raw.trim().replaceAll('_', ' ').replaceAll('-', ' ') || 'Staff action failed';
 }
 
+function roleLabel(role: string): string {
+  return role === 'OWNER'
+    ? 'Owner'
+    : role === 'ADMIN'
+      ? 'Administrator'
+      : role === 'MANAGER'
+        ? 'Manager'
+        : 'Staff';
+}
+
 export function StaffPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
@@ -26,12 +36,8 @@ export function StaffPage() {
   const [newEmployeePhone, setNewEmployeePhone] = useState('');
   const staff = useStaff(shopId, selectedId);
   const shopChoices = useMemo(
-    () =>
-      principal.shopIds.map((id, index) => ({
-        id,
-        name: id === shopId ? 'Current shop' : `Shop ${index + 1}`,
-      })),
-    [principal.shopIds, shopId],
+    () => staff.workspaceQuery.data?.shops ?? [],
+    [staff.workspaceQuery.data?.shops],
   );
 
   const rows = useMemo(
@@ -146,7 +152,7 @@ export function StaffPage() {
                 <span>
                   <strong>{employee.displayName}</strong>
                   <small>
-                    {employee.role} · {employee.shopIds.length} shop
+                    {roleLabel(employee.role)} · {employee.shopIds.length} shop
                     {employee.shopIds.length === 1 ? '' : 's'}
                   </small>
                 </span>

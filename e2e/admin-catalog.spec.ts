@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { ADMIN_WIDE_TABLET_VIEWPORTS } from './adminViewports';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const categoryId = '22222222-2222-4222-8222-222222222222';
@@ -190,11 +191,7 @@ async function mockCatalog(page: Page) {
   return { commands };
 }
 
-for (const viewport of [
-  { name: 'phone', width: 390, height: 844 },
-  { name: 'tablet', width: 900, height: 1024 },
-  { name: 'desktop', width: 1440, height: 1000 },
-] as const) {
+for (const viewport of ADMIN_WIDE_TABLET_VIEWPORTS) {
   test(`catalog uses the approved ${viewport.name} management layout`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await mockCatalog(page);
@@ -208,17 +205,24 @@ for (const viewport of [
     if (viewport.name === 'phone') {
       await expect(inspector).toBeHidden();
       await page.getByRole('button', { name: /Classic Smash/ }).click();
+      await expect(page).toHaveURL(new RegExp(`/catalog/products/${productId}$`));
       await expect(list).toBeHidden();
       await expect(inspector).toBeVisible();
       await expect(page.getByRole('button', { name: 'Products' })).toBeVisible();
+      await page.getByRole('button', { name: 'More' }).click();
+      await expect(page.getByText('Recipe / Inventory')).toBeVisible();
+      await expect(page.getByText('Shop Overrides')).toBeVisible();
+      await page.reload();
+      await expect(inspector).toBeVisible();
+      await page.getByRole('button', { name: 'Products' }).click();
+      await expect(page).toHaveURL(/\/catalog\/products$/);
     } else {
       await expect(inspector).toBeVisible();
       await expect(page.getByRole('button', { name: 'Products' })).toBeHidden();
+      await page.getByRole('button', { name: 'More' }).click();
+      await expect(page.getByText('Recipe / Inventory')).toBeVisible();
+      await expect(page.getByText('Shop Overrides')).toBeVisible();
     }
-
-    await page.getByRole('button', { name: 'More' }).click();
-    await expect(page.getByText('Recipe / Inventory')).toBeVisible();
-    await expect(page.getByText('Shop Overrides')).toBeVisible();
   });
 }
 

@@ -47,8 +47,8 @@ export function resolveWorkspaceSetting(
 }
 
 export function settingSourceLabel(source: EffectiveSetting['source']): string {
-  if (source === 'shop') return 'Shop override';
-  if (source === 'business') return 'Business default';
+  if (source === 'shop') return 'Shop setting';
+  if (source === 'business') return 'Business setting';
   return 'Not configured';
 }
 
@@ -61,4 +61,48 @@ export function displaySettingValue(value: unknown): string {
   } catch {
     return '—';
   }
+}
+
+function parseDecimal(raw: string, label: string): number {
+  const normalized = raw.trim();
+  if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) {
+    throw new Error(`${label} must use no more than two decimal places.`);
+  }
+  return Number(normalized);
+}
+
+export function formatMinorAsEgp(value: unknown): string {
+  return typeof value === 'number' && Number.isSafeInteger(value) ? (value / 100).toFixed(2) : '';
+}
+
+export function parseEgpToMinor(raw: string): number {
+  const value = parseDecimal(raw, 'Amount');
+  const minor = Math.round(value * 100);
+  if (!Number.isSafeInteger(minor)) throw new Error('Enter a valid amount.');
+  return minor;
+}
+
+export function formatBasisPointsAsPercent(value: unknown): string {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value)) return '';
+  return (value / 100).toFixed(2);
+}
+
+export function parsePercentToBasisPoints(raw: string): number {
+  const value = parseDecimal(raw, 'Percentage');
+  if (value > 100) throw new Error('Percentage must be between 0 and 100.');
+  return Math.round(value * 100);
+}
+
+export function sortOrderAfterMove(
+  rows: readonly { id: string; sortOrder: number }[],
+  currentId: string,
+  direction: 'up' | 'down',
+): number {
+  const ordered = [...rows].sort((left, right) => left.sortOrder - right.sortOrder);
+  const position = ordered.findIndex((row) => row.id === currentId);
+  const current = ordered[position];
+  if (!current) return 0;
+  const adjacent = ordered[position + (direction === 'up' ? -1 : 1)];
+  if (!adjacent) return current.sortOrder;
+  return direction === 'up' ? Math.max(0, adjacent.sortOrder - 1) : adjacent.sortOrder + 1;
 }

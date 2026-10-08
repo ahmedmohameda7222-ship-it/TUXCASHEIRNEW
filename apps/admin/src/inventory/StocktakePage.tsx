@@ -30,6 +30,7 @@ export function StocktakePage({
 }) {
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const [actualByItem, setActualByItem] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState('');
 
   const parsed = snapshot.lines.map((line) => ({
     line,
@@ -37,12 +38,16 @@ export function StocktakePage({
     actualMicros: toMicros(actualByItem[line.inventoryItemId] ?? ''),
   }));
   const valid = parsed.every((entry) => entry.item && entry.actualMicros !== null);
+  const counted = parsed.filter((entry) => entry.actualMicros !== null).length;
+  const visible = parsed.filter((entry) =>
+    entry.item?.name.toLowerCase().includes(search.trim().toLowerCase()),
+  );
 
   return (
     <section className="admin-inventory-workflow" aria-labelledby="inventory-stocktake-title">
       <div className="admin-inventory-workflow__header">
         <div>
-          <p className="admin-page__eyebrow">Frozen count boundary</p>
+          <p className="admin-page__eyebrow">Physical stock check</p>
           <h2 id="inventory-stocktake-title">Stock count</h2>
         </div>
         <button className="admin-secondary-button" type="button" onClick={onBack}>
@@ -52,17 +57,28 @@ export function StocktakePage({
 
       <div className="admin-inventory-policy-grid">
         <div>
-          <span>Count boundary</span>
-          <strong>Captured before counting</strong>
+          <span>Progress</span>
+          <strong>
+            {counted} / {parsed.length} counted
+          </strong>
         </div>
         <div>
-          <span>Concurrent movements</span>
-          <strong>Preserved after the snapshot</strong>
+          <span>Expected quantities</span>
+          <strong>Captured when this count started</strong>
         </div>
       </div>
 
+      <label className="admin-field">
+        <span>Search items</span>
+        <input
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.currentTarget.value)}
+        />
+      </label>
+
       <div className="admin-inventory-stocktake-list">
-        {parsed.map(({ line, item, actualMicros }) => {
+        {visible.map(({ line, item, actualMicros }) => {
           if (!item) return null;
           const variance = actualMicros === null ? null : actualMicros - line.snapshotOnHandMicros;
           const valueVariance =
@@ -75,11 +91,11 @@ export function StocktakePage({
               </div>
               <dl>
                 <div>
-                  <dt>Snapshot on hand</dt>
+                  <dt>Expected stock</dt>
                   <dd>{formatQuantity(line.snapshotOnHandMicros, item.unitLabel)}</dd>
                 </div>
                 <div>
-                  <dt>Snapshot reserved</dt>
+                  <dt>Reserved</dt>
                   <dd>{formatQuantity(line.snapshotReservedMicros, item.unitLabel)}</dd>
                 </div>
               </dl>
@@ -99,20 +115,20 @@ export function StocktakePage({
                 />
               </label>
               <div className="admin-inventory-variance">
-                <span>Count vs snapshot</span>
+                <span>Difference</span>
                 <strong>
                   {variance === null ? '—' : formatQuantity(variance, item.unitLabel)}
                 </strong>
-                <span>Snapshot value delta</span>
+                <span>Estimated value difference</span>
                 <strong>
                   {valueVariance === null
                     ? '—'
-                    : new Intl.NumberFormat('en-US', {
+                    : `${new Intl.NumberFormat('en-US', {
                         maximumFractionDigits: 2,
-                      }).format(valueVariance)}
+                      }).format(valueVariance / 100)} EGP`}
                 </strong>
-                <span>Snapshot comparison only</span>
-                <strong>Final posted adjustment uses live on-hand at posting</strong>
+                <span>Posting</span>
+                <strong>Current stock movements remain preserved</strong>
               </div>
             </article>
           );

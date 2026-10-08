@@ -4,6 +4,13 @@ function units(value: number, unitLabel: string): string {
   return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(value / 1_000_000)} ${unitLabel}`;
 }
 
+function statusLabel(status: AdminPurchaseOrder['status']): string {
+  return status
+    .replaceAll('_', ' ')
+    .toLowerCase()
+    .replace(/^./, (letter) => letter.toUpperCase());
+}
+
 export function PurchaseOrderPage({
   order,
   canManage,
@@ -30,19 +37,15 @@ export function PurchaseOrderPage({
     <section className="admin-card" aria-label="Purchase order detail">
       <div className="admin-inventory-list__header">
         <span>
-          <strong>{order.reference ?? order.id.slice(0, 8)}</strong>
+          <strong>{order.reference ?? `Purchase order · ${order.supplierName}`}</strong>
           <small>{order.supplierName}</small>
         </span>
-        <strong>{order.status.replaceAll('_', ' ')}</strong>
+        <strong>{statusLabel(order.status)}</strong>
       </div>
       <dl className="admin-definition-grid">
         <div>
           <dt>Expected delivery</dt>
           <dd>{order.expectedDeliveryDate ?? 'Not set'}</dd>
-        </div>
-        <div>
-          <dt>Version</dt>
-          <dd>{order.version}</dd>
         </div>
       </dl>
       <div className="admin-card-grid">

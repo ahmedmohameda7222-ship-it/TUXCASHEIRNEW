@@ -14,7 +14,7 @@
 .admin-disclosure-button,
 .admin-catalog-back,
 .admin-danger-link {
-  min-height: var(--admin-touch-min, 44px);
+  min-height: var(--tux-touch-target);
   border: 1px solid var(--tux-border-subtle);
   border-radius: 12px;
   padding: 0 14px;
@@ -44,7 +44,7 @@
   margin-bottom: 16px;
   padding: 14px 16px;
   border: 1px solid var(--tux-border-subtle);
-  border-radius: var(--admin-radius-card, 16px);
+  border-radius: var(--tux-radius-lg);
   background: var(--tux-surface-panel);
 }
 
@@ -109,7 +109,7 @@
   gap: 6px;
   padding: 24px;
   border: 1px dashed var(--tux-border-strong);
-  border-radius: var(--admin-radius-card, 16px);
+  border-radius: var(--tux-radius-lg);
   color: var(--tux-text-secondary);
   text-align: center;
 }
@@ -149,7 +149,7 @@
 .admin-catalog-inspector {
   min-width: 0;
   border: 1px solid var(--tux-border-subtle);
-  border-radius: var(--admin-radius-card, 16px);
+  border-radius: var(--tux-radius-lg);
   background: var(--tux-surface-panel);
   box-shadow: var(--tux-shadow-sm);
 }
@@ -354,10 +354,25 @@
 .admin-catalog-editor__eyebrow {
   margin: 0 0 4px;
   color: var(--tux-text-secondary);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--tux-font-size-xs);
+  font-weight: 750;
+  letter-spacing: 0.01em;
+}
+
+.admin-product-image-state {
+  display: grid;
+  gap: var(--tux-space-1);
+  min-height: 88px;
+  align-content: center;
+  padding: var(--tux-space-4);
+  border: 1px dashed var(--tux-border-strong);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-subtle);
+}
+
+.admin-product-image-state span {
+  color: var(--tux-text-secondary);
+  font-size: var(--tux-font-size-sm);
 }
 
 .admin-catalog-editor__currency {

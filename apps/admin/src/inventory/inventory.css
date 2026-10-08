@@ -17,7 +17,7 @@
 .admin-inventory-sheet,
 .admin-inventory-item {
   border: 1px solid var(--tux-border-subtle);
-  border-radius: var(--admin-radius-card, 16px);
+  border-radius: var(--tux-radius-lg);
   background: var(--tux-surface-panel);
 }
 
@@ -251,4 +251,31 @@
   .admin-inventory-page-actions > button {
     flex: 1;
   }
+}
+
+.admin-inventory-more-actions {
+  position: relative;
+}
+
+.admin-inventory-more-actions summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.admin-inventory-more-actions summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-inventory-more-actions > div {
+  position: absolute;
+  z-index: 10;
+  inset-inline-end: 0;
+  top: calc(100% + 0.35rem);
+  display: grid;
+  min-width: 13rem;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-control);
+  background: var(--tux-surface-panel);
 }

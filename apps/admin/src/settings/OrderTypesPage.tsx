@@ -1,6 +1,7 @@
 import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
 import { useState, type FormEvent } from 'react';
 
+import { sortOrderAfterMove } from './settingsModel';
 import type { OrderTypeUpdateDraft } from './useSettings';
 
 export type OrderTypesPageProps = {
@@ -8,6 +9,13 @@ export type OrderTypesPageProps = {
   updating: boolean;
   onUpdate(draft: OrderTypeUpdateDraft): void | Promise<void>;
 };
+
+function behaviorLabel(behavior: AdminSettingsWorkspace['orderTypes'][number]['behavior']): string {
+  if (behavior === 'TAKE_AWAY') return 'Take Away';
+  if (behavior === 'DINE_IN') return 'Dine In';
+  if (behavior === 'DELIVERY') return 'Delivery';
+  return 'Other';
+}
 
 export function OrderTypesPage({ workspace, updating, onUpdate }: OrderTypesPageProps) {
   const [draft, setDraft] = useState<OrderTypeUpdateDraft | null>(null);
@@ -37,19 +45,24 @@ export function OrderTypesPage({ workspace, updating, onUpdate }: OrderTypesPage
     <section className="admin-settings-section" aria-labelledby="settings-order-types-title">
       <div className="admin-settings-section__header">
         <div>
-          <p className="admin-settings-kicker">Canonical fulfillment authority</p>
+          <p className="admin-settings-kicker">Ways customers receive orders</p>
           <h2 id="settings-order-types-title">Order types</h2>
         </div>
         <span className="admin-status-pill">{workspace.orderTypes.length} configured</span>
       </div>
       <p className="admin-settings-muted">
-        These are the existing canonical order types consumed by Operations and online ordering.
-        Changes remain draft settings until you publish.
+        Choose the name, behavior, availability, and display position for each order type.
       </p>
       <div className="admin-settings-list">
         {workspace.orderTypes.map((orderType) => {
           if (draft?.orderTypeId === orderType.id) {
             const activeId = `order-type-active-${orderType.id}`;
+            const ordered = [...workspace.orderTypes].sort(
+              (left, right) => left.sortOrder - right.sortOrder,
+            );
+            const position = ordered.findIndex((item) => item.id === orderType.id);
+            const previous = position > 0 ? ordered[position - 1] : undefined;
+            const next = position < ordered.length - 1 ? ordered[position + 1] : undefined;
             return (
               <form
                 className="admin-settings-row admin-settings-row--stack"
@@ -81,26 +94,59 @@ export function OrderTypesPage({ workspace, updating, onUpdate }: OrderTypesPage
                         setDraft((current) => (current ? { ...current, behavior } : current));
                       }}
                     >
-                      <option value="TAKE_AWAY">Take away</option>
-                      <option value="DINE_IN">Dine in</option>
+                      <option value="TAKE_AWAY">Take Away</option>
+                      <option value="DINE_IN">Dine In</option>
                       <option value="DELIVERY">Delivery</option>
                       <option value="OTHER">Other</option>
                     </select>
                   </label>
-                  <label className="admin-field">
-                    <span>Sort order</span>
-                    <input
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={draft.sortOrder}
-                      disabled={updating}
-                      onChange={(event) => {
-                        const sortOrder = Number(event.currentTarget.value);
-                        setDraft((current) => (current ? { ...current, sortOrder } : current));
-                      }}
-                    />
-                  </label>
+                  <div className="admin-field">
+                    <span>Display position</span>
+                    <div className="admin-settings-row__main">
+                      <button
+                        className="admin-secondary-button"
+                        type="button"
+                        disabled={updating || !previous}
+                        onClick={() =>
+                          setDraft((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  sortOrder: sortOrderAfterMove(
+                                    workspace.orderTypes,
+                                    orderType.id,
+                                    'up',
+                                  ),
+                                }
+                              : current,
+                          )
+                        }
+                      >
+                        Move up
+                      </button>
+                      <button
+                        className="admin-secondary-button"
+                        type="button"
+                        disabled={updating || !next}
+                        onClick={() =>
+                          setDraft((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  sortOrder: sortOrderAfterMove(
+                                    workspace.orderTypes,
+                                    orderType.id,
+                                    'down',
+                                  ),
+                                }
+                              : current,
+                          )
+                        }
+                      >
+                        Move down
+                      </button>
+                    </div>
+                  </div>
                   <label className="admin-check-field" htmlFor={activeId}>
                     <input
                       id={activeId}
@@ -136,9 +182,7 @@ export function OrderTypesPage({ workspace, updating, onUpdate }: OrderTypesPage
             <div className="admin-settings-row" key={orderType.id}>
               <div>
                 <strong>{orderType.name}</strong>
-                <span>
-                  {orderType.behavior} · sort {orderType.sortOrder}
-                </span>
+                <span>{behaviorLabel(orderType.behavior)}</span>
               </div>
               <div className="admin-settings-row__main">
                 <span

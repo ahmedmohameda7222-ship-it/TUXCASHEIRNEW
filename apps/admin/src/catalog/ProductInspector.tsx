@@ -37,9 +37,9 @@ export function ProductInspector({
           <h2>{product.name}</h2>
         </div>
         {draftRevision === null ? (
-          <span className="admin-status-pill is-muted">Live version</span>
+          <span className="admin-status-pill is-muted">Live</span>
         ) : (
-          <span className="admin-status-pill">Draft r{draftRevision}</span>
+          <span className="admin-status-pill">Draft changes</span>
         )}
       </header>
       <ProductEditor

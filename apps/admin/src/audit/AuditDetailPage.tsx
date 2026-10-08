@@ -20,11 +20,26 @@ export type AuditDetailViewModel = {
   createdAtLabel: string;
 };
 
-function humanizeKey(key: string): string {
-  return key
+export function auditLabel(key: string): string {
+  const label = key
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/[._-]+/g, ' ')
-    .replace(/^./, (character) => character.toUpperCase());
+    .toLowerCase();
+  return label.replace(/^./, (character) => character.toUpperCase());
+}
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const auditNumberFormatter = new Intl.NumberFormat('en-EG', { maximumFractionDigits: 6 });
+
+export function displayAuditValue(value: unknown): string {
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'number') return auditNumberFormatter.format(value);
+  if (typeof value === 'string') {
+    if (uuidPattern.test(value)) return 'Internal record';
+    if (/^[A-Z][A-Z0-9_]*$/.test(value)) return auditLabel(value);
+    return value;
+  }
+  return String(value ?? '—');
 }
 
 type ChangeRow = { label: string; value: string };
@@ -48,12 +63,12 @@ function appendValueRows(value: unknown, label: string, rows: ChangeRow[]): void
       return;
     }
     for (const [key, child] of entries) {
-      appendValueRows(child, `${label ? `${label} · ` : ''}${humanizeKey(key)}`, rows);
+      appendValueRows(child, `${label ? `${label} · ` : ''}${auditLabel(key)}`, rows);
     }
     return;
   }
 
-  rows.push({ label: label || 'Value', value: String(value ?? '—') });
+  rows.push({ label: label || 'Value', value: displayAuditValue(value) });
 }
 
 function valueRows(value: unknown): ChangeRow[] {
@@ -86,14 +101,16 @@ export function AuditDetailPage({ event }: { event: AuditDetailViewModel }) {
     <article className="admin-audit-detail" aria-labelledby={`audit-${event.id}`}>
       <header>
         <p className="admin-catalog-editor__eyebrow">Audit event</p>
-        <h2 id={`audit-${event.id}`}>{humanizeKey(event.actionType)}</h2>
+        <h2 id={`audit-${event.id}`}>
+          {event.actorLabel} · {auditLabel(event.actionType)}
+        </h2>
         <p>{event.createdAtLabel}</p>
       </header>
       <dl className="admin-audit-facts">
         <div>
           <dt>Actor</dt>
           <dd>
-            {event.actorLabel} · {event.actorRole}
+            {event.actorLabel} · {auditLabel(event.actorRole)}
           </dd>
         </div>
         <div>
@@ -101,35 +118,54 @@ export function AuditDetailPage({ event }: { event: AuditDetailViewModel }) {
           <dd>{event.shopName}</dd>
         </div>
         <div>
-          <dt>Entity</dt>
-          <dd>{event.entityType ? `${event.entityType} · ${event.entityId ?? '—'}` : '—'}</dd>
+          <dt>Activity</dt>
+          <dd>{event.entityType ? auditLabel(event.entityType) : 'General activity'}</dd>
         </div>
         <div>
           <dt>Approval</dt>
           <dd>
             {event.approvalRequestId ? (
               <>
-                <span>{event.approvalRequestId}</span>
-                <span> · Requester: {event.requesterName ?? 'Unknown'}</span>
-                <span> · Approver: {event.approverName ?? 'Not decided'}</span>
-                <span> · Status: {event.approvalStatus ?? 'Unknown'}</span>
+                <span>Requested by {event.requesterName ?? 'Unknown'}</span>
+                <span> · Approved by {event.approverName ?? 'Not decided'}</span>
+                <span>
+                  {' '}
+                  · {event.approvalStatus ? auditLabel(event.approvalStatus) : 'Unknown status'}
+                </span>
               </>
             ) : (
               'Not linked'
             )}
           </dd>
         </div>
-        <div>
-          <dt>Session</dt>
-          <dd>{event.sessionId ?? 'Not recorded'}</dd>
-        </div>
       </dl>
       {event.reason ? <p>Reason: {event.reason}</p> : null}
       <div className="admin-audit-change-grid">
         <ChangeList title="Before" value={event.beforeValue} />
         <ChangeList title="After" value={event.afterValue} />
-        <ChangeList title="Context" value={event.contextMetadata} />
       </div>
+      <details className="admin-audit-technical">
+        <summary>Technical details</summary>
+        <dl className="admin-audit-facts">
+          <div>
+            <dt>Event reference</dt>
+            <dd>{event.id}</dd>
+          </div>
+          <div>
+            <dt>Record reference</dt>
+            <dd>{event.entityId ?? 'Not recorded'}</dd>
+          </div>
+          <div>
+            <dt>Approval reference</dt>
+            <dd>{event.approvalRequestId ?? 'Not linked'}</dd>
+          </div>
+          <div>
+            <dt>Session reference</dt>
+            <dd>{event.sessionId ?? 'Not recorded'}</dd>
+          </div>
+        </dl>
+        <ChangeList title="Additional context" value={event.contextMetadata} />
+      </details>
     </article>
   );
 }

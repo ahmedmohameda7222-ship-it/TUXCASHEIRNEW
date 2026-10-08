@@ -29,8 +29,8 @@ export function ScheduleEditor({ preview, disabled, isPending, onSchedule }: Sch
       </div>
 
       <p className="admin-publish-card__copy">
-        Store the intended Cairo wall-clock time. The trusted scheduler resolves and executes the
-        canonical activation with the draft revision and live-version fence shown above.
+        Choose when these reviewed changes should become live. Times use the shop&apos;s Cairo
+        timezone.
       </p>
 
       <form className="admin-publish-schedule-form" onSubmit={(event) => void submit(event)}>

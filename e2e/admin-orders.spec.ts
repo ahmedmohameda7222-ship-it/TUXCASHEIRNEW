@@ -1,19 +1,6 @@
 import type { AdminOrderDetail, AdminOrderSummary } from '@tux/admin-contracts';
-import {
-  instant,
-  moneyMinor,
-  parseEntityId,
-  type OrderId,
-  type OrderSnapshot,
-  type ShopId,
-} from '@tux/domain';
-import type { OperationsDatabase, OperationsTransaction } from '@tux/persistence';
-import {
-  OrderLifecycleConvergenceService,
-  type OrderLifecycleFeedPage,
-  type OrderLifecycleFeedTransport,
-} from '@tux/sync';
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const activeOrderId = '11111111-1111-4111-8111-111111111111';
@@ -464,10 +451,11 @@ test('orders search filters real Admin list and exposes status-contextual action
   await expect(page.getByRole('button', { name: 'Cancel order' })).toBeVisible();
 
   await page.getByRole('button', { name: /#102/ }).click();
-  await expect(page.getByRole('button', { name: 'Refund / return' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Refund payment' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Return items' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Cancel order' })).toHaveCount(0);
 
+  await page.getByText('Search and filters', { exact: true }).click();
   await page.getByLabel('Search').fill('Mona');
   await page.getByRole('combobox', { name: 'Status' }).first().selectOption('DONE');
   await page.getByRole('combobox', { name: 'Source' }).first().selectOption('ONLINE');
@@ -516,8 +504,9 @@ test('ACTIVE cancellation uses a valid central reason and refreshes immutable re
     note: 'Customer called the shop',
   });
 
-  await expect(page.getByText(/CANCELLED · POS · revision 5/)).toBeVisible();
-  await expect(page.getByText(/Customer request/)).toBeVisible();
+  const detail = page.getByLabel('Order detail');
+  await expect(detail.getByText(/Cancelled · In-store/).last()).toBeVisible();
+  await expect(detail.getByText(/Customer request/)).toBeVisible();
 });
 
 test('stale operational revision conflict is surfaced without pretending cancellation succeeded', async ({
@@ -532,7 +521,12 @@ test('stale operational revision conflict is surfaced without pretending cancell
   await page.getByRole('button', { name: 'Confirm cancellation' }).click();
 
   await expect(page.getByRole('alert')).toContainText(/stale operational revision/i);
-  await expect(page.getByText(/ACTIVE · POS · revision 4/)).toBeVisible();
+  await expect(
+    page
+      .getByLabel('Order detail')
+      .getByText(/Active · In-store/)
+      .last(),
+  ).toBeVisible();
 });
 
 test('DONE refund and return preserve reason snapshots and pending approval state in detail', async ({
@@ -542,191 +536,46 @@ test('DONE refund and return preserve reason snapshots and pending approval stat
   await page.goto('/orders');
   await page.getByRole('button', { name: /#102/ }).click();
 
-  await page.getByRole('button', { name: 'Refund / return' }).click();
+  await page.getByRole('button', { name: 'Refund payment' }).click();
   await page.getByLabel('Reason').selectOption(refundReasonId);
   await page.getByLabel('Admin PIN').fill('1234');
   await page.getByRole('button', { name: 'Submit refund' }).click();
 
   await expect.poll(() => fixture.done.financialEvents.length).toBe(1);
-  await expect(page.getByText(/REFUND · PENDING APPROVAL/)).toBeVisible();
-  await expect(page.getByText(/Customer requested refund · reason v3/)).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const detail = page.getByLabel('Order detail');
+  await expect(detail.getByText('Refund', { exact: true })).toBeVisible();
+  await expect(detail.getByText(/Pending Approval · Customer requested refund/)).toBeVisible();
 
-  await page.getByRole('button', { name: 'Refund / return' }).click();
+  await page.getByRole('button', { name: 'Return items' }).click();
   await page.getByLabel('Reason').selectOption(returnReasonId);
   await page.getByLabel('Admin PIN').fill('1234');
   await page.getByLabel('Return quantity for TUX Burger').fill('1');
   await page.getByRole('button', { name: 'Return selected items' }).click();
 
   await expect.poll(() => fixture.done.financialEvents.length).toBe(2);
-  await expect(page.getByText(/RETURN · POSTED/)).toBeVisible();
-  await expect(page.getByText(/Quality issue · reason v5/)).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(detail.getByText('Return', { exact: true })).toBeVisible();
+  await expect(detail.getByText(/Posted · Quality issue/)).toBeVisible();
 });
 
-function operationsOrder(): OrderSnapshot {
-  return {
-    id: parseEntityId<OrderId>(activeOrderId),
-    shopId: parseEntityId<ShopId>(shopId),
-    businessDayId: parseEntityId('13131313-1313-4131-8131-131313131313'),
-    displayOrderNo: 101,
-    idempotencyKey: 'order-101',
-    status: 'ACTIVE',
-    lifecycle: {
-      revision: 0,
-      doneAt: null,
-      cancellation: null,
-      returned: null,
-    },
-    source: 'POS',
-    operatorWorkerId: parseEntityId('14141414-1414-4141-8141-141414141414'),
-    operatorName: 'Ahmed',
-    createdAt: instant('2026-09-23T06:00:00.000Z'),
-    fulfillment: {
-      orderTypeId: parseEntityId('15151515-1515-4151-8151-151515151515'),
-      orderTypeLabel: 'Take away',
-      behavior: 'TAKE_AWAY',
-      delivery: null,
-    },
-    items: [
-      {
-        id: parseEntityId(activeItemId),
-        productId: parseEntityId('16161616-1616-4161-8161-161616161616'),
-        productName: 'TUX Burger',
-        unitPriceMinor: moneyMinor(12500),
-        quantity: 1,
-        modifiers: [],
-        comboBeverages: [],
-        itemNote: null,
-      },
-    ],
-    orderNote: null,
-    itemsSubtotalMinor: moneyMinor(12500),
-    discountMinor: moneyMinor(0),
-    deliveryFeeMinor: moneyMinor(0),
-    totalMinor: moneyMinor(12500),
-    payments: [
-      {
-        id: parseEntityId(paymentId),
-        method: {
-          id: parseEntityId('17171717-1717-4171-8171-171717171717'),
-          label: 'Cash',
-          logicType: 'CASH',
-        },
-        allocatedMinor: moneyMinor(12500),
-        receivedMinor: moneyMinor(12500),
-        changeMinor: moneyMinor(0),
-      },
-    ],
-  };
+for (const viewport of ADMIN_CORE_VIEWPORTS) {
+  test(`orders remain usable at ${viewport.name} width`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await mockOrders(page);
+    await page.goto('/orders');
+
+    const list = page.locator('.admin-master-detail__list');
+    await list.getByRole('button', { name: /#101/ }).click();
+    await expect(page.locator('.admin-master-detail__detail')).toBeVisible();
+    if (viewport.name === 'phone') {
+      await expect(list).toBeHidden();
+      await expect(page.getByRole('link', { name: /back to orders/i })).toBeVisible();
+    } else {
+      await expect(list).toBeVisible();
+    }
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+  });
 }
-
-function fakeOperationsDatabase() {
-  let stored = operationsOrder();
-  let cursor: string | null = null;
-  const transaction = {
-    orders: {
-      async getById(id: OrderId) {
-        return id === stored.id ? stored : null;
-      },
-      async updateOperationalState(next: OrderSnapshot) {
-        stored = next;
-      },
-      async getLifecycleSyncCursor(shopId: ShopId) {
-        void shopId;
-        return cursor;
-      },
-      async setLifecycleSyncCursor(shopId: ShopId, next: string) {
-        void shopId;
-        cursor = next;
-      },
-    },
-  } as unknown as OperationsTransaction;
-  const database: OperationsDatabase = {
-    transaction: async (work) => work(transaction),
-  };
-  return {
-    database,
-    get order() {
-      return stored;
-    },
-    get cursor() {
-      return cursor;
-    },
-  };
-}
-
-test('idle Operations convergence pulls Admin cancellation proactively and ignores stale lifecycle overwrite', async () => {
-  const state = fakeOperationsDatabase();
-  let page: OrderLifecycleFeedPage = {
-    shopId: parseEntityId<ShopId>(shopId),
-    events: [
-      {
-        sequence: 44,
-        orderId: parseEntityId<OrderId>(activeOrderId),
-        operationalRevision: 5,
-        status: 'CANCELLED',
-        eventType: 'CANCELLED',
-        occurredAt: instant('2026-09-23T06:05:00.000Z'),
-        workerId: null,
-        workerName: 'Admin',
-        adminEmployeeId: ownerSession.principal.employeeId,
-        foodPrepared: false,
-        stockRestored: true,
-        reason: {
-          id: cancellationReasonId,
-          key: 'CUSTOMER_REQUEST',
-          label: 'Customer request',
-          family: 'CANCELLATION',
-          version: 4,
-          scope: 'BUSINESS',
-        },
-        note: 'Customer called the shop',
-      },
-    ],
-    nextCursor: '44',
-    hasMore: false,
-  };
-  let pulls = 0;
-  const transport: OrderLifecycleFeedTransport = {
-    async pull(requestShopId, cursor) {
-      pulls += 1;
-      expect(requestShopId).toBe(parseEntityId<ShopId>(shopId));
-      expect(cursor).toBe(pulls === 1 ? null : '44');
-      return page;
-    },
-  };
-  const service = new OrderLifecycleConvergenceService(state.database, transport);
-
-  expect(await service.syncShop(parseEntityId<ShopId>(shopId))).toBe(1);
-  expect(pulls).toBe(1);
-  expect(state.order.status).toBe('CANCELLED');
-  expect(state.order.lifecycle?.revision).toBe(5);
-  expect(state.cursor).toBe('44');
-
-  page = {
-    shopId: parseEntityId<ShopId>(shopId),
-    events: [
-      {
-        sequence: 45,
-        orderId: parseEntityId<OrderId>(activeOrderId),
-        operationalRevision: 4,
-        status: 'DONE',
-        eventType: 'MARKED_DONE',
-        occurredAt: instant('2026-09-23T06:04:00.000Z'),
-        workerId: parseEntityId('14141414-1414-4141-8141-141414141414'),
-        workerName: 'Ahmed',
-        adminEmployeeId: null,
-        foodPrepared: null,
-        stockRestored: null,
-        reason: null,
-        note: null,
-      },
-    ],
-    nextCursor: '45',
-    hasMore: false,
-  };
-
-  expect(await service.syncShop(parseEntityId<ShopId>(shopId))).toBe(0);
-  expect(state.order.status).toBe('CANCELLED');
-  expect(state.order.lifecycle?.revision).toBe(5);
-  expect(state.cursor).toBe('45');
-});

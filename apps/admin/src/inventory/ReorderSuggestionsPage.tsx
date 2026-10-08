@@ -19,12 +19,28 @@ type ReplenishmentDraft = {
 type NumericReplenishmentDraftKey = Exclude<keyof ReplenishmentDraft, 'preferredPurchaseUnit'>;
 
 const NUMERIC_REPLENISHMENT_FIELDS = [
-  ['Par micros', 'parLevelMicros'],
-  ['Reorder point micros', 'reorderPointMicros'],
-  ['Lead time days', 'leadTimeDays'],
-  ['Minimum order micros', 'minimumOrderMicros'],
-  ['Order multiple micros', 'orderMultipleMicros'],
-] as const satisfies readonly (readonly [string, NumericReplenishmentDraftKey])[];
+  ['Par level', 'parLevelMicros', 'quantity'],
+  ['Reorder point', 'reorderPointMicros', 'quantity'],
+  ['Lead time (days)', 'leadTimeDays', 'days'],
+  ['Minimum order', 'minimumOrderMicros', 'quantity'],
+  ['Order multiple', 'orderMultipleMicros', 'quantity'],
+] as const satisfies readonly (readonly [
+  string,
+  NumericReplenishmentDraftKey,
+  'quantity' | 'days',
+])[];
+
+function quantityInput(micros: number | null): string {
+  return micros === null ? '' : String(micros / 1_000_000);
+}
+
+function quantityMicros(value: string): number | null {
+  if (value.trim() === '') return null;
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount < 0) return null;
+  const micros = Math.round(amount * 1_000_000);
+  return Number.isSafeInteger(micros) ? micros : null;
+}
 
 export function ReorderSuggestionsPage({
   suggestions,
@@ -55,13 +71,12 @@ export function ReorderSuggestionsPage({
   function draftFor(row: AdminInventoryReorderSuggestion): ReplenishmentDraft {
     return (
       drafts[row.inventoryItemId] ?? {
-        parLevelMicros: String(row.parLevelMicros),
-        reorderPointMicros: String(row.reorderPointMicros),
+        parLevelMicros: quantityInput(row.parLevelMicros),
+        reorderPointMicros: quantityInput(row.reorderPointMicros),
         preferredPurchaseUnit: row.preferredPurchaseUnit ?? '',
         leadTimeDays: String(row.leadTimeDays),
-        minimumOrderMicros: row.minimumOrderMicros === null ? '' : String(row.minimumOrderMicros),
-        orderMultipleMicros:
-          row.orderMultipleMicros === null ? '' : String(row.orderMultipleMicros),
+        minimumOrderMicros: quantityInput(row.minimumOrderMicros),
+        orderMultipleMicros: quantityInput(row.orderMultipleMicros),
       }
     );
   }
@@ -119,10 +134,9 @@ export function ReorderSuggestionsPage({
                     <dd>{quantity(row.suggestedOrderMicros, row.unitLabel)}</dd>
                   </div>
                 </dl>
-                {row.preferredSupplierId ? (
+                {row.preferredSupplierName ? (
                   <p className="admin-inventory-note">
-                    Preferred supplier: {row.preferredSupplierId}. Supplier details are resolved by
-                    Purchasing.
+                    Preferred supplier: {row.preferredSupplierName}
                   </p>
                 ) : null}
                 {canManage ? (
@@ -132,24 +146,20 @@ export function ReorderSuggestionsPage({
                       event.preventDefault();
                       onSave(row.inventoryItemId, {
                         expectedVersion: row.version,
-                        parLevelMicros: Number(draft.parLevelMicros),
-                        reorderPointMicros: Number(draft.reorderPointMicros),
+                        parLevelMicros: quantityMicros(draft.parLevelMicros) ?? 0,
+                        reorderPointMicros: quantityMicros(draft.reorderPointMicros) ?? 0,
                         preferredPurchaseUnit: draft.preferredPurchaseUnit.trim() || null,
                         leadTimeDays: Number(draft.leadTimeDays),
-                        minimumOrderMicros:
-                          draft.minimumOrderMicros === '' ? null : Number(draft.minimumOrderMicros),
-                        orderMultipleMicros:
-                          draft.orderMultipleMicros === ''
-                            ? null
-                            : Number(draft.orderMultipleMicros),
+                        minimumOrderMicros: quantityMicros(draft.minimumOrderMicros),
+                        orderMultipleMicros: quantityMicros(draft.orderMultipleMicros),
                       });
                     }}
                   >
-                    {NUMERIC_REPLENISHMENT_FIELDS.map(([label, key]) => (
+                    {NUMERIC_REPLENISHMENT_FIELDS.map(([label, key, kind]) => (
                       <label key={key}>
-                        <span>{label}</span>
+                        <span>{kind === 'quantity' ? `${label} (${row.unitLabel})` : label}</span>
                         <input
-                          inputMode="numeric"
+                          inputMode={kind === 'quantity' ? 'decimal' : 'numeric'}
                           value={draft[key as keyof ReplenishmentDraft]}
                           onChange={(event) =>
                             setDrafts((current) => ({

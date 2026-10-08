@@ -1,9 +1,16 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { AuditDetailPage } from './AuditDetailPage';
+import { AuditDetailPage, auditLabel, displayAuditValue } from './AuditDetailPage';
 
 describe('AuditDetailPage', () => {
+  it('formats action codes and values in business language', () => {
+    expect(auditLabel('ORDER_CANCELLED')).toBe('Order cancelled');
+    expect(displayAuditValue('PENDING')).toBe('Pending');
+    expect(displayAuditValue(true)).toBe('Yes');
+    expect(displayAuditValue(false)).toBe('No');
+  });
+
   it('renders nested before/after leaf values instead of collapsing structured changes', () => {
     const html = renderToStaticMarkup(
       <AuditDetailPage
@@ -43,7 +50,7 @@ describe('AuditDetailPage', () => {
     expect(html).not.toContain('[object Object]');
   });
 
-  it('renders approval attribution and request provenance for linked events', () => {
+  it('prioritizes approval attribution and keeps request provenance in technical details', () => {
     const html = renderToStaticMarkup(
       <AuditDetailPage
         event={{
@@ -70,7 +77,8 @@ describe('AuditDetailPage', () => {
 
     expect(html).toContain('Requester One');
     expect(html).toContain('Approver One');
-    expect(html).toContain('EXECUTED');
+    expect(html).toContain('Executed');
+    expect(html).toContain('Technical details');
     expect(html).toContain('session-123');
     expect(html).toContain('approval-executor');
     expect(html).toContain('2');

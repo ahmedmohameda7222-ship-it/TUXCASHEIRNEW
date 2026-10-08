@@ -222,11 +222,23 @@ describe('Admin inventory route', () => {
   it('revalidates the transfer destination when the active shop changes', async () => {
     const source = await readFile(resolve('apps/admin/src/inventory/TransferPage.tsx'), 'utf8');
     expect(source).toContain(
-      'const selectedDestinationShopId = destinations.includes(destinationShopId)',
+      'const selectedDestinationShopId = destinations.some((shop) => shop.id === destinationShopId)',
     );
+    expect(source).toContain('{shop.name}');
     expect(source).toContain('value={selectedDestinationShopId}');
     expect(source).toContain('selectedDestinationShopId.length === 0');
     expect(source).toContain('destinationShopId: selectedDestinationShopId');
+  });
+
+  it('resolves shop and supplier names inside the business-scoped inventory BFF', async () => {
+    const source = await readFile(resolve('apps/admin/api/admin/inventory.ts'), 'utf8');
+
+    expect(source).toContain("'shops'");
+    expect(source).toContain("'suppliers'");
+    expect(source).toContain('business_id: `eq.${context.principal.businessId}`');
+    expect(source).toContain("id: `in.(${context.principal.shopIds.join(',')})`");
+    expect(source).toContain('preferredSupplierName: row.preferredSupplierId');
+    expect(source).toContain('shops: shopRows');
   });
 
   it('retains one command ID for retries of the same inventory or purchasing intent', async () => {

@@ -16,7 +16,7 @@ function positiveMicros(value: string): number | null {
 
 export function TransferPage({
   shopId,
-  shopIds,
+  shops,
   items,
   transfers,
   sending,
@@ -26,7 +26,7 @@ export function TransferPage({
   onReceive,
 }: {
   shopId: string;
-  shopIds: readonly string[];
+  shops: readonly { id: string; name: string }[];
   items: readonly AdminInventoryItem[];
   transfers: readonly AdminInventoryTransfer[];
   sending: boolean;
@@ -38,10 +38,8 @@ export function TransferPage({
   }): void;
   onReceive(transferId: string): void;
 }) {
-  const destinations = useMemo(
-    () => shopIds.filter((candidate) => candidate !== shopId),
-    [shopId, shopIds],
-  );
+  const destinations = useMemo(() => shops.filter((shop) => shop.id !== shopId), [shopId, shops]);
+  const shopNames = useMemo(() => new Map(shops.map((shop) => [shop.id, shop.name])), [shops]);
   const incoming = useMemo(
     () =>
       transfers.filter(
@@ -50,13 +48,13 @@ export function TransferPage({
     [shopId, transfers],
   );
   const transferableItems = useMemo(() => items.filter((item) => item.active), [items]);
-  const [destinationShopId, setDestinationShopId] = useState(destinations[0] ?? '');
+  const [destinationShopId, setDestinationShopId] = useState(destinations[0]?.id ?? '');
   const [itemId, setItemId] = useState(transferableItems[0]?.id ?? '');
   const [quantity, setQuantity] = useState('');
   const quantityMicros = positiveMicros(quantity);
-  const selectedDestinationShopId = destinations.includes(destinationShopId)
+  const selectedDestinationShopId = destinations.some((shop) => shop.id === destinationShopId)
     ? destinationShopId
-    : (destinations[0] ?? '');
+    : (destinations[0]?.id ?? '');
   const selectedItemId = transferableItems.some((item) => item.id === itemId)
     ? itemId
     : (transferableItems[0]?.id ?? '');
@@ -65,7 +63,7 @@ export function TransferPage({
     <section className="admin-inventory-workflow" aria-labelledby="inventory-transfer-title">
       <div className="admin-inventory-workflow__header">
         <div>
-          <p className="admin-page__eyebrow">Inter-shop ledger</p>
+          <p className="admin-page__eyebrow">Move stock between shops</p>
           <h2 id="inventory-transfer-title">Transfer stock</h2>
         </div>
         <button className="admin-secondary-button" type="button" onClick={onBack}>
@@ -82,6 +80,9 @@ export function TransferPage({
             {incoming.map((transfer) => (
               <article key={transfer.id} className="admin-inventory-transfer-row">
                 <div>
+                  <strong>
+                    From {shopNames.get(transfer.sourceShopId) ?? 'another authorized shop'}
+                  </strong>
                   {transfer.lines.map((line) => (
                     <span key={line.inventoryItemId}>
                       {formatQuantity(line.quantityMicros, line.unitLabel)} {line.itemName}
@@ -114,9 +115,9 @@ export function TransferPage({
                 value={selectedDestinationShopId}
                 onChange={(event) => setDestinationShopId(event.target.value)}
               >
-                {destinations.map((destination) => (
-                  <option key={destination} value={destination}>
-                    {destination}
+                {destinations.map((shop) => (
+                  <option key={shop.id} value={shop.id}>
+                    {shop.name}
                   </option>
                 ))}
               </select>

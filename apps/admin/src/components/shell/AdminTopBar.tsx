@@ -3,6 +3,16 @@ import type { ReactNode } from 'react';
 
 import type { AdminSessionPrincipal } from '@tux/admin-contracts';
 
+function roleLabel(role: AdminSessionPrincipal['role']): string {
+  return role === 'OWNER'
+    ? 'Owner'
+    : role === 'ADMIN'
+      ? 'Administrator'
+      : role === 'MANAGER'
+        ? 'Manager'
+        : 'Staff';
+}
+
 export function AdminTopBar({
   principal,
   shopControl,
@@ -20,7 +30,7 @@ export function AdminTopBar({
       </div>
       <div className="admin-topbar__context">
         <ShieldCheck size={17} aria-hidden="true" />
-        <span>{principal.role}</span>
+        <span>{roleLabel(principal.role)}</span>
       </div>
       <div className="admin-topbar__spacer" />
       {shopControl}

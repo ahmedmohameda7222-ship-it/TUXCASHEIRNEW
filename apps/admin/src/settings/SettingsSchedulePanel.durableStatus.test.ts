@@ -21,12 +21,12 @@ describe('durable SHOP_CONFIG schedule outcomes', () => {
     expect(settingsHook).toContain('shopConfigSchedules: scheduleList.schedules');
   });
 
-  it('renders durable terminal and retryable outcomes instead of relying on submit-local state', () => {
+  it('renders durable outcomes without exposing retry internals or technical errors', () => {
     expect(panel).toContain('workspace.shopConfigSchedules');
-    expect(panel).toContain('terminalFailure');
-    expect(panel).toContain('nextAttemptAt');
-    expect(panel).toContain('lastError');
-    expect(panel).toContain('Reschedule required');
-    expect(panel).toContain('Retry queued');
+    expect(panel).toContain('Needs attention');
+    expect(panel).toContain('Choose a new time');
+    expect(panel).not.toContain('attemptCount');
+    expect(panel).not.toContain('nextAttemptAt');
+    expect(panel).not.toContain('lastError');
   });
 });

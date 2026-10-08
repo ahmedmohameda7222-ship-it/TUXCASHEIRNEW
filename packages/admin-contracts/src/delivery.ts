@@ -45,6 +45,8 @@ export type AdminDeliveryOrderState =
 
 export type AdminDeliveryOrder = {
   orderId: string;
+  displayOrderNo?: number;
+  displayOrderLabel?: string | null;
   shopId: string;
   riderId: string | null;
   state: AdminDeliveryOrderState;
@@ -66,6 +68,7 @@ export type AdminDeliveryStateEvent = {
 
 export type AdminDeliveryWorkspace = {
   shopId: string;
+  shops?: readonly { id: string; name: string }[];
   zones: readonly AdminDeliveryZone[];
   riders: readonly AdminDeliveryRider[];
   orders: readonly AdminDeliveryOrder[];

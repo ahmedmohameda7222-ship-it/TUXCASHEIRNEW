@@ -1,0 +1,101 @@
+name: Admin Pre-Plan-7 UI/UX Hardening Round 2
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/admin-pre-plan7-ui-ux-hardening-r2.yml'
+      - 'apps/admin/**'
+      - 'e2e/admin-*.spec.ts'
+      - 'e2e/adminViewports.ts'
+      - 'packages/admin-contracts/**'
+      - 'packages/ui/**'
+      - 'scripts/test-admin-*.mjs'
+      - 'scripts/test-migration*.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'playwright.admin.config.ts'
+      - 'tsconfig*.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-pre-plan7-r2-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Formatting
+        run: npm run format:check
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit and component tests
+        run: npm run test
+      - name: Admin security boundary
+        run: npm run test:admin-security
+      - name: Admin deployment contract
+        run: npm run test:admin-deployment
+      - name: Migration invariants
+        run: npm run test:migrations
+      - name: Admin production build
+        run: npm run build:admin
+
+  responsive-e2e:
+    name: responsive-e2e
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Admin phone, tablet, and laptop acceptance
+        run: npm run test:e2e:admin
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-pre-plan7-r2-browser-evidence
+          path: |
+            playwright-report-admin
+            test-results
+          if-no-files-found: warn
+          retention-days: 14

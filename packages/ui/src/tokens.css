@@ -52,6 +52,9 @@
   --tux-control-height-md: 2.75rem;
   --tux-touch-target: 2.75rem;
 
+  --tux-content-max: 90rem;
+  --tux-backdrop-blur: 1.25rem;
+
   --tux-z-header: 20;
   --tux-z-drawer: 40;
   --tux-z-dialog: 60;
@@ -59,11 +62,6 @@
 
   --tux-breakpoint-mobile: 48rem;
   --tux-breakpoint-laptop: 80rem;
-
-  --admin-touch-min: 44px;
-  --admin-radius-card: 16px;
-  --admin-content-max: 1440px;
-  --admin-nav-blur: 20px;
 }
 
 @media (prefers-color-scheme: dark) {

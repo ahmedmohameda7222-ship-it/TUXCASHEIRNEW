@@ -1,6 +1,8 @@
 import type { AdminInventoryItem, AdminInventoryReasonCode } from '@tux/admin-contracts';
 import { useMemo, useState } from 'react';
 
+import { AdminDialog } from '../components/overlay/AdminDialog';
+
 function toPositiveMicros(value: string): number | null {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric <= 0) return null;
@@ -36,18 +38,17 @@ export function RecordWasteSheet({
   const micros = toPositiveMicros(quantity);
 
   return (
-    <section className="admin-inventory-sheet" aria-label="Record waste">
-      <div className="admin-inventory-sheet__heading">
-        <div>
-          <p className="admin-page__eyebrow">Immutable waste movement</p>
-          <h3>Record waste</h3>
-        </div>
-        <button className="admin-secondary-button" type="button" onClick={onCancel}>
-          Close
-        </button>
-      </div>
+    <AdminDialog
+      open
+      variant="sheet"
+      title={`Record waste for ${item.name}`}
+      description="Enter the wasted quantity and choose the reason."
+      onOpenChange={(open) => {
+        if (!open && !pending) onCancel();
+      }}
+    >
       <label className="admin-field">
-        <span>Waste quantity</span>
+        <span>Waste quantity ({item.unitLabel})</span>
         <input
           aria-label="Waste quantity"
           inputMode="decimal"
@@ -81,7 +82,7 @@ export function RecordWasteSheet({
             checked={override}
             onChange={(event) => setOverride(event.target.checked)}
           />
-          <span>Emergency negative-stock override (OWNER only)</span>
+          <span>Allow stock to go below zero</span>
         </label>
       ) : null}
       <button
@@ -102,6 +103,14 @@ export function RecordWasteSheet({
       >
         Post waste
       </button>
-    </section>
+      <button
+        className="admin-secondary-button"
+        type="button"
+        disabled={pending}
+        onClick={onCancel}
+      >
+        Cancel
+      </button>
+    </AdminDialog>
   );
 }

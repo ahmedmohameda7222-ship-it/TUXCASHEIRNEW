@@ -76,6 +76,7 @@ export interface AdminInventoryReorderSuggestion {
   readonly reorderPointMicros: number;
   readonly suggestedOrderMicros: number;
   readonly preferredSupplierId: string | null;
+  readonly preferredSupplierName?: string | null;
   readonly preferredPurchaseUnit: string | null;
   readonly leadTimeDays: number;
   readonly minimumOrderMicros: number | null;
@@ -120,6 +121,7 @@ export interface AdminInventoryIntelligence {
 
 export interface AdminInventoryWorkspace {
   readonly shopId: string;
+  readonly shops?: readonly { id: string; name: string }[];
   readonly items: readonly AdminInventoryItem[];
   readonly reasonCodes: readonly AdminInventoryReasonCode[];
   readonly transfers: readonly AdminInventoryTransfer[];

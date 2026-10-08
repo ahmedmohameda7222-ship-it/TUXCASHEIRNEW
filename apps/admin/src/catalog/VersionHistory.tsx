@@ -29,7 +29,7 @@ export function VersionHistory({
     <section className="admin-publish-card" aria-labelledby="catalog-history-heading">
       <div className="admin-publish-card__heading">
         <div>
-          <p className="admin-catalog-editor__eyebrow">Immutable history</p>
+          <p className="admin-catalog-editor__eyebrow">Past releases</p>
           <h2 id="catalog-history-heading">Version history</h2>
         </div>
       </div>
@@ -37,7 +37,7 @@ export function VersionHistory({
       {versions.length === 0 ? (
         <div className="admin-empty-state">
           <strong>No publish history yet</strong>
-          <span>The first canonical publish will appear here.</span>
+          <span>Your first published catalog will appear here.</span>
         </div>
       ) : (
         <div className="admin-publish-history">

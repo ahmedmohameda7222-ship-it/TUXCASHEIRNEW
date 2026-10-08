@@ -10,7 +10,6 @@ export function StaffPaymentPage({
   financeAccounts,
   canPay,
   onCommand,
-  onSensitiveCommand,
 }: {
   employee: EmployeeDetail;
   shopId: string;
@@ -18,7 +17,6 @@ export function StaffPaymentPage({
   financeAccounts?: readonly StaffFinanceAccountChoice[];
   canPay: boolean;
   onCommand(command: StaffCommandDraft): void;
-  onSensitiveCommand?(command: StaffCommandDraft, pin: string): void;
 }) {
   const available = (accounts ?? financeAccounts ?? []).filter(
     (account) => account.shopId === null || account.shopId === shopId,
@@ -29,7 +27,14 @@ export function StaffPaymentPage({
   const [expected, setExpected] = useState('');
   const [paid, setPaid] = useState('');
   const [paymentDate, setPaymentDate] = useState('');
-  const [approvalPin, setApprovalPin] = useState('');
+  const accountTypeLabel = (type: string) =>
+    type === 'BANK'
+      ? 'Bank account'
+      : type === 'WALLET'
+        ? 'Wallet'
+        : type === 'CASH'
+          ? 'Cash'
+          : 'Settlement account';
 
   return (
     <section aria-label="Pay">
@@ -59,7 +64,7 @@ export function StaffPaymentPage({
             <select value={accountId} onChange={(event) => setAccountId(event.target.value)}>
               {available.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.name} · {account.accountType}
+                  {account.name} · {accountTypeLabel(account.accountType)}
                 </option>
               ))}
             </select>
@@ -104,16 +109,6 @@ export function StaffPaymentPage({
               onChange={(event) => setPaymentDate(event.target.value)}
             />
           </label>
-          <label className="admin-field">
-            <span>Admin PIN for approval policy</span>
-            <input
-              aria-label="Admin PIN for staff payment approval"
-              inputMode="numeric"
-              type="password"
-              value={approvalPin}
-              onChange={(event) => setApprovalPin(event.target.value)}
-            />
-          </label>
           <button
             className="admin-primary-button"
             type="button"
@@ -132,12 +127,7 @@ export function StaffPaymentPage({
                 note: null,
                 reference: null,
               };
-              if (approvalPin && onSensitiveCommand) {
-                onSensitiveCommand(command, approvalPin);
-                setApprovalPin('');
-              } else {
-                onCommand(command);
-              }
+              onCommand(command);
             }}
           >
             Record payment

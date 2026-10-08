@@ -200,6 +200,7 @@ export type StaffListResult = {
 
 export type StaffWorkspace = {
   readonly employees: StaffListResult;
+  readonly shops?: readonly { id: string; name: string }[];
   readonly financeAccounts: readonly StaffFinanceAccountChoice[];
   readonly workers: readonly StaffWorkerChoice[];
 };

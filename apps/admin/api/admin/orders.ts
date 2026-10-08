@@ -164,6 +164,12 @@ type MovementRow = {
   created_at: string;
 };
 
+type InventoryItemLabelRow = {
+  id: string;
+  name: string;
+  unit_label: string;
+};
+
 type AuditRow = {
   id: string;
   action_type: string;
@@ -465,9 +471,25 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
         ]);
 
       const itemIds = items.map((item) => item.id);
-      const [modifiers, beverages] =
+      const inventoryItemIds = [
+        ...new Set(movementRows.map((movement) => movement.inventory_item_id)),
+      ];
+      const [modifiers, beverages, inventoryItemLabels] =
         itemIds.length === 0
-          ? [[], []]
+          ? [
+              [],
+              [],
+              inventoryItemIds.length === 0
+                ? []
+                : await client.select<InventoryItemLabelRow[]>(
+                    'inventory_items',
+                    new URLSearchParams({
+                      select: 'id,name,unit_label',
+                      shop_id: `eq.${input.shopId}`,
+                      id: `in.(${inventoryItemIds.join(',')})`,
+                    }),
+                  ),
+            ]
           : await Promise.all([
               client.select<ModifierRow[]>(
                 'order_item_modifiers',
@@ -488,7 +510,19 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
                   order: 'order_item_id.asc,unit_index.asc',
                 }),
               ),
+              inventoryItemIds.length === 0
+                ? Promise.resolve([])
+                : client.select<InventoryItemLabelRow[]>(
+                    'inventory_items',
+                    new URLSearchParams({
+                      select: 'id,name,unit_label',
+                      shop_id: `eq.${input.shopId}`,
+                      id: `in.(${inventoryItemIds.join(',')})`,
+                    }),
+                  ),
             ]);
+
+      const inventoryItemLabelsById = new Map(inventoryItemLabels.map((item) => [item.id, item]));
 
       const returnIds = returnRows.map((row) => row.id);
       const returnItemRows =
@@ -624,14 +658,18 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           createdAt: event.created_at,
         })),
         financialEvents,
-        inventoryMovements: movementRows.map((movement) => ({
-          id: movement.id,
-          inventoryItemId: movement.inventory_item_id,
-          movementType: movement.movement_type,
-          quantityDeltaMicros: safeInteger(movement.quantity_delta_micros),
-          reservedDeltaMicros: safeInteger(movement.reserved_delta_micros),
-          createdAt: movement.created_at,
-        })),
+        inventoryMovements: movementRows.map((movement) => {
+          const item = inventoryItemLabelsById.get(movement.inventory_item_id);
+          return {
+            id: movement.id,
+            inventoryItemId: movement.inventory_item_id,
+            ...(item ? { inventoryItemName: item.name, unitLabel: item.unit_label } : {}),
+            movementType: movement.movement_type,
+            quantityDeltaMicros: safeInteger(movement.quantity_delta_micros),
+            reservedDeltaMicros: safeInteger(movement.reserved_delta_micros),
+            createdAt: movement.created_at,
+          };
+        }),
         auditEvents: auditRows.map((event) => ({
           id: event.id,
           actionType: event.action_type,

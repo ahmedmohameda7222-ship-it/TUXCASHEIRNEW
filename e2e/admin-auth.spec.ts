@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { ADMIN_CORE_VIEWPORTS, ADMIN_VIEWPORTS } from './adminViewports';
 
 const staffSession = {
   principal: {
@@ -21,6 +22,27 @@ const ownerSession = {
   },
   csrfToken: 'c'.repeat(64),
 };
+
+for (const viewport of [...ADMIN_CORE_VIEWPORTS, ADMIN_VIEWPORTS.smallPhone]) {
+  test(`keeps PIN login usable without overflow on ${viewport.name}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.route('**/api/admin/session', async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'session_required' }),
+      });
+    });
+
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Enter PIN' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'PIN' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+      .toBe(true);
+  });
+}
 
 test('requires PIN login and preserves staff shop isolation', async ({ page }) => {
   let authenticated = false;

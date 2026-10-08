@@ -22,6 +22,12 @@ export function SuppliersPage({
   const [contactName, setContactName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [search, setSearch] = useState('');
+  const visibleSuppliers = suppliers.filter((supplier) =>
+    [supplier.name, supplier.contactName, supplier.phone, supplier.email]
+      .filter(Boolean)
+      .some((value) => value!.toLowerCase().includes(search.trim().toLowerCase())),
+  );
 
   function clearDraft() {
     setName('');
@@ -40,8 +46,16 @@ export function SuppliersPage({
           </button>
         ) : null}
       </div>
+      <label className="admin-field">
+        <span>Search suppliers</span>
+        <input
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.currentTarget.value)}
+        />
+      </label>
       <div className="admin-card-grid">
-        {suppliers.map((supplier) => (
+        {visibleSuppliers.map((supplier) => (
           <article className="admin-card" key={supplier.id}>
             <strong>{supplier.name}</strong>
             <span>{supplier.contactName ?? 'No contact name'}</span>

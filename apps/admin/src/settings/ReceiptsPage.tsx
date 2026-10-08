@@ -26,9 +26,7 @@ export function ReceiptsPage({
         </div>
       </div>
       <p className="admin-field__help">
-        Effective values resolve the shop override first, then the business default. Saved changes
-        affect future orders only after Publish settings; historical receipt snapshots remain
-        unchanged.
+        Update how future receipts look and number orders. Existing receipts stay unchanged.
       </p>
 
       <div className="admin-settings-receipts__grid">
@@ -55,7 +53,7 @@ export function ReceiptsPage({
           kind="integer"
           min={1}
           max={RECEIPT_SEQUENCE_MAX}
-          help="The Operations allocator applies sequence changes at a safe business-day boundary."
+          help="A new starting number takes effect at the next business-day boundary."
           updating={updating}
           onUpdate={onUpdate}
         />
@@ -70,13 +68,10 @@ export function ReceiptsPage({
               </p>
               <h3>Sequence reset policy</h3>
             </div>
-            {resetPolicy.source === 'shop' && resetPolicy.version !== null ? (
-              <span className="admin-status-pill">v{resetPolicy.version}</span>
-            ) : null}
           </div>
           <p>{displaySettingValue(resetPolicy.value ?? 'BUSINESS_DAY')}</p>
           <p className="admin-field__help">
-            Business-day reset is the approved numbering policy and is not changed mid-day.
+            Receipt numbering restarts at the beginning of each business day.
           </p>
         </article>
       </div>

@@ -8,7 +8,7 @@
 .admin-publish-card {
   min-width: 0;
   border: 1px solid var(--tux-border-subtle);
-  border-radius: var(--admin-radius-card, 16px);
+  border-radius: var(--tux-radius-lg);
   background: var(--tux-surface-panel);
   box-shadow: var(--tux-shadow-sm);
 }

@@ -12,7 +12,17 @@ import { OrderDetailPage } from './OrderDetailPage';
 import { RefundReturnPage } from './RefundReturnPage';
 import { useOrders, type OrderSearchFilters } from './useOrders';
 
-type ActionMode = 'cancel' | 'refund-return' | null;
+type ActionMode = 'cancel' | 'refund' | 'return' | null;
+
+function orderStatusLabel(value: AdminOrderStatus): string {
+  return { ACTIVE: 'Active', DONE: 'Completed', CANCELLED: 'Cancelled', RETURNED: 'Returned' }[
+    value
+  ];
+}
+
+function orderSourceLabel(value: AdminOrderSource): string {
+  return value === 'POS' ? 'In-store' : 'Online';
+}
 
 function readableError(error: unknown): string | null {
   if (!error) return null;
@@ -78,40 +88,43 @@ export function OrdersPage() {
       title="Orders"
       description="Search order history and complete controlled cancellation, refund or return actions."
     >
-      <section className="admin-catalog-editor__section is-compact" aria-label="Order filters">
-        <label className="admin-field">
-          <span>Search</span>
-          <input
-            value={query}
-            placeholder="Order number, customer, phone or operator"
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
-        <label className="admin-field">
-          <span>Status</span>
-          <select
-            value={status}
-            onChange={(event) => setStatus(event.target.value as AdminOrderStatus | '')}
-          >
-            <option value="">All statuses</option>
-            <option value="ACTIVE">Active</option>
-            <option value="DONE">Done</option>
-            <option value="CANCELLED">Cancelled</option>
-            <option value="RETURNED">Returned</option>
-          </select>
-        </label>
-        <label className="admin-field">
-          <span>Source</span>
-          <select
-            value={source}
-            onChange={(event) => setSource(event.target.value as AdminOrderSource | '')}
-          >
-            <option value="">All sources</option>
-            <option value="POS">POS</option>
-            <option value="ONLINE">Online</option>
-          </select>
-        </label>
-      </section>
+      <details className="admin-orders-filters" open={Boolean(query || status || source)}>
+        <summary>Search and filters</summary>
+        <section className="admin-catalog-editor__section is-compact" aria-label="Order filters">
+          <label className="admin-field">
+            <span>Search</span>
+            <input
+              value={query}
+              placeholder="Order number, customer, phone or operator"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+          <label className="admin-field">
+            <span>Status</span>
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value as AdminOrderStatus | '')}
+            >
+              <option value="">All statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="DONE">Done</option>
+              <option value="CANCELLED">Cancelled</option>
+              <option value="RETURNED">Returned</option>
+            </select>
+          </label>
+          <label className="admin-field">
+            <span>Source</span>
+            <select
+              value={source}
+              onChange={(event) => setSource(event.target.value as AdminOrderSource | '')}
+            >
+              <option value="">All sources</option>
+              <option value="POS">POS</option>
+              <option value="ONLINE">Online</option>
+            </select>
+          </label>
+        </section>
+      </details>
 
       {actionError ? <p role="alert">{actionError}</p> : null}
 
@@ -163,7 +176,7 @@ export function OrdersPage() {
                   </small>
                 </span>
                 <span>
-                  {row.status} · {row.source}
+                  {orderStatusLabel(row.status)} · {orderSourceLabel(row.source)}
                 </span>
               </button>
             ))}
@@ -197,8 +210,8 @@ export function OrdersPage() {
                 refunding={ordersApi.refundOrder.isPending}
                 returning={ordersApi.returnOrderItems.isPending}
                 onCancel={() => setAction('cancel')}
-                onRefund={() => setAction('refund-return')}
-                onReturn={() => setAction('refund-return')}
+                onRefund={() => setAction('refund')}
+                onReturn={() => setAction('return')}
               />
               {action === 'cancel' ? (
                 <CancelOrderSheet
@@ -217,8 +230,9 @@ export function OrdersPage() {
                   }
                 />
               ) : null}
-              {action === 'refund-return' ? (
+              {action === 'refund' || action === 'return' ? (
                 <RefundReturnPage
+                  mode={action}
                   order={detail}
                   reasons={refundReasons}
                   refunding={ordersApi.refundOrder.isPending}

@@ -38,9 +38,9 @@ describe('StocktakePage', () => {
       />,
     );
 
-    expect(html).toContain('Count vs snapshot');
-    expect(html).toContain('Snapshot comparison only');
-    expect(html).toContain('Final posted adjustment uses live on-hand at posting');
+    expect(html).toContain('Difference');
+    expect(html).toContain('Expected stock');
+    expect(html).toContain('Current stock movements remain preserved');
     expect(html).not.toContain('Quantity variance');
   });
 });

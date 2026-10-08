@@ -14,6 +14,10 @@ type SettingOverrideEditorProps = {
   help?: string;
   min?: number;
   max?: number;
+  step?: number | 'any';
+  inputMode?: 'decimal' | 'numeric';
+  formatValue?(value: unknown): string;
+  parseInput?(raw: string): unknown;
   updating: boolean;
   onUpdate(draft: SettingOverrideUpdateDraft): void | Promise<void>;
 };
@@ -69,11 +73,15 @@ export function SettingOverrideEditor({
   help,
   min,
   max,
+  step,
+  inputMode,
+  formatValue,
+  parseInput,
   updating,
   onUpdate,
 }: SettingOverrideEditorProps) {
   const resolved = resolveWorkspaceSetting(workspace, settingKey);
-  const resolvedRaw = initialText(resolved.value, kind);
+  const resolvedRaw = formatValue ? formatValue(resolved.value) : initialText(resolved.value, kind);
   const resolvedExpectedVersion = resolved.source === 'shop' ? resolved.version : null;
   const latestResolvedRef = useRef({
     raw: resolvedRaw,
@@ -101,7 +109,7 @@ export function SettingOverrideEditor({
     event.preventDefault();
     setError(null);
     try {
-      const value = parseValue(editor.raw, kind, min, max);
+      const value = parseInput ? parseInput(editor.raw) : parseValue(editor.raw, kind, min, max);
       await onUpdate({ settingKey, value, expectedVersion: editor.expectedVersion });
       setEditor((current) => ({
         raw: current.raw,
@@ -124,9 +132,6 @@ export function SettingOverrideEditor({
           <p className="admin-catalog-editor__eyebrow">{settingSourceLabel(resolved.source)}</p>
           <h3>{label}</h3>
         </div>
-        {resolved.source === 'shop' && resolved.version !== null ? (
-          <span className="admin-status-pill">v{resolved.version}</span>
-        ) : null}
       </div>
 
       {kind === 'boolean' ? (
@@ -148,10 +153,10 @@ export function SettingOverrideEditor({
           <input
             aria-label={label}
             type={kind === 'integer' ? 'number' : 'text'}
-            inputMode={kind === 'integer' ? 'numeric' : undefined}
+            inputMode={inputMode ?? (kind === 'integer' ? 'numeric' : undefined)}
             min={min}
             max={max}
-            step={kind === 'integer' ? 1 : undefined}
+            step={step ?? (kind === 'integer' ? 1 : undefined)}
             value={editor.raw}
             disabled={updating}
             onChange={(event) => setEditor((current) => ({ ...current, raw: event.target.value }))}

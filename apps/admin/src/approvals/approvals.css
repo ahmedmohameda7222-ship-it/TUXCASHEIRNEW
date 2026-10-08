@@ -22,9 +22,9 @@
   width: 100%;
   text-align: left;
   padding: 0.9rem;
-  border: 1px solid var(--admin-border, #d8d8d8);
-  border-radius: 0.8rem;
-  background: var(--admin-surface, #fff);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
   color: inherit;
 }
 
@@ -37,9 +37,9 @@
   display: grid;
   gap: 1rem;
   padding: 1rem;
-  border: 1px solid var(--admin-border, #d8d8d8);
-  border-radius: 0.9rem;
-  background: var(--admin-surface, #fff);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
 }
 
 .admin-approval-detail__header,
@@ -82,56 +82,12 @@
   margin: 0.35rem 0 0;
 }
 
-.admin-dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-  background: rgb(0 0 0 / 45%);
-}
-
-.admin-dialog {
-  width: min(30rem, 100%);
-  max-height: calc(100vh - 2rem);
-  overflow: auto;
-  padding: 1.1rem;
-  border-radius: 0.9rem;
-  background: var(--admin-surface, #fff);
-}
-
-.admin-dialog form {
-  display: grid;
-  gap: 1rem;
-}
-
 @media (max-width: 767px) {
   .admin-approvals-layout {
     grid-template-columns: 1fr;
   }
 
-  .admin-approval-list {
-    display: flex;
-    overflow-x: auto;
-    padding-bottom: 0.35rem;
-  }
-
-  .admin-approval-list__item {
-    min-width: 15rem;
-  }
-
   .admin-approval-facts {
     grid-template-columns: 1fr;
-  }
-
-  .admin-dialog-backdrop {
-    align-items: end;
-    padding: 0;
-  }
-
-  .admin-dialog {
-    width: 100%;
-    border-radius: 1rem 1rem 0 0;
   }
 }

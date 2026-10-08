@@ -44,6 +44,22 @@ type SpecialForm = {
   note: string;
 };
 
+const weekdays = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+] as const;
+
+function serviceLabel(serviceKind: ShopHoursServiceKind): string {
+  if (serviceKind === 'OPEN') return 'Shop opening hours';
+  if (serviceKind === 'DELIVERY') return 'Delivery hours';
+  return 'Online ordering hours';
+}
+
 export type WeeklyHoursEditorState = {
   expectedSettingsVersion: number;
   expectedRow: WeeklyHoursExpectedRow;
@@ -220,6 +236,7 @@ function WeeklyHoursRowEditor({
     >
       <div className="admin-settings-grid">
         <select
+          aria-label="Service hours type"
           value={editor.form.serviceKind}
           disabled={busy}
           onChange={(event) => {
@@ -231,14 +248,12 @@ function WeeklyHoursRowEditor({
             }));
           }}
         >
-          <option value="OPEN">Open</option>
-          <option value="DELIVERY">Delivery</option>
-          <option value="ONLINE">Online</option>
+          <option value="OPEN">Shop opening hours</option>
+          <option value="DELIVERY">Delivery hours</option>
+          <option value="ONLINE">Online ordering hours</option>
         </select>
-        <input
-          type="number"
-          min={0}
-          max={6}
+        <select
+          aria-label={`${serviceLabel(editor.form.serviceKind)} weekday`}
           value={editor.form.dayOfWeek}
           disabled={busy}
           onChange={(event) => {
@@ -249,8 +264,15 @@ function WeeklyHoursRowEditor({
               form: { ...current.form, dayOfWeek: value },
             }));
           }}
-        />
+        >
+          {weekdays.map((day, index) => (
+            <option key={day} value={index}>
+              {day}
+            </option>
+          ))}
+        </select>
         <input
+          aria-label={`${weekdays[editor.form.dayOfWeek]} opening time`}
           type="time"
           step={1}
           value={editor.form.opensLocal}
@@ -265,6 +287,7 @@ function WeeklyHoursRowEditor({
           }}
         />
         <input
+          aria-label={`${weekdays[editor.form.dayOfWeek]} closing time`}
           type="time"
           step={1}
           value={editor.form.closesLocal}
@@ -373,6 +396,7 @@ function SpecialHoursRowEditor({
     >
       <div className="admin-settings-grid">
         <input
+          aria-label="Special date"
           type="date"
           value={editor.serviceDate}
           disabled={busy}
@@ -382,6 +406,7 @@ function SpecialHoursRowEditor({
           }}
         />
         <select
+          aria-label="Special-date service hours type"
           value={editor.serviceKind}
           disabled={busy}
           onChange={(event) => {
@@ -389,9 +414,9 @@ function SpecialHoursRowEditor({
             setEditor((current) => ({ ...current, dirty: true, serviceKind: value }));
           }}
         >
-          <option value="OPEN">Open</option>
-          <option value="DELIVERY">Delivery</option>
-          <option value="ONLINE">Online</option>
+          <option value="OPEN">Shop opening hours</option>
+          <option value="DELIVERY">Delivery hours</option>
+          <option value="ONLINE">Online ordering hours</option>
         </select>
         <label className="admin-check-field">
           <input
@@ -406,6 +431,7 @@ function SpecialHoursRowEditor({
           <span>Closed all day</span>
         </label>
         <input
+          aria-label="Special-date opening time"
           type="time"
           step={1}
           value={editor.opensLocal}
@@ -416,6 +442,7 @@ function SpecialHoursRowEditor({
           }}
         />
         <input
+          aria-label="Special-date closing time"
           type="time"
           step={1}
           value={editor.closesLocal}
@@ -426,6 +453,7 @@ function SpecialHoursRowEditor({
           }}
         />
         <input
+          aria-label="Special-date note"
           value={editor.note}
           maxLength={500}
           disabled={busy}
@@ -446,7 +474,7 @@ function SpecialHoursRowEditor({
           disabled={busy || !onUpsert}
           onClick={() => void deactivate()}
         >
-          Deactivate special override
+          Deactivate special hours
         </button>
       </div>
     </form>
@@ -561,7 +589,7 @@ export function ShopsPage({
     <section className="admin-settings-section" aria-labelledby="settings-shop-title">
       <div className="admin-settings-section__header">
         <div>
-          <p className="admin-settings-kicker">Canonical shop identity</p>
+          <p className="admin-settings-kicker">Shop details</p>
           <h2 id="settings-shop-title">{shop.name}</h2>
         </div>
         <span className="admin-status-pill">{shop.lifecycleState}</span>
@@ -603,38 +631,43 @@ export function ShopsPage({
               }
             />
           </label>
-          <label className="admin-field">
-            <span>Latitude</span>
-            <input
-              type="number"
-              min={-90}
-              max={90}
-              step="any"
-              value={identity.latitude}
-              disabled={busy}
-              onChange={(event) =>
-                setIdentity((current) => ({ ...current, latitude: event.currentTarget.value }))
-              }
-            />
-          </label>
-          <label className="admin-field">
-            <span>Longitude</span>
-            <input
-              type="number"
-              min={-180}
-              max={180}
-              step="any"
-              value={identity.longitude}
-              disabled={busy}
-              onChange={(event) =>
-                setIdentity((current) => ({ ...current, longitude: event.currentTarget.value }))
-              }
-            />
-          </label>
         </div>
+        <details className="admin-settings-advanced">
+          <summary>Advanced location</summary>
+          <div className="admin-settings-grid">
+            <label className="admin-field">
+              <span>Latitude</span>
+              <input
+                type="number"
+                min={-90}
+                max={90}
+                step="any"
+                value={identity.latitude}
+                disabled={busy}
+                onChange={(event) =>
+                  setIdentity((current) => ({ ...current, latitude: event.currentTarget.value }))
+                }
+              />
+            </label>
+            <label className="admin-field">
+              <span>Longitude</span>
+              <input
+                type="number"
+                min={-180}
+                max={180}
+                step="any"
+                value={identity.longitude}
+                disabled={busy}
+                onChange={(event) =>
+                  setIdentity((current) => ({ ...current, longitude: event.currentTarget.value }))
+                }
+              />
+            </label>
+          </div>
+        </details>
         <p className="admin-field__help">
-          One canonical contact/location authority feeds Menu, delivery, receipts and store-location
-          surfaces. Changes become live only after Publish settings.
+          These details appear anywhere customers or staff need this shop&apos;s contact
+          information.
         </p>
         <button className="admin-primary-button" type="submit" disabled={busy || !onUpdateIdentity}>
           Save shop identity
@@ -708,6 +741,7 @@ export function ShopsPage({
           <strong>Add weekly window</strong>
           <div className="admin-settings-grid">
             <select
+              aria-label="New service hours type"
               value={weeklyNew.serviceKind}
               disabled={busy}
               onChange={(event) =>
@@ -717,14 +751,12 @@ export function ShopsPage({
                 }))
               }
             >
-              <option value="OPEN">Open</option>
-              <option value="DELIVERY">Delivery</option>
-              <option value="ONLINE">Online</option>
+              <option value="OPEN">Shop opening hours</option>
+              <option value="DELIVERY">Delivery hours</option>
+              <option value="ONLINE">Online ordering hours</option>
             </select>
-            <input
-              type="number"
-              min={0}
-              max={6}
+            <select
+              aria-label="Weekday"
               value={weeklyNew.dayOfWeek}
               disabled={busy}
               onChange={(event) =>
@@ -733,8 +765,15 @@ export function ShopsPage({
                   dayOfWeek: Number(event.currentTarget.value),
                 }))
               }
-            />
+            >
+              {weekdays.map((day, index) => (
+                <option key={day} value={index}>
+                  {day}
+                </option>
+              ))}
+            </select>
             <input
+              aria-label="New opening time"
               type="time"
               step={1}
               value={weeklyNew.opensLocal}
@@ -744,6 +783,7 @@ export function ShopsPage({
               }
             />
             <input
+              aria-label="New closing time"
               type="time"
               step={1}
               value={weeklyNew.closesLocal}
@@ -764,7 +804,7 @@ export function ShopsPage({
       </div>
 
       <div className="admin-settings-subsection">
-        <h3>Special-date overrides</h3>
+        <h3>Special-date hours</h3>
         <div className="admin-settings-list">
           {workspace.specialHours.map((hours) => (
             <SpecialHoursRowEditor
@@ -777,9 +817,10 @@ export function ShopsPage({
           ))}
         </div>
         <form className="admin-settings-card" onSubmit={(event) => void createSpecial(event)}>
-          <strong>Add special-date override</strong>
+          <strong>Add special-date hours</strong>
           <div className="admin-settings-grid">
             <input
+              aria-label="New special date"
               type="date"
               required
               value={specialNew.serviceDate}
@@ -789,6 +830,7 @@ export function ShopsPage({
               }
             />
             <select
+              aria-label="New special-date service hours type"
               value={specialNew.serviceKind}
               disabled={busy}
               onChange={(event) =>
@@ -798,9 +840,9 @@ export function ShopsPage({
                 }))
               }
             >
-              <option value="OPEN">Open</option>
-              <option value="DELIVERY">Delivery</option>
-              <option value="ONLINE">Online</option>
+              <option value="OPEN">Shop opening hours</option>
+              <option value="DELIVERY">Delivery hours</option>
+              <option value="ONLINE">Online ordering hours</option>
             </select>
             <label className="admin-check-field">
               <input
@@ -814,6 +856,7 @@ export function ShopsPage({
               <span>Closed all day</span>
             </label>
             <input
+              aria-label="New special-date opening time"
               type="time"
               step={1}
               value={specialNew.opensLocal}
@@ -823,6 +866,7 @@ export function ShopsPage({
               }
             />
             <input
+              aria-label="New special-date closing time"
               type="time"
               step={1}
               value={specialNew.closesLocal}
@@ -832,6 +876,7 @@ export function ShopsPage({
               }
             />
             <input
+              aria-label="New special-date note"
               value={specialNew.note}
               maxLength={500}
               disabled={busy}

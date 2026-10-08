@@ -39,7 +39,7 @@ export function SettingsScheduleActionProvider({
 }
 
 function scheduleLabel(schedule: AdminShopConfigSchedule): string {
-  if (schedule.operation === 'PUBLISH_SETTINGS') return 'Publish staged settings';
+  if (schedule.operation === 'PUBLISH_SETTINGS') return 'Publish saved settings';
   return schedule.onlineOrdersPaused ? 'Pause online orders' : 'Resume online orders';
 }
 
@@ -54,8 +54,7 @@ function scheduleStatus(schedule: AdminShopConfigSchedule): string {
     case 'CANCELLED':
       return 'Cancelled';
     case 'FAILED':
-      if (schedule.terminalFailure) return 'Failed · Reschedule required';
-      return schedule.nextAttemptAt ? 'Failed · Retry queued' : 'Failed · Retry pending';
+      return 'Needs attention';
   }
 }
 
@@ -99,8 +98,7 @@ export function SettingsSchedulePanel({
         <strong>Activate later in Egypt local time</strong>
       </div>
       <p className="admin-field__help">
-        Current staged settings are snapshotted when the schedule is accepted. Later unpublished
-        edits are not pulled into that scheduled activation.
+        The settings saved when you schedule this change will be used at the selected time.
       </p>
       <div className="admin-settings-grid">
         <label className="admin-field">
@@ -110,7 +108,7 @@ export function SettingsSchedulePanel({
             disabled={disabled}
             onChange={(event) => setMode(event.currentTarget.value as SettingsScheduleMode)}
           >
-            <option value="PUBLISH_SETTINGS">Publish current staged settings</option>
+            <option value="PUBLISH_SETTINGS">Publish saved settings</option>
             <option value="PAUSE_ONLINE">Pause online orders</option>
             <option value="RESUME_ONLINE">Resume online orders</option>
           </select>
@@ -135,8 +133,8 @@ export function SettingsSchedulePanel({
         {action?.busy ? 'Scheduling…' : 'Schedule change'}
       </button>
       <small>
-        Publishing staged settings covers configured opening/delivery/online hours and other
-        settings owned by this workspace. Emergency controls above remain immediate.
+        Scheduled publishing includes opening, delivery, and online hours. Emergency controls above
+        remain immediate.
       </small>
       {message ? (
         <p className="admin-field__help" aria-live="polite">
@@ -159,14 +157,11 @@ export function SettingsSchedulePanel({
                 <strong>{scheduleStatus(schedule)}</strong>
               </div>
               <small>
-                {schedule.localScheduledAt} {schedule.timezone} · attempt {schedule.attemptCount}
+                {schedule.localScheduledAt} {schedule.timezone}
               </small>
-              {schedule.status === 'FAILED' &&
-              !schedule.terminalFailure &&
-              schedule.nextAttemptAt ? (
-                <small>Retry queued for {schedule.nextAttemptAt}</small>
+              {schedule.status === 'FAILED' ? (
+                <small>Choose a new time or publish the saved settings manually.</small>
               ) : null}
-              {schedule.lastError ? <small>Last error: {schedule.lastError}</small> : null}
             </article>
           ))}
         </div>

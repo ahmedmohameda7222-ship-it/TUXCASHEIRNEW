@@ -11,7 +11,7 @@ describe('Plan 2 final P2 review regressions', () => {
     const publishReview = source('./PublishReviewPage.tsx');
 
     expect(publishReview).not.toContain('const preview = data?.draftPreviews[0]');
-    expect(publishReview).toContain('Draft to review');
+    expect(publishReview).toContain('Changes to review');
     expect(publishReview).toMatch(/draftPreviews\.map\(/);
   });
 

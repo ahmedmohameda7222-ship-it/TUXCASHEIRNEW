@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { ADMIN_WIDE_TABLET_VIEWPORTS } from './adminViewports';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const draftId = '55555555-5555-4555-8555-555555555555';
@@ -353,7 +354,7 @@ test('publish review shows version-fenced draft diff, history, and Cairo schedul
   await page.goto('/catalog/products/publishing');
 
   await expect(page.getByRole('heading', { name: 'Review & publish' })).toBeVisible();
-  await expect(page.getByText('Live version 48')).toBeVisible();
+  await expect(page.getByText('Live', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('1 product changed')).toBeVisible();
   await expect(page.getByText('1 price change')).toBeVisible();
   await expect(page.getByLabel('Schedule publish').getByText('Africa/Cairo')).toBeVisible();
@@ -378,7 +379,9 @@ test('publish history restores as a new version and pending schedules can be can
   await page.goto('/catalog/products/publishing');
 
   await page.getByRole('button', { name: 'Restore version 47' }).click();
-  await expect(page.getByText('Restored as version 49.')).toBeVisible();
+  await expect(
+    page.getByText('The selected catalog version was restored and published.'),
+  ).toBeVisible();
   expect(fixture.commands.at(-1)).toMatchObject({
     type: 'version.restore',
     sourcePublishVersion: 47,
@@ -401,12 +404,15 @@ test('advanced product controls load from a version-fenced draft and save canoni
 
   await page.getByRole('button', { name: /Classic Smash/ }).click();
   await page.getByRole('button', { name: /More/ }).click();
+  await expect
+    .poll(() => fixture.commands.some((command) => command.type === 'draft.create'))
+    .toBe(true);
   await expect(page.getByText('Bacon')).toBeVisible();
   await expect(page.locator('form').getByText('Water', { exact: true })).toBeVisible();
   await expect(page.getByText(/Meat/)).toBeVisible();
 
   await page.getByLabel('Max quantity').fill('4');
-  await page.getByLabel('Meat quantity micro-units').fill('750000');
+  await page.getByLabel('Meat quantity in g').fill('0.75');
   await page.getByRole('button', { name: 'Save draft' }).click();
 
   await expect
@@ -443,11 +449,7 @@ test('advanced product controls load from a version-fenced draft and save canoni
   );
 });
 
-for (const viewport of [
-  { name: 'phone', width: 390, height: 844 },
-  { name: 'tablet', width: 900, height: 1024 },
-  { name: 'desktop', width: 1440, height: 1000 },
-] as const) {
+for (const viewport of ADMIN_WIDE_TABLET_VIEWPORTS) {
   test(`publish review remains usable on ${viewport.name}`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await mockPublishing(page);

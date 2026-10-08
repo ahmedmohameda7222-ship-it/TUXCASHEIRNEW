@@ -1,5 +1,5 @@
 import type { AdminCustomerDetail } from '@tux/admin-contracts';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { AdminTabs } from '../components/navigation/AdminTabs';
 import { SegmentsPage } from './SegmentsPage';
@@ -8,14 +8,16 @@ function money(minor: number): string {
   return `${(minor / 100).toFixed(2)} EGP`;
 }
 
-type CustomerDetailSection = 'overview' | 'addresses' | 'history';
+type CustomerDetailSection = 'overview' | 'orders' | 'addresses' | 'loyalty' | 'history';
 
 export function CustomerDetailPage({
   customer,
+  loyalty,
   canMerge,
   onMerge,
 }: {
   customer: AdminCustomerDetail;
+  loyalty: ReactNode;
   canMerge: boolean;
   onMerge(): void;
 }) {
@@ -68,6 +70,34 @@ export function CustomerDetailPage({
             ),
           },
           {
+            id: 'orders',
+            label: 'Orders',
+            content: (
+              <dl>
+                <div>
+                  <dt>All orders</dt>
+                  <dd>{customer.orderCount}</dd>
+                </div>
+                <div>
+                  <dt>Delivery orders</dt>
+                  <dd>{customer.deliveryOrderCount}</dd>
+                </div>
+                <div>
+                  <dt>Lifetime spend</dt>
+                  <dd>{money(customer.lifetimeSpendMinor)}</dd>
+                </div>
+                <div>
+                  <dt>Last order</dt>
+                  <dd>
+                    {customer.lastOrderAt
+                      ? new Date(customer.lastOrderAt).toLocaleDateString()
+                      : 'No orders yet'}
+                  </dd>
+                </div>
+              </dl>
+            ),
+          },
+          {
             id: 'addresses',
             label: 'Addresses',
             content:
@@ -82,8 +112,13 @@ export function CustomerDetailPage({
               ),
           },
           {
+            id: 'loyalty',
+            label: 'Loyalty',
+            content: loyalty,
+          },
+          {
             id: 'history',
-            label: 'Linked shops',
+            label: 'History',
             content:
               customer.linkedShops.length === 0 ? (
                 <p>No linked shops.</p>

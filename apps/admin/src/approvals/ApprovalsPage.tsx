@@ -11,6 +11,7 @@ import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { AdminApiError, adminFetch } from '../lib/adminApi';
 import {
   ApprovalDetailView,
+  approvalStatusLabel,
   type ApprovalDecisionKind,
   type ApprovalDetailViewModel,
 } from './ApprovalDetailPage';
@@ -42,6 +43,22 @@ type ApprovalApiModel = {
 type ApprovalListResponse = { approvals: ApprovalApiModel[]; nextCursor?: string | null };
 type StatusFilter = 'ALL' | AdminApprovalStatus;
 type ApprovalDecisionState = { kind: ApprovalDecisionKind; requestId: string };
+
+export function approvalDecisionErrorMessage(error: unknown): string | undefined {
+  if (!error) return undefined;
+  if (!(error instanceof AdminApiError)) return 'The decision could not be completed.';
+  if (error.errorCode === 'self_approval_forbidden') {
+    return 'A different authorized person must approve or reject this request.';
+  }
+  if (error.errorCode === 'approval_already_decided') {
+    return 'This request has already been decided. Reload to see its current status.';
+  }
+  if (error.errorCode === 'approval_expired') {
+    return 'This request has expired. Submit a new request if the action is still needed.';
+  }
+  if (error.errorCode.toLowerCase().includes('pin')) return 'The PIN was not accepted.';
+  return 'The decision could not be completed. Reload and try again.';
+}
 
 function formatInstant(value: string | null | undefined): string {
   if (!value) return '—';
@@ -154,12 +171,7 @@ export function ApprovalsPage() {
     },
   });
 
-  const decisionError =
-    decisionMutation.error instanceof AdminApiError
-      ? decisionMutation.error.errorCode.replaceAll('_', ' ')
-      : decisionMutation.error
-        ? 'The decision could not be completed.'
-        : undefined;
+  const decisionError = approvalDecisionErrorMessage(decisionMutation.error);
 
   return (
     <PageScaffold
@@ -177,10 +189,10 @@ export function ApprovalsPage() {
             <option value="ALL">All</option>
             <option value="PENDING">Pending</option>
             <option value="APPROVED">Approved</option>
-            <option value="EXECUTING">Executing</option>
-            <option value="EXECUTED">Executed</option>
+            <option value="EXECUTING">In progress</option>
+            <option value="EXECUTED">Completed</option>
             <option value="REJECTED">Rejected</option>
-            <option value="FAILED">Failed</option>
+            <option value="FAILED">Needs attention</option>
           </select>
         </label>
       </div>
@@ -227,7 +239,7 @@ export function ApprovalsPage() {
                 <strong>{approval.actionLabel}</strong>
                 <span>{approval.requesterName}</span>
                 <span>{approval.shopName}</span>
-                <span>{approval.displayStatus ?? approval.status}</span>
+                <span>{approvalStatusLabel(approval.displayStatus ?? approval.status)}</span>
               </button>
             ))}
             {approvalsQuery.hasNextPage ? (

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'wouter';
 
 import type {
   CatalogPublishPreview,
@@ -36,7 +37,7 @@ function errorMessage(error: unknown): string {
     if (error.code === 'schedule_in_progress') {
       return 'This scheduled publish is already being executed and cannot be cancelled.';
     }
-    return `Catalog action failed: ${error.code}`;
+    return 'We could not complete that catalog action. Refresh and try again.';
   }
   return 'Catalog action failed. Refresh and try again.';
 }
@@ -56,11 +57,11 @@ function PublishSummary({ preview }: { preview: CatalogPublishPreview }) {
     >
       <div className="admin-publish-card__heading">
         <div>
-          <p className="admin-catalog-editor__eyebrow">Draft preview</p>
+          <p className="admin-catalog-editor__eyebrow">Release preview</p>
           <h2 id="publish-summary-heading">Change summary</h2>
         </div>
         <span className={`admin-status-pill${preview.stale ? ' is-warning' : ''}`}>
-          {preview.stale ? 'Refresh required' : `Draft r${preview.draftRevision}`}
+          {preview.stale ? 'Refresh required' : 'Ready to publish'}
         </span>
       </div>
       <div className="admin-publish-metrics">
@@ -68,23 +69,23 @@ function PublishSummary({ preview }: { preview: CatalogPublishPreview }) {
           <strong>
             {countLabel(preview.changedProductIds.length, 'product changed', 'products changed')}
           </strong>
-          <span>Canonical product fields that differ from live state.</span>
+          <span>Products with changes waiting to go live.</span>
         </div>
         <div>
           <strong>
             {countLabel(preview.priceChangedProductIds.length, 'price change', 'price changes')}
           </strong>
-          <span>Pricing changes require catalog.pricing at execution time.</span>
+          <span>Products whose customer price will change.</span>
         </div>
         <div>
           <strong>
             {countLabel(
               preview.changedRelationCounts.productModifierLinks,
-              'modifier link changed',
-              'modifier links changed',
+              'extras setup changed',
+              'extras setups changed',
             )}
           </strong>
-          <span>Product-to-modifier relations that differ from the published catalog.</span>
+          <span>Products with changes to available extras.</span>
         </div>
         <div>
           <strong>
@@ -94,7 +95,7 @@ function PublishSummary({ preview }: { preview: CatalogPublishPreview }) {
               'combo options changed',
             )}
           </strong>
-          <span>Combo beverage relations that differ from the published catalog.</span>
+          <span>Combos with changes to their drink choices.</span>
         </div>
         <div>
           <strong>
@@ -104,12 +105,8 @@ function PublishSummary({ preview }: { preview: CatalogPublishPreview }) {
               'recipe lines changed',
             )}
           </strong>
-          <span>Recipe relations that differ from the published catalog.</span>
+          <span>Products with recipe quantity changes.</span>
         </div>
-      </div>
-      <div className="admin-publish-version-line">
-        <span>Draft base version {preview.basePublishVersion}</span>
-        <span>Current catalog version {preview.currentPublishVersion}</span>
       </div>
     </section>
   );
@@ -130,11 +127,11 @@ export function PublishReviewPage() {
       <PageScaffold
         eyebrow="Catalog"
         title="Review & publish"
-        description="Select one shop before reviewing or changing its canonical catalog."
+        description="Select one shop before reviewing or changing its catalog."
       >
         <div className="admin-callout is-warning">
           <div>
-            <strong>Concrete shop required</strong>
+            <strong>Select a shop</strong>
             <span>Publishing, scheduling, and restores never run against All Shops.</span>
           </div>
         </div>
@@ -164,12 +161,12 @@ export function PublishReviewPage() {
   async function publishNow() {
     if (!preview) return;
     await runAction(async () => {
-      const result = await publishing.publishDraft.mutateAsync({
+      await publishing.publishDraft.mutateAsync({
         draftId: preview.draftId,
         expectedDraftRevision: preview.draftRevision,
         expectedVersion: preview.currentPublishVersion,
       });
-      setNotice(`Published as version ${result.publishVersion}.`);
+      setNotice('Catalog published.');
     });
   }
 
@@ -199,11 +196,11 @@ export function PublishReviewPage() {
     if (!data) return;
     setPendingRestoreVersion(sourcePublishVersion);
     await runAction(async () => {
-      const result = await publishing.restoreVersion.mutateAsync({
+      await publishing.restoreVersion.mutateAsync({
         sourcePublishVersion,
         expectedVersion: data.currentPublishVersion,
       });
-      setNotice(`Restored as version ${result.publishVersion}.`);
+      setNotice('The selected catalog version was restored and published.');
     });
     setPendingRestoreVersion(null);
   }
@@ -219,11 +216,11 @@ export function PublishReviewPage() {
     <PageScaffold
       eyebrow="Catalog"
       title="Review & publish"
-      description="Review trusted draft differences, control weekly availability, publish immediately, schedule in Cairo time, or restore a historical version as a new version."
+      description="Review catalog changes, publish now, schedule a Cairo activation time, or restore an earlier release."
       primaryAction={
-        <a className="admin-secondary-button admin-publish-back-link" href="/catalog/products">
+        <Link className="admin-secondary-button admin-publish-back-link" href="/catalog/products">
           Back to products
-        </a>
+        </Link>
       }
     >
       {notice ? (
@@ -251,8 +248,8 @@ export function PublishReviewPage() {
         <div className="admin-publish-page">
           <div className="admin-publish-live-bar">
             <div>
-              <span className="admin-catalog-editor__eyebrow">Canonical state</span>
-              <strong>Live version {data.currentPublishVersion}</strong>
+              <span className="admin-catalog-editor__eyebrow">Catalog status</span>
+              <strong>Live</strong>
             </div>
             <span className="admin-status-pill">Shop scoped</span>
           </div>
@@ -268,15 +265,15 @@ export function PublishReviewPage() {
 
           {draftPreviews.length > 1 ? (
             <label className="admin-field">
-              <span>Draft to review</span>
+              <span>Changes to review</span>
               <select
-                aria-label="Draft to review"
+                aria-label="Changes to review"
                 value={preview?.draftId ?? ''}
                 onChange={(event) => setSelectedDraftId(event.target.value)}
               >
-                {draftPreviews.map((candidate) => (
+                {draftPreviews.map((candidate, index) => (
                   <option key={candidate.draftId} value={candidate.draftId}>
-                    Draft {candidate.draftId.slice(0, 8)} · r{candidate.draftRevision}
+                    Saved changes {index + 1}
                   </option>
                 ))}
               </select>
@@ -288,8 +285,10 @@ export function PublishReviewPage() {
               {preview.stale ? (
                 <div className="admin-callout is-warning">
                   <div>
-                    <strong>Draft is based on an older live version</strong>
-                    <span>Refresh/rebase the draft before publishing or scheduling it.</span>
+                    <strong>These changes need to be refreshed</strong>
+                    <span>
+                      The live catalog changed after this work was saved. Refresh before publishing.
+                    </span>
                   </div>
                 </div>
               ) : null}
@@ -304,8 +303,7 @@ export function PublishReviewPage() {
                   </div>
                 </div>
                 <p className="admin-publish-card__copy">
-                  Publishing creates a new immutable version and updates the canonical Operations
-                  configuration. Browser state never becomes the source of truth.
+                  Make these reviewed changes visible to customers and Operations.
                 </p>
                 <button
                   className="admin-primary-button"
@@ -335,7 +333,7 @@ export function PublishReviewPage() {
             <section className="admin-publish-card" aria-labelledby="scheduled-publishes-heading">
               <div className="admin-publish-card__heading">
                 <div>
-                  <p className="admin-catalog-editor__eyebrow">Durable jobs</p>
+                  <p className="admin-catalog-editor__eyebrow">Upcoming</p>
                   <h2 id="scheduled-publishes-heading">Scheduled publishes</h2>
                 </div>
               </div>
@@ -348,16 +346,11 @@ export function PublishReviewPage() {
                         <span className="admin-status-pill">{scheduleStatusLabel(schedule)}</span>
                       </div>
                       <span>Cairo timezone</span>
-                      <span>Target base version {schedule.targetBasePublishVersion ?? '—'}</span>
-                      {schedule.status === 'FAILED' && !schedule.terminalFailure ? (
+                      {schedule.status === 'FAILED' ? (
                         <span>
-                          Next retry {schedule.nextAttemptAt ?? 'pending scheduler assignment'}
+                          We could not complete this publish. Review the changes and schedule it
+                          again.
                         </span>
-                      ) : null}
-                      {schedule.status === 'FAILED' &&
-                      schedule.terminalFailure &&
-                      schedule.lastError ? (
-                        <span>Failure: {schedule.lastError}</span>
                       ) : null}
                     </div>
                     <button

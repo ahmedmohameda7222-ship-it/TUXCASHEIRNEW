@@ -1,4 +1,8 @@
-import type { AdminCustomerDetail, AdminLoyaltyProgram } from '@tux/admin-contracts';
+import type {
+  AdminCustomerDetail,
+  AdminLoyaltyProgram,
+  AdminReasonCodeConfiguration,
+} from '@tux/admin-contracts';
 import { useState, type FormEvent } from 'react';
 
 export type LoyaltyAdjustmentInput = {
@@ -7,15 +11,28 @@ export type LoyaltyAdjustmentInput = {
   note: string | null;
 };
 
+function loyaltyEventLabel(eventType: string): string {
+  const labels: Record<string, string> = {
+    EARN: 'Points earned',
+    REDEEM: 'Points redeemed',
+    ADJUSTMENT: 'Manual adjustment',
+    EXPIRY: 'Points expired',
+    REFUND: 'Refund adjustment',
+  };
+  return labels[eventType] ?? 'Loyalty update';
+}
+
 export function LoyaltyPanel({
   customer,
   program,
+  reasons,
   canManage,
   saving,
   onAdjust,
 }: {
   customer: AdminCustomerDetail;
   program: AdminLoyaltyProgram | null;
+  reasons: readonly AdminReasonCodeConfiguration[];
   canManage: boolean;
   saving: boolean;
   onAdjust(input: LoyaltyAdjustmentInput): void;
@@ -56,7 +73,7 @@ export function LoyaltyPanel({
           </div>
           <div>
             <dt>Redemption value</dt>
-            <dd>{program.redemptionMinorPerPoint} minor / point</dd>
+            <dd>1 point = EGP {(program.redemptionMinorPerPoint / 100).toFixed(2)}</dd>
           </div>
           <div>
             <dt>Minimum redemption</dt>
@@ -73,14 +90,15 @@ export function LoyaltyPanel({
         <p>No loyalty program configured.</p>
       )}
 
-      <h4>Ledger history</h4>
+      <h4>Points history</h4>
       {customer.loyaltyHistory.length === 0 ? (
         <p>No loyalty events.</p>
       ) : (
         <ul>
           {customer.loyaltyHistory.map((event) => (
             <li key={event.id}>
-              <strong>{event.eventType}</strong> · {event.pointsDelta > 0 ? '+' : ''}
+              <strong>{loyaltyEventLabel(event.eventType)}</strong> ·{' '}
+              {event.pointsDelta > 0 ? '+' : ''}
               {event.pointsDelta}
               {event.note ? ` · ${event.note}` : ''}
             </li>
@@ -100,12 +118,19 @@ export function LoyaltyPanel({
             />
           </label>
           <label className="admin-field">
-            <span>Reason code</span>
-            <input
+            <span>Reason</span>
+            <select
               value={reasonCodeId}
               onChange={(event) => setReasonCodeId(event.target.value)}
               required
-            />
+            >
+              <option value="">Choose a reason</option>
+              {reasons.map((reason) => (
+                <option key={reason.id} value={reason.id}>
+                  {reason.label}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="admin-field">
             <span>Note</span>
