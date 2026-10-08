@@ -339,6 +339,10 @@ const correction=rpc(`public.finance_adjust_snapshot_v1(
   '${e}'::uuid,'${s}'::uuid,'${z.snapshotId}'::uuid,100,
   'Explicit correction event','test-correction')`,'append correction');
 assert.equal(correction.ok,true);
+const frozenZAfterCorrection=rpc(`(select snapshot from public.end_day_financial_snapshots
+ where id='${z.snapshotId}'::uuid)`,'financial Z after later adjustment');
+assert.deepEqual(frozenZAfterCorrection,finalizedZ,
+ 'later immutable adjustment must not rewrite any frozen Z financial or movement facts');
 sql(`update public.end_day_financial_snapshots set snapshot='{}' where id='${z.snapshotId}'`,'Z immutable',true);
 assert.equal(sql(`select status from public.business_days where id='${day}'`,'Admin never reopens'),'CLOSED');
 
