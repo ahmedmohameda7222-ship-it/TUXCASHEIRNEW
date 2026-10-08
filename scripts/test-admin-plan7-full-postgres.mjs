@@ -232,6 +232,7 @@ assert.equal(rpc(`public.finance_finalize_day_v1(
   '${e}'::uuid,'${s}'::uuid,'${day}'::uuid,'finalize-after-ops')`,'idempotent Z').replayed,true);
 assert.equal(sql(`select count(*) from public.end_day_financial_snapshots where business_day_id='${day}'`,'single Z'),'1');
 assert.equal(sql(`select count(*) from public.daily_owner_summaries where business_day_id='${day}'`,'owner summary created'),'1');
+assert.equal(sql(`select summary->>'cashVarianceMinor' from public.daily_owner_summaries where business_day_id='${day}'`,'monetary cash variance'),'0');
 const correction=rpc(`public.finance_adjust_snapshot_v1(
   '${e}'::uuid,'${s}'::uuid,'${z.snapshotId}'::uuid,100,
   'Explicit correction event','test-correction')`,'append correction');
