@@ -30,7 +30,9 @@ export function EndDayPage() {
   const dayId = selectedDay ?? days[0]?.id;
   const detail = useFinanceOperations(shopId, dayId);
   const report = detail.dayQuery.data;
-  const cashierNames = new Map((detail.cashierQuery.data?.workers ?? []).map((w) => [w.id, w.display_name]));
+  const cashierNames = new Map(
+    (detail.cashierQuery.data?.workers ?? []).map((w) => [w.id, w.display_name]),
+  );
   const canReconcile = principal.permissions.includes('finance.reconcile');
   const canAdjust = principal.permissions.includes('finance.adjust');
 
