@@ -37,7 +37,7 @@ export type FinanceCommandResult = {
   readonly version?: number;
 };
 
-export function useFinance(shopId: string | undefined, accountId: string | null) {
+export function useFinance(shopId: string | undefined, accountId: string | null, movementId: string | null = null) {
   const session = useAdminSession();
   const client = useQueryClient();
   const namespace =
@@ -54,11 +54,11 @@ export function useFinance(shopId: string | undefined, accountId: string | null)
   });
 
   const historyQuery = useQuery({
-    queryKey: ['admin', 'finance', shopId, 'history', accountId],
+    queryKey: ['admin', 'finance', shopId, 'history', accountId, movementId],
     enabled: Boolean(shopId && accountId),
     queryFn: () =>
       adminFetch<{ accountId: string; movements: FinanceAccountActivity[] }>(
-        `/api/admin/finance?shopId=${encodeURIComponent(shopId!)}&view=account-history&accountId=${encodeURIComponent(accountId!)}`,
+        `/api/admin/finance?shopId=${encodeURIComponent(shopId!)}&view=account-history&accountId=${encodeURIComponent(accountId!)}${movementId ? `&movementId=${encodeURIComponent(movementId)}` : ''}`,
       ).then((response) => response.movements),
   });
 
