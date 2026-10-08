@@ -40,7 +40,7 @@ create function auth.uid() returns uuid language sql stable as $$ select nullif(
 const migrations = readdirSync(resolve('supabase/migrations'))
   .filter((name) => /^\d+_.+\.sql$/.test(name))
   .sort();
-const target = '20261008070000_admin_plan7_finance_setup.sql';
+const target = '20261008072000_admin_plan7_finance_workspace.sql';
 assert(migrations.includes(target), 'setup migration missing');
 for (const name of migrations.slice(0, migrations.indexOf(target) + 1)) {
   const result = spawnSync('psql', [databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', '-f', resolve('supabase/migrations', name)], {
@@ -71,6 +71,10 @@ insert into public.payment_methods(id,shop_id,display_name,logic_type,active,sor
   values ('${pm}','${s}','Cash','CASH',true,1);
 `, 'zero-account fixture');
 assert.equal(psql('select count(*) from public.finance_accounts', 'no account seeding'), '0');
+const zeroWorkspace = rpc(`public.finance_workspace_v1('${e}'::uuid,'${s}'::uuid)`, 'zero-account workspace');
+assert.equal(zeroWorkspace.setupState, 'SETUP_REQUIRED');
+assert.deepEqual(zeroWorkspace.accounts, []);
+assert.equal(zeroWorkspace.moneyPosition, null);
 assert.equal(psql('select count(*) from public.payment_method_finance_accounts', 'no mapping seeding'), '0');
 
 const callCreate = (name, commandId = 'create-cash') =>
@@ -81,6 +85,9 @@ assert.equal(created.replayed, false);
 assert.equal(rpc(callCreate('Front Till'), 'idempotent account replay').replayed, true);
 assert.equal(rpc(callCreate('Changed Name'), 'conflicting account replay').code, 'finance_command_conflict');
 assert.equal(psql('select count(*) from public.finance_accounts', 'no duplicate account'), '1');
+const beforeMap = rpc(`public.finance_workspace_v1('${e}'::uuid,'${s}'::uuid)`, 'unmapped workspace');
+assert.equal(beforeMap.setupState, 'NEEDS_ATTENTION');
+assert.equal(beforeMap.moneyPosition.totalTrackedMoneyMinor, 12500);
 
 const accountId = created.accountId;
 const callMap = (accountIdInput, version, commandId) =>
@@ -92,6 +99,10 @@ assert.equal(mapped.version, 1);
 assert.equal(rpc(callMap(accountId, 0, 'map-1'), 'mapping replay').replayed, true);
 assert.equal(rpc(callMap(accountId, 0, 'stale-map'), 'stale version conflict').code, 'finance_mapping_version_conflict');
 assert.equal(psql('select count(*) from public.payment_method_finance_accounts where active', 'one active mapping'), '1');
+const linkedWorkspace = rpc(`public.finance_workspace_v1('${e}'::uuid,'${s}'::uuid)`, 'mapped workspace');
+assert.equal(linkedWorkspace.setupState, 'READY');
+assert.equal(linkedWorkspace.accounts[0].balanceMinor, 12500);
+assert.equal(linkedWorkspace.paymentMethods[0].mappingVersion, 1);
 
 const stillMapped = rpc(
   `public.set_finance_account_active_v1('${e}'::uuid,'${s}'::uuid,'${accountId}'::uuid,1,false,'deactivate-before-unmap')`,
