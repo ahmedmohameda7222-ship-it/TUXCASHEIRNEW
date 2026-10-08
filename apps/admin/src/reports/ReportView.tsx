@@ -79,6 +79,7 @@ export function ReportView({
           description="There are no matching records for this shop and date range."
         />
       ) : (
+        <div className="tux-report-results">
         <ul className="tux-report-mobile-entries" aria-label="Report entries">
           {data.rows.map((fact) => {
             const href = sourceLink(fact.sourceKind, fact.id);
@@ -124,6 +125,7 @@ export function ReportView({
               })}
             </tbody>
           </table>
+        </div>
         </div>
       )}
       <nav className="tux-report-pagination" aria-label="Report pages">
