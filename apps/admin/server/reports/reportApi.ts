@@ -136,48 +136,60 @@ export async function handleReportsRequest(
       }
       if (query.get('view') === 'filter-options') {
         const definitions = [
-          ['orderTypes','order_types','name'],
-          ['paymentMethods','payment_methods','display_name'],
-          ['workers','workers','display_name'],
-          ['customers','customer_contacts','name'],
-          ['products','products','name'],
-          ['categories','menu_categories','name'],
-          ['deliveryZones','delivery_zones','name'],
+          ['orderTypes', 'order_types', 'name'],
+          ['paymentMethods', 'payment_methods', 'display_name'],
+          ['workers', 'workers', 'display_name'],
+          ['customers', 'customer_contacts', 'name'],
+          ['products', 'products', 'name'],
+          ['categories', 'menu_categories', 'name'],
+          ['deliveryZones', 'delivery_zones', 'name'],
         ] as const;
-        const optionSets = await Promise.all(definitions.map(async ([key, table, label]) => {
-          const rows = await client.select<Array<Record<string, unknown>>>(
-            table,
-            new URLSearchParams({
-              select: `id,${label}`,
-              shop_id: `eq.${shopId}`,
-              order: `${label}.asc`,
-              limit: '100',
-            }),
-          );
-          return [key,rows.map((item) => ({ id: item['id'], label: item[label] || 'Unnamed' }))] as const;
-        }));
-        if (principal.role === 'OWNER' || principal.role === 'ADMIN') {
-          const businessDefinitions = [
-            ['promotions','promotion_rules','name'],
-            ['suppliers','suppliers','name'],
-            ['employees','business_employees','display_name'],
-          ] as const;
-          const businessSets = await Promise.all(businessDefinitions.map(async ([key,table,label]) => {
+        const optionSets = await Promise.all(
+          definitions.map(async ([key, table, label]) => {
             const rows = await client.select<Array<Record<string, unknown>>>(
               table,
               new URLSearchParams({
                 select: `id,${label}`,
-                business_id: `eq.${principal.businessId}`,
+                shop_id: `eq.${shopId}`,
                 order: `${label}.asc`,
                 limit: '100',
               }),
             );
-            return [key,rows.map((item) => ({ id: item['id'], label: item[label] || 'Unnamed' }))] as const;
-          }));
-          sendJson(response,200,{ options: Object.fromEntries([...optionSets,...businessSets]) });
+            return [
+              key,
+              rows.map((item) => ({ id: item['id'], label: item[label] || 'Unnamed' })),
+            ] as const;
+          }),
+        );
+        if (principal.role === 'OWNER' || principal.role === 'ADMIN') {
+          const businessDefinitions = [
+            ['promotions', 'promotion_rules', 'name'],
+            ['suppliers', 'suppliers', 'name'],
+            ['employees', 'business_employees', 'display_name'],
+          ] as const;
+          const businessSets = await Promise.all(
+            businessDefinitions.map(async ([key, table, label]) => {
+              const rows = await client.select<Array<Record<string, unknown>>>(
+                table,
+                new URLSearchParams({
+                  select: `id,${label}`,
+                  business_id: `eq.${principal.businessId}`,
+                  order: `${label}.asc`,
+                  limit: '100',
+                }),
+              );
+              return [
+                key,
+                rows.map((item) => ({ id: item['id'], label: item[label] || 'Unnamed' })),
+              ] as const;
+            }),
+          );
+          sendJson(response, 200, {
+            options: Object.fromEntries([...optionSets, ...businessSets]),
+          });
           return;
         }
-        sendJson(response,200,{ options: Object.fromEntries(optionSets) });
+        sendJson(response, 200, { options: Object.fromEntries(optionSets) });
         return;
       }
       const shops = query.getAll('reportShopId');
@@ -189,14 +201,17 @@ export async function handleReportsRequest(
       for (const id of selected) requirePermission(principal, 'reports.view', id);
       if (query.get('view') === 'dashboard') {
         const dateToday = new Intl.DateTimeFormat('en-CA', {
-          timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit',
+          timeZone: 'Africa/Cairo',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
         }).format(new Date());
         const from = isoDate.parse(query.get('from') ?? dateToday);
         const to = isoDate.parse(query.get('to') ?? dateToday);
         const fromMs = safeDate(from);
         const toMs = safeDate(to);
         if (fromMs > toMs || toMs - fromMs > 31 * 86400000) {
-          sendJson(response,400,{ error:'dashboard_range_invalid' });
+          sendJson(response, 400, { error: 'dashboard_range_invalid' });
           return;
         }
         const result = await client.rpc<Record<string, unknown>>(
@@ -209,10 +224,10 @@ export async function handleReportsRequest(
           },
         );
         if (result['ok'] !== true) {
-          rpcFailure(response,result);
+          rpcFailure(response, result);
           return;
         }
-        sendJson(response,200,result);
+        sendJson(response, 200, result);
         return;
       }
       const selectedArea = area.parse(query.get('area') ?? 'sales');
@@ -243,23 +258,39 @@ export async function handleReportsRequest(
         .max(20000)
         .parse(query.get('offset') ?? '0');
       const source = z.enum(['POS', 'ONLINE']).nullable().parse(query.get('source'));
-      const contextSchema = z.object({
-        orderTypeId: uuid.optional(),
-        paymentMethodId: uuid.optional(),
-        workerId: uuid.optional(),
-        employeeId: uuid.optional(),
-        customerId: uuid.optional(),
-        productId: uuid.optional(),
-        categoryId: uuid.optional(),
-        promotionId: uuid.optional(),
-        supplierId: uuid.optional(),
-        deliveryZoneId: uuid.optional(),
-        status: z.string().regex(/^[A-Z_]{2,40}$/).optional(),
-      }).strict();
+      const contextSchema = z
+        .object({
+          orderTypeId: uuid.optional(),
+          paymentMethodId: uuid.optional(),
+          workerId: uuid.optional(),
+          employeeId: uuid.optional(),
+          customerId: uuid.optional(),
+          productId: uuid.optional(),
+          categoryId: uuid.optional(),
+          promotionId: uuid.optional(),
+          supplierId: uuid.optional(),
+          deliveryZoneId: uuid.optional(),
+          status: z
+            .string()
+            .regex(/^[A-Z_]{2,40}$/)
+            .optional(),
+        })
+        .strict();
       const context = contextSchema.parse(
         Object.fromEntries(
-          ['orderTypeId','paymentMethodId','workerId','employeeId','customerId',
-           'productId','categoryId','promotionId','supplierId','deliveryZoneId','status']
+          [
+            'orderTypeId',
+            'paymentMethodId',
+            'workerId',
+            'employeeId',
+            'customerId',
+            'productId',
+            'categoryId',
+            'promotionId',
+            'supplierId',
+            'deliveryZoneId',
+            'status',
+          ]
             .filter((key) => query.has(key))
             .map((key) => [key, query.get(key)]),
         ),
@@ -283,7 +314,10 @@ export async function handleReportsRequest(
         rpcFailure(response, current);
         return;
       }
-      const comparison = z.enum(['previous','week','month','year']).nullable().parse(query.get('compare'));
+      const comparison = z
+        .enum(['previous', 'week', 'month', 'year'])
+        .nullable()
+        .parse(query.get('compare'));
       if (comparison === null) {
         sendJson(response, 200, current);
         return;
@@ -301,8 +335,8 @@ export async function handleReportsRequest(
         previousTo = dateLabel(end);
       } else if (comparison === 'year') {
         const y = new Date(fromUtc).getUTCFullYear() - 1;
-        previousFrom = dateLabel(Date.UTC(y,0,1));
-        previousTo = dateLabel(Date.UTC(y,11,31));
+        previousFrom = dateLabel(Date.UTC(y, 0, 1));
+        previousTo = dateLabel(Date.UTC(y, 11, 31));
       }
       const previous = await client.rpc<Record<string, unknown>>('admin_finance_report_query_v2', {
         ...args,
