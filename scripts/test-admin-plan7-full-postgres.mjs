@@ -275,11 +275,37 @@ const reportConfig=rpc(`public.admin_report_config_query_v1('${e}'::uuid,'${s}':
 assert.equal(reportConfig.targets.length,1);
 assert.equal(reportConfig.savedViews.length,1);
 
+// A physical cash drawer includes recorded float and drawer pay-in/out,
+ // not only paid cash orders. Use canonical worker-provenance money movements.
+sql(`insert into public.finance_movements(
+ business_id,shop_id,finance_account_id,movement_type,amount_minor,
+ command_id,request_fingerprint,actor_worker_id)
+values
+ ('${b}','${s}','${cashId}','OPENING_FLOAT',2500,'drawer-float',
+  repeat('1',64),'${w}'),
+ ('${b}','${s}','${cashId}','PAY_IN',1000,'drawer-pay-in',
+  repeat('2',64),'${w}'),
+ ('${b}','${s}','${cashId}','PAY_OUT',-300,'drawer-pay-out',
+  repeat('3',64),'${w}');`,'trusted cashier float and pay-in/out');
+const drawer=rpc(`private.plan7_drawer_facts_v1(
+ '${b}'::uuid,'${s}'::uuid,'${day}'::uuid,'${w}'::uuid)`,
+ 'materialized drawer cash evidence');
+assert.equal(drawer.cashSalesExpectationMinor,0);
+assert.equal(drawer.recordedCashMovementMinor,3200);
+assert.equal(drawer.recordedDrawerExpectationMinor,3200);
+assert.equal(drawer.openingFloatRecorded,true);
+const drawerWorkspace=rpc(`public.finance_cashier_expectations_v1(
+ '${e}'::uuid,'${s}'::uuid,'${day}'::uuid)`,'cashier drawer read model');
+assert.equal(drawerWorkspace.ok,true);
+assert.equal(drawerWorkspace.cashiers.find(c=>c.cashierWorkerId===w).expectedMinor,3200);
+
 sql(`update public.business_days set status='CLOSED',ended_at=now(),
   ended_by_worker_id='${w}' where id='${day}';`,'fixture Operations close');
 const cashier=rpc(`public.finance_reconcile_cashier_v1(
-  '${e}'::uuid,'${s}'::uuid,'${day}'::uuid,'${w}'::uuid,0,null::text,'count-zero')`,'cashier count');
+  '${e}'::uuid,'${s}'::uuid,'${day}'::uuid,'${w}'::uuid,3300,'Recorded cash overage','count-positive')`,'cashier count');
 assert.equal(cashier.ok,true);
+assert.equal(cashier.expectedMinor,3200);
+assert.equal(cashier.varianceMinor,100);
 const z=rpc(`public.finance_finalize_day_v1(
   '${e}'::uuid,'${s}'::uuid,'${day}'::uuid,'finalize-after-ops')`,'finalize financial Z');
 assert.equal(z.ok,true);
@@ -287,7 +313,7 @@ assert.equal(rpc(`public.finance_finalize_day_v1(
   '${e}'::uuid,'${s}'::uuid,'${day}'::uuid,'finalize-after-ops')`,'idempotent Z').replayed,true);
 assert.equal(sql(`select count(*) from public.end_day_financial_snapshots where business_day_id='${day}'`,'single Z'),'1');
 assert.equal(sql(`select count(*) from public.daily_owner_summaries where business_day_id='${day}'`,'owner summary created'),'1');
-assert.equal(sql(`select summary->>'cashVarianceMinor' from public.daily_owner_summaries where business_day_id='${day}'`,'monetary cash variance'),'0');
+assert.equal(sql(`select summary->>'cashVarianceMinor' from public.daily_owner_summaries where business_day_id='${day}'`,'monetary cash variance'),'100');
 const correction=rpc(`public.finance_adjust_snapshot_v1(
   '${e}'::uuid,'${s}'::uuid,'${z.snapshotId}'::uuid,100,
   'Explicit correction event','test-correction')`,'append correction');
