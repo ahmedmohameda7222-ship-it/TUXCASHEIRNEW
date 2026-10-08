@@ -145,9 +145,18 @@ function FinanceProfitSummary({ summary }: { summary: ProfitSummary | null }) {
             {formatEgp(summary.estimatedOperatingProfitMinor)}
           </strong>
           <dl className="tux-finance-position__breakdown">
-            <div><dt>Net sales</dt><dd>{formatEgp(summary.netSalesMinor)}</dd></div>
-            <div><dt>COGS</dt><dd>{formatEgp(summary.cogsMinor)}</dd></div>
-            <div><dt>Expenses</dt><dd>{formatEgp(summary.expensesMinor)}</dd></div>
+            <div>
+              <dt>Net sales</dt>
+              <dd>{formatEgp(summary.netSalesMinor)}</dd>
+            </div>
+            <div>
+              <dt>COGS</dt>
+              <dd>{formatEgp(summary.cogsMinor)}</dd>
+            </div>
+            <div>
+              <dt>Expenses</dt>
+              <dd>{formatEgp(summary.expensesMinor)}</dd>
+            </div>
           </dl>
         </>
       ) : (

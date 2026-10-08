@@ -17,7 +17,11 @@ async function mockReports(page: Page) {
   const queries: URLSearchParams[] = [];
   const commands: Array<Record<string, unknown>> = [];
   await page.route('**/api/admin/session', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(session) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(session),
+    });
   });
   await page.route('**/api/admin/reports**', async (route) => {
     const request = route.request();
@@ -60,32 +64,36 @@ async function mockReports(page: Page) {
           incompleteCostEvents: 0,
           coverageNote: null,
         },
-        rows: [{
-          id: '44444444-4444-4444-8444-444444444444',
-          shopId,
-          occurredAt: '2026-10-08T09:00:00.000Z',
-          sourceKind: 'payment',
-          label: 'Cash payment',
-          amountMinor: 12500,
-          quantity: 1,
-          orderSource: 'POS',
-          costMissing: false,
-        }],
-        nextOffset: null,
-        ...(compare ? {
-          comparison: {
-            periodStart: '2026-10-07',
-            periodEnd: '2026-10-07',
-            summary: {
-              eventCount: 1,
-              orderCount: 1,
-              totalAmountMinor: 9000,
-              totalQuantity: 1,
-              incompleteCostEvents: 0,
-              coverageNote: null,
-            },
+        rows: [
+          {
+            id: '44444444-4444-4444-8444-444444444444',
+            shopId,
+            occurredAt: '2026-10-08T09:00:00.000Z',
+            sourceKind: 'payment',
+            label: 'Cash payment',
+            amountMinor: 12500,
+            quantity: 1,
+            orderSource: 'POS',
+            costMissing: false,
           },
-        } : {}),
+        ],
+        nextOffset: null,
+        ...(compare
+          ? {
+              comparison: {
+                periodStart: '2026-10-07',
+                periodEnd: '2026-10-07',
+                summary: {
+                  eventCount: 1,
+                  orderCount: 1,
+                  totalAmountMinor: 9000,
+                  totalQuantity: 1,
+                  incompleteCostEvents: 0,
+                  coverageNote: null,
+                },
+              },
+            }
+          : {}),
       }),
     });
   });
@@ -102,14 +110,19 @@ test('reports preserve source filtering and period comparison on server-side req
   await page.getByLabel('Order source').selectOption('POS');
   await expect.poll(() => queries.some((query) => query.get('source') === 'POS')).toBe(true);
   await page.getByLabel('Compare previous period').check();
-  await expect.poll(() => queries.some((query) =>
-    query.get('source') === 'POS' && query.get('compare') === 'previous')).toBe(true);
+  await expect
+    .poll(() =>
+      queries.some((query) => query.get('source') === 'POS' && query.get('compare') === 'previous'),
+    )
+    .toBe(true);
   await expect(page.getByText('Previous period recorded amount')).toBeVisible();
   await page.getByLabel('Report', { exact: true }).selectOption('expenses');
   await expect.poll(() => queries.some((query) => query.get('area') === 'expenses')).toBe(true);
 });
 
-test('saved report views send one authorized CSRF-protected versioned command', async ({ page }) => {
+test('saved report views send one authorized CSRF-protected versioned command', async ({
+  page,
+}) => {
   const { commands } = await mockReports(page);
   await page.goto('/reports');
   await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();

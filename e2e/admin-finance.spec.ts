@@ -67,7 +67,11 @@ const workspace = {
 async function mockFinance(page: Page, dayStatus: 'OPEN' | 'CLOSED' = 'OPEN') {
   const postedCommands: Array<Record<string, unknown>> = [];
   await page.route('**/api/admin/session', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(session) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(session),
+    });
   });
   await page.route('**/api/admin/finance**', async (route) => {
     const request = route.request();
@@ -88,13 +92,15 @@ async function mockFinance(page: Page, dayStatus: 'OPEN' | 'CLOSED' = 'OPEN') {
     let data: unknown = workspace;
     if (view === 'days') {
       data = {
-        days: [{
-          id: businessDayId,
-          shop_id: shopId,
-          status: dayStatus,
-          started_at: '2026-10-08T06:00:00.000Z',
-          ended_at: dayStatus === 'CLOSED' ? '2026-10-08T16:00:00.000Z' : null,
-        }],
+        days: [
+          {
+            id: businessDayId,
+            shop_id: shopId,
+            status: dayStatus,
+            started_at: '2026-10-08T06:00:00.000Z',
+            ended_at: dayStatus === 'CLOSED' ? '2026-10-08T16:00:00.000Z' : null,
+          },
+        ],
       };
     } else if (view === 'day') {
       expect(url.searchParams.get('businessDayId')).toBe(businessDayId);
@@ -126,7 +132,11 @@ async function mockFinance(page: Page, dayStatus: 'OPEN' | 'CLOSED' = 'OPEN') {
     } else if (view === 'owner-summary') {
       data = { summaries: [] };
     }
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(data),
+    });
   });
   return postedCommands;
 }
@@ -141,7 +151,9 @@ test('Bank & Cash keeps tracked money distinct from profit and posts a transfer 
   await expect(page.getByText('Estimated Operating Profit')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Money movement' })).toBeVisible();
   await page.getByRole('button', { name: 'Money movement' }).click();
-  await expect(page.getByText('Internal transfers do not create sales or operating profit.')).toBeVisible();
+  await expect(
+    page.getByText('Internal transfers do not create sales or operating profit.'),
+  ).toBeVisible();
   await page.getByLabel('From account').selectOption(cashAccountId);
   await page.getByLabel('To account').selectOption(bankAccountId);
   await page.getByLabel('Amount (EGP)').fill('20.00');
