@@ -26,10 +26,12 @@ describe('Plan 7 report domain permissions', () => {
       { metric: 'WASTE', targetValue: 15 },
     ];
     expect(filterAuthorizedReportTargets(staff, targets)).toEqual([targets[0]]);
-    expect(filterAuthorizedReportTargets(
-      { ...staff, role: 'MANAGER', permissions: ['reports.view', 'inventory.view'] },
-      targets,
-    )).toEqual([targets[0], targets[2]]);
+    expect(
+      filterAuthorizedReportTargets(
+        { ...staff, role: 'MANAGER', permissions: ['reports.view', 'inventory.view'] },
+        targets,
+      ),
+    ).toEqual([targets[0], targets[2]]);
     expect(filterAuthorizedReportTargets(staff, [{ metric: 'UNKNOWN' }])).toEqual([]);
   });
 
