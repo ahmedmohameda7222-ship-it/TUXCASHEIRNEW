@@ -51,6 +51,16 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: 24, cache: npm }
       - run: npm ci
+      - name: Preview Plan 7 Prettier formatting
+        run: |
+          echo PRETTIER_CALCULATIONS_BEGIN
+          npx prettier apps/admin/server/finance/calculations.ts | base64 -w0
+          echo
+          echo PRETTIER_CALCULATIONS_END
+          echo PRETTIER_TEST_BEGIN
+          npx prettier apps/admin/server/finance/calculations.test.ts | base64 -w0
+          echo
+          echo PRETTIER_TEST_END
       - run: npm run format:check
       - run: npm run lint
       - run: npx vitest run apps/admin/server/finance/calculations.test.ts
