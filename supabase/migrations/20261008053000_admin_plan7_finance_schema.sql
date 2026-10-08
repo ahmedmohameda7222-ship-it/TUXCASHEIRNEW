@@ -256,7 +256,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = pg_catalog, public, private
-as $
+as $$
 declare
   v_status text;
 begin
@@ -269,7 +269,7 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 
 create trigger end_day_financial_snapshots_closed_guard
 before insert on public.end_day_financial_snapshots
