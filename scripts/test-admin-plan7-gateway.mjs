@@ -26,8 +26,7 @@ assert.match(financeApi,/if \(account\.shop_id !== null\) movementQuery\.set\('s
   'shop-scoped histories must be filtered without hiding business-wide movements');
 const playwrightConfig=fs.readFileSync('playwright.admin.config.ts','utf8');
 const plan7Workflow=fs.readFileSync('.github/workflows/admin-plan7-finance-reports-tdd.yml','utf8');
-assert.match(playwrightConfig,/\\.spec\\.ts|finance\\|reports/,
-  'Finance and Reports must be included in permanent Admin Playwright testMatch');
+assert(playwrightConfig.includes('workforce|finance|reports'), 'Plan 7 tests are matched');
 assert.match(plan7Workflow,/test:e2e:admin/,
   'Plan 7 permanent workflow must execute real browser E2E, not only static gates');
 assert.match(cron,/timingSafeEqual/);
