@@ -192,5 +192,6 @@ for (const vp of [{ width: 390, height: 844 }, { width: 768, height: 1024 }, { w
     await page.goto('/finance');
     await expect(page.getByText('Total tracked money')).toBeVisible();
     await expect(page.getByText('Estimated Operating Profit')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 }
