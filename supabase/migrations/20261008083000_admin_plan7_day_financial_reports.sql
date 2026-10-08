@@ -30,6 +30,7 @@ declare
   v_cash_refunds bigint;
   v_expenses bigint;
   v_staff_expenses bigint;
+  v_bank_fees bigint;
   v_cogs bigint;
   v_missing bigint;
   v_waste bigint;
@@ -83,6 +84,15 @@ begin
   where s.business_id=v_business_id and s.shop_id=p_shop_id
     and s.created_at>=v_day.started_at
     and s.created_at<coalesce(v_day.ended_at,now());
+
+  -- Provider fees are expenses, not transfers. Recognize fees on ledger posting
+  -- within the business-day window without rewriting settled money movements.
+  select coalesce(sum(-fm.amount_minor),0)::bigint into v_bank_fees
+  from public.finance_movements fm
+  where fm.business_id=v_business_id and fm.shop_id=p_shop_id
+    and fm.movement_type='BANK_FEE'
+    and fm.created_at>=v_day.started_at
+    and fm.created_at<coalesce(v_day.ended_at,now());
 
   select count(*) filter(where m.unit_cost_minor is null),
     coalesce(round(sum(-m.quantity_delta_micros::numeric*m.unit_cost_minor/1000000)),0)::bigint,
@@ -157,12 +167,14 @@ begin
     'postedRefundsMinor',v_refunds,'netSalesMinor',v_allocated-v_refunds,
     'cashPaymentsMinor',v_cash,'cashRefundsMinor',v_cash_refunds,
     'cashSalesNetMinor',v_cash-v_cash_refunds,
-    'operatingExpensesMinor',v_expenses,'staffPaymentsMinor',v_staff_expenses,
-    'totalExpensesMinor',v_expenses+v_staff_expenses,
+    'operatingExpensesMinor',v_expenses+v_bank_fees,
+    'manualExpensesMinor',v_expenses,'staffPaymentsMinor',v_staff_expenses,
+    'bankFeesMinor',v_bank_fees,
+    'totalExpensesMinor',v_expenses+v_staff_expenses+v_bank_fees,
     'cogsMinor',case when v_missing>0 then null else v_cogs end,
     'estimatedOperatingProfitMinor',
        case when v_missing>0 then null
-         else v_allocated-v_refunds-v_cogs-v_expenses-v_staff_expenses end,
+         else v_allocated-v_refunds-v_cogs-v_expenses-v_staff_expenses-v_bank_fees end,
     'wasteCostMinor',v_waste,'missingInventoryCostCount',v_missing,
     'unattributedPaymentCount',v_unmapped,
     'paymentBreakdown',v_breakdown,'cashierReconciliations',v_reconciliations,

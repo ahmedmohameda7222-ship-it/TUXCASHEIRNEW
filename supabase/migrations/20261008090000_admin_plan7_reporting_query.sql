@@ -74,7 +74,9 @@ begin
     select m.id::text,m.shop_id,m.created_at,'inventory-movement',
       coalesce(i.name,m.movement_type),
       case when m.unit_cost_minor is not null then
-        round(-m.quantity_delta_micros::numeric*m.unit_cost_minor/1000000)
+        round(case when v_area='profit'
+          then m.quantity_delta_micros::numeric*m.unit_cost_minor/1000000
+          else -m.quantity_delta_micros::numeric*m.unit_cost_minor/1000000 end)
         else null::numeric end,
       m.quantity_delta_micros::bigint,null::text,
       m.unit_cost_minor is null
@@ -115,6 +117,13 @@ begin
       (o.tax_minor+o.service_charge_minor)::numeric,1::bigint,o.source,false
     from public.orders o where v_area='tax' and o.shop_id=any(p_shop_ids)
       and (p_source is null or o.source=p_source)
+    union all
+    select fm.id::text,fm.shop_id,fm.created_at,'bank-fee',
+      'Bank/settlement provider fee',fm.amount_minor::numeric,
+      1::bigint,null::text,false
+    from public.finance_movements fm
+    where v_area in ('expenses','profit') and fm.business_id=v_business_id
+      and fm.shop_id=any(p_shop_ids) and fm.movement_type='BANK_FEE'
     union all
     select e.id::text,e.shop_id,e.created_at,'expense',
       e.description,(-e.amount_minor)::numeric,1::bigint,null::text,false
