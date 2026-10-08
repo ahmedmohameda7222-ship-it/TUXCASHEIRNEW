@@ -19,6 +19,11 @@ for (const path of [
   'apps/admin/api/admin/reports.ts',
   'apps/admin/api/cron/admin-recurring-expenses.ts',
 ]) assert.equal(fs.existsSync(path),false,`no standalone serverless entrypoint: ${path}`);
+const financeApi=fs.readFileSync('apps/admin/server/finance/financeApi.ts','utf8');
+assert.match(financeApi,/account\.shop_id === null && role !== 'OWNER'/,
+  'business-wide account history must require elevated authority');
+assert.match(financeApi,/if \(account\.shop_id !== null\) movementQuery\.set\('shop_id'/,
+  'shop-scoped histories must be filtered without hiding business-wide movements');
 assert.match(cron,/timingSafeEqual/);
 assert.match(cron,/CRON_SECRET/);
 assert.match(cron,/require|Bearer|unauthorized/);
