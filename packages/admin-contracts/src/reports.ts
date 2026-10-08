@@ -55,3 +55,14 @@ export type ReportTarget = {
   readonly periodEnd: string;
   readonly targetValue: number;
 };
+
+/** Canonical record target supplied by the trusted reporting server, not inferred in React. */
+export type ReportDrilldown =
+  | { readonly type: 'ORDER'; readonly orderId: string }
+  | { readonly type: 'PURCHASE_ORDER'; readonly purchaseOrderId: string }
+  | { readonly type: 'CUSTOMER'; readonly customerId: string }
+  | { readonly type: 'STAFF'; readonly employeeId: string; readonly section?: 'attendance' | 'pay' }
+  | { readonly type: 'INVENTORY_ITEM'; readonly inventoryItemId: string }
+  | { readonly type: 'FINANCE_ACCOUNT'; readonly accountId: string; readonly movementId?: string }
+  | { readonly type: 'FINANCIAL_DAY'; readonly businessDayId: string }
+  | { readonly type: 'EXPENSE'; readonly expenseId: string };
