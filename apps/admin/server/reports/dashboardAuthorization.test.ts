@@ -37,8 +37,14 @@ describe('Dashboard HTTP response authorization', () => {
   it('does not include finance, inventory, staff, delivery or approvals facts with only reports.view', () => {
     const sanitized = maskDashboardMetrics(principal, response);
     expect(sanitized['netSalesMinor']).toBe(2500);
-    for (const key of ['estimatedOperatingProfitMinor', 'lowStockCount',
-      'outOfStockCount', 'staffOnShiftCount', 'deliveryOpenCount', 'pendingApprovalCount']) {
+    for (const key of [
+      'estimatedOperatingProfitMinor',
+      'lowStockCount',
+      'outOfStockCount',
+      'staffOnShiftCount',
+      'deliveryOpenCount',
+      'pendingApprovalCount',
+    ]) {
       expect(sanitized[key]).toBeNull();
     }
     expect(sanitized['topProducts']).toEqual([]);
@@ -48,8 +54,15 @@ describe('Dashboard HTTP response authorization', () => {
   });
 
   it('allows only independently granted manager domains even if finance is denied', () => {
-    const manager = { ...principal, role: 'MANAGER' as const,
-      permissions: ['reports.view', 'staff.view', 'inventory.view'] as AdminSessionPrincipal['permissions'] };
+    const manager = {
+      ...principal,
+      role: 'MANAGER' as const,
+      permissions: [
+        'reports.view',
+        'staff.view',
+        'inventory.view',
+      ] as AdminSessionPrincipal['permissions'],
+    };
     const sanitized = maskDashboardMetrics(manager, response);
     expect(sanitized['staffOnShiftCount']).toBe(3);
     expect(sanitized['lowStockCount']).toBe(5);
@@ -58,7 +71,10 @@ describe('Dashboard HTTP response authorization', () => {
   });
 
   it('allows finance profit only with finance.view and never returns unknown RPC fields', () => {
-    const withFinance = { ...principal, permissions: ['reports.view', 'finance.view'] as AdminSessionPrincipal['permissions'] };
+    const withFinance = {
+      ...principal,
+      permissions: ['reports.view', 'finance.view'] as AdminSessionPrincipal['permissions'],
+    };
     const sanitized = maskDashboardMetrics(withFinance, response);
     expect(sanitized['estimatedOperatingProfitMinor']).toBe(1500);
     expect(sanitized).not.toHaveProperty('financeAccountBalances');
