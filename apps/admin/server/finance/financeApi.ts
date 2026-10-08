@@ -99,6 +99,7 @@ async function readAccountHistory(
   shopId: string,
   role: string,
   accountId: string,
+  movementId: string | null,
 ): Promise<Record<string, unknown>> {
   const accounts = await client.select<AccountRow[]>(
     'finance_accounts',
@@ -127,7 +128,18 @@ async function readAccountHistory(
   // Business accounts include movements from every shop in the tracked balance.
   // Owner/Admin may inspect that complete account history; shop accounts remain scoped.
   if (account.shop_id !== null) movementQuery.set('shop_id', `eq.${shopId}`);
-  const rows = await client.select<MovementRow[]>('finance_movements', movementQuery);
+  const latest = await client.select<MovementRow[]>('finance_movements', movementQuery);
+  // A deep-linked immutable event may be older than the newest 50 movements.
+  // Resolve it using the SAME account, business and shop scope, never by ID alone.
+  let rows = latest;
+  if (movementId && !latest.some((row) => row.id === movementId)) {
+    const exactQuery = new URLSearchParams(movementQuery);
+    exactQuery.set('id', `eq.${movementId}`);
+    exactQuery.delete('order');
+    exactQuery.set('limit', '1');
+    const exact = await client.select<MovementRow[]>('finance_movements', exactQuery);
+    rows = [...exact, ...latest];
+  }
   return {
     accountId,
     movements: rows.map((movement) => ({
@@ -184,7 +196,10 @@ export async function handleFinanceRequest(
         sendJson(
           response,
           200,
-          await readAccountHistory(client, principal.businessId, shopId, principal.role, accountId),
+          await readAccountHistory(
+            client, principal.businessId, shopId, principal.role, accountId,
+            query.has('movementId') ? uuid.parse(query.get('movementId')) : null,
+          ),
         );
         return;
       }
