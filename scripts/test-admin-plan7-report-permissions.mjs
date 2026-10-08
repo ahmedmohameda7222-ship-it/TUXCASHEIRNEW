@@ -20,7 +20,7 @@ for (const [area, permission] of [
   ['customers', 'customers.view'],
   ['promotions', 'promotions.manage'],
 ]) {
-  assert(policy.includes(`'${area}': '${permission}'`), `${area} must require ${permission}`);
+  assert(policy.includes(`${area.includes('-') ? `'${area}'` : area}: '${permission}'`), `${area} must require ${permission}`);
   assert(migration.includes(`when '${area}' then '${permission}'`), `SQL ${area} policy absent`);
 }
 assert.match(bff, /requireReportArea\(principal, selectedArea, id\)/);
