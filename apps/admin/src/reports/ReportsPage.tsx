@@ -39,7 +39,7 @@ export function ReportsPage() {
     const rawShopIds=view.filters['shopIds'];
     const savedShops=Array.isArray(rawShopIds)?
       rawShopIds.filter((id):id is string=>typeof id==='string'
-        && principal.shopIds.includes(id)):[shopId];
+        && principal.shopIds.includes(id)):[shopId!];
     const area=view.reportArea;
     if (!(area in REPORT_LABELS)) return;
     const fromDate=view.filters['fromDate'];
@@ -50,7 +50,7 @@ export function ReportsPage() {
       fromDate:typeof fromDate==='string'&&iso.test(fromDate)?fromDate:cairoToday(),
       toDate:typeof toDate==='string'&&iso.test(toDate)?toDate:cairoToday(),
       source:source==='POS'||source==='ONLINE'?source:null,
-      shopIds:savedShops.length>0?savedShops:[shopId],
+      shopIds:savedShops.length>0?savedShops:[shopId!],
       comparePrevious:view.filters['comparePrevious']===true,offset:0,
     });
   }
