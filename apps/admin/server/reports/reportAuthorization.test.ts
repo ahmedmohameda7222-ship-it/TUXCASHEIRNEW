@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { AdminAuthorizationError } from '../authorization.js';
 import {
   canReadReportFilterOption,
+  filterAuthorizedReportTargets,
   requireReportArea,
   requireReportContextPermissions,
 } from './reportAuthorization.js';
@@ -18,6 +19,20 @@ const staff: AdminSessionPrincipal = {
 };
 
 describe('Plan 7 report domain permissions', () => {
+  it('keeps authorized sales targets but strips finance and inventory targets for STAFF', () => {
+    const targets = [
+      { metric: 'NET_SALES', targetValue: 500 },
+      { metric: 'FOOD_COST_PERCENT', targetValue: 2700 },
+      { metric: 'WASTE', targetValue: 15 },
+    ];
+    expect(filterAuthorizedReportTargets(staff, targets)).toEqual([targets[0]]);
+    expect(filterAuthorizedReportTargets(
+      { ...staff, role: 'MANAGER', permissions: ['reports.view', 'inventory.view'] },
+      targets,
+    )).toEqual([targets[0], targets[2]]);
+    expect(filterAuthorizedReportTargets(staff, [{ metric: 'UNKNOWN' }])).toEqual([]);
+  });
+
   it('cannot use reports.view to read protected financial areas', () => {
     expect(() => requireReportArea(staff, 'sales', shopId)).not.toThrow();
     for (const area of ['profit', 'payments', 'bank-cash', 'expenses', 'end-day'] as const) {
