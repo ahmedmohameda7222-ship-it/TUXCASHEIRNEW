@@ -345,7 +345,7 @@ sql(`insert into public.business_days(id,shop_id,status,started_at,started_by_wo
 insert into public.order_types(id,shop_id,name,behavior,active,sort_order)
  values ('${orderType}','${s}','Takeaway','TAKE_AWAY',true,1);
 insert into public.payment_methods(id,shop_id,display_name,logic_type,requires_reconciliation,active,sort_order)
- values ('${paymentMethod}','${s}','Cash','CASH',false,true,1);
+ values ('${paymentMethod}','${s}','AOV test cash','CASH',false,true,1);
 insert into public.orders(
  id,shop_id,business_day_id,display_order_no,idempotency_key,source,status,
  operator_worker_id,operator_name_snapshot,order_type_id,
