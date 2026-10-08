@@ -2,6 +2,7 @@ import type {
   FinanceAccountBalance,
   FinanceAccountType,
   FinancePaymentMethod,
+  ProfitSummary,
 } from '@tux/admin-contracts';
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
@@ -132,6 +133,33 @@ function FinancePosition({
   );
 }
 
+function FinanceProfitSummary({ summary }: { summary: ProfitSummary | null }) {
+  return (
+    <section className="tux-finance-position" aria-labelledby="finance-profit-title">
+      <p id="finance-profit-title" className="tux-finance-muted">
+        Estimated Operating Profit
+      </p>
+      {summary ? (
+        <>
+          <strong className="tux-finance-position__total">
+            {formatEgp(summary.estimatedOperatingProfitMinor)}
+          </strong>
+          <dl className="tux-finance-position__breakdown">
+            <div><dt>Net sales</dt><dd>{formatEgp(summary.netSalesMinor)}</dd></div>
+            <div><dt>COGS</dt><dd>{formatEgp(summary.cogsMinor)}</dd></div>
+            <div><dt>Expenses</dt><dd>{formatEgp(summary.expensesMinor)}</dd></div>
+          </dl>
+        </>
+      ) : (
+        <p>Not available until the supporting financial costs are verified.</p>
+      )}
+      <p className="tux-finance-muted">
+        Operating profit is not cash received and does not increase any tracked account balance.
+      </p>
+    </section>
+  );
+}
+
 export function FinancePage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
@@ -143,6 +171,7 @@ export function FinancePage() {
   const paymentMethods = workspace?.paymentMethods ?? [];
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId);
   const canManage = principal.permissions.includes('finance.manage_accounts');
+  const canAdjust = principal.permissions.includes('finance.adjust');
 
   const [accountFormOpen, setAccountFormOpen] = useState(false);
   const [moneyMovementOpen, setMoneyMovementOpen] = useState(false);
@@ -224,16 +253,18 @@ export function FinancePage() {
       title="Bank & Cash"
       description="Accounts and payment method links for this shop."
       primaryAction={
-        canManage ? (
+        canManage || canAdjust ? (
           <div className="tux-finance-toolbar">
-            <button
-              type="button"
-              className="admin-primary-button"
-              onClick={() => setAccountFormOpen(true)}
-            >
-              Add account
-            </button>
-            {principal.permissions.includes('finance.adjust') ? (
+            {canManage ? (
+              <button
+                type="button"
+                className="admin-primary-button"
+                onClick={() => setAccountFormOpen(true)}
+              >
+                Add account
+              </button>
+            ) : null}
+            {canAdjust ? (
               <button
                 type="button"
                 className="admin-secondary-button"
@@ -294,6 +325,7 @@ export function FinancePage() {
         />
       ) : null}
       {workspace?.moneyPosition ? <FinancePosition position={workspace.moneyPosition} /> : null}
+      {workspace ? <FinanceProfitSummary summary={workspace.profitSummary} /> : null}
       {workspace && workspace.unmappedPaymentMethodCount > 0 ? (
         <p className="tux-finance-attention" role="status">
           {workspace.unmappedPaymentMethodCount} payment{' '}
