@@ -142,3 +142,10 @@ test('saved report views send one authorized CSRF-protected versioned command', 
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   );
 });
+
+test('phone report presentation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockReports(page);
+  await page.goto('/reports');
+  await expect(page.getByRole('list', { name: 'Report entries' })).toBeVisible();
+});
