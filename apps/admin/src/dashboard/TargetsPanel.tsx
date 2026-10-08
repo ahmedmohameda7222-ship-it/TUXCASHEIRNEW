@@ -5,7 +5,7 @@ function targetLabel(metric: ReportTargetRow['metric']): string {
   return {
     NET_SALES: 'Net sales',
     ORDER_COUNT: 'Orders',
-    FOOD_COST_PERCENT: 'Food cost basis points',
+    FOOD_COST_PERCENT: 'Food cost %',
     WASTE: 'Waste cost',
   }[metric];
 }
