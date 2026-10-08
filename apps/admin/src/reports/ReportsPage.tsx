@@ -81,13 +81,15 @@ export function ReportsPage() {
           : 'previous',
       context: Object.fromEntries(
         Object.entries(
-          view.filters['context'] && typeof view.filters['context'] === 'object' &&
-          !Array.isArray(view.filters['context'])
-            ? view.filters['context'] as Record<string, unknown> : {},
-        ).filter((entry): entry is [string,string] => (
-          typeof entry[1] === 'string' &&
-          /^(?:[0-9a-f-]{36}|[A-Z_]{2,40})$/i.test(entry[1])
-        )),
+          view.filters['context'] &&
+            typeof view.filters['context'] === 'object' &&
+            !Array.isArray(view.filters['context'])
+            ? (view.filters['context'] as Record<string, unknown>)
+            : {},
+        ).filter(
+          (entry): entry is [string, string] =>
+            typeof entry[1] === 'string' && /^(?:[0-9a-f-]{36}|[A-Z_]{2,40})$/i.test(entry[1]),
+        ),
       ),
       offset: 0,
     });
