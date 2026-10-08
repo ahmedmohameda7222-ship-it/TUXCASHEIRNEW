@@ -391,4 +391,22 @@ assert.equal(average.netSalesMinor,10000,'only actual paid cash is net sales');
 assert.equal(average.averageOrderMinor,10000,
   'average order value must divide by paid orders, not by all operational orders');
 
+const limited='45000000-0000-4000-8000-000000000001';
+sql(`insert into public.business_employees(id,business_id,display_name,role,active)
+values ('${limited}','${b}','Custom permission staff','STAFF',true);
+insert into public.employee_shop_assignments(business_id,employee_id,shop_id)
+values ('${b}','${limited}','${s}');
+insert into public.admin_employee_permissions(business_id,employee_id,permission_key,effect)
+values ('${b}','${limited}','reports.view','ALLOW'),
+('${b}','${limited}','finance.view','DENY');`, 'mixed staff permission fixture');
+const limitedProfit=rpc(`public.admin_finance_report_query_v2(
+'${limited}'::uuid,array['${s}'::uuid],'profit',
+'${today}'::date,'${today}'::date,20,0,null::text,'{}'::jsonb)`, 'staff profit denial');
+assert.equal(limitedProfit.code,'permission_forbidden');
+const limitedDashboard=rpc(`public.admin_plan7_dashboard_metrics_v1(
+'${limited}'::uuid,array['${s}'::uuid],
+'${today}'::date,'${today}'::date)`, 'staff dashboard masking');
+assert.equal(limitedDashboard.ok,true);
+assert.equal(limitedDashboard.estimatedOperatingProfitMinor,null);
+
 console.log('Plan 7 complete management, X/Z, report, recurrence and audit integration passed.');
