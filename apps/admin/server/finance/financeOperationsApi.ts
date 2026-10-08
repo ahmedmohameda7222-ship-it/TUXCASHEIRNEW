@@ -141,6 +141,13 @@ const operationSchema = z.discriminatedUnion('type', [
     .strict(),
   z
     .object({
+      type: z.literal('finance.recurring.process'),
+      shopId: uuid,
+      commandId,
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal('finance.recurring.post'),
       shopId: uuid,
       occurrenceId: uuid,
@@ -174,6 +181,17 @@ const advancedViews = new Set([
   'recurring',
 ]);
 
+function cairoBusinessDate(): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Cairo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const value = (name: string) => parts.find((item) => item.type === name)?.value ?? '';
+  return `${value('year')}-${value('month')}-${value('day')}`;
+}
+
 export function isAdvancedFinanceView(value: string | null): boolean {
   return value !== null && advancedViews.has(value);
 }
@@ -192,6 +210,7 @@ export function isAdvancedFinanceCommand(value: unknown): boolean {
       'finance.snapshot.adjust',
       'finance.recurring.rule',
       'finance.recurring.post',
+      'finance.recurring.process',
       'finance.category.create',
     ].includes(value)
   );
@@ -379,6 +398,17 @@ export async function handleAdvancedFinance(
         return;
       }
       if (view === 'recurring') {
+        if (principal.permissions.includes('finance.adjust')) {
+          const generated = await client.rpc<Record<string, unknown>>(
+            'process_due_recurring_expenses_v2',
+            { p_actor_employee_id: principal.employeeId, p_shop_id: shopId,
+              p_until: cairoBusinessDate(), p_max_rules: 25 },
+          );
+          if (generated['ok'] !== true) {
+            sendCommandResponse(response, generated);
+            return;
+          }
+        }
         const result = await client.rpc<Record<string, unknown>>('finance_recurring_workspace_v1', {
           p_actor_employee_id: principal.employeeId,
           p_shop_id: shopId,
@@ -452,6 +482,13 @@ export async function handleAdvancedFinance(
         p_next_due_date: command.nextDueDate,
         p_active: command.active,
         p_command_id: command.commandId,
+      });
+    } else if (command.type === 'finance.recurring.process') {
+      result = await client.rpc('process_due_recurring_expenses_v2', {
+        p_actor_employee_id: principal.employeeId,
+        p_shop_id: shopId,
+        p_until: cairoBusinessDate(),
+        p_max_rules: 25,
       });
     } else if (command.type === 'finance.recurring.post') {
       result = await client.rpc('post_recurring_expense_occurrence_v1', {
