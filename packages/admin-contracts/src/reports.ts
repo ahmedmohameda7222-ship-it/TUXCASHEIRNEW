@@ -17,6 +17,10 @@ export const ADMIN_REPORT_AREAS = [
   'end-day',
   'bank-cash',
   'shop-comparison',
+  'loyalty',
+  'promotions',
+  'segments',
+  'attendance',
 ] as const;
 export type AdminReportArea = (typeof ADMIN_REPORT_AREAS)[number];
 
