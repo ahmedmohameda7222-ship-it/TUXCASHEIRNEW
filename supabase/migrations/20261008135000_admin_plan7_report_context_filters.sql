@@ -102,6 +102,7 @@ begin
       and p.shop_id=any(p_shop_ids)
       and (p_source is null or o.source=p_source)
       and private.plan7_report_order_context_v1(o.shop_id,o.id,p_context)
+      and (p_context->>'paymentMethodId' is null or p.payment_method_id::text=p_context->>'paymentMethodId')
     union all
     select r.id::text,r.shop_id,r.created_at,
       'refund',r.reason_label_snapshot,
@@ -122,6 +123,10 @@ begin
     where v_area='products' and oi.shop_id=any(p_shop_ids)
       and (p_source is null or o.source=p_source)
       and private.plan7_report_order_context_v1(o.shop_id,o.id,p_context)
+      and (p_context->>'productId' is null or oi.product_id::text=p_context->>'productId')
+      and (p_context->>'categoryId' is null or exists (
+        select 1 from public.products prod where prod.shop_id=oi.shop_id
+        and prod.id=oi.product_id and prod.category_id::text=p_context->>'categoryId'))
     union all
     select m.id::text,m.shop_id,m.created_at,'inventory-movement',
       coalesce(i.name,m.movement_type),
@@ -174,6 +179,9 @@ begin
     from public.orders o where v_area='tax' and o.shop_id=any(p_shop_ids)
       and (p_source is null or o.source=p_source)
       and private.plan7_report_order_context_v1(o.shop_id,o.id,p_context)
+      and (p_context->>'paymentMethodId' is null or r.payment_id in
+        (select pay.id from public.payments pay where pay.shop_id=r.shop_id
+           and pay.payment_method_id::text=p_context->>'paymentMethodId'))
     union all
     select ar.id::text,ar.shop_id,ar.created_at,'return',
       concat('Merchandise return: ',ar.reason_label_snapshot),
@@ -251,6 +259,8 @@ begin
     from public.staff_payment_expense_events sp
     where v_area in ('expenses','staff','profit')
       and sp.business_id=v_business_id and sp.shop_id=any(p_shop_ids)
+      and (p_context->>'employeeId' is null or sp.employee_id::text=p_context->>'employeeId')
+      and p_context->>'workerId' is null and p_context->>'status' is null
     union all
     select fm.id::text,fm.shop_id,fm.created_at,'finance-movement',
       fm.movement_type,fm.amount_minor::numeric,1::bigint,null::text,false
