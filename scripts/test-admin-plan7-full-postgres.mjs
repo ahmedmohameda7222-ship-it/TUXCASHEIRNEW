@@ -72,6 +72,12 @@ assert.equal(managerCommand('OWNER_WITHDRAWAL',{
 },'manager-owner-withdraw').code,'permission_forbidden',
   'owner capital movements require OWNER or ADMIN role');
 
+assert.equal(managerCommand('TRANSFER',{
+  fromAccountId:cashId,toAccountId:bank.accountId,
+  amountMinor:100,reason:'Authorized shop-internal movement',
+},'manager-shop-transfer').ok,true,
+  'shop-scoped finance.adjust must remain functional');
+
 const owner=movement('OWNER_CONTRIBUTION',{
   fromAccountId:cashId,amountMinor:50000,reason:'Owner investment, not sales',
 },'test-owner-deposit');
