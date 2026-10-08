@@ -98,6 +98,21 @@ export function useFinanceOperations(shopId:string|undefined,businessDayId:strin
       reconciliations:Array<{id:string;cashier_worker_id:string}>;
     }>(path('cashiers',`&businessDayId=${encodeURIComponent(businessDayId!)}`)),
   });
+  const recurringQuery=useQuery({
+    queryKey:['admin','finance-ops',namespace,shopId,'recurring'],
+    enabled:Boolean(shopId),
+    queryFn:()=>adminFetch<{
+      rules:Array<{
+        id:string;categoryId:string|null;description:string;
+        amountMinor:number;cadence:'DAILY'|'WEEKLY'|'MONTHLY';
+        nextDueDate:string;active:boolean;version:number;
+      }>;
+      due:Array<{
+        id:string;ruleId:string;dueOn:string;status:'DUE';
+        description:string;amountMinor:number;categoryId:string|null;ruleVersion:number;
+      }>;
+    }>(path('recurring')),
+  });
   const ownerSummaryQuery=useQuery({
     queryKey:['admin','finance-ops',namespace,shopId,'owner-summary'],
     enabled:Boolean(shopId),
@@ -140,5 +155,5 @@ export function useFinanceOperations(shopId:string|undefined,businessDayId:strin
     },
   });
   return {daysQuery,dayQuery,dayHistoryQuery,expensesQuery,
-    categoriesQuery,settlementsQuery,cashierQuery,ownerSummaryQuery,command};
+    categoriesQuery,settlementsQuery,cashierQuery,recurringQuery,ownerSummaryQuery,command};
 }
