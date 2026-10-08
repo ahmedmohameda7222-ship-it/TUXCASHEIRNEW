@@ -2,6 +2,8 @@ import type { AdminReportArea } from '@tux/admin-contracts';
 import { useState } from 'react';
 
 import { PageScaffold } from '../components/layout/PageScaffold';
+import { TargetsPanel } from '../dashboard/TargetsPanel';
+import { OwnerSummaryCard } from '../dashboard/OwnerSummaryCard';
 import { useShopScope } from '../shops/ShopScopeProvider';
 
 import { REPORT_LABELS, ReportFilters } from './ReportFilters';
@@ -66,6 +68,9 @@ export function ReportsPage() {
       retry={()=>void reports.reportQuery.refetch()}
       onOffset={(offset)=>setFilters((previous)=>({...previous,offset}))}
     />
+    <TargetsPanel targets={config?.targets??[]} filters={filters}
+      summary={reports.reportQuery.data?.summary} />
+    {principal.permissions.includes('finance.view')?<OwnerSummaryCard shopId={shopId} />:null}
     <SavedViews shopId={shopId} views={config?.savedViews??[]}
       targets={config?.targets??[]} filters={filters}
       canSetTargets={principal.permissions.includes('settings.manage')}
