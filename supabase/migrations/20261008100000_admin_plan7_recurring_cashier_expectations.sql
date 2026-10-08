@@ -61,6 +61,10 @@ create table public.recurring_expense_occurrences (
   shop_id uuid not null,
   rule_id uuid not null,
   due_on date not null,
+  amount_minor bigint not null check(amount_minor>0),
+  description_snapshot text not null check(btrim(description_snapshot)<>''),
+  category_id uuid,
+  rule_version bigint not null check(rule_version>0),
   status text not null default 'DUE' check(status in ('DUE','RECORDED')),
   expense_id uuid,
   created_at timestamptz not null default now(),
@@ -191,8 +195,8 @@ begin
    v_step:=0;
    while v_date<=p_until loop
      insert into public.recurring_expense_occurrences(
-       business_id,shop_id,rule_id,due_on)
-     values(v_rule.business_id,v_rule.shop_id,v_rule.id,v_date)
+       business_id,shop_id,rule_id,due_on,amount_minor,description_snapshot,category_id,rule_version)
+     values(v_rule.business_id,v_rule.shop_id,v_rule.id,v_date,v_rule.amount_minor,v_rule.description,v_rule.category_id,v_rule.version)
      on conflict(rule_id,due_on) do nothing;
      if found then v_count:=v_count+1; end if;
      v_date:=case v_rule.cadence
@@ -232,7 +236,8 @@ begin
  where r.business_id=v_business_id and r.shop_id=p_shop_id;
  select coalesce(jsonb_agg(jsonb_build_object(
    'id',o.id,'ruleId',o.rule_id,'dueOn',o.due_on,'status',o.status,
-   'description',r.description,'amountMinor',r.amount_minor)
+   'description',o.description_snapshot,'amountMinor',o.amount_minor,
+   'categoryId',o.category_id,'ruleVersion',o.rule_version)
    order by o.due_on,o.id),'[]'::jsonb)
  into v_due
  from public.recurring_expense_occurrences o
@@ -242,6 +247,57 @@ begin
  return jsonb_build_object('ok',true,'rules',v_rules,'due',v_due);
 end;
 $$;
+
+
+-- Consume a single DUE occurrence through the same canonical expense/finance RPC.
+create or replace function public.post_recurring_expense_occurrence_v1(
+  p_actor_employee_id uuid,p_shop_id uuid,p_occurrence_id uuid,
+  p_business_day_id uuid,p_finance_account_id uuid,p_reason text,
+  p_command_id text
+) returns jsonb language plpgsql security definer
+set search_path=pg_catalog,public,private as $
+declare
+  v_business_id uuid;v_authorized boolean;
+  v_occ public.recurring_expense_occurrences%rowtype;
+  v_result jsonb;v_expense_id uuid;
+begin
+  select a.business_id,a.authorized into v_business_id,v_authorized
+  from public.resolve_admin_authorization_v1(
+    p_actor_employee_id,p_shop_id,'finance.adjust') a;
+  if not coalesce(v_authorized,false) or v_business_id is null then
+    return jsonb_build_object('ok',false,'code','permission_forbidden');
+  end if;
+  select * into v_occ from public.recurring_expense_occurrences
+    where id=p_occurrence_id and business_id=v_business_id
+      and shop_id=p_shop_id for update;
+  if not found then return jsonb_build_object('ok',false,'code','recurring_due_not_found'); end if;
+  if v_occ.status='RECORDED' then
+    return jsonb_build_object('ok',false,'code','recurring_due_already_recorded');
+  end if;
+  v_result:=public.execute_finance_management_v1(
+    p_actor_employee_id,p_shop_id,'EXPENSE',
+    jsonb_build_object(
+      'amountMinor',v_occ.amount_minor,
+      'businessDayId',p_business_day_id,
+      'fromAccountId',p_finance_account_id,
+      'description',v_occ.description_snapshot,
+      'categoryId',v_occ.category_id,
+      'expenseDate',v_occ.due_on,
+      'reason',p_reason,
+      'recurringOccurrenceId',v_occ.id
+    ),p_command_id);
+  if v_result->>'ok'<>'true' then return v_result; end if;
+  v_expense_id:=(v_result->>'expenseId')::uuid;
+  update public.recurring_expense_occurrences
+  set status='RECORDED',expense_id=v_expense_id,recorded_at=now()
+  where id=v_occ.id;
+  return v_result||jsonb_build_object('occurrenceId',v_occ.id);
+end;
+$;
+revoke all on function public.post_recurring_expense_occurrence_v1(uuid,uuid,uuid,uuid,uuid,text,text)
+ from public,anon,authenticated;
+grant execute on function public.post_recurring_expense_occurrence_v1(uuid,uuid,uuid,uuid,uuid,text,text)
+ to service_role;
 
 revoke all on function public.finance_cashier_expectations_v1(uuid,uuid,uuid)
   from public,anon,authenticated;
