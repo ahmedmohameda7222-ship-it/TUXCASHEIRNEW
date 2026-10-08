@@ -82,3 +82,23 @@ export function requireReportContextPermissions(
     }
   }
 }
+
+/** BFF defense in depth for read models already filtered by the trusted RPC. */
+export function filterAuthorizedReportTargets(
+  principal: AdminSessionPrincipal,
+  targets: unknown,
+): readonly Record<string, unknown>[] {
+  if (!Array.isArray(targets)) return [];
+  const requiredByMetric: Readonly<Record<string, AdminPermission>> = {
+    NET_SALES: 'reports.view',
+    ORDER_COUNT: 'reports.view',
+    FOOD_COST_PERCENT: 'finance.view',
+    WASTE: 'inventory.view',
+  };
+  return targets.filter((target): target is Record<string, unknown> => {
+    if (!target || typeof target !== 'object' || Array.isArray(target)) return false;
+    const metric = (target as Record<string, unknown>)['metric'];
+    const required = typeof metric === 'string' ? requiredByMetric[metric] : undefined;
+    return Boolean(required && principal.permissions.includes(required));
+  });
+}
