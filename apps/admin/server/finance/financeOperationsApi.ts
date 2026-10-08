@@ -64,6 +64,11 @@ const operationSchema = z.discriminatedUnion('type', [
     commandId,
   }).strict(),
   z.object({
+    type:z.literal('finance.category.create'),
+    shopId:uuid,scope:z.enum(['SHOP','BUSINESS']),
+    name:z.string().trim().min(1).max(100),commandId,
+  }).strict(),
+  z.object({
     type: z.literal('finance.recurring.rule'),shopId:uuid,ruleId:uuid.nullable(),
     expectedVersion:z.number().int().nonnegative(),
     categoryId:uuid.nullable(),description:reason,amountMinor:minor,
@@ -93,7 +98,7 @@ export function isAdvancedFinanceCommand(value: unknown): boolean {
     'finance.transfer','finance.bank-deposit','finance.owner-contribution',
     'finance.owner-withdrawal','finance.expense.post','finance.settlement.record',
     'finance.cashier.reconcile','finance.day.finalize','finance.snapshot.adjust',
-    'finance.recurring.rule','finance.recurring.post',
+    'finance.recurring.rule','finance.recurring.post','finance.category.create',
   ].includes(value);
 }
 
@@ -250,7 +255,16 @@ export async function handleAdvancedFinance(
       requireRecentReauth(context.session,300);
     }
     let result:Record<string,unknown>;
-    if (command.type==='finance.recurring.rule') {
+    if (command.type==='finance.category.create') {
+      if (command.scope==='BUSINESS' && !['OWNER','ADMIN'].includes(principal.role)) {
+        throw new AdminAuthorizationError('permission_forbidden');
+      }
+      result=await client.rpc('create_expense_category_v1',{
+        p_actor_employee_id:principal.employeeId,p_shop_id:shopId,
+        p_scope_shop_id:command.scope==='BUSINESS'?null:shopId,
+        p_name:command.name,p_command_id:command.commandId,
+      });
+    } else if (command.type==='finance.recurring.rule') {
       result=await client.rpc('upsert_recurring_expense_rule_v1',{
         p_actor_employee_id:principal.employeeId,p_shop_id:shopId,
         p_rule_id:command.ruleId,p_expected_version:command.expectedVersion,
