@@ -113,6 +113,9 @@ begin
       and r.business_id=v_business_id and r.shop_id=any(p_shop_ids)
       and r.state='POSTED' and (p_source is null or o.source=p_source)
       and private.plan7_report_order_context_v1(o.shop_id,o.id,p_context)
+      and (p_context->>'paymentMethodId' is null or r.payment_id in
+        (select pay.id from public.payments pay where pay.shop_id=r.shop_id
+           and pay.payment_method_id::text=p_context->>'paymentMethodId'))
     union all
     select oi.id::text,oi.shop_id,o.created_at,'order-item',
       oi.product_name_snapshot,
@@ -179,9 +182,6 @@ begin
     from public.orders o where v_area='tax' and o.shop_id=any(p_shop_ids)
       and (p_source is null or o.source=p_source)
       and private.plan7_report_order_context_v1(o.shop_id,o.id,p_context)
-      and (p_context->>'paymentMethodId' is null or r.payment_id in
-        (select pay.id from public.payments pay where pay.shop_id=r.shop_id
-           and pay.payment_method_id::text=p_context->>'paymentMethodId'))
     union all
     select ar.id::text,ar.shop_id,ar.created_at,'return',
       concat('Merchandise return: ',ar.reason_label_snapshot),
