@@ -49,6 +49,10 @@ export function OwnerSummaryCard({ shopId }: { shopId: string }) {
               <dd>{count(latest.summary, 'orderCount')}</dd>
             </div>
             <div>
+              <dt>Net cash difference</dt>
+              <dd>{metric(latest.summary, 'cashVarianceMinor')}</dd>
+            </div>
+            <div>
               <dt>Cash count differences</dt>
               <dd>{count(latest.summary, 'cashVarianceCount')}</dd>
             </div>
