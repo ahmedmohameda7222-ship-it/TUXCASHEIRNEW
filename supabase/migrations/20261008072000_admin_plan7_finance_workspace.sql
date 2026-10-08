@@ -50,6 +50,7 @@ begin
   ),
   method_rows as (
     select pm.id,pm.display_name,pm.logic_type,pm.active,
+      coalesce(map.version,0) as mapping_version,
       case when coalesce(map.active,false) and coalesce(acc.active,false)
         then map.finance_account_id
         else null::uuid
@@ -81,7 +82,7 @@ begin
     'paymentMethods',
       coalesce((select jsonb_agg(jsonb_build_object(
         'id',m.id,'displayName',m.display_name,'logicType',m.logic_type,
-        'financeAccountId',m.account_id
+        'financeAccountId',m.account_id,'mappingVersion',m.mapping_version
       ) order by m.display_name,m.id) from method_rows m),'[]'::jsonb),
     'unmappedPaymentMethodCount',
       (select count(*) from method_rows where account_id is null),
