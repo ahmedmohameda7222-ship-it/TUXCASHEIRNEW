@@ -197,7 +197,11 @@ export async function handleFinanceRequest(
           response,
           200,
           await readAccountHistory(
-            client, principal.businessId, shopId, principal.role, accountId,
+            client,
+            principal.businessId,
+            shopId,
+            principal.role,
+            accountId,
             query.has('movementId') ? uuid.parse(query.get('movementId')) : null,
           ),
         );
