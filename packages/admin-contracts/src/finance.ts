@@ -10,6 +10,7 @@ export type FinanceAccountBalance = {
   readonly active: boolean;
   readonly openingBalanceMinor: number;
   readonly balanceMinor: number;
+  readonly version: number;
 };
 
 export type MoneyPosition = {
@@ -47,9 +48,25 @@ export type PaymentSettlement = {
   readonly reference: string | null;
 };
 
+export type FinancePaymentMethod = {
+  readonly id: string;
+  readonly displayName: string;
+  readonly logicType: string;
+  readonly financeAccountId: string | null;
+  readonly mappingVersion: number;
+};
+
+export type FinanceAccountActivity = {
+  readonly id: string;
+  readonly label: string;
+  readonly amountMinor: number;
+  readonly occurredAt: string;
+};
+
 export type FinanceWorkspace = {
   readonly setupState: FinanceSetupState;
   readonly accounts: readonly FinanceAccountBalance[];
+  readonly paymentMethods: readonly FinancePaymentMethod[];
   readonly moneyPosition: MoneyPosition | null;
   readonly profitSummary: ProfitSummary | null;
   readonly unmappedPaymentMethodCount: number;
