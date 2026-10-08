@@ -118,3 +118,67 @@ begin
 end;
 $$;
 
+
+-- Plan 7 expected cashier reconciliation and recurring expense definitions.
+create or replace function public.finance_cashier_expectations_v1(
+  p_actor_employee_id uuid,p_shop_id uuid,p_business_day_id uuid
+) returns jsonb language plpgsql security definer
+set search_path=pg_catalog,public,private as $$
+declare
+  v_business_id uuid;v_authorized boolean;v_rows jsonb;
+begin
+  select a.business_id,a.authorized into v_business_id,v_authorized
+  from public.resolve_admin_authorization_v1(
+    p_actor_employee_id,p_shop_id,'finance.view') a;
+  if not coalesce(v_authorized,false) or v_business_id is null then
+    return jsonb_build_object('ok',false,'code','permission_forbidden');
+  end if;
+  if not exists(select 1 from public.business_days d
+    where d.id=p_business_day_id and d.shop_id=p_shop_id) then
+    return jsonb_build_object('ok',false,'code','finance_day_not_found');
+  end if;
+  with receipts as (
+    select o.operator_worker_id worker_id,
+      sum(p.allocated_minor)::bigint cash_in
+    from public.payments p
+    join public.orders o on o.id=p.order_id and o.shop_id=p.shop_id
+    where o.shop_id=p_shop_id and o.business_day_id=p_business_day_id
+      and p.logic_type_snapshot='CASH'
+    group by o.operator_worker_id
+  ),
+  refunded as (
+    select o.operator_worker_id worker_id,sum(r.amount_minor)::bigint cash_out
+    from public.admin_order_refunds r
+    join public.payments p on p.id=r.payment_id and p.shop_id=r.shop_id
+    join public.orders o on o.id=p.order_id and o.shop_id=p.shop_id
+    where r.business_id=v_business_id and r.shop_id=p_shop_id
+      and r.state='POSTED' and o.business_day_id=p_business_day_id
+      and p.logic_type_snapshot='CASH'
+    group by o.operator_worker_id
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'cashierWorkerId',w.id,'displayName',w.display_name,
+    'cashCollectedMinor',coalesce(rc.cash_in,0),
+    'postedCashRefundsMinor',coalesce(rf.cash_out,0),
+    'expectedMinor',(d.facts->>'recordedDrawerExpectationMinor')::bigint,
+    'cashSalesExpectationMinor',d.facts->'cashSalesExpectationMinor',
+    'recordedCashMovementMinor',d.facts->'recordedCashMovementMinor',
+    'openingFloatRecorded',d.facts->'openingFloatRecorded',
+    'actualMinor',rec.actual_minor,
+    'varianceMinor',rec.variance_minor,
+    'reconciled',rec.id is not null
+  ) order by w.display_name,w.id),'[]'::jsonb) into v_rows
+  from public.workers w
+  left join receipts rc on rc.worker_id=w.id
+  left join refunded rf on rf.worker_id=w.id
+  left join public.cashier_reconciliations rec
+    on rec.shop_id=p_shop_id and rec.business_day_id=p_business_day_id
+       and rec.cashier_worker_id=w.id
+  cross join lateral (select private.plan7_drawer_facts_v1(v_business_id,p_shop_id,p_business_day_id,w.id) facts) d
+  where w.shop_id=p_shop_id and
+  (coalesce(rc.cash_in,0)<>0 or coalesce(rf.cash_out,0)<>0 or
+   (d.facts->>'recordedCashMovementMinor')::bigint<>0 or rec.id is not null);
+  return jsonb_build_object('ok',true,'cashiers',v_rows);
+end;
+$$;
+
