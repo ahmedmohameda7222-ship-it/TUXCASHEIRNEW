@@ -33,7 +33,7 @@ assert.equal(fs.existsSync('apps/admin/server/finance/recurringCronApi.ts'),fals
 const bff=fs.readFileSync('apps/admin/server/finance/financeOperationsApi.ts','utf8');
 assert.match(bff,/process_due_recurring_expenses_v2/);
 assert.match(bff,/finance\.recurring\.process/);
-const dueSql=fs.readFileSync('supabase/migrations/20261008140000_admin_plan7_recurring_due_trusted_fallback.sql','utf8');
+const dueSql=fs.readFileSync('supabase/migrations/20261008232140_20261008140000_admin_plan7_recurring_due_trusted_fallback.sql','utf8');
 assert.match(dueSql,/for update skip locked/);
 assert.match(dueSql,/on conflict\(rule_id,due_on\) do nothing/);
 assert.match(dueSql,/p_max_rules not between 1 and 25/);
