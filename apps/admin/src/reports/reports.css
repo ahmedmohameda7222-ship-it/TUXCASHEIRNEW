@@ -172,3 +172,33 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.tux-report-context {
+  grid-column: 1 / -1;
+  min-width: 0;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 14px;
+  padding: 0.75rem;
+}
+
+.tux-report-context > summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.tux-report-context__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.tux-report-context__fields label {
+  min-width: 0;
+}
+
+@media (max-width: 639px) {
+  .tux-report-context__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
