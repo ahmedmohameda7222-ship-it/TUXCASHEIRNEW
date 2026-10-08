@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 
 import {
   EmptyState,
@@ -22,12 +22,14 @@ export function EndDayPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [location] = useLocation();
+  const requestedDay = new URLSearchParams(location.split('?')[1] ?? '').get('businessDayId');
   const [cashierOpen, setCashierOpen] = useState(false);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [pin, setPin] = useState('');
   const operations = useFinanceOperations(shopId, undefined);
   const days = operations.daysQuery.data?.days ?? [];
-  const dayId = selectedDay ?? days[0]?.id;
+  const dayId = selectedDay ?? (requestedDay && /^[0-9a-f-]{36}$/i.test(requestedDay) ? requestedDay : undefined) ?? days[0]?.id;
   const detail = useFinanceOperations(shopId, dayId);
   const report = detail.dayQuery.data;
   const cashierNames = new Map(
