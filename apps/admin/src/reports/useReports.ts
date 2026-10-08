@@ -19,6 +19,7 @@ export type ReportFact = {
 };
 export type ReportSummary = {
   readonly eventCount: number;
+  readonly orderCount: number;
   readonly totalAmountMinor: number | null;
   readonly totalQuantity: number;
   readonly incompleteCostEvents: number;

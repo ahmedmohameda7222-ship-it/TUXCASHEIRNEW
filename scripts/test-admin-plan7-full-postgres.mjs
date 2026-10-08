@@ -122,6 +122,7 @@ const nowReport=rpc(`public.admin_finance_report_query_v1(
   '${e}'::uuid,array['${s}'::uuid],'expenses',
   '${today}'::date,'${today}'::date,50,0,null::text)`,'expense report');
 assert.equal(nowReport.ok,true);
+assert.equal(nowReport.summary.orderCount,0,'no canonical orders in finance expense fixture');
 assert(nowReport.summary.eventCount>=2,'canonical manual and recurring expenses in report');
 assert.equal(nowReport.summary.totalAmountMinor,-1450);
 

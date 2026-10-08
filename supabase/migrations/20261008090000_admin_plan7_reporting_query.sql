@@ -163,7 +163,15 @@ begin
   )
   select
     jsonb_build_object(
-      'eventCount',a.event_count,'totalAmountMinor',
+      'eventCount',a.event_count,
+      'orderCount',(
+        select count(*) from public.orders o
+        where o.shop_id=any(p_shop_ids)
+          and (o.created_at at time zone 'Africa/Cairo')::date
+            between p_start_date and p_end_date
+          and (p_source is null or o.source=p_source)
+      ),
+      'totalAmountMinor',
         case when a.incomplete_cost_events>0
           and v_area in ('profit','inventory-consumption','waste','margin-variance')
           then null else a.total_minor end,

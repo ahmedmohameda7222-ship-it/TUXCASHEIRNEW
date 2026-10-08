@@ -54,9 +54,9 @@ export function HomeDashboard() {
           </div>
           {reports.reportQuery.data?.summary ? (
             <div className="tux-finance-position">
-              <p className="tux-finance-muted">Sales report events</p>
+              <p className="tux-finance-muted">Orders today</p>
               <strong className="tux-finance-position__total">
-                {reports.reportQuery.data.summary.eventCount}
+                {reports.reportQuery.data.summary.orderCount}
               </strong>
             </div>
           ) : (

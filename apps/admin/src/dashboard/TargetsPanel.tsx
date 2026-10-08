@@ -38,7 +38,7 @@ export function TargetsPanel({
             target.metric === 'NET_SALES'
               ? summary?.totalAmountMinor
               : target.metric === 'ORDER_COUNT'
-                ? summary?.eventCount
+                ? summary?.orderCount
                 : null;
           const display =
             canCompare && typeof actual === 'number'
