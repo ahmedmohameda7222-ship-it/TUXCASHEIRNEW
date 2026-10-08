@@ -410,6 +410,10 @@ export async function handleReportsRequest(
       command.type === 'report.target.set' ? 'settings.manage' : 'reports.view',
       command.shopId,
     );
+    if (command.type === 'report.target.set') {
+      if (command.metric === 'FOOD_COST_PERCENT') requirePermission(principal, 'finance.view', command.shopId);
+      if (command.metric === 'WASTE') requirePermission(principal, 'inventory.view', command.shopId);
+    }
     if (command.type === 'report.view.save') {
       requireReportArea(principal, command.reportArea, command.shopId);
       requireReportContextPermissions(principal, command.filters, command.shopId);
