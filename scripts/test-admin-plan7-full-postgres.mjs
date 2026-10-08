@@ -300,6 +300,13 @@ assert.equal(drawerWorkspace.ok,true);
 assert.equal(drawerWorkspace.cashiers.find(c=>c.cashierWorkerId===w).expectedMinor,3200);
 const cashOnlyX=rpc(`public.finance_day_report_v1(
  '${e}'::uuid,'${s}'::uuid,'${day}'::uuid)`,'cash-only cashier X report');
+assert.equal(cashOnlyX.openingFloatMinor,2500,'cash float is distinct from sales');
+assert.equal(cashOnlyX.cashPayInsMinor,1000,'pay-ins are a separate ledger class');
+assert.equal(cashOnlyX.cashPayOutsMinor,300,'pay-outs are a separate ledger class');
+assert.equal(cashOnlyX.bankDepositsMinor,0,'normal transfers are not bank deposits');
+assert.equal(cashOnlyX.cashExpensesMinor,1200,'cash account expenses are separate');
+assert.equal(cashOnlyX.transfersOutMinor,10100,'transfers are directional, not revenue');
+assert.equal(cashOnlyX.transfersInMinor,10100,'internal transfers conserve funds');
 assert.equal(cashOnlyX.missingCashierReconciliationCount,1,
   'unreconciled opening float/pay-in/out worker must block financial Z');
 
@@ -314,6 +321,13 @@ assert.equal(cashier.varianceMinor,100);
 const z=rpc(`public.finance_finalize_day_v1(
   '${e}'::uuid,'${s}'::uuid,'${day}'::uuid,'finalize-after-ops')`,'finalize financial Z');
 assert.equal(z.ok,true);
+const finalizedZ=rpc(`(select snapshot from public.end_day_financial_snapshots
+  where id='${z.snapshotId}'::uuid)`,'frozen classified Z');
+for (const key of ['openingFloatMinor','cashPayInsMinor','cashPayOutsMinor',
+  'cashExpensesMinor','transfersInMinor','transfersOutMinor','bankDepositsMinor']) {
+ assert.equal(finalizedZ[key],cashOnlyX[key],'Z freezes '+key);
+}
+
 assert.equal(rpc(`public.finance_finalize_day_v1(
   '${e}'::uuid,'${s}'::uuid,'${day}'::uuid,'finalize-after-ops')`,'idempotent Z').replayed,true);
 assert.equal(sql(`select count(*) from public.end_day_financial_snapshots where business_day_id='${day}'`,'single Z'),'1');
