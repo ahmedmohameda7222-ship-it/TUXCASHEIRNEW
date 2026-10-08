@@ -6,6 +6,7 @@ import { AuditPage } from '../audit/AuditPage';
 import { CatalogPage } from '../catalog/CatalogPage';
 import { PublishReviewPage } from '../catalog/PublishReviewPage';
 import { PageScaffold } from '../components/layout/PageScaffold';
+import { HomeDashboard } from '../dashboard/HomeDashboard';
 import { CustomersPage } from '../customers/CustomersPage';
 import { DeliveryPage } from '../delivery/DeliveryPage';
 import { InventoryPage } from '../inventory/InventoryPage';
@@ -80,6 +81,7 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   }
 
   if (location === '/catalog/products/publishing') return <PublishReviewPage />;
+  if (route.path === '/') return <HomeDashboard />;
   if (route.path === '/catalog/products') return <CatalogPage />;
   if (route.path === '/settings') return <SettingsPage />;
   if (route.path === '/approvals') return <ApprovalsPage />;
