@@ -298,6 +298,11 @@ const drawerWorkspace=rpc(`public.finance_cashier_expectations_v1(
  '${e}'::uuid,'${s}'::uuid,'${day}'::uuid)`,'cashier drawer read model');
 assert.equal(drawerWorkspace.ok,true);
 assert.equal(drawerWorkspace.cashiers.find(c=>c.cashierWorkerId===w).expectedMinor,3200);
+const cashOnlyX=rpc(`public.finance_day_report_v1(
+ '${e}'::uuid,'${s}'::uuid,'${day}'::uuid)`,'cash-only cashier X report');
+assert.equal(cashOnlyX.missingCashierReconciliationCount,1,
+  'unreconciled opening float/pay-in/out worker must block financial Z');
+
 
 sql(`update public.business_days set status='CLOSED',ended_at=now(),
   ended_by_worker_id='${w}' where id='${day}';`,'fixture Operations close');
