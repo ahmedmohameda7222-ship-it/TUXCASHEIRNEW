@@ -12,6 +12,7 @@ import { InventoryPage } from '../inventory/InventoryPage';
 import { FinancePage } from '../finance/FinancePage';
 import { OrdersPage } from '../orders/OrdersPage';
 import { PurchasingPage } from '../purchasing/PurchasingPage';
+import { ReportsPage } from '../reports/ReportsPage';
 import { SettingsPage } from '../settings/SettingsPage';
 import { StaffPage } from '../staff/StaffPage';
 
@@ -87,6 +88,7 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   if (route.path === '/purchasing') return <PurchasingPage />;
   if (route.path === '/staff') return <StaffPage />;
   if (route.path === '/finance') return <FinancePage />;
+  if (route.path === '/reports') return <ReportsPage />;
 
   if (route.path === '/more') {
     const secondary = ADMIN_ROUTES.filter(
