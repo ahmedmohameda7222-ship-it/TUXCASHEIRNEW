@@ -31,6 +31,7 @@ const a = '16000000-0000-4000-8000-000000000001';
 const a2 = '16000000-0000-4000-8000-000000000002';
 const orderType = '17000000-0000-4000-8000-000000000001';
 const method = '18000000-0000-4000-8000-000000000001';
+const method2 = '18000000-0000-4000-8000-000000000002';
 const o1 = '19000000-0000-4000-8000-000000000001';
 const o2 = '19000000-0000-4000-8000-000000000002';
 const p1 = '20000000-0000-4000-8000-000000000001';
@@ -89,7 +90,8 @@ run(`
   insert into public.order_types(id,shop_id,name,behavior,active,sort_order)
     values ('${orderType}','${s}','Takeaway','TAKE_AWAY',true,1);
   insert into public.payment_methods(id,shop_id,display_name,logic_type,requires_reconciliation,active,sort_order)
-    values ('${method}','${s}','Cash','CASH',false,true,1);
+    values ('${method}','${s}','Cash first','CASH',false,true,1),
+           ('${method2}','${s}','Cash second','CASH',false,true,2);
   insert into public.finance_accounts(id,business_id,shop_id,account_type,name,active,opening_balance_minor)
     values ('${a}','${b}','${s}','CASH','Till',true,0),
            ('${a2}','${b}','${s}','BANK','Bank',true,0);
@@ -127,12 +129,12 @@ assert.equal(read("select count(*) from public.finance_movements", 'unmapped cou
 run(`
   insert into public.payment_method_finance_accounts(
     business_id,shop_id,payment_method_id,finance_account_id,active
-  ) values ('${b}','${s}','${method}','${a}',true);
+  ) values ('${b}','${s}','${method2}','${a}',true);
   insert into public.payments(
     id,shop_id,order_id,part_index,payment_method_id,payment_method_label_snapshot,
     logic_type_snapshot,allocated_minor,received_minor,change_minor,created_at
   ) values (
-    '${p2}','${s}','${o1}',2,'${method}','Cash',
+    '${p2}','${s}','${o1}',2,'${method2}','Cash second',
     'CASH',10000,15000,5000,now() + interval '1 second'
   );
 `, 'explicit mapping and split cash change');
@@ -151,6 +153,9 @@ assert.equal(
 assert.equal(read(`select count(*) from public.finance_movements where source_id='${p1}'`, 'historical unmapped'), '0');
 
 run(`
+  insert into public.payment_method_finance_accounts(
+    business_id,shop_id,payment_method_id,finance_account_id,active
+  ) values ('${b}','${s}','${method}','${a}',true);
   insert into public.payments(
     id,shop_id,order_id,part_index,payment_method_id,payment_method_label_snapshot,
     logic_type_snapshot,allocated_minor,received_minor,change_minor,created_at
@@ -186,7 +191,7 @@ assert.equal(
 run(`
   update public.payment_method_finance_accounts
     set finance_account_id='${a2}', version=version+1, updated_at=now()
-    where business_id='${b}' and shop_id='${s}' and payment_method_id='${method}';
+    where business_id='${b}' and shop_id='${s}' and payment_method_id='${method2}';
   insert into public.admin_order_refunds(
     id,business_id,shop_id,order_id,payment_id,amount_minor,
     reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,
