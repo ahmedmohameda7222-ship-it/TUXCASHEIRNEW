@@ -66,7 +66,10 @@ describe('typed report drilldowns', () => {
       }),
     } as unknown as AdminSupabaseClient;
     const result = await enrichReportDrilldowns(
-      [source('movement-1', 'finance-movement'), { ...source('order-1', 'customer-order'), shopId: 'other-shop' }],
+      [
+        source('movement-1', 'finance-movement'),
+        { ...source('order-1', 'customer-order'), shopId: 'other-shop' },
+      ],
       { ...principal, permissions: ['reports.view'] },
       client,
     );
