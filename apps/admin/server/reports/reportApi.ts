@@ -134,6 +134,52 @@ export async function handleReportsRequest(
         sendJson(response, 200, data);
         return;
       }
+      if (query.get('view') === 'filter-options') {
+        const definitions = [
+          ['orderTypes','order_types','name'],
+          ['paymentMethods','payment_methods','display_name'],
+          ['workers','workers','display_name'],
+          ['customers','customer_contacts','name'],
+          ['products','products','name'],
+          ['categories','menu_categories','name'],
+          ['deliveryZones','delivery_zones','name'],
+        ] as const;
+        const optionSets = await Promise.all(definitions.map(async ([key, table, label]) => {
+          const rows = await client.select<Array<Record<string, unknown>>>(
+            table,
+            new URLSearchParams({
+              select: `id,${label}`,
+              shop_id: `eq.${shopId}`,
+              order: `${label}.asc`,
+              limit: '100',
+            }),
+          );
+          return [key,rows.map((item) => ({ id: item['id'], label: item[label] || 'Unnamed' }))] as const;
+        }));
+        if (principal.role === 'OWNER' || principal.role === 'ADMIN') {
+          const businessDefinitions = [
+            ['promotions','promotion_rules','name'],
+            ['suppliers','suppliers','name'],
+            ['employees','business_employees','display_name'],
+          ] as const;
+          const businessSets = await Promise.all(businessDefinitions.map(async ([key,table,label]) => {
+            const rows = await client.select<Array<Record<string, unknown>>>(
+              table,
+              new URLSearchParams({
+                select: `id,${label}`,
+                business_id: `eq.${principal.businessId}`,
+                order: `${label}.asc`,
+                limit: '100',
+              }),
+            );
+            return [key,rows.map((item) => ({ id: item['id'], label: item[label] || 'Unnamed' }))] as const;
+          }));
+          sendJson(response,200,{ options: Object.fromEntries([...optionSets,...businessSets]) });
+          return;
+        }
+        sendJson(response,200,{ options: Object.fromEntries(optionSets) });
+        return;
+      }
       const shops = query.getAll('reportShopId');
       const selected = shops.length > 0 ? z.array(uuid).min(1).max(50).parse(shops) : [shopId];
       if (new Set(selected).size !== selected.length) {
