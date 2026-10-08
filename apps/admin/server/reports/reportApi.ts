@@ -13,6 +13,7 @@ import {
 import { readAdminSessionToken } from '../session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../supabaseAdmin.js';
 import {
+  filterAuthorizedReportTargets,
   canReadReportFilterOption,
   requireReportArea,
   requireReportContextPermissions,
@@ -142,7 +143,7 @@ export async function handleReportsRequest(
         const savedViews = Array.isArray(data['savedViews']) ? data['savedViews'] : [];
         sendJson(response, 200, {
           ...data,
-          targets: principal.permissions.includes('finance.view') ? data['targets'] : [],
+          targets: filterAuthorizedReportTargets(principal, data['targets']),
           savedViews: savedViews.filter((view) => {
             if (!view || typeof view !== 'object') return false;
             const area = (view as Record<string, unknown>)['reportArea'];
