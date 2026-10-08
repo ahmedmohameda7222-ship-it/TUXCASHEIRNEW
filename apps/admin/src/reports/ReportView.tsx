@@ -80,52 +80,60 @@ export function ReportView({
         />
       ) : (
         <div className="tux-report-results">
-        <ul className="tux-report-mobile-entries" aria-label="Report entries">
-          {data.rows.map((fact) => {
-            const href = sourceLink(fact.sourceKind, fact.id);
-            return (
-              <li key={`mobile:${fact.sourceKind}:${fact.id}`}>
-                <div className="tux-report-mobile-entries__top">
-                  <span>{new Date(fact.occurredAt).toLocaleDateString('en-EG', { timeZone: 'Africa/Cairo' })}</span>
-                  <strong>{fact.amountMinor === null ? 'Not available' : amountLabel(fact.amountMinor)}</strong>
-                </div>
-                <small>{fact.sourceKind.replaceAll('-', ' ')}</small>
-                <p>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</p>
-              </li>
-            );
-          })}
-        </ul>
-        <div className="tux-report-table-wrap">
-          <table className="tux-report-table">
-            <thead>
-              <tr>
-                <th scope="col">Date</th>
-                <th scope="col">Source</th>
-                <th scope="col">Description</th>
-                <th scope="col">Amount (EGP)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.rows.map((fact) => {
-                const href = sourceLink(fact.sourceKind, fact.id);
-                return (
-                  <tr key={`${fact.sourceKind}:${fact.id}`}>
-                    <td>
+          <ul className="tux-report-mobile-entries" aria-label="Report entries">
+            {data.rows.map((fact) => {
+              const href = sourceLink(fact.sourceKind, fact.id);
+              return (
+                <li key={`mobile:${fact.sourceKind}:${fact.id}`}>
+                  <div className="tux-report-mobile-entries__top">
+                    <span>
                       {new Date(fact.occurredAt).toLocaleDateString('en-EG', {
                         timeZone: 'Africa/Cairo',
                       })}
-                    </td>
-                    <td>{fact.sourceKind.replaceAll('-', ' ')}</td>
-                    <td>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</td>
-                    <td>
+                    </span>
+                    <strong>
                       {fact.amountMinor === null ? 'Not available' : amountLabel(fact.amountMinor)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </strong>
+                  </div>
+                  <small>{fact.sourceKind.replaceAll('-', ' ')}</small>
+                  <p>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</p>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="tux-report-table-wrap">
+            <table className="tux-report-table">
+              <thead>
+                <tr>
+                  <th scope="col">Date</th>
+                  <th scope="col">Source</th>
+                  <th scope="col">Description</th>
+                  <th scope="col">Amount (EGP)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map((fact) => {
+                  const href = sourceLink(fact.sourceKind, fact.id);
+                  return (
+                    <tr key={`${fact.sourceKind}:${fact.id}`}>
+                      <td>
+                        {new Date(fact.occurredAt).toLocaleDateString('en-EG', {
+                          timeZone: 'Africa/Cairo',
+                        })}
+                      </td>
+                      <td>{fact.sourceKind.replaceAll('-', ' ')}</td>
+                      <td>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</td>
+                      <td>
+                        {fact.amountMinor === null
+                          ? 'Not available'
+                          : amountLabel(fact.amountMinor)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
       <nav className="tux-report-pagination" aria-label="Report pages">
