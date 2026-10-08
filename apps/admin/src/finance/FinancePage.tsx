@@ -5,7 +5,7 @@ import type {
   ProfitSummary,
 } from '@tux/admin-contracts';
 import { useState } from 'react';
-import { Link, useLocation } from 'wouter';
+import { Link, useLocation, useSearch } from 'wouter';
 
 import {
   EmptyState,
@@ -43,6 +43,7 @@ function AccountDetail({
   history,
   loading,
   onDeactivate,
+  highlightedMovementId,
 }: {
   account: FinanceAccountBalance;
   canManage: boolean;
@@ -53,6 +54,7 @@ function AccountDetail({
     occurredAt: string;
   }[];
   loading: boolean;
+  highlightedMovementId: string | null;
   onDeactivate(): void;
 }) {
   return (
@@ -83,7 +85,8 @@ function AccountDetail({
       ) : null}
       <ol className="tux-finance-activity">
         {history.map((movement) => (
-          <li key={movement.id}>
+          <li key={movement.id} aria-current={movement.id === highlightedMovementId ? 'true' : undefined}
+            className={movement.id === highlightedMovementId ? 'is-selected' : undefined}>
             <div>
               <strong>{movement.label}</strong>
               <small>{new Date(movement.occurredAt).toLocaleString('en-EG')}</small>
@@ -173,8 +176,11 @@ export function FinancePage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const [location, navigate] = useLocation();
+  const search = useSearch();
+  const movementId = new URLSearchParams(search).get('movementId');
+  const selectedMovementId = movementId && /^[0-9a-f-]{36}$/i.test(movementId) ? movementId : null;
   const selectedAccountId = detailIdFromPath(location, '/finance');
-  const finance = useFinance(shopId, selectedAccountId);
+  const finance = useFinance(shopId, selectedAccountId, selectedMovementId);
   const workspace = finance.workspaceQuery.data;
   const accounts = workspace?.accounts ?? [];
   const paymentMethods = workspace?.paymentMethods ?? [];
@@ -383,6 +389,7 @@ export function FinancePage() {
                   canManage={canManage}
                   history={finance.historyQuery.data ?? []}
                   loading={finance.historyQuery.isLoading}
+                  highlightedMovementId={selectedMovementId}
                   onDeactivate={() => setDeactivateAccount(selectedAccount)}
                 />
               ) : (
