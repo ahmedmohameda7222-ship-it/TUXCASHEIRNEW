@@ -138,6 +138,7 @@ test('Bank & Cash keeps tracked money distinct from profit and posts a transfer 
   await page.goto('/finance');
   await expect(page.getByRole('heading', { name: 'Bank & Cash' })).toBeVisible();
   await expect(page.getByText('Total tracked money')).toBeVisible();
+  await expect(page.getByText('Estimated Operating Profit')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Money movement' })).toBeVisible();
   await page.getByRole('button', { name: 'Money movement' }).click();
   await expect(page.getByText('Internal transfers do not create sales or operating profit.')).toBeVisible();
