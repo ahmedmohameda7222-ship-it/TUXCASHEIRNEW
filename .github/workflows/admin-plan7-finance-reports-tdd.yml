@@ -26,6 +26,7 @@ jobs:
       - run: node scripts/test-admin-plan7-migration.mjs
       - run: node scripts/test-admin-plan7-materialization-migration.mjs
       - run: node scripts/test-admin-plan7-finance-setup-migration.mjs
+      - run: node scripts/test-admin-plan7-workspace-migration.mjs
 
   schema-postgres:
     needs: schema-invariants
@@ -67,7 +68,7 @@ jobs:
           echo PRETTIER_TEST_END
       - run: npm run format:check
       - run: npm run lint
-      - run: npx vitest run apps/admin/server/finance/calculations.test.ts
+      - run: npx vitest run apps/admin/server/finance/calculations.test.ts apps/admin/src/finance/money.test.ts
       - run: npm run typecheck
       - run: npm run test:admin-security
       - run: npm run test:admin-deployment
