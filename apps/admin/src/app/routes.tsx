@@ -10,6 +10,9 @@ import { CustomersPage } from '../customers/CustomersPage';
 import { DeliveryPage } from '../delivery/DeliveryPage';
 import { InventoryPage } from '../inventory/InventoryPage';
 import { FinancePage } from '../finance/FinancePage';
+import { ExpensesPage } from '../finance/ExpensesPage';
+import { SettlementsPage } from '../finance/SettlementsPage';
+import { EndDayPage } from '../finance/EndDayPage';
 import { OrdersPage } from '../orders/OrdersPage';
 import { PurchasingPage } from '../purchasing/PurchasingPage';
 import { ReportsPage } from '../reports/ReportsPage';
@@ -87,7 +90,12 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   if (route.path === '/delivery') return <DeliveryPage />;
   if (route.path === '/purchasing') return <PurchasingPage />;
   if (route.path === '/staff') return <StaffPage />;
-  if (route.path === '/finance') return <FinancePage />;
+  if (route.path === '/finance') {
+    if (location.startsWith('/finance/expenses')) return <ExpensesPage />;
+    if (location.startsWith('/finance/settlements')) return <SettlementsPage />;
+    if (location.startsWith('/finance/end-day')) return <EndDayPage />;
+    return <FinancePage />;
+  }
   if (route.path === '/reports') return <ReportsPage />;
 
   if (route.path === '/more') {
