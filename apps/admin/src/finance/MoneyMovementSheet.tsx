@@ -16,11 +16,13 @@ const movementTypes: Readonly<Record<MovementAction, string>> = {
 export function MoneyMovementSheet({
   shopId,
   accounts,
+  canManageCapital,
   open,
   onClose,
 }: {
   shopId: string;
   accounts: readonly FinanceAccountBalance[];
+  canManageCapital: boolean;
   open: boolean;
   onClose(): void;
 }) {
@@ -32,9 +34,14 @@ export function MoneyMovementSheet({
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const operations = useFinanceOperations(shopId, undefined);
-  const active = accounts.filter((account) => account.active);
+  const active = accounts.filter(
+    (account) => account.active && (canManageCapital || account.shopId !== null),
+  );
   function submit() {
     try {
+      if (!canManageCapital && action.startsWith('OWNER_')) {
+        throw new Error('Owner capital movements require owner or administrator access.');
+      }
       const amountMinor = parseEgpMinor(amount);
       if (amountMinor <= 0) throw new Error('Enter a positive amount.');
       if (!reason.trim()) throw new Error('A reason is required.');
@@ -114,7 +121,7 @@ export function MoneyMovementSheet({
         <label>
           Movement type
           <select value={action} onChange={(e) => setAction(e.target.value as MovementAction)}>
-            {Object.entries(movementTypes).map(([key, label]) => (
+            {Object.entries(movementTypes).filter(([key]) => canManageCapital || !key.startsWith('OWNER_')).map(([key, label]) => (
               <option key={key} value={key}>
                 {label}
               </option>
