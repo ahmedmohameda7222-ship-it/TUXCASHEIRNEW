@@ -15,7 +15,13 @@ import { SchedulePage, type StaffCommandDraft } from './SchedulePage';
 import { StaffMetricsPanel } from './StaffMetricsPanel';
 import { StaffPaymentPage } from './StaffPaymentPage';
 
-export type StaffDetailSection = 'profile' | 'schedule' | 'attendance' | 'leave' | 'pay' | 'permissions';
+export type StaffDetailSection =
+  | 'profile'
+  | 'schedule'
+  | 'attendance'
+  | 'leave'
+  | 'pay'
+  | 'permissions';
 type StaffShopChoice = { id: string; name: string };
 
 type LinkedOperationsIdentity = Extract<
