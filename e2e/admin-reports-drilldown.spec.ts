@@ -66,7 +66,9 @@ const samples = [
 
 for (const sample of samples) {
   test(`report ${sample.kind} navigates to exact canonical parent record`, async ({ page }) => {
-    await page.setViewportSize(sample.kind === 'staff-payment' ? { width: 390, height: 844 } : { width: 1440, height: 960 });
+    await page.setViewportSize(
+      sample.kind === 'staff-payment' ? { width: 390, height: 844 } : { width: 1440, height: 960 },
+    );
     await page.route('**/api/admin/session', async (route) =>
       route.fulfill({
         status: 200,
@@ -163,48 +165,61 @@ for (const sample of samples) {
           ? { employee }
           : {
               employees: {
-                rows: [{
-                  id: recordId,
-                  displayName: 'Mona Ali',
-                  phone: employee.phone,
-                  role: 'STAFF',
-                  active: true,
-                  shopIds: [shopId],
-                  operationsSetupRequiredShopIds: [shopId],
-                }],
+                rows: [
+                  {
+                    id: recordId,
+                    displayName: 'Mona Ali',
+                    phone: employee.phone,
+                    role: 'STAFF',
+                    active: true,
+                    shopIds: [shopId],
+                    operationsSetupRequiredShopIds: [shopId],
+                  },
+                ],
                 nextCursor: null,
               },
               workers: [],
               shops: [{ id: shopId, name: 'Authorized shop' }],
               financeAccounts: [],
             };
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(body),
+        });
       });
     }
     if (sample.kind === 'customer-segment') {
       await page.route('**/api/admin/customers**', async (route) => {
         const view = new URL(route.request().url()).searchParams.get('view');
-        const body = view === 'customer'
-          ? { customer: {
-              id: recordId,
-              normalizedPhone: '+201012345678',
-              displayName: 'Mona VIP',
-              orderCount: 2,
-              lifetimeSpendMinor: 5000,
-              lastOrderAt: null,
-              loyaltyBalance: 10,
-              deliveryOrderCount: 0,
-              segments: ['VIP'],
-              linkedShops: [{ shopId, shopName: 'Authorized shop' }],
-              addresses: [],
-              loyaltyHistory: [],
-            } }
-          : view === 'customers'
-            ? { customers: [] }
-            : view === 'loyalty-program'
-              ? { program: null }
-              : { reasons: [] };
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+        const body =
+          view === 'customer'
+            ? {
+                customer: {
+                  id: recordId,
+                  normalizedPhone: '+201012345678',
+                  displayName: 'Mona VIP',
+                  orderCount: 2,
+                  lifetimeSpendMinor: 5000,
+                  lastOrderAt: null,
+                  loyaltyBalance: 10,
+                  deliveryOrderCount: 0,
+                  segments: ['VIP'],
+                  linkedShops: [{ shopId, shopName: 'Authorized shop' }],
+                  addresses: [],
+                  loyaltyHistory: [],
+                },
+              }
+            : view === 'customers'
+              ? { customers: [] }
+              : view === 'loyalty-program'
+                ? { program: null }
+                : { reasons: [] };
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(body),
+        });
       });
     }
     if (sample.kind === 'loyalty-event' || sample.kind === 'promotion-use') {
@@ -212,30 +227,54 @@ for (const sample of samples) {
         const url = new URL(route.request().url());
         const body = url.searchParams.get('orderId')
           ? {
-              id: recordId, shopId, status: 'DONE', operationalRevision: 1, source: 'POS',
-              displayOrderNo: 42, displayOrderLabel: '#42',
-              createdAt: '2026-10-08T09:00:00.000Z', totalMinor: 2500,
+              id: recordId,
+              shopId,
+              status: 'DONE',
+              operationalRevision: 1,
+              source: 'POS',
+              displayOrderNo: 42,
+              displayOrderLabel: '#42',
+              createdAt: '2026-10-08T09:00:00.000Z',
+              totalMinor: 2500,
               customer: null,
               fulfillment: {
-                orderTypeLabel: 'Take away', behavior: 'TAKE_AWAY',
-                address: null, deliveryZoneLabel: null, finalDeliveryFeeMinor: 0,
+                orderTypeLabel: 'Take away',
+                behavior: 'TAKE_AWAY',
+                address: null,
+                deliveryZoneLabel: null,
+                finalDeliveryFeeMinor: 0,
               },
-              payments: [], items: [], statusHistory: [],
-              financialEvents: [], inventoryMovements: [], auditEvents: [],
+              payments: [],
+              items: [],
+              statusHistory: [],
+              financialEvents: [],
+              inventoryMovements: [],
+              auditEvents: [],
             }
           : { shopId, rows: [], nextCursor: null };
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(body),
+        });
       });
     }
     await page.goto('/reports');
-    const suffix = sample.kind === 'finance-movement'
-      ? '?movementId=55555555-5555-4555-8555-555555555555'
-      : sample.kind === 'attendance-event' ? '?section=attendance'
-      : sample.kind === 'staff-payment' ? '?section=pay' : '';
+    const suffix =
+      sample.kind === 'finance-movement'
+        ? '?movementId=55555555-5555-4555-8555-555555555555'
+        : sample.kind === 'attendance-event'
+          ? '?section=attendance'
+          : sample.kind === 'staff-payment'
+            ? '?section=pay'
+            : '';
     const expected = `${sample.destination}${recordId}${suffix}`;
-    const link = sample.kind === 'staff-payment'
-      ? page.getByRole('list', { name: 'Report entries' }).getByRole('link', { name: sample.label })
-      : page.getByRole('table').getByRole('link', { name: sample.label });
+    const link =
+      sample.kind === 'staff-payment'
+        ? page
+            .getByRole('list', { name: 'Report entries' })
+            .getByRole('link', { name: sample.label })
+        : page.getByRole('table').getByRole('link', { name: sample.label });
     await expect(link).toHaveAttribute('href', expected);
     await link.click();
     await expect
