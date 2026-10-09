@@ -83,8 +83,18 @@ describe('typed report drilldowns', () => {
         switch (table) {
           case 'loyalty_ledger':
             return [
-              { id: 'loyalty-paid', shop_id: shopId, order_id: 'order-a', customer_id: 'customer-a' },
-              { id: 'loyalty-no-order', shop_id: shopId, order_id: null, customer_id: 'customer-a' },
+              {
+                id: 'loyalty-paid',
+                shop_id: shopId,
+                order_id: 'order-a',
+                customer_id: 'customer-a',
+              },
+              {
+                id: 'loyalty-no-order',
+                shop_id: shopId,
+                order_id: null,
+                customer_id: 'customer-a',
+              },
             ];
           case 'promotion_usage_ledger':
             return [{ id: 'promotion-use-a', shop_id: shopId, order_id: 'order-b' }];
@@ -95,12 +105,18 @@ describe('typed report drilldowns', () => {
             ];
           case 'customer_segments':
             return [
-              { id: 'segment-a', business_id: principal.businessId, canonical_customer_id: 'customer-a' },
+              {
+                id: 'segment-a',
+                business_id: principal.businessId,
+                canonical_customer_id: 'customer-a',
+              },
             ];
           case 'customer_contacts':
             return [{ id: 'contact-a', shop_id: shopId, canonical_customer_id: 'customer-a' }];
           case 'staff_payment_expense_events':
-            return [{ staff_payment_record_id: 'pay-a', shop_id: shopId, employee_id: 'employee-a' }];
+            return [
+              { staff_payment_record_id: 'pay-a', shop_id: shopId, employee_id: 'employee-a' },
+            ];
           default:
             return [];
         }
@@ -114,10 +130,18 @@ describe('typed report drilldowns', () => {
         source('segment-a', 'customer-segment'),
         source('pay-a', 'staff-payment'),
       ],
-      { ...principal, permissions: [...principal.permissions, 'customers.view', 'loyalty.manage', 'promotions.manage'] },
+      {
+        ...principal,
+        permissions: [
+          ...principal.permissions,
+          'customers.view',
+          'loyalty.manage',
+          'promotions.manage',
+        ],
+      },
       client,
     );
-    expect(result.map(row=>row.drilldown)).toEqual([
+    expect(result.map((row) => row.drilldown)).toEqual([
       { type: 'ORDER', orderId: 'order-a' },
       { type: 'CUSTOMER', customerId: 'contact-a' },
       { type: 'ORDER', orderId: 'order-b' },
@@ -131,32 +155,66 @@ describe('typed report drilldowns', () => {
       select: vi.fn(async (table: string) => {
         switch (table) {
           case 'loyalty_ledger':
-            return [{ id: 'loyalty-a', shop_id: shopId, order_id: 'other-order', customer_id: 'cross-customer' }];
+            return [
+              {
+                id: 'loyalty-a',
+                shop_id: shopId,
+                order_id: 'other-order',
+                customer_id: 'cross-customer',
+              },
+            ];
           case 'promotion_usage_ledger':
             return [{ id: 'promotion-a', shop_id: shopId, order_id: 'other-order' }];
           case 'orders':
             return [{ id: 'other-order', shop_id: 'other-shop' }];
           case 'customer_segments':
-            return [{ id: 'segment-a', business_id: 'other-business', canonical_customer_id: 'cross-customer' }];
+            return [
+              {
+                id: 'segment-a',
+                business_id: 'other-business',
+                canonical_customer_id: 'cross-customer',
+              },
+            ];
           case 'customer_contacts':
-            return [{ id: 'cross-contact', shop_id: 'other-shop', canonical_customer_id: 'cross-customer' }];
+            return [
+              {
+                id: 'cross-contact',
+                shop_id: 'other-shop',
+                canonical_customer_id: 'cross-customer',
+              },
+            ];
           default:
             return [];
         }
       }),
     } as unknown as AdminSupabaseClient;
     const result = await enrichReportDrilldowns(
-      [source('loyalty-a','loyalty-event'),source('promotion-a','promotion-use'),source('segment-a','customer-segment')],
-      { ...principal, permissions: [...principal.permissions, 'customers.view','loyalty.manage','promotions.manage'] },
+      [
+        source('loyalty-a', 'loyalty-event'),
+        source('promotion-a', 'promotion-use'),
+        source('segment-a', 'customer-segment'),
+      ],
+      {
+        ...principal,
+        permissions: [
+          ...principal.permissions,
+          'customers.view',
+          'loyalty.manage',
+          'promotions.manage',
+        ],
+      },
       client,
     );
-    expect(result.every(row=>row.drilldown===null)).toBe(true);
-    const noGrant=await enrichReportDrilldowns(
-      [source('loyalty-a','loyalty-event'),source('promotion-a','promotion-use'),source('segment-a','customer-segment')],
+    expect(result.every((row) => row.drilldown === null)).toBe(true);
+    const noGrant = await enrichReportDrilldowns(
+      [
+        source('loyalty-a', 'loyalty-event'),
+        source('promotion-a', 'promotion-use'),
+        source('segment-a', 'customer-segment'),
+      ],
       { ...principal, permissions: ['reports.view'] },
       client,
     );
-    expect(noGrant.every(row=>row.drilldown===null)).toBe(true);
+    expect(noGrant.every((row) => row.drilldown === null)).toBe(true);
   });
-
 });
