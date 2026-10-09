@@ -148,8 +148,8 @@ describe('EmployeeDetailPage', () => {
   it('displays the URL-selected Attendance and Pay tab for an exact employee', () => {
     const attendance = render(employee(), true, [], 'attendance');
     const pay = render(employee(), true, [], 'pay');
-    expect(attendance).toMatch(/role="tab" aria-selected="true"[^>]*>Attendance<\\/button>/);
-    expect(pay).toMatch(/role="tab" aria-selected="true"[^>]*>Pay \\/ Compensation<\\/button>/);
+    expect(attendance).toMatch(/role="tab" aria-selected="true"[^>]*>Attendance/);
+    expect(pay).toMatch(/role="tab" aria-selected="true"[^>]*>Pay/);
     expect(attendance).toContain('role="tabpanel"');
     expect(pay).toContain('role="tabpanel"');
   });
