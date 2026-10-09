@@ -19,7 +19,7 @@ export function reportDrilldownHref(target: ReportDrilldown | null): string | nu
     case 'CUSTOMER':
       return `/customers/${encodeURIComponent(target.customerId)}`;
     case 'STAFF':
-      return `/staff/${encodeURIComponent(target.employeeId)}`;
+      return `/staff/${encodeURIComponent(target.employeeId)}${target.section ? `?section=${encodeURIComponent(target.section)}` : ''}`;
     case 'INVENTORY_ITEM':
       return `/inventory/${encodeURIComponent(target.inventoryItemId)}`;
     case 'FINANCE_ACCOUNT':
