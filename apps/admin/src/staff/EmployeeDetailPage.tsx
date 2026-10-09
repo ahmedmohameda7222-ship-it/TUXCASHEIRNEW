@@ -16,12 +16,7 @@ import { StaffMetricsPanel } from './StaffMetricsPanel';
 import { StaffPaymentPage } from './StaffPaymentPage';
 
 export type StaffDetailSection =
-  | 'profile'
-  | 'schedule'
-  | 'attendance'
-  | 'leave'
-  | 'pay'
-  | 'permissions';
+  'profile' | 'schedule' | 'attendance' | 'leave' | 'pay' | 'permissions';
 type StaffShopChoice = { id: string; name: string };
 
 type LinkedOperationsIdentity = Extract<
