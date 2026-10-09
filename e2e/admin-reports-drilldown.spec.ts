@@ -252,7 +252,7 @@ for (const sample of samples) {
       await expect(page.getByRole('article', { name: 'Employee Mona Ali' })).toBeVisible();
       await expect(page.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true');
       await page.goBack();
-      await expect(page).toHaveURL(/\\/reports/);
+      await expect(page).toHaveURL(/reports/);
     }
     if (sample.kind === 'customer-segment') {
       await expect(page.getByRole('article', { name: 'Customer Mona VIP' })).toBeVisible();
