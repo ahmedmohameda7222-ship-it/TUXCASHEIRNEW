@@ -85,19 +85,28 @@ describe('typed report drilldowns', () => {
             return [
               {
                 id: 'loyalty-paid',
+                business_id: principal.businessId,
                 shop_id: shopId,
                 order_id: 'order-a',
                 customer_id: 'customer-a',
               },
               {
                 id: 'loyalty-no-order',
+                business_id: principal.businessId,
                 shop_id: shopId,
                 order_id: null,
                 customer_id: 'customer-a',
               },
             ];
           case 'promotion_usage_ledger':
-            return [{ id: 'promotion-use-a', shop_id: shopId, order_id: 'order-b' }];
+            return [
+              {
+                id: 'promotion-use-a',
+                business_id: principal.businessId,
+                shop_id: shopId,
+                order_id: 'order-b',
+              },
+            ];
           case 'orders':
             return [
               { id: 'order-a', shop_id: shopId },
@@ -158,13 +167,21 @@ describe('typed report drilldowns', () => {
             return [
               {
                 id: 'loyalty-a',
+                business_id: principal.businessId,
                 shop_id: shopId,
                 order_id: 'other-order',
                 customer_id: 'cross-customer',
               },
             ];
           case 'promotion_usage_ledger':
-            return [{ id: 'promotion-a', shop_id: shopId, order_id: 'other-order' }];
+            return [
+              {
+                id: 'promotion-a',
+                business_id: principal.businessId,
+                shop_id: shopId,
+                order_id: 'other-order',
+              },
+            ];
           case 'orders':
             return [{ id: 'other-order', shop_id: 'other-shop' }];
           case 'customer_segments':
