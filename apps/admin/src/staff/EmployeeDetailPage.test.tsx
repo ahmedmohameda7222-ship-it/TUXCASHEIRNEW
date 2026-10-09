@@ -153,5 +153,4 @@ describe('EmployeeDetailPage', () => {
     expect(attendance).toContain('role="tabpanel"');
     expect(pay).toContain('role="tabpanel"');
   });
-
 });
