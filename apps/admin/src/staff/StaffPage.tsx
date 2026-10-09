@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useLocation } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 
 import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
 import { PageScaffold } from '../components/layout/PageScaffold';
@@ -7,7 +7,7 @@ import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDet
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { AdminDialog } from '../components/overlay/AdminDialog';
 import { useShopScope } from '../shops/ShopScopeProvider';
-import { EmployeeDetailPage } from './EmployeeDetailPage';
+import { EmployeeDetailPage, type StaffDetailSection } from './EmployeeDetailPage';
 import { useStaff, type StaffApiCommandDraft } from './useStaff';
 
 function readableError(error: unknown): string | null {
@@ -26,10 +26,26 @@ function roleLabel(role: string): string {
         : 'Staff';
 }
 
+export function staffSectionFromSearch(search: string): StaffDetailSection {
+  const candidate = new URLSearchParams(search).get('section');
+  switch (candidate) {
+    case 'schedule':
+    case 'attendance':
+    case 'leave':
+    case 'pay':
+    case 'permissions':
+      return candidate;
+    default:
+      return 'profile';
+  }
+}
+
 export function StaffPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const [location, navigate] = useLocation();
+  const search = useSearch();
+  const selectedSection = staffSectionFromSearch(search);
   const selectedId = detailIdFromPath(location, '/staff');
   const [createOpen, setCreateOpen] = useState(false);
   const [newEmployeeName, setNewEmployeeName] = useState('');
@@ -178,6 +194,12 @@ export function StaffPage() {
             <EmployeeDetailPage
               key={`${detail.id}:${shopId}`}
               employee={detail}
+              section={selectedSection}
+              onSectionChange={(section) => {
+                if (!selectedId) return;
+                const path = detailPath('/staff', selectedId);
+                navigate(section === 'profile' ? path : `${path}?section=${section}`);
+              }}
               shopId={shopId}
               canManage={canManage}
               canPay={canPay}
