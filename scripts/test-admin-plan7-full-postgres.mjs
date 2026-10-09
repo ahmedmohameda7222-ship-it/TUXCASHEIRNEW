@@ -425,6 +425,47 @@ const products=rpc(`public.admin_plan7_dashboard_metrics_v1(
  'paid-only Top Products');
 assert.deepEqual(products.topProducts.map(p=>[p.name,p.quantity]),[['Latte',2]]);
 
+
+ // Product Performance uses paid order participation, never operational order existence.
+const splitOrder='40000000-0000-4000-8000-000000000004';
+sql(`insert into public.orders(id,shop_id,business_day_id,display_order_no,idempotency_key,source,status,
+ operator_worker_id,operator_name_snapshot,order_type_id,order_type_label_snapshot,
+ order_type_behavior_snapshot,configured_delivery_fee_minor,final_delivery_fee_minor,
+ items_subtotal_minor,discount_minor,total_minor,created_at,updated_at,
+ operational_revision,service_charge_minor,tax_minor) values
+ ('${splitOrder}','${s}','${newDay}',4,'split-paid','POS','DONE',
+ '${w}','Cashier','${orderType}','Takeaway','TAKE_AWAY',0,0,3000,0,3000,
+ now(),now(),0,0,0);
+insert into public.order_items(id,shop_id,order_id,product_id,product_name_snapshot,
+ unit_price_minor,quantity,line_position) values
+ (gen_random_uuid(),'${s}','${splitOrder}','${latte}','Latte',1000,3,1);
+insert into public.payments(id,shop_id,order_id,part_index,payment_method_id,
+ payment_method_label_snapshot,logic_type_snapshot,allocated_minor,received_minor,
+ change_minor,created_at) values
+ (gen_random_uuid(),'${s}','${splitOrder}',1,'${paymentMethod}',
+ 'Cash','CASH',1500,1500,0,now()),
+ (gen_random_uuid(),'${s}','${splitOrder}',2,'${paymentMethod}',
+ 'Cash','CASH',1500,1500,0,now());`, 'split-payment product fixture');
+const productReport=(context)=>rpc(`public.admin_finance_report_query_v2(
+ '${e}'::uuid,array['${s}'::uuid],'products',
+ '${today}'::date,'${today}'::date,50,0,null::text,
+ '${JSON.stringify(context)}'::jsonb)`, 'Product Performance paid participation');
+const allProductReport=productReport({});
+assert.equal(allProductReport.ok,true);
+assert.equal(allProductReport.rows.filter(row=>row.sourceKind==='order-item').length,2,
+ 'only two paid order item events (no unpaid active/cancelled events)');
+assert.equal(allProductReport.summary.totalQuantity,5,
+ 'split payments must not multiply paid product quantity');
+assert.equal(allProductReport.summary.totalAmountMinor,5000,
+ 'split payments must not multiply recorded item sale amount');
+assert.deepEqual(allProductReport.rows.map(row=>row.label),['Latte','Latte']);
+assert.equal(productReport({productId:espresso}).summary.totalQuantity,0,
+ 'unpaid ACTIVE and CANCELLED Espresso never contribute product quantity');
+assert.equal(productReport({productId:latte}).summary.totalQuantity,5,
+ 'product context preserves paid participation');
+assert.equal(productReport({categoryId:category}).summary.totalQuantity,5,
+ 'category context preserves paid participation');
+
 const limited='45000000-0000-4000-8000-000000000001';
 sql(`insert into public.business_employees(id,business_id,display_name,role,active)
 values ('${limited}','${b}','Custom permission staff','STAFF',true);
