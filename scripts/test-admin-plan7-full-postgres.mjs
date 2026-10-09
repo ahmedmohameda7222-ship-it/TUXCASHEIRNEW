@@ -428,7 +428,10 @@ assert.deepEqual(products.topProducts.map(p=>[p.name,p.quantity]),[['Latte',2]])
 
  // Product Performance uses paid order participation, never operational order existence.
 const splitOrder='40000000-0000-4000-8000-000000000004';
-sql(`insert into public.orders(id,shop_id,business_day_id,display_order_no,idempotency_key,source,status,
+const splitMethod='39000000-0000-4000-8000-000000000002';
+sql(`insert into public.payment_methods(id,shop_id,display_name,logic_type,requires_reconciliation,active,sort_order)
+ values ('${splitMethod}','${s}','Split cash','CASH',false,true,2);
+insert into public.orders(id,shop_id,business_day_id,display_order_no,idempotency_key,source,status,
  operator_worker_id,operator_name_snapshot,order_type_id,order_type_label_snapshot,
  order_type_behavior_snapshot,configured_delivery_fee_minor,final_delivery_fee_minor,
  items_subtotal_minor,discount_minor,total_minor,created_at,updated_at,
@@ -444,7 +447,7 @@ insert into public.payments(id,shop_id,order_id,part_index,payment_method_id,
  change_minor,created_at) values
  (gen_random_uuid(),'${s}','${splitOrder}',1,'${paymentMethod}',
  'Cash','CASH',1500,1500,0,now()),
- (gen_random_uuid(),'${s}','${splitOrder}',2,'${paymentMethod}',
+ (gen_random_uuid(),'${s}','${splitOrder}',2,'${splitMethod}',
  'Cash','CASH',1500,1500,0,now());`, 'split-payment product fixture');
 const productReport=(context)=>rpc(`public.admin_finance_report_query_v2(
  '${e}'::uuid,array['${s}'::uuid],'products',
