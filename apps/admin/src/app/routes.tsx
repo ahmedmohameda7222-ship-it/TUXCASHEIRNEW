@@ -6,11 +6,17 @@ import { AuditPage } from '../audit/AuditPage';
 import { CatalogPage } from '../catalog/CatalogPage';
 import { PublishReviewPage } from '../catalog/PublishReviewPage';
 import { PageScaffold } from '../components/layout/PageScaffold';
+import { HomeDashboard } from '../dashboard/HomeDashboard';
 import { CustomersPage } from '../customers/CustomersPage';
 import { DeliveryPage } from '../delivery/DeliveryPage';
 import { InventoryPage } from '../inventory/InventoryPage';
+import { FinancePage } from '../finance/FinancePage';
+import { ExpensesPage } from '../finance/ExpensesPage';
+import { SettlementsPage } from '../finance/SettlementsPage';
+import { EndDayPage } from '../finance/EndDayPage';
 import { OrdersPage } from '../orders/OrdersPage';
 import { PurchasingPage } from '../purchasing/PurchasingPage';
+import { ReportsPage } from '../reports/ReportsPage';
 import { SettingsPage } from '../settings/SettingsPage';
 import { StaffPage } from '../staff/StaffPage';
 
@@ -75,6 +81,7 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   }
 
   if (location === '/catalog/products/publishing') return <PublishReviewPage />;
+  if (route.path === '/') return <HomeDashboard />;
   if (route.path === '/catalog/products') return <CatalogPage />;
   if (route.path === '/settings') return <SettingsPage />;
   if (route.path === '/approvals') return <ApprovalsPage />;
@@ -85,6 +92,13 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   if (route.path === '/delivery') return <DeliveryPage />;
   if (route.path === '/purchasing') return <PurchasingPage />;
   if (route.path === '/staff') return <StaffPage />;
+  if (route.path === '/finance') {
+    if (location.startsWith('/finance/expenses')) return <ExpensesPage />;
+    if (location.startsWith('/finance/settlements')) return <SettlementsPage />;
+    if (location.startsWith('/finance/end-day')) return <EndDayPage />;
+    return <FinancePage />;
+  }
+  if (route.path === '/reports') return <ReportsPage />;
 
   if (route.path === '/more') {
     const secondary = ADMIN_ROUTES.filter(

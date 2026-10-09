@@ -1,0 +1,111 @@
+name: Admin Plan 7 Finance & Reports TDD
+
+concurrency:
+  group: admin-plan7-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/admin-07-finance-reports]
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'scripts/test-admin-plan7-**'
+      - 'apps/admin/**'
+      - 'packages/admin-contracts/**'
+      - '.github/workflows/admin-plan7-finance-reports-tdd.yml'
+
+jobs:
+  format-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - name: Capture deterministic formatter output
+        run: |
+          for file in e2e/admin-reports-drilldown.spec.ts e2e/admin-dashboard.spec.ts apps/admin/src/dashboard/homeDashboard.css e2e/admin-finance.spec.ts e2e/admin-reports.spec.ts e2e/admin-reports-drilldown.spec.ts e2e/admin-dashboard.spec.ts apps/admin/api/admin/finance.ts apps/admin/api/admin/reports.ts apps/admin/api/cron/admin-recurring-expenses.ts apps/admin/server/finance/calculations.test.ts apps/admin/server/finance/calculations.ts apps/admin/server/finance/financeApi.ts apps/admin/server/finance/financeOperationsApi.ts apps/admin/server/reports/reportApi.ts apps/admin/server/reports/reportAuthorization.ts apps/admin/server/reports/dashboardAuthorization.ts apps/admin/server/reports/dashboardAuthorization.test.ts apps/admin/server/reports/reportAuthorization.test.ts apps/admin/server/reports/dashboardAuthorization.test.ts apps/admin/server/reports/reportDrilldowns.ts apps/admin/server/reports/reportDrilldowns.test.ts packages/admin-contracts/src/reports.ts apps/admin/src/dashboard/HomeDashboard.tsx apps/admin/src/dashboard/OwnerSummaryCard.tsx apps/admin/src/dashboard/TargetsPanel.tsx apps/admin/src/finance/CashierReconciliation.tsx apps/admin/src/finance/EndDayHistoryPage.tsx apps/admin/src/finance/EndDayPage.tsx apps/admin/src/finance/ExpensesPage.tsx apps/admin/src/finance/finance.css apps/admin/src/finance/FinancePage.tsx apps/admin/src/finance/MoneyMovementSheet.tsx apps/admin/src/finance/RecurringExpenses.tsx apps/admin/src/finance/SettlementsPage.tsx apps/admin/src/finance/useFinanceOperations.ts apps/admin/src/reports/ReportFilters.tsx apps/admin/src/reports/reports.css apps/admin/src/reports/ReportsPage.tsx apps/admin/src/reports/ReportView.tsx apps/admin/src/reports/SavedViews.tsx apps/admin/src/reports/useReports.ts apps/admin/src/staff/EmployeeDetailPage.tsx apps/admin/src/staff/EmployeeDetailPage.test.tsx apps/admin/src/staff/StaffPage.tsx; do
+            echo "FORMAT_BEGIN_${file}"
+            npx prettier "$file" | base64 -w0
+            echo
+            echo "FORMAT_END_${file}"
+          done
+
+  schema-invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24 }
+      - run: node scripts/test-admin-plan7-migration.mjs
+      - run: node scripts/test-admin-plan7-gateway.mjs
+      - run: node scripts/test-admin-plan7-materialization-migration.mjs
+      - run: node scripts/test-admin-plan7-finance-setup-migration.mjs
+      - run: node scripts/test-admin-plan7-workspace-migration.mjs
+      - run: node scripts/test-admin-plan7-coverage-migration.mjs
+      - run: node scripts/test-admin-plan7-report-filters.mjs
+      - run: node scripts/test-admin-plan7-dashboard.mjs
+      - run: node scripts/test-admin-plan7-report-permissions.mjs
+
+  schema-postgres:
+    needs: schema-invariants
+    runs-on: ubuntu-latest
+    env: { TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres }
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: postgres }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24 }
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - run: node scripts/test-admin-plan7-postgres.mjs
+      - run: node scripts/test-admin-plan7-materialization-postgres.mjs
+      - run: node scripts/test-admin-plan7-setup-postgres.mjs
+      - run: node scripts/test-admin-plan7-full-postgres.mjs
+      - name: Run full migrations on an independent empty PostgreSQL database
+        run: |
+          psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE tux_plan7_migration_smoke;'
+          TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/tux_plan7_migration_smoke npm run test:migrations
+
+  regression:
+    needs: schema-invariants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - name: Preview Plan 7 Prettier formatting
+        run: |
+          echo PRETTIER_CALCULATIONS_BEGIN
+          npx prettier apps/admin/server/finance/calculations.ts | base64 -w0
+          echo
+          echo PRETTIER_CALCULATIONS_END
+          echo PRETTIER_TEST_BEGIN
+          npx prettier apps/admin/server/finance/calculations.test.ts | base64 -w0
+          echo
+          echo PRETTIER_TEST_END
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npx vitest run apps/admin/server/finance/calculations.test.ts apps/admin/src/finance/money.test.ts apps/admin/server/reports/reportAuthorization.test.ts apps/admin/server/reports/reportDrilldowns.test.ts
+      - run: npm run typecheck
+      - run: npm run test:admin-security
+      - run: npm run test:admin-deployment
+      - run: node scripts/test-admin-plan7-gateway.mjs
+
+  browser-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:admin -- e2e/admin-finance.spec.ts e2e/admin-reports.spec.ts e2e/admin-reports-drilldown.spec.ts e2e/admin-dashboard.spec.ts

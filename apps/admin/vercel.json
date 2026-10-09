@@ -27,6 +27,14 @@
       "dest": "/api/admin/orders?__adminResource=delivery"
     },
     {
+      "src": "/api/admin/finance",
+      "dest": "/api/admin/orders?__adminResource=finance"
+    },
+    {
+      "src": "/api/admin/reports",
+      "dest": "/api/admin/orders?__adminResource=reports"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }

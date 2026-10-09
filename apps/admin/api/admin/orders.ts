@@ -28,6 +28,8 @@ import { handleCrmRequest } from '../../server/customers/crmApi.js';
 import { handleCustomersRequest } from '../../server/customers/customerApi.js';
 import { handleDeliveryRequest } from '../../server/delivery/deliveryApi.js';
 import { handleStaffRequest } from '../../server/staff/staffApi.js';
+import { handleFinanceRequest } from '../../server/finance/financeApi.js';
+import { handleReportsRequest } from '../../server/reports/reportApi.js';
 import { createOrderService, type OrderStore } from '../../server/orders/orderService.js';
 import { readAdminSessionToken } from '../../server/session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
@@ -807,6 +809,18 @@ export default async function handler(
   response: AdminResponse,
 ): Promise<void> {
   const routedUrl = new URL(request.url ?? '/', 'http://admin.local');
+  if (routedUrl.searchParams.get('__adminResource') === 'finance') {
+    routedUrl.searchParams.delete('__adminResource');
+    request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
+    await handleFinanceRequest(request, response);
+    return;
+  }
+  if (routedUrl.searchParams.get('__adminResource') === 'reports') {
+    routedUrl.searchParams.delete('__adminResource');
+    request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
+    await handleReportsRequest(request, response);
+    return;
+  }
   if (routedUrl.searchParams.get('__adminResource') === 'delivery') {
     routedUrl.searchParams.delete('__adminResource');
     request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');

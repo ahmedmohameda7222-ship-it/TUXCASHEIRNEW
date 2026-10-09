@@ -15,7 +15,8 @@ import { SchedulePage, type StaffCommandDraft } from './SchedulePage';
 import { StaffMetricsPanel } from './StaffMetricsPanel';
 import { StaffPaymentPage } from './StaffPaymentPage';
 
-type DetailTab = 'profile' | 'schedule' | 'attendance' | 'leave' | 'pay' | 'permissions';
+export type StaffDetailSection =
+  'profile' | 'schedule' | 'attendance' | 'leave' | 'pay' | 'permissions';
 type StaffShopChoice = { id: string; name: string };
 
 type LinkedOperationsIdentity = Extract<
@@ -48,6 +49,8 @@ function roleLabel(role: AdminRole): string {
 
 export function EmployeeDetailPage({
   employee,
+  section,
+  onSectionChange,
   shopId = employee.assignments[0]?.shopId ?? '',
   canManage,
   canPay,
@@ -58,6 +61,8 @@ export function EmployeeDetailPage({
   onSensitiveCommand,
 }: {
   employee: EmployeeDetail;
+  section: StaffDetailSection;
+  onSectionChange(section: StaffDetailSection): void;
   shopId?: string;
   canManage: boolean;
   canPay: boolean;
@@ -67,7 +72,6 @@ export function EmployeeDetailPage({
   onCommand(command: StaffCommandDraft): void;
   onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
 }) {
-  const [tab, setTab] = useState<DetailTab>('profile');
   const [sensitiveAction, setSensitiveAction] = useState<SensitiveAction>(null);
   const [actorPin, setActorPin] = useState('');
   const [newPin, setNewPin] = useState('');
@@ -412,10 +416,10 @@ export function EmployeeDetailPage({
         </div>
       </header>
 
-      <AdminTabs<DetailTab>
+      <AdminTabs<StaffDetailSection>
         label="Employee detail sections"
-        value={tab}
-        onChange={setTab}
+        value={section}
+        onChange={onSectionChange}
         tabs={[
           { id: 'profile', label: 'Profile', content: profileContent },
           {

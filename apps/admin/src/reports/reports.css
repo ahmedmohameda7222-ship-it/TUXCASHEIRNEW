@@ -1,0 +1,204 @@
+.tux-report-filters,
+.tux-report-target-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 0.75rem;
+}
+.tux-report-filters label,
+.tux-report-target-form label,
+.tux-report-dialog-label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 650;
+}
+.tux-report-filters input,
+.tux-report-filters select,
+.tux-report-target-form input,
+.tux-report-target-form select,
+.tux-report-dialog-label input {
+  min-width: 0;
+  width: 100%;
+  min-height: var(--tux-touch-target);
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--tux-border-strong);
+  border-radius: 12px;
+  background: var(--tux-surface-panel);
+  color: var(--tux-text-primary);
+}
+.tux-report-filters__check {
+  display: flex !important;
+  align-items: center;
+  gap: 0.5rem !important;
+  font-weight: 500 !important;
+}
+.tux-report-filters__check input {
+  width: auto;
+  min-height: 24px;
+}
+.tux-report-view,
+.tux-reports-config {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.tux-report-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 0.75rem;
+}
+.tux-report-metrics > div {
+  display: grid;
+  gap: 0.3rem;
+  padding: 1rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 16px;
+  background: var(--tux-surface-panel);
+}
+.tux-report-metrics small {
+  color: var(--tux-text-secondary);
+}
+.tux-report-metrics strong {
+  font-size: clamp(1rem, 3vw, 1.6rem);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.tux-report-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 16px;
+}
+.tux-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  min-width: 520px;
+}
+.tux-report-table th,
+.tux-report-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--tux-border-subtle);
+}
+.tux-report-table th {
+  color: var(--tux-text-secondary);
+  font-size: 0.8rem;
+}
+.tux-report-table td:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tux-report-table a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.tux-report-caveat {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 12px;
+  color: var(--tux-text-secondary);
+}
+.tux-report-pagination,
+.tux-reports-config__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.tux-report-pagination span {
+  font-size: 0.84rem;
+  color: var(--tux-text-secondary);
+}
+.tux-reports-saved {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+.tux-reports-saved li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--tux-border-subtle);
+}
+
+.tux-report-mobile-entries {
+  display: none;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+@media (max-width: 639px) {
+  .tux-report-table-wrap {
+    display: none;
+  }
+
+  .tux-report-mobile-entries {
+    display: grid;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  .tux-report-mobile-entries li {
+    min-width: 0;
+    padding: 1rem;
+    border: 1px solid var(--tux-border-subtle);
+    border-radius: 14px;
+    background: var(--tux-surface-panel);
+    overflow-wrap: anywhere;
+  }
+
+  .tux-report-mobile-entries__top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .tux-report-mobile-entries small {
+    color: var(--tux-text-secondary);
+  }
+
+  .tux-report-mobile-entries p {
+    margin: 0.5rem 0 0;
+  }
+
+  .tux-report-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.tux-report-context {
+  grid-column: 1 / -1;
+  min-width: 0;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 14px;
+  padding: 0.75rem;
+}
+
+.tux-report-context > summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.tux-report-context__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.tux-report-context__fields label {
+  min-width: 0;
+}
+
+@media (max-width: 639px) {
+  .tux-report-context__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

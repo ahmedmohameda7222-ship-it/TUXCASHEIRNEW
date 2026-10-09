@@ -39,10 +39,13 @@ function render(
   detail: EmployeeDetail,
   canManage = true,
   workers: readonly StaffWorkerChoice[] = [],
+  section: 'profile' | 'attendance' | 'pay' = 'profile',
 ) {
   return renderToStaticMarkup(
     <EmployeeDetailPage
       employee={detail}
+      section={section}
+      onSectionChange={() => undefined}
       shopId={SHOP_ID}
       canManage={canManage}
       canPay
@@ -141,5 +144,13 @@ describe('EmployeeDetailPage', () => {
     expect(html).toContain('Other shop');
     expect(html).toContain('Access &amp; Permissions');
     expect(html).not.toContain('Complete Operations setup');
+  });
+  it('displays the URL-selected Attendance and Pay tab for an exact employee', () => {
+    const attendance = render(employee(), true, [], 'attendance');
+    const pay = render(employee(), true, [], 'pay');
+    expect(attendance).toMatch(/role="tab" aria-selected="true"[^>]*>Attendance/);
+    expect(pay).toMatch(/role="tab" aria-selected="true"[^>]*>Pay/);
+    expect(attendance).toContain('role="tabpanel"');
+    expect(pay).toContain('role="tabpanel"');
   });
 });
