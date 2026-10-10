@@ -28,7 +28,7 @@ export function SettlementsPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const finance = useFinance(shopId, null);
-  const operations = useFinanceOperations(shopId, undefined);
+  const operations = useFinanceOperations(shopId, undefined, ['settlements']);
   const [open, setOpen] = useState(false);
   const [source, setSource] = useState('');
   const [destination, setDestination] = useState('');
