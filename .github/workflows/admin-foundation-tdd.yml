@@ -125,6 +125,7 @@ jobs:
         run: >-
           npx vitest run
           apps/admin/server/dispatcherIsolation.test.ts
+          apps/admin/server/observability.test.ts
           apps/admin/src/app/queryClient.test.ts
           apps/admin/src/dashboard/OwnerSummaryCard.test.tsx
       - name: Admin contracts typecheck
