@@ -25,10 +25,10 @@ run('node', ['scripts/test-admin-workforce-reactivation-postgres.mjs'],
 // Exercise the NEW reconciliation files as an ordered forward-only chain
 // against a disposable PostgreSQL fixture that predates this correction.
 for (const file of [
-  '20261010210000_admin_order_terminal_parity_reconciliation.sql',
-  '20261010210100_admin_workforce_scope_parity.sql',
-  '20261010210200_admin_workforce_mutation_parity.sql',
-  '20261010210300_admin_workforce_operations_parity.sql',
+  '20261010184417_admin_order_terminal_parity_reconciliation.sql',
+  '20261010184435_admin_workforce_scope_parity.sql',
+  '20261010184440_admin_workforce_mutation_parity.sql',
+  '20261010184445_admin_workforce_operations_parity.sql',
 ]) psql(['-f', resolve('supabase/migrations', file)], file);
 
 const names = [
