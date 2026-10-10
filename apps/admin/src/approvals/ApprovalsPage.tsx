@@ -90,7 +90,9 @@ function toViewModel(approval: ApprovalApiModel): ApprovalDetailViewModel {
   };
 }
 
-export function approvalDetailPollInterval(status?: AdminApprovalStatus | 'EXPIRED'): number | false {
+export function approvalDetailPollInterval(
+  status?: AdminApprovalStatus | 'EXPIRED',
+): number | false {
   if (status === undefined) return 15_000;
   if (status === 'PENDING' || status === 'APPROVED' || status === 'EXECUTING') {
     return 15_000;
