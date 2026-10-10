@@ -1,7 +1,7 @@
 import type { FinanceAccountBalance } from '@tux/admin-contracts';
 import { useState } from 'react';
 
-import { InlineError } from '../components/feedback/AdminStates';
+import { ErrorState, InlineError, LoadingState } from '../components/feedback/AdminStates';
 import { AdminDialog } from '../components/overlay/AdminDialog';
 import { formatEgp, parseEgpMinor } from './money';
 import { useFinanceOperations } from './useFinanceOperations';
@@ -134,6 +134,19 @@ export function RecurringExpenses({
           </>
         ) : null}
       </div>
+      {finance.recurringQuery.isLoading ? <LoadingState title="Loading recurring expenses" /> : null}
+      {finance.recurringQuery.isError ? (
+        <ErrorState
+          title="Recurring expenses unavailable"
+          action={
+            <button type="button" className="admin-secondary-button" onClick={() => void finance.recurringQuery.refetch()}>
+              Retry
+            </button>
+          }
+        />
+      ) : null}
+      {finance.recurringQuery.data ? (
+        <>
       {rules.length === 0 ? (
         <p>No recurring expense rules have been configured.</p>
       ) : (
@@ -192,6 +205,8 @@ export function RecurringExpenses({
         Due reminders do not debit accounts. Money and operating expense are posted only after
         confirmation.
       </p>
+        </>
+      ) : null}
       <AdminDialog
         open={ruleOpen}
         onOpenChange={setRuleOpen}
