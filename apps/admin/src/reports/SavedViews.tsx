@@ -125,7 +125,7 @@ export function SavedViews({
       </div>
       {error ? (
         <InlineError>
-          {error instanceof Error ? error.message : 'Unable to update report settings'}
+          Unable to update report settings. Please retry.
         </InlineError>
       ) : null}
       <h2>Saved views</h2>
