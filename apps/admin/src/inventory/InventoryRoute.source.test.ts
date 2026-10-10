@@ -14,7 +14,7 @@ import {
 describe('Admin inventory route', () => {
   it('mounts the real InventoryPage instead of the generic placeholder', async () => {
     const source = await readFile(resolve('apps/admin/src/app/routes.tsx'), 'utf8');
-    expect(source).toContain("const InventoryPage = lazy(() =>");
+    expect(source).toContain('const InventoryPage = lazy(() =>');
     expect(source).toContain("import('../inventory/InventoryPage')");
     expect(source).toContain("default: module.InventoryPage");
     expect(source).toContain("if (route.path === '/inventory') return <InventoryPage />;");
