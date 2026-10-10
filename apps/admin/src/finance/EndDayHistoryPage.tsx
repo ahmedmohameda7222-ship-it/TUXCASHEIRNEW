@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { InlineError, LoadingState } from '../components/feedback/AdminStates';
+import { ErrorState, InlineError, LoadingState } from '../components/feedback/AdminStates';
 import { AdminDialog } from '../components/overlay/AdminDialog';
 import { formatEgp, parseEgpMinor } from './money';
 import { useFinanceOperations } from './useFinanceOperations';
@@ -51,6 +51,16 @@ export function EndDayHistoryPage({ shopId, canAdjust }: { shopId: string; canAd
       <h2>Financial Z history</h2>
       {operations.dayHistoryQuery.isLoading ? (
         <LoadingState title="Loading finalized days" />
+      ) : null}
+      {operations.dayHistoryQuery.isError ? (
+        <ErrorState
+          title="Financial Z history unavailable"
+          action={
+            <button className="admin-secondary-button" type="button" onClick={() => void operations.dayHistoryQuery.refetch()}>
+              Retry
+            </button>
+          }
+        />
       ) : null}
       {history?.snapshots.length === 0 ? <p>No financial Z snapshots finalized yet.</p> : null}
       <ul className="tux-finance-ledger-list">
@@ -190,9 +200,7 @@ export function EndDayHistoryPage({ shopId, canAdjust }: { shopId: string; canAd
           {validation ? <InlineError>{validation}</InlineError> : null}
           {operations.command.error ? (
             <InlineError>
-              {operations.command.error instanceof Error
-                ? operations.command.error.message
-                : 'Adjustment failed'}
+              Adjustment could not be completed. Please retry.
             </InlineError>
           ) : null}
         </div>
