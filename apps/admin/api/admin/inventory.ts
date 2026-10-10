@@ -457,7 +457,7 @@ function selectScopedReasons(
     );
 }
 
-async function loadWorkspace(
+export async function loadInventoryWorkspace(
   client: AdminSupabaseClient,
   context: AdminSessionContext,
   shopId: string,
@@ -767,7 +767,7 @@ export default async function handler(
         sendJson(response, 200, { ...result });
         return;
       }
-      sendJson(response, 200, { ...(await loadWorkspace(client, context, shopId)) });
+      sendJson(response, 200, { ...(await loadInventoryWorkspace(client, context, shopId)) });
       return;
     }
 
