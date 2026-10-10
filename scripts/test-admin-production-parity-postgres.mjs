@@ -31,6 +31,16 @@ for (const file of [
   '20261010184445_admin_workforce_operations_parity.sql',
 ]) psql(['-f', resolve('supabase/migrations', file)], file);
 
+const pinIndex = scalar(`select indexdef from pg_indexes where schemaname='public'
+  and tablename='business_employees' and indexname='business_employees_active_pin_lookup_uq'`);
+assert.match(pinIndex, /\\(business_id, pin_lookup_hash\\)/,
+  'Employee active PIN lookup uniqueness must be scoped to a business');
+const pinCommandUnique = scalar(`select pg_get_constraintdef(c.oid) from pg_constraint c
+  where c.conrelid='private.admin_employee_pin_change_commands'::regclass
+  and c.conname='admin_employee_pin_change_commands_business_command_uq'`);
+assert.equal(pinCommandUnique, 'UNIQUE (business_id, command_id)',
+  'Staged employee PIN commands must use business-scoped idempotency');
+
 const names = [
   ['private','workforce_target_role_denial_v1'],
   ['private','workforce_global_target_denial_v1'],
