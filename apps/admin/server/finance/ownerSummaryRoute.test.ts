@@ -69,7 +69,9 @@ beforeEach(() => {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string | URL | Request) => {
-      const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+      const url = new URL(
+        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
+      );
       calls.push(url.toString());
       if (url.pathname.endsWith('/rest/v1/daily_owner_summaries')) {
         return Response.json([
@@ -105,9 +107,16 @@ describe('Owner Summary direct HTTP authorization', () => {
     expect(response.status()).toBe(200);
     expect(response.raw()).toContain('estimatedOperatingProfitMinor');
     for (const field of [
-      'netSalesMinor', 'orderCount', 'lowStockCount', 'wasteCostMinor',
-      'pendingApprovalCount', 'majorPostedRefundCount',
-      'failedOnlineOrderCount', 'sections', 'futureSecret', 'staffNames',
+      'netSalesMinor',
+      'orderCount',
+      'lowStockCount',
+      'wasteCostMinor',
+      'pendingApprovalCount',
+      'majorPostedRefundCount',
+      'failedOnlineOrderCount',
+      'sections',
+      'futureSecret',
+      'staffNames',
     ]) {
       expect(response.raw()).not.toContain(field);
     }
@@ -117,7 +126,7 @@ describe('Owner Summary direct HTTP authorization', () => {
     expect(query.searchParams.get('shop_id')).toBe(`eq.${shopId}`);
   });
 
-  it('never reads or returns another shop\'s summaries', async () => {
+  it("never reads or returns another shop's summaries", async () => {
     const response = captureResponse();
     await handleAdvancedFinance(request(otherShopId), response.response);
     expect(response.status()).toBe(403);
@@ -127,7 +136,11 @@ describe('Owner Summary direct HTTP authorization', () => {
 
   it('preserves full authorized domains for a fully-permitted principal', async () => {
     state.permissions = [
-      'finance.view', 'reports.view', 'orders.view', 'inventory.view', 'approvals.review',
+      'finance.view',
+      'reports.view',
+      'orders.view',
+      'inventory.view',
+      'approvals.review',
     ];
     const response = captureResponse();
     await handleAdvancedFinance(request(shopId), response.response);
