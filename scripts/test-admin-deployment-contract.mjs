@@ -133,6 +133,9 @@ function stripRuntimeTypes(source) {
 // Inspect the resulting runtime imports, including side effects and import().
 const adminManifest = JSON.parse(fs.readFileSync('apps/admin/package.json', 'utf8'));
 const packagedSources = adminConfig.functions?.['api/**/*.ts']?.includeFiles;
+if (typeof packagedSources !== 'string') {
+  throw new Error('Admin Vercel functions includeFiles must be a single glob string');
+}
 const includes = Array.isArray(packagedSources)
   ? packagedSources
   : typeof packagedSources === 'string'
