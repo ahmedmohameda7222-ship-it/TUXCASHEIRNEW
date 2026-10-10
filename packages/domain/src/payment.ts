@@ -1,11 +1,11 @@
-import type { PaymentMethod } from './catalog';
-import type { CheckoutChannel } from './checkoutPolicy';
-import { DomainInvariantError } from './errors';
-import type { DeliveryZoneId } from './ids';
-import { moneyMinor, subtractMoney, ZERO_MONEY, type MoneyMinor } from './money';
-import type { PaymentMethodSnapshot } from './models';
-import type { PaymentDraft } from './orderDraft';
-import type { PaymentMethodZoneRuleSetting } from './settings';
+import type { PaymentMethod } from './catalog.js';
+import type { CheckoutChannel } from './checkoutPolicy.js';
+import { DomainInvariantError } from './errors.js';
+import type { DeliveryZoneId } from './ids.js';
+import { moneyMinor, subtractMoney, ZERO_MONEY, type MoneyMinor } from './money.js';
+import type { PaymentMethodSnapshot } from './models.js';
+import type { PaymentDraft } from './orderDraft.js';
+import type { PaymentMethodZoneRuleSetting } from './settings.js';
 
 const MAX_PAYMENT_REFERENCE_LENGTH = 200;
 
