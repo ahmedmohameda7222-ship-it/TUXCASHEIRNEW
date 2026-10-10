@@ -20,6 +20,9 @@ export type SettingsScheduleSuccess = {
 type SettingsScheduleAction = {
   schedule(draft: SettingsScheduleDraft): Promise<SettingsScheduleSuccess>;
   busy: boolean;
+  historyLoading?: boolean;
+  historyError?: boolean;
+  retryHistory?: () => void;
 };
 
 const SettingsScheduleActionContext = createContext<SettingsScheduleAction | null>(null);
@@ -146,7 +149,16 @@ export function SettingsSchedulePanel({
         <span>Durable schedule history</span>
         <strong>Latest 50 actions</strong>
       </div>
-      {schedules.length === 0 ? (
+      {action?.historyLoading ? (
+        <p className="admin-field__help">Loading scheduled configuration history…</p>
+      ) : action?.historyError ? (
+        <div>
+          <p role="alert">Scheduled history unavailable. Other shop settings remain available.</p>
+          <button className="admin-secondary-button" type="button" onClick={action.retryHistory}>
+            Retry history
+          </button>
+        </div>
+      ) : schedules.length === 0 ? (
         <p className="admin-field__help">No scheduled configuration history yet.</p>
       ) : (
         <div className="admin-settings-grid">
