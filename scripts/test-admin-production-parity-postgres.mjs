@@ -29,7 +29,7 @@ for (const file of [
   '20261010184435_admin_workforce_scope_parity.sql',
   '20261010184440_admin_workforce_mutation_parity.sql',
   '20261010184445_admin_workforce_operations_parity.sql',
-  '20261010223000_admin_workforce_pin_tenant_indexes_parity.sql',
+  '20261010185358_admin_workforce_pin_tenant_indexes_parity.sql',
 ]) psql(['-f', resolve('supabase/migrations', file)], file);
 
 const pinIndex = scalar(`select indexdef from pg_indexes where schemaname='public'
