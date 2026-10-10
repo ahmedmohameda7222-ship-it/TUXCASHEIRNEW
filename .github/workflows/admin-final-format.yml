@@ -1,0 +1,42 @@
+name: Admin Final Correction Format
+on:
+  push:
+    branches:
+      - fix/admin-production-runtime-performance
+    paths:
+      - '.github/workflows/admin-final-format.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Format final Admin correction sources
+        run: |
+          npx prettier --write \
+            apps/admin/server/observability.ts \
+            apps/admin/server/observability.test.ts \
+            apps/admin/server/finance/financeApi.ts \
+            apps/admin/server/finance/financeOperationsApi.ts \
+            apps/admin/server/reports/reportApi.ts \
+            apps/admin/api/admin/inventory.ts \
+            apps/admin/src/orders/OrdersTask2.test.tsx
+      - name: Commit exact formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/admin
+          if ! git diff --cached --quiet; then
+            git commit -m "style(admin): format production runtime correction follow-ups"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
