@@ -27,13 +27,13 @@ export function EndDayPage() {
   const [cashierOpen, setCashierOpen] = useState(false);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [pin, setPin] = useState('');
-  const operations = useFinanceOperations(shopId, undefined);
+  const operations = useFinanceOperations(shopId, undefined, ['days']);
   const days = operations.daysQuery.data?.days ?? [];
   const dayId =
     selectedDay ??
     (requestedDay && /^[0-9a-f-]{36}$/i.test(requestedDay) ? requestedDay : undefined) ??
     days[0]?.id;
-  const detail = useFinanceOperations(shopId, dayId);
+  const detail = useFinanceOperations(shopId, dayId, ['day', 'cashiers']);
   const report = detail.dayQuery.data;
   const cashierNames = new Map(
     (detail.cashierQuery.data?.workers ?? []).map((w) => [w.id, w.display_name]),
