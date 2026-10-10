@@ -20,6 +20,7 @@
     "test": "vitest run --exclude \"e2e/**\" --exclude scripts/monorepo-architecture-guard.test.mjs --exclude scripts/catalog-architecture-guard.test.mjs",
     "test:admin-security": "node scripts/test-admin-security.mjs",
     "test:admin-deployment": "node scripts/test-admin-deployment-contract.mjs",
+    "test:admin-runtime": "node scripts/test-admin-runtime-smoke.mjs",
     "test:whatsapp-architecture": "node scripts/test-whatsapp-package-layering.mjs",
     "test:whatsapp-security": "node scripts/test-whatsapp-security.mjs",
     "test:catalog-architecture": "node --test scripts/catalog-architecture-guard.test.mjs && node scripts/test-catalog-architecture.mjs",
