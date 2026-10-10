@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { stripTypeScriptTypes } from 'node:module';
+import * as nodeModule from 'node:module';
 
 const adminVercelPath = 'apps/admin/vercel.json';
 const menuVercelPath = 'apps/menu/vercel.json';
@@ -108,6 +108,26 @@ for (const directory of ['apps/admin/api', 'apps/admin/server']) {
   }
 }
 
+// For Node 20 compatibility, use installed TypeScript if the built-in parser
+// is unavailable. CI checkout-only jobs use Node 24 and need no installation.
+const legacyTypeScript =
+  typeof nodeModule.stripTypeScriptTypes === 'function'
+    ? null
+    : (await import('typescript')).default;
+
+function stripRuntimeTypes(source) {
+  if (typeof nodeModule.stripTypeScriptTypes === 'function') {
+    return nodeModule.stripTypeScriptTypes(source, { mode: 'transform' });
+  }
+  return legacyTypeScript.transpileModule(source, {
+    compilerOptions: {
+      module: legacyTypeScript.ModuleKind.ESNext,
+      target: legacyTypeScript.ScriptTarget.ES2022,
+      verbatimModuleSyntax: true,
+    },
+  }).outputText;
+}
+
 // Strip type-only syntax with Node's built-in TypeScript parser, so the guard
 // also works in checkout-only CI jobs that deliberately do not run npm ci.
 // Inspect the resulting runtime imports, including side effects and import().
@@ -148,7 +168,7 @@ for (const directory of ['apps/admin/api', 'apps/admin/server']) {
   for (const fileName of collectTsFiles(directory)) {
     if (fileName.endsWith('.test.ts') || fileName.includes('.source.test.')) continue;
     const filePath = path.join(directory, fileName);
-    const runtimeSource = stripTypeScriptTypes(fs.readFileSync(filePath, 'utf8'), { mode: 'transform' });
+    const runtimeSource = stripRuntimeTypes(fs.readFileSync(filePath, 'utf8'));
     // Type-only named imports become `import {} from ...`: these are inert.
     for (const match of runtimeSource.matchAll(/\bimport\s+(?!\()(?:([^;]*?)\s+from\s+)?['"](@tux\/[^'"]+)['"]/gs)) {
       const bindings = match[1]?.trim();
