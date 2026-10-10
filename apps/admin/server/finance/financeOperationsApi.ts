@@ -13,6 +13,7 @@ import {
 import { requireRecentReauth, AdminRecentReauthError } from '../reauth.js';
 import { readAdminSessionToken } from '../session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../supabaseAdmin.js';
+import { adminRequestOperation } from '../observability.js';
 import { maskOwnerSummaryForPrincipal } from './ownerSummaryAuthorization.js';
 
 const uuid = z.string().uuid();
@@ -217,7 +218,7 @@ export function isAdvancedFinanceCommand(value: unknown): boolean {
   );
 }
 
-function errorResponse(response: AdminResponse, error: unknown): void {
+function errorResponse(response: AdminResponse, error: unknown, request: AdminRequest): void {
   if (error instanceof AdminAuthError) sendJson(response, error.status, { error: error.code });
   else if (error instanceof AdminRecentReauthError) {
     sendJson(response, 403, { error: error.code });
@@ -226,10 +227,10 @@ function errorResponse(response: AdminResponse, error: unknown): void {
   } else if (error instanceof z.ZodError) {
     sendJson(response, 400, { error: 'finance_request_invalid' });
   } else if (error instanceof AdminSupabaseError) {
-    console.error('Finance operations backend unavailable', { status: error.status });
+    console.error('Finance operations backend unavailable', { resource: 'finance', operation: adminRequestOperation(request), status: error.status });
     sendJson(response, 502, { error: 'admin_backend_unavailable' });
   } else {
-    console.error('Finance operations unexpected failure');
+    console.error('Finance operations unexpected failure', { resource: 'finance', operation: adminRequestOperation(request), status: 500 });
     sendJson(response, 500, { error: 'admin_request_failed' });
   }
 }
@@ -576,6 +577,6 @@ export async function handleAdvancedFinance(
     }
     sendCommandResponse(response, result);
   } catch (error) {
-    errorResponse(response, error);
+    errorResponse(response, error, request);
   }
 }
