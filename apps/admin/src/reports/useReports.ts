@@ -118,6 +118,7 @@ export function useReports(
   shopId: string | undefined,
   filters: ReportFilters,
   filterOptionsEnabled: boolean,
+  configEnabled = true,
 ) {
   const session = useAdminSession();
   const cache = useQueryClient();
@@ -150,7 +151,7 @@ export function useReports(
   const configQuery = useQuery({
     queryKey: ['admin', 'reports', namespace, 'config', shopId],
     staleTime: REPORT_CONFIG_STALE_TIME_MS,
-    enabled: Boolean(shopId),
+    enabled: Boolean(shopId && configEnabled),
     queryFn: () =>
       adminFetch<ReportConfigResponse>(
         `/api/admin/reports?view=configuration&shopId=${encodeURIComponent(shopId!)}`,
