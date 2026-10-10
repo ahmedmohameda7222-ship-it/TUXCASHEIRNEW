@@ -68,7 +68,9 @@ describe('Plan 2 final review round 7 regressions', () => {
     const settingsPage = source('./SettingsPage.tsx');
     expect(settingsHook).toContain('settingsScheduleQueryKey(shopId)');
     expect(settingsHook).toContain('staleTime: 15 * 60_000');
-    expect(settingsPage).toContain('shopConfigSchedules: settings.schedulesQuery.data?.schedules ?? []');
+    expect(settingsPage).toContain(
+      'shopConfigSchedules: settings.schedulesQuery.data?.schedules ?? []',
+    );
     expect(settingsHook).toContain('queryKey: settingsScheduleQueryKey(shopId)');
     expect(panel).toContain('workspace.shopConfigSchedules');
     expect(panel).toContain('Needs attention');
