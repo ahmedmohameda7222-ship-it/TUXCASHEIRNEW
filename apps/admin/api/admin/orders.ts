@@ -24,12 +24,6 @@ import {
   type AdminRequest,
   type AdminResponse,
 } from '../../server/http.js';
-import { handleCrmRequest } from '../../server/customers/crmApi.js';
-import { handleCustomersRequest } from '../../server/customers/customerApi.js';
-import { handleDeliveryRequest } from '../../server/delivery/deliveryApi.js';
-import { handleStaffRequest } from '../../server/staff/staffApi.js';
-import { handleFinanceRequest } from '../../server/finance/financeApi.js';
-import { handleReportsRequest } from '../../server/reports/reportApi.js';
 import { createOrderService, type OrderStore } from '../../server/orders/orderService.js';
 import { readAdminSessionToken } from '../../server/session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
@@ -812,19 +806,19 @@ export default async function handler(
   if (routedUrl.searchParams.get('__adminResource') === 'finance') {
     routedUrl.searchParams.delete('__adminResource');
     request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
-    await handleFinanceRequest(request, response);
+    await (await import('../../server/finance/financeApi.js')).handleFinanceRequest(request, response);
     return;
   }
   if (routedUrl.searchParams.get('__adminResource') === 'reports') {
     routedUrl.searchParams.delete('__adminResource');
     request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
-    await handleReportsRequest(request, response);
+    await (await import('../../server/reports/reportApi.js')).handleReportsRequest(request, response);
     return;
   }
   if (routedUrl.searchParams.get('__adminResource') === 'delivery') {
     routedUrl.searchParams.delete('__adminResource');
     request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
-    await handleDeliveryRequest(request, response);
+    await (await import('../../server/delivery/deliveryApi.js')).handleDeliveryRequest(request, response);
     return;
   }
 
@@ -832,17 +826,17 @@ export default async function handler(
     routedUrl.searchParams.delete('__adminResource');
     request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
     if (routedUrl.searchParams.has('view') || routedUrl.searchParams.get('surface') === 'crm') {
-      await handleCrmRequest(request, response);
+      await (await import('../../server/customers/crmApi.js')).handleCrmRequest(request, response);
       return;
     }
-    await handleCustomersRequest(request, response);
+    await (await import('../../server/customers/customerApi.js')).handleCustomersRequest(request, response);
     return;
   }
 
   if (routedUrl.searchParams.get('__adminResource') === 'staff') {
     routedUrl.searchParams.delete('__adminResource');
     request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
-    await handleStaffRequest(request, response);
+    await (await import('../../server/staff/staffApi.js')).handleStaffRequest(request, response);
     return;
   }
 
