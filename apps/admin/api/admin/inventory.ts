@@ -727,11 +727,19 @@ function handleFailure(response: AdminResponse, error: unknown, request: AdminRe
       sendJson(response, 403, { error: 'permission_forbidden' });
       return;
     }
-    console.error('Admin inventory database request failed', { resource: 'inventory', operation: adminRequestOperation(request), status: error.status });
+    console.error('Admin inventory database request failed', {
+      resource: 'inventory',
+      operation: adminRequestOperation(request),
+      status: error.status,
+    });
     sendJson(response, 502, { error: 'admin_backend_unavailable' });
     return;
   }
-  console.error('Admin inventory request failed', { resource: 'inventory', operation: adminRequestOperation(request), status: 500 });
+  console.error('Admin inventory request failed', {
+    resource: 'inventory',
+    operation: adminRequestOperation(request),
+    status: 500,
+  });
   sendJson(response, 500, { error: 'admin_request_failed' });
 }
 

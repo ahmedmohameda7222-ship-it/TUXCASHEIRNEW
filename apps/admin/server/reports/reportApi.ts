@@ -91,10 +91,18 @@ function respondError(response: AdminResponse, error: unknown, request: AdminReq
   else if (error instanceof z.ZodError)
     sendJson(response, 400, { error: 'report_request_invalid' });
   else if (error instanceof AdminSupabaseError) {
-    console.error('Report database failure', { resource: 'reports', operation: adminRequestOperation(request), status: error.status });
+    console.error('Report database failure', {
+      resource: 'reports',
+      operation: adminRequestOperation(request),
+      status: error.status,
+    });
     sendJson(response, 502, { error: 'admin_backend_unavailable' });
   } else {
-    console.error('Report request failed', { resource: 'reports', operation: adminRequestOperation(request), status: 500 });
+    console.error('Report request failed', {
+      resource: 'reports',
+      operation: adminRequestOperation(request),
+      status: 500,
+    });
     sendJson(response, 500, { error: 'admin_request_failed' });
   }
 }

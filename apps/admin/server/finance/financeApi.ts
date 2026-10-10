@@ -160,10 +160,18 @@ function sendFailure(response: AdminResponse, error: unknown, request: AdminRequ
   } else if (error instanceof z.ZodError) {
     sendJson(response, 400, { error: 'invalid_finance_request' });
   } else if (error instanceof AdminSupabaseError) {
-    console.error('Finance backend unavailable', { resource: 'finance', operation: adminRequestOperation(request), status: error.status });
+    console.error('Finance backend unavailable', {
+      resource: 'finance',
+      operation: adminRequestOperation(request),
+      status: error.status,
+    });
     sendJson(response, 502, { error: 'admin_backend_unavailable' });
   } else {
-    console.error('Finance request failed', { resource: 'finance', operation: adminRequestOperation(request), status: 500 });
+    console.error('Finance request failed', {
+      resource: 'finance',
+      operation: adminRequestOperation(request),
+      status: 500,
+    });
     sendJson(response, 500, { error: 'admin_request_failed' });
   }
 }
