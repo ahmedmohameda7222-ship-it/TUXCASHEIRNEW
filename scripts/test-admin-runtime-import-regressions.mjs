@@ -38,9 +38,13 @@ try {
 
   fs.rmSync(probePath);
   const config = JSON.parse(originalVercel);
-  delete config.functions;
+  config.functions['api/**/*.ts'].includeFiles = '../../packages/irrelevant/**';
   fs.writeFileSync(configPath, JSON.stringify(config));
   checkContract(false, 'Missing Admin Vercel runtime source packaging');
+
+  delete config.functions;
+  fs.writeFileSync(configPath, JSON.stringify(config));
+  checkContract(false, 'Admin Vercel functions includeFiles must be a single glob string');
 } finally {
   if (fs.existsSync(probePath)) fs.rmSync(probePath);
   fs.writeFileSync(configPath, originalVercel);
