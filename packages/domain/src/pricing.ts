@@ -1,12 +1,12 @@
-import { DomainInvariantError } from './errors';
+import { DomainInvariantError } from './errors.js';
 import {
   addMoney,
   assertNonNegativeMoney,
   multiplyMoney,
   subtractMoney,
   type MoneyMinor,
-} from './money';
-import type { DraftOrderLine } from './orderDraft';
+} from './money.js';
+import type { DraftOrderLine } from './orderDraft.js';
 
 export interface OrderPricing {
   readonly itemsSubtotalMinor: MoneyMinor;
