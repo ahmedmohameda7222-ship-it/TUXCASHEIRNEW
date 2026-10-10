@@ -19,7 +19,7 @@ export function RecurringExpenses({
   categories: readonly { id: string; name: string }[];
   canManage: boolean;
 }) {
-  const finance = useFinanceOperations(shopId, undefined);
+  const finance = useFinanceOperations(shopId, undefined, ['recurring']);
   const rules = finance.recurringQuery.data?.rules ?? [];
   const due = finance.recurringQuery.data?.due ?? [];
   const [ruleOpen, setRuleOpen] = useState(false);
