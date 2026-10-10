@@ -42,6 +42,8 @@ function AccountDetail({
   canManage,
   history,
   loading,
+  error,
+  onRetry,
   onDeactivate,
   highlightedMovementId,
 }: {
@@ -54,6 +56,8 @@ function AccountDetail({
     occurredAt: string;
   }[];
   loading: boolean;
+  error: boolean;
+  onRetry(): void;
   highlightedMovementId: string | null;
   onDeactivate(): void;
 }) {
@@ -77,7 +81,8 @@ function AccountDetail({
       ) : null}
       <h3>Activity</h3>
       {loading ? <LoadingState title="Loading account activity" /> : null}
-      {!loading && history.length === 0 ? (
+      {error ? <ErrorState title="Account activity unavailable" action={<button type="button" className="admin-secondary-button" onClick={onRetry}>Retry</button>} /> : null}
+      {!loading && !error && history.length === 0 ? (
         <EmptyState
           title="No transactions yet"
           description="Transactions will appear here once they are recorded."
@@ -392,6 +397,8 @@ export function FinancePage() {
                   canManage={canManage}
                   history={finance.historyQuery.data ?? []}
                   loading={finance.historyQuery.isLoading}
+                  error={finance.historyQuery.isError}
+                  onRetry={() => void finance.historyQuery.refetch()}
                   highlightedMovementId={selectedMovementId}
                   onDeactivate={() => setDeactivateAccount(selectedAccount)}
                 />
