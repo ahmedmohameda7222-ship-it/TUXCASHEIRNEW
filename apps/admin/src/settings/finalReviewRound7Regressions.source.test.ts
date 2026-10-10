@@ -65,8 +65,11 @@ describe('Plan 2 final review round 7 regressions', () => {
     expect(contracts).toContain('shopConfigSchedules');
     expect(scheduleApi).toContain("'scheduled_config_changes'");
     expect(scheduleApi).toContain("change_kind: 'eq.SHOP_CONFIG'");
-    expect(settingsHook).toContain('shopConfigSchedules: scheduleList.schedules');
-    expect(settingsHook).toContain('onSuccess: invalidateWorkspace');
+    const settingsPage = source('./SettingsPage.tsx');
+    expect(settingsHook).toContain('settingsScheduleQueryKey(shopId)');
+    expect(settingsHook).toContain('staleTime: 15 * 60_000');
+    expect(settingsPage).toContain('shopConfigSchedules: settings.schedulesQuery.data?.schedules ?? []');
+    expect(settingsHook).toContain('queryKey: settingsScheduleQueryKey(shopId)');
     expect(panel).toContain('workspace.shopConfigSchedules');
     expect(panel).toContain('Needs attention');
     expect(panel).toContain('Choose a new time');
