@@ -484,7 +484,6 @@ async function loadWorkspace(
         'shops',
         new URLSearchParams({
           select: 'id,name',
-          business_id: `eq.${context.principal.businessId}`,
           id: `in.(${context.principal.shopIds.join(',')})`,
           order: 'name.asc,id.asc',
         }),
