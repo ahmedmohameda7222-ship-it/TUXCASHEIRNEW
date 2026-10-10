@@ -1,4 +1,4 @@
-export { brandValue, type Brand } from './brand';
+export { brandValue, type Brand } from './brand.js';
 export {
   BULK_STOCK_UNDO_WINDOW_MS,
   bulkStockBalance,
@@ -10,7 +10,7 @@ export {
   undoBulkMovementDelta,
   undoBulkMovementType,
   type BulkStockMovementType,
-} from './bulkStock';
+} from './bulkStock.js';
 export {
   allocateDisplayOrderNo,
   closeBusinessDay,
@@ -18,8 +18,8 @@ export {
   type BusinessDay,
   type ClosedBusinessDay,
   type OpenBusinessDay,
-} from './businessDay';
-export type * from './catalog';
+} from './businessDay.js';
+export type * from './catalog.js';
 export {
   applyBasisPoints,
   calculateCheckoutPricing,
@@ -27,11 +27,11 @@ export {
   type CheckoutChannel,
   type CheckoutPricing,
   type EffectiveCheckoutPolicy,
-} from './checkoutPolicy';
+} from './checkoutPolicy.js';
 export {
   parseOperationsConfigurationBundle,
   type OperationsConfigurationBundle,
-} from './configurationBundle';
+} from './configurationBundle.js';
 export {
   deliveryZoneContains,
   isDeliveryRoutingOpen,
@@ -43,7 +43,7 @@ export {
   type DeliveryRoutingResult,
   type DeliveryRoutingShop,
   type DeliveryRoutingZone,
-} from './deliveryRouting';
+} from './deliveryRouting.js';
 export {
   addProductUnit,
   applyDeliveryZone,
@@ -52,7 +52,7 @@ export {
   duplicateDraftLineUnit,
   productQuantityInDraft,
   replaceDraftLineCustomization,
-} from './draftOperations';
+} from './draftOperations.js';
 export {
   buildEndDayReconciliationProjection,
   calculateEndDayFinancialProjection,
@@ -62,8 +62,8 @@ export {
   type EndDayFinancialProjection,
   type EndDayPaymentExpectation,
   type EndDayReconciliationProjectionLine,
-} from './endDay';
-export { DomainInvariantError } from './errors';
+} from './endDay.js';
+export { DomainInvariantError } from './errors.js';
 export {
   calculateExpenseTotals,
   createManualExpense,
@@ -78,11 +78,11 @@ export {
   type ManualExpenseLifecycleSnapshot,
   type ManualExpenseRecord,
   type ManualExpenseValues,
-} from './expense';
-export { parseEntityId } from './ids';
-export type * from './ids';
-export type { JsonPrimitive, JsonValue } from './json';
-export type * from './models';
+} from './expense.js';
+export { parseEntityId } from './ids.js';
+export type * from './ids.js';
+export type { JsonPrimitive, JsonValue } from './json.js';
+export type * from './models.js';
 export {
   addMoney,
   assertNonNegativeMoney,
@@ -90,9 +90,9 @@ export {
   multiplyMoney,
   subtractMoney,
   ZERO_MONEY,
-} from './money';
-export type { MoneyMinor } from './money';
-export { assertOrderSnapshotIntegrity } from './order';
+} from './money.js';
+export type { MoneyMinor } from './money.js';
+export { assertOrderSnapshotIntegrity } from './order.js';
 export {
   cancelActiveOrder,
   canUndoOrderDone,
@@ -101,15 +101,15 @@ export {
   orderLifecycle,
   returnFailedDelivery,
   undoOrderDone,
-} from './orderLifecycle';
-export type * from './orderDraft';
-export { hasMeaningfulOrderDraft } from './orderDraft';
+} from './orderLifecycle.js';
+export type * from './orderDraft.js';
+export { hasMeaningfulOrderDraft } from './orderDraft.js';
 export {
   assertParkedOrderDraftInvariant,
   type ParkedOrderDraft,
   type ParkedOrderDraftState,
-} from './parkedOrderDraft';
-export { InvalidOrderDraftError, parseOrderDraft } from './orderDraftParser';
+} from './parkedOrderDraft.js';
+export { InvalidOrderDraftError, parseOrderDraft } from './orderDraftParser.js';
 export {
   parsePoundsToMinor,
   parseWholePoundsToMinor,
@@ -118,24 +118,24 @@ export {
   preparePaymentParts,
   type PreparedPaymentPart,
   type PaymentPreparationContext,
-} from './payment';
-export { normalizeEgyptianPhone, type EgyptianPhoneNormalization } from './phone';
-export { calculateDraftLineTotal, calculateOrderPricing, type OrderPricing } from './pricing';
+} from './payment.js';
+export { normalizeEgyptianPhone, type EgyptianPhoneNormalization } from './phone.js';
+export { calculateDraftLineTotal, calculateOrderPricing, type OrderPricing } from './pricing.js';
 export {
   validateOrderDraft,
   type OrderDraftValidationResult,
   type OrderValidationIssue,
   type OrderValidationPath,
   type ValidatedOrderDraft,
-} from './orderValidation';
+} from './orderValidation.js';
 export {
   addStockQuantities,
   STOCK_QUANTITY_SCALE,
   stockQuantityMicros,
   wholeStockUnits,
-} from './quantity';
-export type { StockQuantityMicros } from './quantity';
-export type * from './settings';
+} from './quantity.js';
+export type { StockQuantityMicros } from './quantity.js';
+export type * from './settings.js';
 export {
   OPERATIONS_SYNC_PAYLOAD_VERSION,
   operationsSyncPayloadJson,
@@ -148,9 +148,9 @@ export {
   type OrderTransitionSyncEventType,
   type OrderTransitionSyncSnapshotV1,
   type WorkerSessionSyncEventType,
-} from './syncContract';
-export { suggestCashTenders, type TenderSuggestion } from './tender';
-export { instant, type Instant } from './time';
+} from './syncContract.js';
+export { suggestCashTenders, type TenderSuggestion } from './tender.js';
+export { instant, type Instant } from './time.js';
 export {
   assertWhatsAppMessageInvariant,
   type WhatsAppConversation,
@@ -166,7 +166,7 @@ export {
   type WhatsAppStarterTemplate,
   type WhatsAppQuickReply,
   type WhatsAppQuickReplyCategory,
-} from './whatsapp';
+} from './whatsapp.js';
 export {
   flattenWorkerMenuLayoutProductOrder,
   normalizeWorkerMenuLayoutUpdate,
@@ -178,7 +178,7 @@ export {
   type WorkerMenuLayoutCatalog,
   type WorkerMenuLayoutSyncState,
   type WorkerMenuLayoutUpdate,
-} from './workerMenuLayout';
+} from './workerMenuLayout.js';
 export {
   parseSystemAccentColor,
   parseWorkerUiPreferences,
@@ -186,4 +186,4 @@ export {
   type SystemAccentColor,
   type WorkerUiPreferences,
   type WorkerUiPreferencesSyncState,
-} from './workerUiPreferences';
+} from './workerUiPreferences.js';
