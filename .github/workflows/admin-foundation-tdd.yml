@@ -73,6 +73,19 @@ jobs:
       - name: Admin OWNER bootstrap invariant
         run: node scripts/test-admin-owner-bootstrap.mjs
 
+  dependency-audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Classify npm audit findings
+        run: node scripts/report-admin-dependency-audit.mjs
+
   contracts:
     runs-on: ubuntu-24.04
     steps:
@@ -120,3 +133,5 @@ jobs:
         run: npm run typecheck -w @tux/admin
       - name: Admin app build
         run: npm run build -w @tux/admin
+      - name: Admin initial bundle budget
+        run: node scripts/test-admin-bundle-budget.mjs
