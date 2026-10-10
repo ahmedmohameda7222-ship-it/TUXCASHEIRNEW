@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // TypeScript's bundler resolver allows extensionless source imports, but native
 // Node ESM never does. Normalize the compiled graph, not application logic.
-const root = path.resolve('packages/domain/dist');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../packages/domain/dist');
 let checked = 0;
 async function walk(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
