@@ -38,5 +38,10 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ]
+  ],
+  "functions": {
+    "api/**/*.ts": {
+      "includeFiles": "../../packages/domain/src/**"
+    }
+  }
 }
