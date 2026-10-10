@@ -117,6 +117,8 @@ jobs:
         run: npm run test:admin-security
       - name: Admin Vercel deployment contract
         run: npm run test:admin-deployment
+      - name: Runtime workspace import negative regressions
+        run: node scripts/test-admin-runtime-import-regressions.mjs
       - name: Admin production import-graph smoke
         run: npm run test:admin-runtime
       - name: Admin runtime isolation and retry regressions
