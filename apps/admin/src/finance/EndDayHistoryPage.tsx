@@ -6,7 +6,7 @@ import { formatEgp, parseEgpMinor } from './money';
 import { useFinanceOperations } from './useFinanceOperations';
 
 export function EndDayHistoryPage({ shopId, canAdjust }: { shopId: string; canAdjust: boolean }) {
-  const operations = useFinanceOperations(shopId, undefined);
+  const operations = useFinanceOperations(shopId, undefined, ['day-history']);
   const history = operations.dayHistoryQuery.data;
   const [snapshotId, setSnapshotId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
