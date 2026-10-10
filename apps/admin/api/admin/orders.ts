@@ -86,7 +86,6 @@ type OrderRow = {
   operational_revision: number | string;
   source: 'POS' | 'ONLINE';
   display_order_no: number | string;
-  display_order_label: string | null;
   created_at: string;
   total_minor: number | string;
   customer_contact_id: string | null;
@@ -315,7 +314,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
       const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
       const query = new URLSearchParams({
         select:
-          'id,shop_id,status,operational_revision,source,display_order_no,display_order_label,created_at,total_minor,customer_contact_id,customer_name_snapshot,normalized_phone_snapshot,order_type_label_snapshot,order_type_behavior_snapshot,address_snapshot,delivery_zone_label_snapshot,final_delivery_fee_minor',
+          'id,shop_id,status,operational_revision,source,display_order_no,created_at,total_minor,customer_contact_id,customer_name_snapshot,normalized_phone_snapshot,order_type_label_snapshot,order_type_behavior_snapshot,address_snapshot,delivery_zone_label_snapshot,final_delivery_fee_minor',
         shop_id: `eq.${input.shopId}`,
         order: 'created_at.desc,id.desc',
         limit: String(limit + 1),
@@ -363,7 +362,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           operationalRevision: safeInteger(row.operational_revision),
           source: row.source,
           displayOrderNo: safeInteger(row.display_order_no),
-          displayOrderLabel: row.display_order_label,
+          displayOrderLabel: `#${safeInteger(row.display_order_no)}`,
           createdAt: row.created_at,
           totalMinor: safeInteger(row.total_minor),
           customerName: row.customer_name_snapshot,
@@ -380,7 +379,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
         'orders',
         new URLSearchParams({
           select:
-            'id,shop_id,status,operational_revision,source,display_order_no,display_order_label,created_at,total_minor,customer_contact_id,customer_name_snapshot,normalized_phone_snapshot,order_type_label_snapshot,order_type_behavior_snapshot,address_snapshot,delivery_zone_label_snapshot,final_delivery_fee_minor',
+            'id,shop_id,status,operational_revision,source,display_order_no,created_at,total_minor,customer_contact_id,customer_name_snapshot,normalized_phone_snapshot,order_type_label_snapshot,order_type_behavior_snapshot,address_snapshot,delivery_zone_label_snapshot,final_delivery_fee_minor',
           id: `eq.${input.orderId}`,
           shop_id: `eq.${input.shopId}`,
           limit: '1',
@@ -577,7 +576,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
         operationalRevision: safeInteger(order.operational_revision),
         source: order.source,
         displayOrderNo: safeInteger(order.display_order_no),
-        displayOrderLabel: order.display_order_label,
+        displayOrderLabel: `#${safeInteger(order.display_order_no)}`,
         createdAt: order.created_at,
         totalMinor: safeInteger(order.total_minor),
         customer:
