@@ -168,7 +168,7 @@ for (const directory of ['apps/admin/api', 'apps/admin/server']) {
           isRuntimeImportClause(node.importClause)) {
         assertRuntimeWorkspaceImport(node.moduleSpecifier.text, filePath);
       }
-      if (ts.isExportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) &&
+      if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier) &&
           !node.isTypeOnly &&
           (!node.exportClause || !ts.isNamedExports(node.exportClause) ||
             node.exportClause.elements.some((element) => !element.isTypeOnly))) {
