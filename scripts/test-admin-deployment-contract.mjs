@@ -157,7 +157,7 @@ function assertRuntimeWorkspaceImport(specifier, sourcePath) {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   if (/\.ts["']/.test(JSON.stringify(manifest.exports ?? {}))) {
     const sourcePattern = `../../packages/${packageDirectory}/src/**`;
-    const packagePattern = `../../packages/${packageDirectory}/**`;
+    const packagePattern = `../../packages/${packageDirectory}/{src,dist}/**`;
     if (!includes.includes(sourcePattern) && !includes.includes(packagePattern)) {
       throw new Error(`Missing Admin Vercel runtime source packaging for ${packageName}: ${sourcePattern}`);
     }
