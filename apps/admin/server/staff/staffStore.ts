@@ -468,7 +468,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
           'shops',
           new URLSearchParams({
             select: 'id,name',
-            business_id: `eq.${businessId}`,
+            // Business-scoped shop IDs come from the authenticated principal.
             id: inFilter(authorizedShopIds),
             order: 'name.asc,id.asc',
           }),
