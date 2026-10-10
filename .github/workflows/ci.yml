@@ -65,6 +65,8 @@ jobs:
         run: npm run lint
       - name: Unit and integration tests
         run: npm run test
+      - name: Sync workspace domain source regression
+        run: npm test -w @tux/sync
       - name: Admin security gate
         run: npm run test:admin-security
       - name: WhatsApp architecture gate
