@@ -41,7 +41,9 @@ export function ReportsPage() {
     context: {},
     offset: 0,
   }));
-  const reports = useReports(shopId, filters);
+  const [filterOptionsExpanded, setFilterOptionsExpanded] = useState(false);
+  const hasContextFilters = Object.values(filters.context ?? {}).some(Boolean);
+  const reports = useReports(shopId, filters, filterOptionsExpanded || hasContextFilters);
   const config = reports.configQuery.data;
 
   if (!shopId)
@@ -107,6 +109,7 @@ export function ReportsPage() {
         canCompareShops={principal.role === 'OWNER'}
         allShopIds={principal.shopIds}
         options={reports.optionsQuery.data?.options ?? {}}
+        onExpand={() => setFilterOptionsExpanded(true)}
       />
       <ReportView
         data={reports.reportQuery.data}
