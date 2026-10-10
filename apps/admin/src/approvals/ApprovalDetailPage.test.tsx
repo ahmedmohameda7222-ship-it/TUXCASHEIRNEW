@@ -6,7 +6,7 @@ import {
   approvalDecisionDialogTitle,
   type ApprovalDetailViewModel,
 } from './ApprovalDetailPage';
-import { approvalDecisionErrorMessage } from './ApprovalsPage';
+import { approvalDecisionErrorMessage, approvalDetailPollInterval } from './ApprovalsPage';
 import { AdminApiError } from '../lib/adminApi';
 
 const pending: ApprovalDetailViewModel = {
@@ -29,6 +29,15 @@ function render(model: ApprovalDetailViewModel): string {
 }
 
 describe('ApprovalDetailPage', () => {
+  it('stops detail polling after a terminal decision', () => {
+    for (const status of ['REJECTED', 'EXECUTED', 'FAILED', 'EXPIRED'] as const) {
+      expect(approvalDetailPollInterval(status)).toBe(false);
+    }
+    for (const status of ['PENDING', 'APPROVED', 'EXECUTING'] as const) {
+      expect(approvalDetailPollInterval(status)).toBe(15_000);
+    }
+  });
+
   it('turns decision errors into clear next steps without exposing error codes', () => {
     expect(
       approvalDecisionErrorMessage(new AdminApiError(403, 'self_approval_forbidden')),
