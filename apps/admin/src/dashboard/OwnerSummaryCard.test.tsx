@@ -1,7 +1,14 @@
+import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import { OwnerSummaryCard } from './OwnerSummaryCard';
+
+vi.mock('wouter', () => ({
+  Link: ({ href, children }: { href: string; children: ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
+}));
 
 const mock = vi.hoisted(() => ({
   query: {
