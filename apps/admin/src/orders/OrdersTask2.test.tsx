@@ -69,7 +69,9 @@ const order: AdminOrderDetail = {
 describe('Orders Task 2 controls', () => {
   it('mounts the real OrdersPage at /orders', async () => {
     const source = await readFile(resolve('apps/admin/src/app/routes.tsx'), 'utf8');
-    expect(source).toContain("import { OrdersPage } from '../orders/OrdersPage';");
+    expect(source).toContain('const OrdersPage = lazy(() =>');
+    expect(source).toContain("import('../orders/OrdersPage')");
+    expect(source).toContain('default: module.OrdersPage');
     expect(source).toContain("if (route.path === '/orders') return <OrdersPage />;");
   });
 
