@@ -121,7 +121,7 @@ const includes = Array.isArray(packagedSources)
 
 function assertRuntimeWorkspaceImport(specifier, sourcePath) {
   if (!specifier.startsWith('@tux/')) return;
-  const match = /^(@tux\\/[^/]+)/.exec(specifier);
+  const match = /^(@tux\/[^/]+)/.exec(specifier);
   if (!match) throw new Error(`Invalid workspace import: ${specifier}`);
   const packageName = match[1];
   if (packageName === '@tux/admin-contracts') {
@@ -136,7 +136,7 @@ function assertRuntimeWorkspaceImport(specifier, sourcePath) {
     throw new Error(`Unknown Admin runtime workspace package: ${packageName}`);
   }
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  if (/\\.ts["']/.test(JSON.stringify(manifest.exports ?? {}))) {
+  if (/\.ts["']/.test(JSON.stringify(manifest.exports ?? {}))) {
     const sourcePattern = `../../packages/${packageDirectory}/src/**`;
     if (!includes.includes(sourcePattern)) {
       throw new Error(`Missing Admin Vercel runtime source packaging for ${packageName}: ${sourcePattern}`);
@@ -150,16 +150,16 @@ for (const directory of ['apps/admin/api', 'apps/admin/server']) {
     const filePath = path.join(directory, fileName);
     const runtimeSource = stripTypeScriptTypes(fs.readFileSync(filePath, 'utf8'));
     // Type-only named imports become `import {} from ...`: these are inert.
-    for (const match of runtimeSource.matchAll(/\\bimport\\s+(?!\\()(?:([^;]*?)\\s+from\\s+)?['"](@tux\\/[^'"]+)['"]/gs)) {
+    for (const match of runtimeSource.matchAll(/\bimport\s+(?!\()(?:([^;]*?)\s+from\s+)?['"](@tux\/[^'"]+)['"]/gs)) {
       const bindings = match[1]?.trim();
-      if (bindings && /^\\{\\s*\\}$/.test(bindings)) continue;
+      if (bindings && /^\{\s*\}$/.test(bindings)) continue;
       assertRuntimeWorkspaceImport(match[2], filePath);
     }
-    for (const match of runtimeSource.matchAll(/\\bexport\\s+(\\*|\\{[^}]*\\})\\s+from\\s+['"](@tux\\/[^'"]+)['"]/g)) {
-      if (/^\\{\\s*\\}$/.test(match[1])) continue;
+    for (const match of runtimeSource.matchAll(/\bexport\s+(\*|\{[^}]*\})\s+from\s+['"](@tux\/[^'"]+)['"]/g)) {
+      if (/^\{\s*\}$/.test(match[1])) continue;
       assertRuntimeWorkspaceImport(match[2], filePath);
     }
-    for (const match of runtimeSource.matchAll(/\\bimport\\s*\\(\\s*['"](@tux\\/[^'"]+)['"]/g)) {
+    for (const match of runtimeSource.matchAll(/\bimport\s*\(\s*['"](@tux\/[^'"]+)['"]/g)) {
       assertRuntimeWorkspaceImport(match[1], filePath);
     }
   }
