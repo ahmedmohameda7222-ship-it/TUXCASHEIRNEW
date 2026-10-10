@@ -496,4 +496,81 @@ const limitedConfig=rpc(`public.admin_report_config_query_v1(
 assert.deepEqual(limitedConfig.targets.map(t=>t.metric),['NET_SALES'],
   'reports.view keeps its sales target but must hide finance-only cost targets');
 
+// Post-merge accounting-date invariant: expense posting/audit time is NOT report time.
+const accountingDate='2026-10-01';
+const laterPostingDate=today;
+const legacyCreatedDate='2026-10-09';
+const backdated=movement('EXPENSE',{
+  fromAccountId:cashId,businessDayId:newDay,expenseDate:accountingDate,
+  amountMinor:100000,description:'Backdated P1 expense',
+  categoryId:null,reason:'October 1 accounting expense posted later',
+},'postmerge-backdated-expense');
+assert.equal(backdated.ok,true);
+assert.equal(sql(`select expense_date from public.admin_expense_finance_details
+ where shop_id='${s}' and expense_id='${backdated.expenseId}'`,
+ 'backdated canonical business date'),accountingDate);
+assert.equal(sql(`select (created_at at time zone 'Africa/Cairo')::date>'${accountingDate}'::date
+ from public.expenses where id='${backdated.expenseId}'`,
+ 'immutable later actual posting timestamp'),'t');
+const accountingReport=(area,date)=>rpc(`public.admin_finance_report_query_v2(
+ '${e}'::uuid,array['${s}'::uuid],'${area}',
+ '${date}'::date,'${date}'::date,100,0,null::text,'{}'::jsonb)`,
+ `${area} accounting on ${date}`);
+for (const area of ['expenses','profit']) {
+ const first=accountingReport(area,accountingDate);
+ const later=accountingReport(area,laterPostingDate);
+ assert.equal(first.ok,true);
+ const rows=first.rows.filter(row=>row.id===backdated.expenseId);
+ assert.equal(rows.length,1,`${area}: backdated expense occurs once on business date`);
+ assert.equal(rows[0].amountMinor,-100000,`${area}: full value in correct period`);
+ assert.equal(later.rows.filter(row=>row.id===backdated.expenseId).length,0,
+   `${area}: backdated expense must not be allocated to posting date`);
+}
+const overdueRule=rpc(`public.upsert_recurring_expense_rule_v1(
+ '${e}'::uuid,'${s}'::uuid,null::uuid,0,null::uuid,
+ 'Overdue post-merge rent',2300,'MONTHLY','${accountingDate}'::date,true,
+ 'postmerge-overdue-rule')`,'overdue recurring definition');
+assert.equal(overdueRule.ok,true);
+const generatedOverdue=rpc(`public.process_due_recurring_expenses_v2(
+ '${e}'::uuid,'${s}'::uuid,'${today}'::date,25)`,'generate overdue recurrence');
+assert.equal(generatedOverdue.ok,true);
+const overdueId=sql(`select id from public.recurring_expense_occurrences
+ where shop_id='${s}' and due_on='${accountingDate}'
+   and rule_id='${overdueRule.ruleId}'`,'overdue occurrence');
+assert(overdueId,'recurring occurrence must exist for due date');
+const overdueExpense=rpc(`public.post_recurring_expense_occurrence_v1(
+ '${e}'::uuid,'${s}'::uuid,'${overdueId}'::uuid,
+ '${newDay}'::uuid,'${cashId}'::uuid,'Overdue rent paid later',
+ 'postmerge-overdue-post')`,'post delayed recurring expense');
+assert.equal(overdueExpense.ok,true);
+assert.equal(sql(`select expense_date from public.admin_expense_finance_details
+ where expense_id='${overdueExpense.expenseId}'`,'overdue finance detail'),accountingDate);
+assert.equal(sql(`select (created_at at time zone 'Africa/Cairo')::date>'${accountingDate}'::date
+ from public.expenses where id='${overdueExpense.expenseId}'`,'overdue actual posting'),'t');
+for(const area of ['expenses','profit']) {
+ assert.equal(accountingReport(area,accountingDate).rows.filter(
+   row=>row.id===overdueExpense.expenseId).length,1,
+   `${area}: recurring due date governs accounting`);
+ assert.equal(accountingReport(area,laterPostingDate).rows.filter(
+   row=>row.id===overdueExpense.expenseId).length,0,
+   `${area}: recurring post date must not shift accounting`);
+}
+// Historical Operations expenses have no finance detail and must fall back to Cairo created_at.
+const legacyId='43000000-0000-4000-8000-000000000001';
+sql(`insert into public.expenses(id,shop_id,business_day_id,kind,description,
+ amount_minor,paid_from,created_by_worker_id,created_at,updated_at)
+ values ('${legacyId}','${s}','${newDay}','MANUAL','Legacy expense no detail',
+ 750,'CASH','${w}','2026-10-09 12:00:00+03','2026-10-09 12:00:00+03')`,
+ 'genuine legacy expense without Plan 7 finance detail');
+assert.equal(sql(`select count(*) from public.admin_expense_finance_details
+ where expense_id='${legacyId}'`,'legacy no details'),'0');
+for(const area of ['expenses','profit']) {
+ const legacy=accountingReport(area,legacyCreatedDate).rows.filter(row=>row.id===legacyId);
+ assert.equal(legacy.length,1,`${area}: legacy expense still reported exactly once`);
+ assert.equal(legacy[0].amountMinor,-750);
+ assert.equal(accountingReport(area,accountingDate).rows.filter(
+   row=>row.id===legacyId).length,0);
+}
+
+
 console.log('Plan 7 complete management, X/Z, report, recurrence and audit integration passed.');

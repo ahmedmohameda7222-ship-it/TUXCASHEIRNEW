@@ -13,6 +13,7 @@ import {
 import { requireRecentReauth, AdminRecentReauthError } from '../reauth.js';
 import { readAdminSessionToken } from '../session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../supabaseAdmin.js';
+import { maskOwnerSummaryForPrincipal } from './ownerSummaryAuthorization.js';
 
 const uuid = z.string().uuid();
 const commandId = uuid;
@@ -431,7 +432,14 @@ export async function handleAdvancedFinance(
             limit: '30',
           }),
         );
-        sendJson(response, 200, { summaries });
+        sendJson(response, 200, {
+          summaries: summaries.map((row) => ({
+            id: row['id'],
+            business_day_id: row['business_day_id'],
+            generated_at: row['generated_at'],
+            summary: maskOwnerSummaryForPrincipal(principal, row['summary']),
+          })),
+        });
         return;
       }
       sendJson(response, 400, { error: 'finance_view_invalid' });
