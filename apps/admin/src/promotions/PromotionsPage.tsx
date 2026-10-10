@@ -100,7 +100,7 @@ export function PromotionsPage({ shopId }: { shopId: string }) {
       {promotionsQuery.isLoading ? <p>Loading promotions…</p> : null}
       {promotionsQuery.isError ? <p role="alert">Promotions could not be loaded.</p> : null}
 
-      {promotions.length === 0 && !promotionsQuery.isLoading ? (
+      {promotions.length === 0 && !promotionsQuery.isLoading && !promotionsQuery.isError ? (
         <p>No promotions configured.</p>
       ) : (
         <ul>
