@@ -68,10 +68,7 @@ describe('Owner Summary trusted BFF domain filtering', () => {
   });
 
   it('allows order exceptions but not inventory without its own grant', () => {
-    const result = maskOwnerSummaryForPrincipal(
-      principal(['finance.view', 'orders.view']),
-      stored,
-    );
+    const result = maskOwnerSummaryForPrincipal(principal(['finance.view', 'orders.view']), stored);
     expect(result['orderCount']).toBe(12);
     expect(result['majorPostedRefundCount']).toBe(2);
     expect(result['failedOnlineOrderCount']).toBe(3);
@@ -81,13 +78,25 @@ describe('Owner Summary trusted BFF domain filtering', () => {
 
   it('aligns sales with reports.view and returns the full authorized known fields', () => {
     const result = maskOwnerSummaryForPrincipal(
-      principal(['finance.view', 'orders.view', 'reports.view', 'inventory.view', 'approvals.review']),
+      principal([
+        'finance.view',
+        'orders.view',
+        'reports.view',
+        'inventory.view',
+        'approvals.review',
+      ]),
       stored,
     );
     for (const key of [
-      'netSalesMinor', 'orderCount', 'estimatedOperatingProfitMinor',
-      'cashSalesNetMinor', 'lowStockCount', 'wasteCostMinor',
-      'majorPostedRefundCount', 'failedOnlineOrderCount', 'pendingApprovalCount',
+      'netSalesMinor',
+      'orderCount',
+      'estimatedOperatingProfitMinor',
+      'cashSalesNetMinor',
+      'lowStockCount',
+      'wasteCostMinor',
+      'majorPostedRefundCount',
+      'failedOnlineOrderCount',
+      'pendingApprovalCount',
     ]) {
       expect(result[key]).toBe(stored[key as keyof typeof stored]);
     }
