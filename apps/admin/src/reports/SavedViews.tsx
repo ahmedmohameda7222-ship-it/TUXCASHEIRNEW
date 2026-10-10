@@ -123,11 +123,7 @@ export function SavedViews({
           </button>
         ) : null}
       </div>
-      {error ? (
-        <InlineError>
-          Unable to update report settings. Please retry.
-        </InlineError>
-      ) : null}
+      {error ? <InlineError>Unable to update report settings. Please retry.</InlineError> : null}
       <h2>Saved views</h2>
       {views.length === 0 ? (
         <p>No saved report views yet.</p>

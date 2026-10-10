@@ -191,7 +191,12 @@ export function ReportFilters({
         </label>
       ) : null}
       {extraFields.length > 0 || statuses.length > 0 ? (
-        <details className="tux-report-context" onToggle={(event) => { if (event.currentTarget.open) onExpand(); }}>
+        <details
+          className="tux-report-context"
+          onToggle={(event) => {
+            if (event.currentTarget.open) onExpand();
+          }}
+        >
           <summary>More filters</summary>
           <div className="tux-report-context__fields">
             {extraFields

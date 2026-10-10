@@ -57,12 +57,14 @@ describe('Owner Summary states', () => {
     mock.query.isLoading = false;
     mock.query.isError = false;
     mock.query.data = {
-      summaries: [{
-        id: 'summary',
-        business_day_id: 'day',
-        generated_at: '2026-10-08T18:00:00Z',
-        summary: { netSalesMinor: 37000, orderCount: 3 },
-      }],
+      summaries: [
+        {
+          id: 'summary',
+          business_day_id: 'day',
+          generated_at: '2026-10-08T18:00:00Z',
+          summary: { netSalesMinor: 37000, orderCount: 3 },
+        },
+      ],
     };
     const html = renderToStaticMarkup(<OwnerSummaryCard shopId="shop" />);
     expect(html).toContain('Net sales');

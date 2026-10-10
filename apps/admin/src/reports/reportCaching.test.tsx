@@ -1,7 +1,11 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { REPORT_CONFIG_STALE_TIME_MS, REPORT_FILTER_OPTIONS_STALE_TIME_MS, useReports } from './useReports';
+import {
+  REPORT_CONFIG_STALE_TIME_MS,
+  REPORT_FILTER_OPTIONS_STALE_TIME_MS,
+  useReports,
+} from './useReports';
 
 const mock = vi.hoisted(() => ({
   queries: [] as Array<{ queryKey: unknown[]; staleTime?: number; enabled?: boolean }>,

@@ -806,19 +806,25 @@ export default async function handler(
   if (routedUrl.searchParams.get('__adminResource') === 'finance') {
     routedUrl.searchParams.delete('__adminResource');
     request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
-    await (await import('../../server/finance/financeApi.js')).handleFinanceRequest(request, response);
+    await (
+      await import('../../server/finance/financeApi.js')
+    ).handleFinanceRequest(request, response);
     return;
   }
   if (routedUrl.searchParams.get('__adminResource') === 'reports') {
     routedUrl.searchParams.delete('__adminResource');
     request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
-    await (await import('../../server/reports/reportApi.js')).handleReportsRequest(request, response);
+    await (
+      await import('../../server/reports/reportApi.js')
+    ).handleReportsRequest(request, response);
     return;
   }
   if (routedUrl.searchParams.get('__adminResource') === 'delivery') {
     routedUrl.searchParams.delete('__adminResource');
     request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
-    await (await import('../../server/delivery/deliveryApi.js')).handleDeliveryRequest(request, response);
+    await (
+      await import('../../server/delivery/deliveryApi.js')
+    ).handleDeliveryRequest(request, response);
     return;
   }
 
@@ -829,7 +835,9 @@ export default async function handler(
       await (await import('../../server/customers/crmApi.js')).handleCrmRequest(request, response);
       return;
     }
-    await (await import('../../server/customers/customerApi.js')).handleCustomersRequest(request, response);
+    await (
+      await import('../../server/customers/customerApi.js')
+    ).handleCustomersRequest(request, response);
     return;
   }
 

@@ -120,11 +120,21 @@ export function ReportsPage() {
         retry={() => void reports.reportQuery.refetch()}
         onOffset={(offset) => setFilters((previous) => ({ ...previous, offset }))}
       />
-      {reports.configQuery.isLoading ? <LoadingState title="Loading saved report settings" /> : null}
+      {reports.configQuery.isLoading ? (
+        <LoadingState title="Loading saved report settings" />
+      ) : null}
       {reports.configQuery.isError ? (
         <ErrorState
           title="Saved report settings unavailable"
-          action={<button className="admin-secondary-button" type="button" onClick={() => void reports.configQuery.refetch()}>Retry</button>}
+          action={
+            <button
+              className="admin-secondary-button"
+              type="button"
+              onClick={() => void reports.configQuery.refetch()}
+            >
+              Retry
+            </button>
+          }
         />
       ) : null}
       {config ? (
@@ -135,17 +145,19 @@ export function ReportsPage() {
         />
       ) : null}
       {principal.permissions.includes('finance.view') ? <OwnerSummaryCard shopId={shopId} /> : null}
-      {config ? <SavedViews
-        shopId={shopId}
-        views={config.savedViews}
-        targets={config.targets}
-        filters={filters}
-        canSetTargets={principal.permissions.includes('settings.manage')}
-        pending={reports.command.isPending}
-        error={reports.command.error}
-        onCommand={(draft) => reports.command.mutate(draft)}
-        onApply={applySavedView}
-      /> : null}
+      {config ? (
+        <SavedViews
+          shopId={shopId}
+          views={config.savedViews}
+          targets={config.targets}
+          filters={filters}
+          canSetTargets={principal.permissions.includes('settings.manage')}
+          pending={reports.command.isPending}
+          error={reports.command.error}
+          onCommand={(draft) => reports.command.mutate(draft)}
+          onApply={applySavedView}
+        />
+      ) : null}
     </PageScaffold>
   );
 }

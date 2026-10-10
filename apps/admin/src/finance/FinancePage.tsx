@@ -81,7 +81,16 @@ function AccountDetail({
       ) : null}
       <h3>Activity</h3>
       {loading ? <LoadingState title="Loading account activity" /> : null}
-      {error ? <ErrorState title="Account activity unavailable" action={<button type="button" className="admin-secondary-button" onClick={onRetry}>Retry</button>} /> : null}
+      {error ? (
+        <ErrorState
+          title="Account activity unavailable"
+          action={
+            <button type="button" className="admin-secondary-button" onClick={onRetry}>
+              Retry
+            </button>
+          }
+        />
+      ) : null}
       {!loading && !error && history.length === 0 ? (
         <EmptyState
           title="No transactions yet"

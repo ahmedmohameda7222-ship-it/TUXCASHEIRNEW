@@ -39,7 +39,11 @@ export function OwnerSummaryCard({ shopId }: { shopId: string }) {
           title="Owner Summary unavailable"
           description="The financial summary could not be loaded."
           action={
-            <button type="button" className="admin-secondary-button" onClick={() => void query.refetch()}>
+            <button
+              type="button"
+              className="admin-secondary-button"
+              onClick={() => void query.refetch()}
+            >
               Retry
             </button>
           }

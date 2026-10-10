@@ -56,7 +56,11 @@ export function EndDayHistoryPage({ shopId, canAdjust }: { shopId: string; canAd
         <ErrorState
           title="Financial Z history unavailable"
           action={
-            <button className="admin-secondary-button" type="button" onClick={() => void operations.dayHistoryQuery.refetch()}>
+            <button
+              className="admin-secondary-button"
+              type="button"
+              onClick={() => void operations.dayHistoryQuery.refetch()}
+            >
               Retry
             </button>
           }
@@ -199,9 +203,7 @@ export function EndDayHistoryPage({ shopId, canAdjust }: { shopId: string; canAd
           </label>
           {validation ? <InlineError>{validation}</InlineError> : null}
           {operations.command.error ? (
-            <InlineError>
-              Adjustment could not be completed. Please retry.
-            </InlineError>
+            <InlineError>Adjustment could not be completed. Please retry.</InlineError>
           ) : null}
         </div>
       </AdminDialog>
