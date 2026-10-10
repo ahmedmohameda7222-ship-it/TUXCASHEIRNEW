@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 
 const adminVercelPath = 'apps/admin/vercel.json';
 const menuVercelPath = 'apps/menu/vercel.json';
@@ -104,6 +105,82 @@ for (const directory of ['apps/admin/api', 'apps/admin/server']) {
         `Admin Vercel runtime code must use @tux/admin-contracts only through type-only imports: ${absolutePath}`,
       );
     }
+  }
+}
+
+// Parse actual TypeScript module syntax. String checks miss named mixed type/value
+// imports, side-effect imports, re-exports and lazy import() expressions.
+const adminManifest = JSON.parse(fs.readFileSync('apps/admin/package.json', 'utf8'));
+const bundledSourcePatterns = adminConfig.functions?.['api/**/*.ts']?.includeFiles;
+const includes = Array.isArray(bundledSourcePatterns)
+  ? bundledSourcePatterns
+  : typeof bundledSourcePatterns === 'string'
+    ? [bundledSourcePatterns]
+    : [];
+
+function assertRuntimeWorkspaceImport(specifier, sourcePath) {
+  if (!specifier.startsWith('@tux/')) return;
+  const match = /^(@tux\/[^/]+)/.exec(specifier);
+  if (!match) throw new Error(`Invalid workspace import: ${specifier}`);
+  const packageName = match[1];
+  if (packageName === '@tux/admin-contracts') {
+    throw new Error(`Runtime import of type-only Admin contracts: ${sourcePath}`);
+  }
+  if (!Object.hasOwn(adminManifest.dependencies ?? {}, packageName)) {
+    throw new Error(`Undeclared Admin runtime workspace dependency ${packageName}: ${sourcePath}`);
+  }
+  const packageDirectory = packageName.slice('@tux/'.length);
+  const manifestFile = `packages/${packageDirectory}/package.json`;
+  if (!fs.existsSync(manifestFile)) {
+    throw new Error(`Unknown Admin runtime workspace package: ${packageName}`);
+  }
+  const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+  const exportsSource = JSON.stringify(manifest.exports ?? {});
+  if (exportsSource.includes('/src/') || exportsSource.includes('.ts')) {
+    const expected = `../../packages/${packageDirectory}/src/**`;
+    if (!includes.includes(expected)) {
+      throw new Error(`Missing Admin Vercel runtime source packaging for ${packageName}: ${expected}`);
+    }
+  }
+}
+
+function isRuntimeImportClause(clause) {
+  if (!clause || clause.isTypeOnly) return false;
+  if (clause.name) return true;
+  const bindings = clause.namedBindings;
+  return !bindings || ts.isNamespaceImport(bindings) ||
+    bindings.elements.some((element) => !element.isTypeOnly);
+}
+
+for (const directory of ['apps/admin/api', 'apps/admin/server']) {
+  for (const fileName of collectTsFiles(directory)) {
+    if (fileName.endsWith('.test.ts') || fileName.includes('.source.test.')) continue;
+    const filePath = path.join(directory, fileName);
+    const ast = ts.createSourceFile(
+      filePath,
+      fs.readFileSync(filePath, 'utf8'),
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS,
+    );
+    function visit(node) {
+      if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) &&
+          isRuntimeImportClause(node.importClause)) {
+        assertRuntimeWorkspaceImport(node.moduleSpecifier.text, filePath);
+      }
+      if (ts.isExportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) &&
+          !node.isTypeOnly &&
+          (!node.exportClause || !ts.isNamedExports(node.exportClause) ||
+            node.exportClause.elements.some((element) => !element.isTypeOnly))) {
+        assertRuntimeWorkspaceImport(node.moduleSpecifier.text, filePath);
+      }
+      if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+          node.arguments.length === 1 && ts.isStringLiteral(node.arguments[0])) {
+        assertRuntimeWorkspaceImport(node.arguments[0].text, filePath);
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(ast);
   }
 }
 
