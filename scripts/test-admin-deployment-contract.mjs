@@ -148,7 +148,7 @@ for (const directory of ['apps/admin/api', 'apps/admin/server']) {
   for (const fileName of collectTsFiles(directory)) {
     if (fileName.endsWith('.test.ts') || fileName.includes('.source.test.')) continue;
     const filePath = path.join(directory, fileName);
-    const runtimeSource = stripTypeScriptTypes(fs.readFileSync(filePath, 'utf8'));
+    const runtimeSource = stripTypeScriptTypes(fs.readFileSync(filePath, 'utf8'), { mode: 'transform' });
     // Type-only named imports become `import {} from ...`: these are inert.
     for (const match of runtimeSource.matchAll(/\bimport\s+(?!\()(?:([^;]*?)\s+from\s+)?['"](@tux\/[^'"]+)['"]/gs)) {
       const bindings = match[1]?.trim();
