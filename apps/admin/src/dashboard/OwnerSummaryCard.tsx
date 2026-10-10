@@ -1,7 +1,8 @@
 import { Link } from 'wouter';
 
+import { ErrorState, LoadingState } from '../components/feedback/AdminStates';
 import { formatEgp } from '../finance/money';
-import { useFinanceOperations } from '../finance/useFinanceOperations';
+import { useOwnerSummary } from '../finance/useFinanceOperations';
 
 const summaryMetrics = [
   { field: 'netSalesMinor', label: 'Net sales', kind: 'money' },
@@ -16,8 +17,8 @@ const summaryMetrics = [
 ] as const;
 
 export function OwnerSummaryCard({ shopId }: { shopId: string }) {
-  const finance = useFinanceOperations(shopId, undefined);
-  const latest = finance.ownerSummaryQuery.data?.summaries[0];
+  const query = useOwnerSummary(shopId);
+  const latest = query.data?.summaries[0];
   const authorizedMetrics = summaryMetrics.filter((metric) => {
     const value = latest?.summary[metric.field];
     return typeof value === 'number' && Number.isSafeInteger(value);
@@ -31,9 +32,21 @@ export function OwnerSummaryCard({ shopId }: { shopId: string }) {
           End Day history
         </Link>
       </div>
-      {!latest ? (
+      {query.isLoading ? (
+        <LoadingState title="Loading Owner Summary" />
+      ) : query.isError ? (
+        <ErrorState
+          title="Owner Summary unavailable"
+          description="The financial summary could not be loaded."
+          action={
+            <button type="button" className="admin-secondary-button" onClick={() => void query.refetch()}>
+              Retry
+            </button>
+          }
+        />
+      ) : query.data?.summaries.length === 0 ? (
         <p>No finalized financial day has generated an Owner Summary for this shop yet.</p>
-      ) : (
+      ) : latest ? (
         <div>
           <p className="tux-finance-muted">
             Generated{' '}
@@ -54,6 +67,8 @@ export function OwnerSummaryCard({ shopId }: { shopId: string }) {
           )}
           <Link href="/reports">Open source reports</Link>
         </div>
+      ) : (
+        <LoadingState title="Loading Owner Summary" />
       )}
     </section>
   );
