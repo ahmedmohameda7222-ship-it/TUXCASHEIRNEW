@@ -1,15 +1,15 @@
-import type { OperationsConfigurationSnapshot } from './catalog';
-import { DomainInvariantError } from './errors';
-import { calculateExpenseTotals, type ExpenseLedgerRecord } from './expense';
-import type { PaymentMethodId } from './ids';
-import type { OrderSnapshot, PaymentLogicType } from './models';
+import type { OperationsConfigurationSnapshot } from './catalog.js';
+import { DomainInvariantError } from './errors.js';
+import { calculateExpenseTotals, type ExpenseLedgerRecord } from './expense.js';
+import type { PaymentMethodId } from './ids.js';
+import type { OrderSnapshot, PaymentLogicType } from './models.js';
 import {
   addMoney,
   assertNonNegativeMoney,
   subtractMoney,
   ZERO_MONEY,
   type MoneyMinor,
-} from './money';
+} from './money.js';
 
 export interface EndDayPaymentExpectation {
   readonly paymentMethodId: PaymentMethodId;

@@ -1,7 +1,7 @@
-import { DomainInvariantError } from './errors';
-import type { BusinessDayId, ShopId, WorkerId } from './ids';
-import type { OrderDraft } from './orderDraft';
-import type { Instant } from './time';
+import { DomainInvariantError } from './errors.js';
+import type { BusinessDayId, ShopId, WorkerId } from './ids.js';
+import type { OrderDraft } from './orderDraft.js';
+import type { Instant } from './time.js';
 
 export type ParkedOrderDraftState = 'PARKED' | 'RESTORED' | 'DISCARDED';
 

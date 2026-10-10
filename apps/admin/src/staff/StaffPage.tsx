@@ -147,7 +147,9 @@ export function StaffPage() {
                 }
               />
             ) : null}
-            {rows.length === 0 && !staff.workspaceQuery.isLoading ? (
+            {rows.length === 0 &&
+            !staff.workspaceQuery.isLoading &&
+            !staff.workspaceQuery.isError ? (
               <EmptyState
                 title="No employees assigned to this shop"
                 description="Add or assign a staff profile to begin."

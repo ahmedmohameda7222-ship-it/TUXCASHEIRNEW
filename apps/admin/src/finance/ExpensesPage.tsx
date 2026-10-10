@@ -147,7 +147,9 @@ export function ExpensesPage() {
           }
         />
       ) : null}
-      {operations.expensesQuery.data?.expenses.length === 0 ? (
+      {!operations.expensesQuery.isLoading &&
+      !operations.expensesQuery.isError &&
+      operations.expensesQuery.data?.expenses.length === 0 ? (
         <EmptyState
           title="No expenses recorded"
           description="Open-day management expenses will appear here."

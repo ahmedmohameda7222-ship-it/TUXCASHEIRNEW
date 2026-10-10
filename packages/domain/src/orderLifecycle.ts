@@ -1,7 +1,7 @@
-import { DomainInvariantError } from './errors';
-import type { WorkerId } from './ids';
-import type { OrderLifecycleSnapshot, OrderReasonCodeSnapshot, OrderSnapshot } from './models';
-import type { Instant } from './time';
+import { DomainInvariantError } from './errors.js';
+import type { WorkerId } from './ids.js';
+import type { OrderLifecycleSnapshot, OrderReasonCodeSnapshot, OrderSnapshot } from './models.js';
+import type { Instant } from './time.js';
 
 export const DONE_UNDO_WINDOW_MS = 8_000;
 

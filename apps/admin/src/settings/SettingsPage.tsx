@@ -268,7 +268,7 @@ export function SettingsPage() {
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const section = settingsSectionForLocation(location);
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
-  const settings = useSettings(shopId);
+  const settings = useSettings(shopId, section === 'shop');
 
   if (!shopId) {
     return (
@@ -298,7 +298,10 @@ export function SettingsPage() {
     );
   }
 
-  const workspace = settings.workspaceQuery.data;
+  const workspace = {
+    ...settings.workspaceQuery.data,
+    shopConfigSchedules: settings.schedulesQuery.data?.schedules ?? [],
+  };
 
   return (
     <>
@@ -306,6 +309,9 @@ export function SettingsPage() {
         action={{
           schedule: (draft) => settings.scheduleSettingsChange.mutateAsync(draft),
           busy: settings.scheduleSettingsChange.isPending,
+          historyLoading: settings.schedulesQuery.isPending,
+          historyError: settings.schedulesQuery.isError,
+          retryHistory: () => void settings.schedulesQuery.refetch(),
         }}
       >
         <SettingsWorkspaceView

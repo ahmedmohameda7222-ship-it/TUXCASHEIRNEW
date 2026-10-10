@@ -18,11 +18,15 @@ describe('durable SHOP_CONFIG schedule outcomes', () => {
     expect(scheduleApi).toContain('business_id: `eq.${context.principal.businessId}`');
     expect(scheduleApi).toContain('shop_id: `eq.${shopId}`');
     expect(settingsHook).toContain('/api/admin/settings-schedule?shopId=${encodedShopId}');
-    expect(settingsHook).toContain('shopConfigSchedules: scheduleList.schedules');
+    expect(settingsHook).toContain('settingsScheduleQueryKey(shopId)');
+    expect(settingsHook).toContain('staleTime: 15 * 60_000');
+    expect(settingsHook).not.toContain('Promise.all([');
   });
 
   it('renders durable outcomes without exposing retry internals or technical errors', () => {
     expect(panel).toContain('workspace.shopConfigSchedules');
+    expect(panel).toContain('Scheduled history unavailable');
+    expect(panel).toContain('Retry history');
     expect(panel).toContain('Needs attention');
     expect(panel).toContain('Choose a new time');
     expect(panel).not.toContain('attemptCount');

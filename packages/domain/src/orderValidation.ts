@@ -1,16 +1,16 @@
-import type { OperationsConfigurationSnapshot, OrderType } from './catalog';
+import type { OperationsConfigurationSnapshot, OrderType } from './catalog.js';
 import {
   calculateCheckoutPricing,
   resolveEffectiveCheckoutPolicy,
   type CheckoutChannel,
   type CheckoutPricing,
   type EffectiveCheckoutPolicy,
-} from './checkoutPolicy';
-import { DomainInvariantError } from './errors';
-import { ZERO_MONEY } from './money';
-import type { OrderDraft } from './orderDraft';
-import { preparePaymentParts } from './payment';
-import { normalizeEgyptianPhone } from './phone';
+} from './checkoutPolicy.js';
+import { DomainInvariantError } from './errors.js';
+import { ZERO_MONEY } from './money.js';
+import type { OrderDraft } from './orderDraft.js';
+import { preparePaymentParts } from './payment.js';
+import { normalizeEgyptianPhone } from './phone.js';
 
 export type OrderValidationPath =
   | 'businessDay'

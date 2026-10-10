@@ -7,10 +7,10 @@ import type {
   PaymentMethodId,
   ProductId,
   ShopId,
-} from './ids';
-import type { MoneyMinor } from './money';
-import type { ComboBeverageSnapshot, OrderModifierSnapshot } from './models';
-import type { Instant } from './time';
+} from './ids.js';
+import type { MoneyMinor } from './money.js';
+import type { ComboBeverageSnapshot, OrderModifierSnapshot } from './models.js';
+import type { Instant } from './time.js';
 
 export interface DraftOrderLine {
   readonly id: DraftLineId;

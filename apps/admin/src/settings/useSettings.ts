@@ -57,6 +57,10 @@ type SettingOverrideUpdateCommand = Extract<SettingsCommand, { type: 'setting.ov
 function settingsQueryKey(shopId: string) {
   return ['admin', 'settings', shopId] as const;
 }
+
+export function settingsScheduleQueryKey(shopId: string) {
+  return ['admin', 'settings', 'schedules', shopId] as const;
+}
 function csrfTokenForMutation(session: ReturnType<typeof useAdminSession>): string {
   if (session.state.status !== 'authenticated') throw new SettingsUiError('session_required');
   return session.state.session.csrfToken;
@@ -148,7 +152,7 @@ function requireShopManagementSuccess(result: ShopManagementWriteResult): void {
   );
 }
 
-export function useSettings(shopId: string | undefined) {
+export function useSettings(shopId: string | undefined, includeSchedules = false) {
   const session = useAdminSession();
   const queryClient = useQueryClient();
 
@@ -158,15 +162,25 @@ export function useSettings(shopId: string | undefined) {
     queryFn: async (): Promise<AdminSettingsWorkspace> => {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
       const encodedShopId = encodeURIComponent(shopId);
-      const [workspace, scheduleList] = await Promise.all([
-        adminFetch<SettingsWorkspaceBase>(
-          `/api/admin/settings?shopId=${encodedShopId}&view=workspace`,
-        ),
-        adminFetch<SettingsScheduleListResult>(
-          `/api/admin/settings-schedule?shopId=${encodedShopId}`,
-        ),
-      ]);
-      return { ...workspace, shopConfigSchedules: scheduleList.schedules };
+      const workspace = await adminFetch<SettingsWorkspaceBase>(
+        `/api/admin/settings?shopId=${encodedShopId}&view=workspace`,
+      );
+      return { ...workspace, shopConfigSchedules: [] };
+    },
+  });
+
+  const schedulesQuery = useQuery({
+    queryKey: shopId
+      ? settingsScheduleQueryKey(shopId)
+      : ['admin', 'settings', 'schedules', 'no-shop'],
+    enabled: Boolean(shopId) && includeSchedules,
+    staleTime: 15 * 60_000,
+    queryFn: async (): Promise<SettingsScheduleListResult> => {
+      if (!shopId) throw new SettingsUiError('concrete_shop_required');
+      const encodedShopId = encodeURIComponent(shopId);
+      return adminFetch<SettingsScheduleListResult>(
+        `/api/admin/settings-schedule?shopId=${encodedShopId}`,
+      );
     },
   });
 
@@ -243,7 +257,11 @@ export function useSettings(shopId: string | undefined) {
         ...(result.idempotentReplay === true ? { idempotentReplay: true } : {}),
       };
     },
-    onSuccess: invalidateWorkspace,
+    onSuccess: async () => {
+      if (shopId) {
+        await queryClient.invalidateQueries({ queryKey: settingsScheduleQueryKey(shopId) });
+      }
+    },
   });
 
   const updateOperationalState = useMutation({
@@ -367,6 +385,7 @@ export function useSettings(shopId: string | undefined) {
 
   return {
     workspaceQuery,
+    schedulesQuery,
     publish,
     scheduleSettingsChange,
     updateOperationalState,

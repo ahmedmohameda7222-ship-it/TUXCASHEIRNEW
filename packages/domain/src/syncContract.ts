@@ -1,7 +1,7 @@
-import { assertOrderSnapshotIntegrity } from './order';
-import type { BusinessDay } from './businessDay';
-import type { CustomerContact } from './catalog';
-import type { ManualExpenseRecord } from './expense';
+import { assertOrderSnapshotIntegrity } from './order.js';
+import type { BusinessDay } from './businessDay.js';
+import type { CustomerContact } from './catalog.js';
+import type { ManualExpenseRecord } from './expense.js';
 import {
   parseEntityId,
   type BusinessDayId,
@@ -23,11 +23,11 @@ import {
   type ShopId,
   type WorkerId,
   type WorkerSessionId,
-} from './ids';
-import type { JsonValue } from './json';
-import { moneyMinor, type MoneyMinor } from './money';
-import { STOCK_QUANTITY_SCALE, stockQuantityMicros, type StockQuantityMicros } from './quantity';
-import { instant, type Instant } from './time';
+} from './ids.js';
+import type { JsonValue } from './json.js';
+import { moneyMinor, type MoneyMinor } from './money.js';
+import { STOCK_QUANTITY_SCALE, stockQuantityMicros, type StockQuantityMicros } from './quantity.js';
+import { instant, type Instant } from './time.js';
 import type {
   Expense,
   ExpensePaidFrom,
@@ -45,7 +45,7 @@ import type {
   PaymentPart,
   Reconciliation,
   WorkerSession,
-} from './models';
+} from './models.js';
 
 export const OPERATIONS_SYNC_PAYLOAD_VERSION = 1 as const;
 

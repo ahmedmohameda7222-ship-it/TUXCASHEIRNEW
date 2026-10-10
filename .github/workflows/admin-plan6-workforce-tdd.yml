@@ -62,6 +62,7 @@ jobs:
       - run: node scripts/test-admin-workforce-postgres.mjs
       - run: node scripts/test-admin-workforce-review-hardening-postgres.mjs
       - run: node scripts/test-admin-workforce-reactivation-postgres.mjs
+      - run: node scripts/test-admin-production-parity-postgres.mjs
       - run: node scripts/test-admin-workforce-tenant-isolation-postgres.mjs
       - run: node scripts/test-admin-workforce-order-approval-terminal-replay-postgres.mjs
   employee-pin-security:

@@ -1,13 +1,13 @@
-import type { DeliveryZone, OperationsConfigurationSnapshot, Product } from './catalog';
-import { DomainInvariantError } from './errors';
-import type { DraftLineId, ProductId } from './ids';
+import type { DeliveryZone, OperationsConfigurationSnapshot, Product } from './catalog.js';
+import { DomainInvariantError } from './errors.js';
+import type { DraftLineId, ProductId } from './ids.js';
 import type {
   DraftLineCustomization,
   DraftModifierSelection,
   DraftOrderLine,
   OrderDraft,
-} from './orderDraft';
-import type { ComboBeverageSnapshot, OrderModifierSnapshot } from './models';
+} from './orderDraft.js';
+import type { ComboBeverageSnapshot, OrderModifierSnapshot } from './models.js';
 
 function sameModifiers(
   left: readonly OrderModifierSnapshot[],

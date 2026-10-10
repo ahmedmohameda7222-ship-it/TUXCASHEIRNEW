@@ -10,17 +10,17 @@
     "node": ">=20.19.0 <27"
   },
   "scripts": {
-    "dev:operations": "npm run dev -w @tux/operations",
-    "dev:admin": "npm run dev -w @tux/admin",
-    "build": "npm run build --workspaces --if-present",
-    "build:admin": "npm run build -w @tux/admin",
+    "dev:operations": "npm run build:domain && npm run dev -w @tux/operations",
+    "dev:admin": "npm run build:domain && npm run dev -w @tux/admin",
+    "build": "npm run build:domain && npm run build --workspaces --if-present",
+    "build:admin": "npm run build:domain && npm run build -w @tux/admin",
     "typecheck": "npm run typecheck --workspaces --if-present && tsc --noEmit -p tsconfig.api.json && npm run typecheck:e2e",
     "typecheck:admin": "npm run typecheck -w @tux/admin",
     "lint": "eslint \"{api,server,apps,packages,e2e}/**/*.{ts,tsx,mjs}\" playwright.config.ts playwright.menu.config.ts playwright.admin.config.ts --max-warnings 0",
     "test": "vitest run --exclude \"e2e/**\" --exclude scripts/monorepo-architecture-guard.test.mjs --exclude scripts/catalog-architecture-guard.test.mjs",
     "test:admin-security": "node scripts/test-admin-security.mjs",
     "test:admin-deployment": "node scripts/test-admin-deployment-contract.mjs",
-    "test:admin-runtime": "node scripts/test-admin-runtime-smoke.mjs",
+    "test:admin-runtime": "npm run build:domain && node scripts/test-admin-domain-native-runtime.mjs && node scripts/test-admin-runtime-smoke.mjs",
     "test:whatsapp-architecture": "node scripts/test-whatsapp-package-layering.mjs",
     "test:whatsapp-security": "node scripts/test-whatsapp-security.mjs",
     "test:catalog-architecture": "node --test scripts/catalog-architecture-guard.test.mjs && node scripts/test-catalog-architecture.mjs",
@@ -40,7 +40,9 @@
     "test:monorepo-architecture": "node --test scripts/monorepo-architecture-guard.test.mjs && node scripts/test-monorepo-architecture.mjs",
     "test:admin-inventory-ledger": "node scripts/test-admin-inventory-ledger-migration.mjs",
     "test:admin-order-inventory-lifecycle": "node scripts/test-admin-order-inventory-lifecycle.mjs",
-    "test:admin-inventory-intelligence": "node scripts/test-admin-inventory-intelligence-migration.mjs && vitest run apps/admin/server/inventory/intelligence.test.ts apps/admin/src/inventory/ReorderSuggestionsPage.test.tsx apps/admin/src/inventory/VarianceReport.test.tsx"
+    "test:admin-inventory-intelligence": "node scripts/test-admin-inventory-intelligence-migration.mjs && vitest run apps/admin/server/inventory/intelligence.test.ts apps/admin/src/inventory/ReorderSuggestionsPage.test.tsx apps/admin/src/inventory/VarianceReport.test.tsx",
+    "build:domain": "npm run build -w @tux/domain",
+    "prepare": "npm run build:domain"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

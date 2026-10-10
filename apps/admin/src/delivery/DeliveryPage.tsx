@@ -225,7 +225,7 @@ export function DeliveryPage() {
         ))}
       </nav>
 
-      {workspace ? (
+      {workspace && !workspaceQuery.isError ? (
         <>
           {section === 'zones' ? (
             <section aria-label="Delivery zones">

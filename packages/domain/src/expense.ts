@@ -1,8 +1,8 @@
-import { DomainInvariantError } from './errors';
-import type { BusinessDayId, ExpenseId, ShopId, WorkerId } from './ids';
-import type { Expense, ExpensePaidFrom } from './models';
-import { addMoney, ZERO_MONEY, type MoneyMinor } from './money';
-import type { Instant } from './time';
+import { DomainInvariantError } from './errors.js';
+import type { BusinessDayId, ExpenseId, ShopId, WorkerId } from './ids.js';
+import type { Expense, ExpensePaidFrom } from './models.js';
+import { addMoney, ZERO_MONEY, type MoneyMinor } from './money.js';
+import type { Instant } from './time.js';
 
 export interface ManualExpenseLifecycleSnapshot {
   readonly revision: number;

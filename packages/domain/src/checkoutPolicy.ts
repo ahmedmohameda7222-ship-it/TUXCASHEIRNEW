@@ -1,8 +1,8 @@
-import type { OperationsConfigurationSnapshot } from './catalog';
-import { DomainInvariantError } from './errors';
-import { addMoney, moneyMinor, subtractMoney, ZERO_MONEY, type MoneyMinor } from './money';
-import type { DraftOrderLine } from './orderDraft';
-import { calculateOrderPricing, type OrderPricing } from './pricing';
+import type { OperationsConfigurationSnapshot } from './catalog.js';
+import { DomainInvariantError } from './errors.js';
+import { addMoney, moneyMinor, subtractMoney, ZERO_MONEY, type MoneyMinor } from './money.js';
+import type { DraftOrderLine } from './orderDraft.js';
+import { calculateOrderPricing, type OrderPricing } from './pricing.js';
 
 export type CheckoutChannel = 'POS' | 'ONLINE';
 
