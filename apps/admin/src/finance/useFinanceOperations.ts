@@ -19,9 +19,21 @@ export type FinanceOperationDraft = Readonly<Record<string, unknown>> & {
   readonly shopId: string;
 };
 
+export type FinanceOperationsView =
+  | 'days'
+  | 'day'
+  | 'day-history'
+  | 'expenses'
+  | 'categories'
+  | 'settlements'
+  | 'cashiers'
+  | 'recurring'
+  | 'owner-summary';
+
 export function useFinanceOperations(
   shopId: string | undefined,
   businessDayId: string | undefined,
+  views: readonly FinanceOperationsView[],
 ) {
   const session = useAdminSession();
   const cache = useQueryClient();
@@ -35,12 +47,12 @@ export function useFinanceOperations(
 
   const daysQuery = useQuery({
     queryKey: ['admin', 'finance-ops', namespace, shopId, 'days'],
-    enabled: Boolean(shopId),
+    enabled: Boolean(shopId && views.includes('days')),
     queryFn: () => adminFetch<{ days: FinanceDayRow[] }>(path('days')),
   });
   const dayQuery = useQuery({
     queryKey: ['admin', 'finance-ops', namespace, shopId, 'day', businessDayId],
-    enabled: Boolean(shopId && businessDayId),
+    enabled: Boolean(shopId && businessDayId && views.includes('day')),
     queryFn: () =>
       adminFetch<FinanceDayReport>(
         path('day', `&businessDayId=${encodeURIComponent(businessDayId!)}`),
@@ -48,7 +60,7 @@ export function useFinanceOperations(
   });
   const dayHistoryQuery = useQuery({
     queryKey: ['admin', 'finance-ops', namespace, shopId, 'day-history'],
-    enabled: Boolean(shopId),
+    enabled: Boolean(shopId && views.includes('day-history')),
     queryFn: () =>
       adminFetch<{
         snapshots: Array<{
@@ -68,7 +80,7 @@ export function useFinanceOperations(
   });
   const expensesQuery = useQuery({
     queryKey: ['admin', 'finance-ops', namespace, shopId, 'expenses'],
-    enabled: Boolean(shopId),
+    enabled: Boolean(shopId && views.includes('expenses')),
     queryFn: () =>
       adminFetch<{
         expenses: Array<{
@@ -83,13 +95,13 @@ export function useFinanceOperations(
   });
   const categoriesQuery = useQuery({
     queryKey: ['admin', 'finance-ops', namespace, shopId, 'categories'],
-    enabled: Boolean(shopId),
+    enabled: Boolean(shopId && views.includes('categories')),
     queryFn: () =>
       adminFetch<{ categories: Array<{ id: string; name: string }> }>(path('categories')),
   });
   const settlementsQuery = useQuery({
     queryKey: ['admin', 'finance-ops', namespace, shopId, 'settlements'],
-    enabled: Boolean(shopId),
+    enabled: Boolean(shopId && views.includes('settlements')),
     queryFn: () =>
       adminFetch<{
         settlements: Array<{
@@ -105,7 +117,7 @@ export function useFinanceOperations(
   });
   const cashierQuery = useQuery({
     queryKey: ['admin', 'finance-ops', namespace, shopId, 'cashiers', businessDayId],
-    enabled: Boolean(shopId && businessDayId),
+    enabled: Boolean(shopId && businessDayId && views.includes('cashiers')),
     queryFn: () =>
       adminFetch<{
         workers: Array<{ id: string; display_name: string }>;
@@ -122,7 +134,7 @@ export function useFinanceOperations(
   });
   const recurringQuery = useQuery({
     queryKey: ['admin', 'finance-ops', namespace, shopId, 'recurring'],
-    enabled: Boolean(shopId),
+    enabled: Boolean(shopId && views.includes('recurring')),
     queryFn: () =>
       adminFetch<{
         rules: Array<{
@@ -149,7 +161,7 @@ export function useFinanceOperations(
   });
   const ownerSummaryQuery = useQuery({
     queryKey: ['admin', 'finance-ops', namespace, shopId, 'owner-summary'],
-    enabled: Boolean(shopId),
+    enabled: Boolean(shopId && views.includes('owner-summary')),
     queryFn: () =>
       adminFetch<{
         summaries: Array<{
@@ -215,4 +227,9 @@ export function useFinanceOperations(
     ownerSummaryQuery,
     command,
   };
+}
+
+/** Fetches only Owner Summary. Other Finance views stay disabled. */
+export function useOwnerSummary(shopId: string | undefined) {
+  return useFinanceOperations(shopId, undefined, ['owner-summary']).ownerSummaryQuery;
 }
