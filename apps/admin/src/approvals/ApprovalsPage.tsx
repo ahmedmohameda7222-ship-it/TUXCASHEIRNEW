@@ -90,6 +90,14 @@ function toViewModel(approval: ApprovalApiModel): ApprovalDetailViewModel {
   };
 }
 
+export function approvalDetailPollInterval(status?: AdminApprovalStatus | 'EXPIRED'): number | false {
+  return status === 'PENDING' || status === 'APPROVED' || status === 'EXECUTING'
+    ? 15_000
+    : status === undefined
+      ? 15_000
+      : false;
+}
+
 export function ApprovalsPage() {
   const session = useAdminSession();
   const queryClient = useQueryClient();
@@ -119,7 +127,8 @@ export function ApprovalsPage() {
       adminFetch<ApprovalListResponse>(
         `/api/admin/approvals?id=${encodeURIComponent(selectedId!)}`,
       ).then((response) => response.approvals[0] ?? null),
-    refetchInterval: 15_000,
+    refetchInterval: (query) =>
+      approvalDetailPollInterval(query.state.data?.displayStatus ?? query.state.data?.status),
   });
 
   const approvals = useMemo(
