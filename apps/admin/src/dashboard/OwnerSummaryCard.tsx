@@ -3,22 +3,26 @@ import { Link } from 'wouter';
 import { formatEgp } from '../finance/money';
 import { useFinanceOperations } from '../finance/useFinanceOperations';
 
-function metric(summary: Readonly<Record<string, unknown>>, field: string): string {
-  const value = summary[field];
-  return typeof value === 'number' && Number.isSafeInteger(value)
-    ? formatEgp(value)
-    : 'Not available';
-}
-function count(summary: Readonly<Record<string, unknown>>, field: string): string {
-  const value = summary[field];
-  return typeof value === 'number' && Number.isSafeInteger(value)
-    ? value.toLocaleString('en-EG')
-    : 'Not available';
-}
+const summaryMetrics = [
+  { field: 'netSalesMinor', label: 'Net sales', kind: 'money' },
+  { field: 'estimatedOperatingProfitMinor', label: 'Operating estimate', kind: 'money' },
+  { field: 'orderCount', label: 'Orders', kind: 'count' },
+  { field: 'cashVarianceMinor', label: 'Net cash difference', kind: 'money' },
+  { field: 'cashVarianceCount', label: 'Cash count differences', kind: 'count' },
+  { field: 'lowStockCount', label: 'Low stock items', kind: 'count' },
+  { field: 'majorPostedRefundCount', label: 'Significant posted refunds', kind: 'count' },
+  { field: 'failedOnlineOrderCount', label: 'Failed online orders', kind: 'count' },
+  { field: 'pendingApprovalCount', label: 'Pending approvals', kind: 'count' },
+] as const;
 
 export function OwnerSummaryCard({ shopId }: { shopId: string }) {
   const finance = useFinanceOperations(shopId, undefined);
   const latest = finance.ownerSummaryQuery.data?.summaries[0];
+  const authorizedMetrics = summaryMetrics.filter((metric) => {
+    const value = latest?.summary[metric.field];
+    return typeof value === 'number' && Number.isSafeInteger(value);
+  });
+
   return (
     <section className="tux-owner-summary" aria-label="Daily Owner Summary">
       <div className="tux-finance-toolbar">
@@ -35,44 +39,19 @@ export function OwnerSummaryCard({ shopId }: { shopId: string }) {
             Generated{' '}
             {new Date(latest.generated_at).toLocaleString('en-EG', { timeZone: 'Africa/Cairo' })}
           </p>
-          <dl className="tux-finance-x-grid">
-            <div>
-              <dt>Net sales</dt>
-              <dd>{metric(latest.summary, 'netSalesMinor')}</dd>
-            </div>
-            <div>
-              <dt>Operating estimate</dt>
-              <dd>{metric(latest.summary, 'estimatedOperatingProfitMinor')}</dd>
-            </div>
-            <div>
-              <dt>Orders</dt>
-              <dd>{count(latest.summary, 'orderCount')}</dd>
-            </div>
-            <div>
-              <dt>Net cash difference</dt>
-              <dd>{metric(latest.summary, 'cashVarianceMinor')}</dd>
-            </div>
-            <div>
-              <dt>Cash count differences</dt>
-              <dd>{count(latest.summary, 'cashVarianceCount')}</dd>
-            </div>
-            <div>
-              <dt>Low stock items</dt>
-              <dd>{count(latest.summary, 'lowStockCount')}</dd>
-            </div>
-            <div>
-              <dt>Significant posted refunds</dt>
-              <dd>{count(latest.summary, 'majorPostedRefundCount')}</dd>
-            </div>
-            <div>
-              <dt>Failed online orders</dt>
-              <dd>{count(latest.summary, 'failedOnlineOrderCount')}</dd>
-            </div>
-            <div>
-              <dt>Pending approvals</dt>
-              <dd>{count(latest.summary, 'pendingApprovalCount')}</dd>
-            </div>
-          </dl>
+          {authorizedMetrics.length > 0 && (
+            <dl className="tux-finance-x-grid">
+              {authorizedMetrics.map(({ field, label, kind }) => {
+                const value = latest.summary[field] as number;
+                return (
+                  <div key={field}>
+                    <dt>{label}</dt>
+                    <dd>{kind === 'money' ? formatEgp(value) : value.toLocaleString('en-EG')}</dd>
+                  </div>
+                );
+              })}
+            </dl>
+          )}
           <Link href="/reports">Open source reports</Link>
         </div>
       )}
