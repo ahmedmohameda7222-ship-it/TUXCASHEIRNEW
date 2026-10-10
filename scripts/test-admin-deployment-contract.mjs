@@ -175,7 +175,7 @@ for (const directory of ['apps/admin/api', 'apps/admin/server']) {
         assertRuntimeWorkspaceImport(node.moduleSpecifier.text, filePath);
       }
       if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword &&
-          node.arguments.length === 1 && ts.isStringLiteral(node.arguments[0])) {
+          node.arguments.length === 1 && node.arguments[0] && ts.isStringLiteral(node.arguments[0])) {
         assertRuntimeWorkspaceImport(node.arguments[0].text, filePath);
       }
       ts.forEachChild(node, visit);
