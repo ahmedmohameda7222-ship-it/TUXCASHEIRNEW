@@ -498,7 +498,8 @@ assert.deepEqual(limitedConfig.targets.map(t=>t.metric),['NET_SALES'],
 
 // Post-merge accounting-date invariant: expense posting/audit time is NOT report time.
 const accountingDate='2026-10-01';
-const laterPostingDate='2026-10-09';
+const laterPostingDate=today;
+const legacyCreatedDate='2026-10-09';
 const backdated=movement('EXPENSE',{
   fromAccountId:cashId,businessDayId:newDay,expenseDate:accountingDate,
   amountMinor:100000,description:'Backdated P1 expense',
@@ -564,7 +565,7 @@ sql(`insert into public.expenses(id,shop_id,business_day_id,kind,description,
 assert.equal(sql(`select count(*) from public.admin_expense_finance_details
  where expense_id='${legacyId}'`,'legacy no details'),'0');
 for(const area of ['expenses','profit']) {
- const legacy=accountingReport(area,laterPostingDate).rows.filter(row=>row.id===legacyId);
+ const legacy=accountingReport(area,legacyCreatedDate).rows.filter(row=>row.id===legacyId);
  assert.equal(legacy.length,1,`${area}: legacy expense still reported exactly once`);
  assert.equal(legacy[0].amountMinor,-750);
  assert.equal(accountingReport(area,accountingDate).rows.filter(
