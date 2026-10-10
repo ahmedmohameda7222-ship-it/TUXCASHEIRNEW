@@ -104,6 +104,14 @@ jobs:
         run: npm run test:admin-security
       - name: Admin Vercel deployment contract
         run: npm run test:admin-deployment
+      - name: Admin production import-graph smoke
+        run: npm run test:admin-runtime
+      - name: Admin runtime isolation and retry regressions
+        run: >-
+          npx vitest run
+          apps/admin/server/dispatcherIsolation.test.ts
+          apps/admin/src/app/queryClient.test.ts
+          apps/admin/src/dashboard/OwnerSummaryCard.test.tsx
       - name: Admin contracts typecheck
         run: npx tsc --noEmit -p packages/admin-contracts/tsconfig.json
       - name: Admin server and API typecheck
