@@ -33,7 +33,8 @@ describe('staffStore', () => {
       if (table === 'employee_worker_links') return [];
       if (table === 'workers') return [];
       if (table === 'shops') {
-        expect(params.get('business_id')).toBe(`eq.${BUSINESS_ID}`);
+        expect(params.has('business_id')).toBe(false);
+        expect(params.get('id')).toBe(`in.(${SHOP_ID})`);
         return [{ id: SHOP_ID, name: 'Downtown' }];
       }
       if (table === 'finance_accounts') {
