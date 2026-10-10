@@ -1,13 +1,13 @@
-import { DomainInvariantError } from './errors';
-import type { Instant } from './time';
-import type { InventoryMovement, InventoryMovementType } from './models';
+import { DomainInvariantError } from './errors.js';
+import type { Instant } from './time.js';
+import type { InventoryMovement, InventoryMovementType } from './models.js';
 import {
   STOCK_QUANTITY_SCALE,
   addStockQuantities,
   stockQuantityMicros,
   wholeStockUnits,
   type StockQuantityMicros,
-} from './quantity';
+} from './quantity.js';
 
 export const BULK_STOCK_UNDO_WINDOW_MS = 8_000;
 
