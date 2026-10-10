@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as AdminAuthService from '../adminAuthService.js';
+
 import { handleAdvancedFinance } from './financeOperationsApi.js';
 import type { AdminRequest, AdminResponse } from '../http.js';
 
@@ -16,7 +18,7 @@ vi.mock('../env.js', () => ({
   }),
 }));
 vi.mock('../adminAuthService.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../adminAuthService.js')>()),
+  ...(await importOriginal<typeof AdminAuthService>()),
   loadAdminSession: async () => ({
     principal: {
       employeeId: 'employee',
