@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import ts from 'typescript';
+import { stripTypeScriptTypes } from 'node:module';
 
 const adminVercelPath = 'apps/admin/vercel.json';
 const menuVercelPath = 'apps/menu/vercel.json';
@@ -108,19 +108,20 @@ for (const directory of ['apps/admin/api', 'apps/admin/server']) {
   }
 }
 
-// Parse actual TypeScript module syntax. String checks miss named mixed type/value
-// imports, side-effect imports, re-exports and lazy import() expressions.
+// Strip type-only syntax with Node's built-in TypeScript parser, so the guard
+// also works in checkout-only CI jobs that deliberately do not run npm ci.
+// Inspect the resulting runtime imports, including side effects and import().
 const adminManifest = JSON.parse(fs.readFileSync('apps/admin/package.json', 'utf8'));
-const bundledSourcePatterns = adminConfig.functions?.['api/**/*.ts']?.includeFiles;
-const includes = Array.isArray(bundledSourcePatterns)
-  ? bundledSourcePatterns
-  : typeof bundledSourcePatterns === 'string'
-    ? [bundledSourcePatterns]
+const packagedSources = adminConfig.functions?.['api/**/*.ts']?.includeFiles;
+const includes = Array.isArray(packagedSources)
+  ? packagedSources
+  : typeof packagedSources === 'string'
+    ? [packagedSources]
     : [];
 
 function assertRuntimeWorkspaceImport(specifier, sourcePath) {
   if (!specifier.startsWith('@tux/')) return;
-  const match = /^(@tux\/[^/]+)/.exec(specifier);
+  const match = /^(@tux\\/[^/]+)/.exec(specifier);
   if (!match) throw new Error(`Invalid workspace import: ${specifier}`);
   const packageName = match[1];
   if (packageName === '@tux/admin-contracts') {
@@ -130,57 +131,37 @@ function assertRuntimeWorkspaceImport(specifier, sourcePath) {
     throw new Error(`Undeclared Admin runtime workspace dependency ${packageName}: ${sourcePath}`);
   }
   const packageDirectory = packageName.slice('@tux/'.length);
-  const manifestFile = `packages/${packageDirectory}/package.json`;
-  if (!fs.existsSync(manifestFile)) {
+  const manifestPath = `packages/${packageDirectory}/package.json`;
+  if (!fs.existsSync(manifestPath)) {
     throw new Error(`Unknown Admin runtime workspace package: ${packageName}`);
   }
-  const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
-  const exportsSource = JSON.stringify(manifest.exports ?? {});
-  if (exportsSource.includes('/src/') || exportsSource.includes('.ts')) {
-    const expected = `../../packages/${packageDirectory}/src/**`;
-    if (!includes.includes(expected)) {
-      throw new Error(`Missing Admin Vercel runtime source packaging for ${packageName}: ${expected}`);
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  if (/\\.ts["']/.test(JSON.stringify(manifest.exports ?? {}))) {
+    const sourcePattern = `../../packages/${packageDirectory}/src/**`;
+    if (!includes.includes(sourcePattern)) {
+      throw new Error(`Missing Admin Vercel runtime source packaging for ${packageName}: ${sourcePattern}`);
     }
   }
-}
-
-function isRuntimeImportClause(clause) {
-  if (!clause || clause.isTypeOnly) return false;
-  if (clause.name) return true;
-  const bindings = clause.namedBindings;
-  return !bindings || ts.isNamespaceImport(bindings) ||
-    bindings.elements.some((element) => !element.isTypeOnly);
 }
 
 for (const directory of ['apps/admin/api', 'apps/admin/server']) {
   for (const fileName of collectTsFiles(directory)) {
     if (fileName.endsWith('.test.ts') || fileName.includes('.source.test.')) continue;
     const filePath = path.join(directory, fileName);
-    const ast = ts.createSourceFile(
-      filePath,
-      fs.readFileSync(filePath, 'utf8'),
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TS,
-    );
-    function visit(node) {
-      if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) &&
-          isRuntimeImportClause(node.importClause)) {
-        assertRuntimeWorkspaceImport(node.moduleSpecifier.text, filePath);
-      }
-      if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier) &&
-          !node.isTypeOnly &&
-          (!node.exportClause || !ts.isNamedExports(node.exportClause) ||
-            node.exportClause.elements.some((element) => !element.isTypeOnly))) {
-        assertRuntimeWorkspaceImport(node.moduleSpecifier.text, filePath);
-      }
-      if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword &&
-          node.arguments.length === 1 && node.arguments[0] && ts.isStringLiteral(node.arguments[0])) {
-        assertRuntimeWorkspaceImport(node.arguments[0].text, filePath);
-      }
-      ts.forEachChild(node, visit);
+    const runtimeSource = stripTypeScriptTypes(fs.readFileSync(filePath, 'utf8'));
+    // Type-only named imports become `import {} from ...`: these are inert.
+    for (const match of runtimeSource.matchAll(/\\bimport\\s+(?!\\()(?:([^;]*?)\\s+from\\s+)?['"](@tux\\/[^'"]+)['"]/gs)) {
+      const bindings = match[1]?.trim();
+      if (bindings && /^\\{\\s*\\}$/.test(bindings)) continue;
+      assertRuntimeWorkspaceImport(match[2], filePath);
     }
-    visit(ast);
+    for (const match of runtimeSource.matchAll(/\\bexport\\s+(\\*|\\{[^}]*\\})\\s+from\\s+['"](@tux\\/[^'"]+)['"]/g)) {
+      if (/^\\{\\s*\\}$/.test(match[1])) continue;
+      assertRuntimeWorkspaceImport(match[2], filePath);
+    }
+    for (const match of runtimeSource.matchAll(/\\bimport\\s*\\(\\s*['"](@tux\\/[^'"]+)['"]/g)) {
+      assertRuntimeWorkspaceImport(match[1], filePath);
+    }
   }
 }
 
