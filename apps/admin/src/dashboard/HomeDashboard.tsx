@@ -78,7 +78,7 @@ export function HomeDashboard() {
     comparePrevious: false,
     offset: 0,
   };
-  const reports = useReports(canReport ? shopId : undefined, filters, false);
+  const reports = useReports(canReport ? shopId : undefined, filters, false, false);
   const readDashboard = (from: string, to: string) => {
     const params = new URLSearchParams({ shopId: shopId!, view: 'dashboard', from, to });
     for (const id of scopeIds) params.append('reportShopId', id);
