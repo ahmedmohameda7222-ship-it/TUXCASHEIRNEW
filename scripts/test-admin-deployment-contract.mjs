@@ -133,11 +133,10 @@ function stripRuntimeTypes(source) {
 // Inspect the resulting runtime imports, including side effects and import().
 const adminManifest = JSON.parse(fs.readFileSync('apps/admin/package.json', 'utf8'));
 const packagedSources = adminConfig.functions?.['api/**/*.ts']?.includeFiles;
-const includes = Array.isArray(packagedSources)
-  ? packagedSources
-  : typeof packagedSources === 'string'
-    ? [packagedSources]
-    : [];
+if (typeof packagedSources !== 'string') {
+  throw new Error('Admin Vercel functions includeFiles must be a single glob string');
+}
+const includes = [packagedSources];
 
 function assertRuntimeWorkspaceImport(specifier, sourcePath) {
   if (!specifier.startsWith('@tux/')) return;
@@ -158,8 +157,15 @@ function assertRuntimeWorkspaceImport(specifier, sourcePath) {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   if (/\.ts["']/.test(JSON.stringify(manifest.exports ?? {}))) {
     const sourcePattern = `../../packages/${packageDirectory}/src/**`;
-    if (!includes.includes(sourcePattern)) {
+    const packagePattern = `../../packages/${packageDirectory}/{src,dist}/**`;
+    if (!includes.includes(sourcePattern) && !includes.includes(packagePattern)) {
       throw new Error(`Missing Admin Vercel runtime source packaging for ${packageName}: ${sourcePattern}`);
+    }
+    if (packageName === '@tux/domain') {
+      const distPattern = `../../packages/${packageDirectory}/dist/**`;
+      if (!includes.includes(distPattern) && !includes.includes(packagePattern)) {
+        throw new Error(`Missing compiled Admin domain runtime packaging: ${distPattern}`);
+      }
     }
   }
 }
