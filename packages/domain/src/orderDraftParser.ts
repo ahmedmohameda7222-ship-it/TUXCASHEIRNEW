@@ -1,4 +1,4 @@
-import { DomainInvariantError } from './errors';
+import { DomainInvariantError } from './errors.js';
 import {
   parseEntityId,
   type BusinessDayId,
@@ -10,10 +10,10 @@ import {
   type PaymentMethodId,
   type ProductId,
   type ShopId,
-} from './ids';
-import { moneyMinor } from './money';
-import type { DraftOrderLine, OrderDraft, OrderRewardRequest, PaymentDraft } from './orderDraft';
-import { instant } from './time';
+} from './ids.js';
+import { moneyMinor } from './money.js';
+import type { DraftOrderLine, OrderDraft, OrderRewardRequest, PaymentDraft } from './orderDraft.js';
+import { instant } from './time.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
