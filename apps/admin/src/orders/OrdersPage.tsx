@@ -150,7 +150,7 @@ export function OrdersPage() {
                 }
               />
             ) : null}
-            {rows.length === 0 && !ordersApi.searchQuery.isLoading ? (
+            {rows.length === 0 && !ordersApi.searchQuery.isLoading && !ordersApi.searchQuery.isError ? (
               <EmptyState
                 title="No matching orders"
                 description="Adjust the search or filters for this shop."
