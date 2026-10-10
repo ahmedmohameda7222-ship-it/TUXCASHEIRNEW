@@ -91,11 +91,12 @@ function toViewModel(approval: ApprovalApiModel): ApprovalDetailViewModel {
 }
 
 export function approvalDetailPollInterval(status?: AdminApprovalStatus | 'EXPIRED'): number | false {
-  return status === 'PENDING' || status === 'APPROVED' || status === 'EXECUTING'
+  return status === undefined ||
+    status === 'PENDING' ||
+    status === 'APPROVED' ||
+    status === 'EXECUTING'
     ? 15_000
-    : status === undefined
-      ? 15_000
-      : false;
+    : false;
 }
 
 export function ApprovalsPage() {
