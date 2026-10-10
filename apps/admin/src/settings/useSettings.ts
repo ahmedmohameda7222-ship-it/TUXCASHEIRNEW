@@ -170,7 +170,9 @@ export function useSettings(shopId: string | undefined, includeSchedules = false
   });
 
   const schedulesQuery = useQuery({
-    queryKey: shopId ? settingsScheduleQueryKey(shopId) : ['admin', 'settings', 'schedules', 'no-shop'],
+    queryKey: shopId
+      ? settingsScheduleQueryKey(shopId)
+      : ['admin', 'settings', 'schedules', 'no-shop'],
     enabled: Boolean(shopId) && includeSchedules,
     staleTime: 15 * 60_000,
     queryFn: async (): Promise<SettingsScheduleListResult> => {
