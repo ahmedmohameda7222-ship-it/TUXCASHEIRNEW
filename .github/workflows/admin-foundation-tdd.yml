@@ -120,7 +120,7 @@ jobs:
       - name: Runtime workspace import negative regressions
         run: node scripts/test-admin-runtime-import-regressions.mjs
       - name: Admin production import-graph smoke
-        run: node scripts/test-admin-production-read-contracts.mjs && npm run test:admin-runtime
+        run: npm run test:admin-runtime && node scripts/test-admin-production-read-contracts.mjs
       - name: Admin runtime isolation and retry regressions
         run: >-
           npx vitest run
