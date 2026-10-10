@@ -1,6 +1,7 @@
 import type { AdminReportArea } from '@tux/admin-contracts';
 import { useState } from 'react';
 
+import { ErrorState, LoadingState } from '../components/feedback/AdminStates';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { TargetsPanel } from '../dashboard/TargetsPanel';
 import { OwnerSummaryCard } from '../dashboard/OwnerSummaryCard';
@@ -41,7 +42,9 @@ export function ReportsPage() {
     context: {},
     offset: 0,
   }));
-  const reports = useReports(shopId, filters);
+  const [filterOptionsExpanded, setFilterOptionsExpanded] = useState(false);
+  const hasContextFilters = Object.values(filters.context ?? {}).some(Boolean);
+  const reports = useReports(shopId, filters, filterOptionsExpanded || hasContextFilters);
   const config = reports.configQuery.data;
 
   if (!shopId)
@@ -107,6 +110,7 @@ export function ReportsPage() {
         canCompareShops={principal.role === 'OWNER'}
         allShopIds={principal.shopIds}
         options={reports.optionsQuery.data?.options ?? {}}
+        onExpand={() => setFilterOptionsExpanded(true)}
       />
       <ReportView
         data={reports.reportQuery.data}
@@ -116,23 +120,44 @@ export function ReportsPage() {
         retry={() => void reports.reportQuery.refetch()}
         onOffset={(offset) => setFilters((previous) => ({ ...previous, offset }))}
       />
-      <TargetsPanel
-        targets={config?.targets ?? []}
-        filters={filters}
-        summary={reports.reportQuery.data?.summary}
-      />
+      {reports.configQuery.isLoading ? (
+        <LoadingState title="Loading saved report settings" />
+      ) : null}
+      {reports.configQuery.isError ? (
+        <ErrorState
+          title="Saved report settings unavailable"
+          action={
+            <button
+              className="admin-secondary-button"
+              type="button"
+              onClick={() => void reports.configQuery.refetch()}
+            >
+              Retry
+            </button>
+          }
+        />
+      ) : null}
+      {config ? (
+        <TargetsPanel
+          targets={config.targets}
+          filters={filters}
+          summary={reports.reportQuery.data?.summary}
+        />
+      ) : null}
       {principal.permissions.includes('finance.view') ? <OwnerSummaryCard shopId={shopId} /> : null}
-      <SavedViews
-        shopId={shopId}
-        views={config?.savedViews ?? []}
-        targets={config?.targets ?? []}
-        filters={filters}
-        canSetTargets={principal.permissions.includes('settings.manage')}
-        pending={reports.command.isPending}
-        error={reports.command.error}
-        onCommand={(draft) => reports.command.mutate(draft)}
-        onApply={applySavedView}
-      />
+      {config ? (
+        <SavedViews
+          shopId={shopId}
+          views={config.savedViews}
+          targets={config.targets}
+          filters={filters}
+          canSetTargets={principal.permissions.includes('settings.manage')}
+          pending={reports.command.isPending}
+          error={reports.command.error}
+          onCommand={(draft) => reports.command.mutate(draft)}
+          onApply={applySavedView}
+        />
+      ) : null}
     </PageScaffold>
   );
 }

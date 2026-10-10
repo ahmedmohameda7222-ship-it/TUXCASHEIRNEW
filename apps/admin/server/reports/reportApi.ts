@@ -12,6 +12,7 @@ import {
 } from '../http.js';
 import { readAdminSessionToken } from '../session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../supabaseAdmin.js';
+import { adminRequestOperation } from '../observability.js';
 import {
   filterAuthorizedReportTargets,
   canReadReportFilterOption,
@@ -84,16 +85,24 @@ const commandSchema = z.discriminatedUnion('type', [
     })
     .strict(),
 ]);
-function respondError(response: AdminResponse, error: unknown) {
+function respondError(response: AdminResponse, error: unknown, request: AdminRequest) {
   if (error instanceof AdminAuthError) sendJson(response, error.status, { error: error.code });
   else if (error instanceof AdminAuthorizationError) sendJson(response, 403, { error: error.code });
   else if (error instanceof z.ZodError)
     sendJson(response, 400, { error: 'report_request_invalid' });
   else if (error instanceof AdminSupabaseError) {
-    console.error('Report database failure', { status: error.status });
+    console.error('Report database failure', {
+      resource: 'reports',
+      operation: adminRequestOperation(request),
+      status: error.status,
+    });
     sendJson(response, 502, { error: 'admin_backend_unavailable' });
   } else {
-    console.error('Report request failed');
+    console.error('Report request failed', {
+      resource: 'reports',
+      operation: adminRequestOperation(request),
+      status: 500,
+    });
     sendJson(response, 500, { error: 'admin_request_failed' });
   }
 }
@@ -450,6 +459,6 @@ export async function handleReportsRequest(
     }
     sendJson(response, 200, result);
   } catch (error) {
-    respondError(response, error);
+    respondError(response, error, request);
   }
 }

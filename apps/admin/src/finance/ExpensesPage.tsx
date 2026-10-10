@@ -44,7 +44,7 @@ export function ExpensesPage() {
   const [receipt, setReceipt] = useState('');
   const [validation, setValidation] = useState<string | null>(null);
   const finance = useFinance(shopId, null);
-  const operations = useFinanceOperations(shopId, undefined);
+  const operations = useFinanceOperations(shopId, undefined, ['days', 'expenses', 'categories']);
   const days = operations.daysQuery.data?.days ?? [];
   const availableDays = days.filter((day) => day.status === 'OPEN');
   const accounts = finance.workspaceQuery.data?.accounts.filter((account) => account.active) ?? [];

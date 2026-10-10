@@ -1,7 +1,7 @@
 import type { FinanceAccountBalance } from '@tux/admin-contracts';
 import { useState } from 'react';
 
-import { InlineError } from '../components/feedback/AdminStates';
+import { ErrorState, InlineError, LoadingState } from '../components/feedback/AdminStates';
 import { AdminDialog } from '../components/overlay/AdminDialog';
 import { formatEgp, parseEgpMinor } from './money';
 import { useFinanceOperations } from './useFinanceOperations';
@@ -19,7 +19,7 @@ export function RecurringExpenses({
   categories: readonly { id: string; name: string }[];
   canManage: boolean;
 }) {
-  const finance = useFinanceOperations(shopId, undefined);
+  const finance = useFinanceOperations(shopId, undefined, ['recurring']);
   const rules = finance.recurringQuery.data?.rules ?? [];
   const due = finance.recurringQuery.data?.due ?? [];
   const [ruleOpen, setRuleOpen] = useState(false);
@@ -134,64 +134,85 @@ export function RecurringExpenses({
           </>
         ) : null}
       </div>
-      {rules.length === 0 ? (
-        <p>No recurring expense rules have been configured.</p>
-      ) : (
-        <ul className="tux-finance-ledger-list">
-          {rules.map((rule) => (
-            <li key={rule.id}>
-              <div>
-                <strong>{rule.description}</strong>
-                <small>
-                  {rule.cadence.toLowerCase()} · Next due {rule.nextDueDate}
-                  {' · '}
-                  {rule.active ? 'Active' : 'Paused'}
-                </small>
-              </div>
-              <strong>{formatEgp(rule.amountMinor)}</strong>
-              {canManage ? (
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  onClick={() => edit(rule.id)}
-                >
-                  Edit
-                </button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
-      <h3>Due reminders</h3>
-      {due.length === 0 ? (
-        <p>No outstanding generated due expenses.</p>
-      ) : (
-        <ul className="tux-finance-ledger-list">
-          {due.map((entry) => (
-            <li key={entry.id}>
-              <div>
-                <strong>{entry.description}</strong>
-                <small>Due {entry.dueOn}</small>
-              </div>
-              <strong>{formatEgp(entry.amountMinor)}</strong>
-              {canManage ? (
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  disabled={!openBusinessDayId}
-                  onClick={() => setPostingDue(entry.id)}
-                >
-                  Record expense
-                </button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
-      <p className="tux-finance-muted">
-        Due reminders do not debit accounts. Money and operating expense are posted only after
-        confirmation.
-      </p>
+      {finance.recurringQuery.isLoading ? (
+        <LoadingState title="Loading recurring expenses" />
+      ) : null}
+      {finance.recurringQuery.isError ? (
+        <ErrorState
+          title="Recurring expenses unavailable"
+          action={
+            <button
+              type="button"
+              className="admin-secondary-button"
+              onClick={() => void finance.recurringQuery.refetch()}
+            >
+              Retry
+            </button>
+          }
+        />
+      ) : null}
+      {finance.recurringQuery.data ? (
+        <>
+          {rules.length === 0 ? (
+            <p>No recurring expense rules have been configured.</p>
+          ) : (
+            <ul className="tux-finance-ledger-list">
+              {rules.map((rule) => (
+                <li key={rule.id}>
+                  <div>
+                    <strong>{rule.description}</strong>
+                    <small>
+                      {rule.cadence.toLowerCase()} · Next due {rule.nextDueDate}
+                      {' · '}
+                      {rule.active ? 'Active' : 'Paused'}
+                    </small>
+                  </div>
+                  <strong>{formatEgp(rule.amountMinor)}</strong>
+                  {canManage ? (
+                    <button
+                      className="admin-secondary-button"
+                      type="button"
+                      onClick={() => edit(rule.id)}
+                    >
+                      Edit
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+          <h3>Due reminders</h3>
+          {due.length === 0 ? (
+            <p>No outstanding generated due expenses.</p>
+          ) : (
+            <ul className="tux-finance-ledger-list">
+              {due.map((entry) => (
+                <li key={entry.id}>
+                  <div>
+                    <strong>{entry.description}</strong>
+                    <small>Due {entry.dueOn}</small>
+                  </div>
+                  <strong>{formatEgp(entry.amountMinor)}</strong>
+                  {canManage ? (
+                    <button
+                      className="admin-secondary-button"
+                      type="button"
+                      disabled={!openBusinessDayId}
+                      onClick={() => setPostingDue(entry.id)}
+                    >
+                      Record expense
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="tux-finance-muted">
+            Due reminders do not debit accounts. Money and operating expense are posted only after
+            confirmation.
+          </p>
+        </>
+      ) : null}
       <AdminDialog
         open={ruleOpen}
         onOpenChange={setRuleOpen}

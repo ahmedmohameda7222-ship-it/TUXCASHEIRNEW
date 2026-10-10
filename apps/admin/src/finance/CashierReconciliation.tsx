@@ -16,7 +16,7 @@ export function CashierReconciliation({
   open: boolean;
   onClose(): void;
 }) {
-  const finance = useFinanceOperations(shopId, businessDayId);
+  const finance = useFinanceOperations(shopId, businessDayId, ['cashiers']);
   const [workerId, setWorkerId] = useState('');
   const [actual, setActual] = useState('');
   const [reason, setReason] = useState('');

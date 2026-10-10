@@ -1,7 +1,10 @@
+import { Suspense } from 'react';
+
 import { LoginPage } from '../auth/LoginPage';
 import { AdminSessionProvider } from '../auth/AdminSessionProvider';
 import { useAdminSession } from '../auth/useAdminSession';
 import { AdminShell } from '../components/shell/AdminShell';
+import { LoadingState } from '../components/feedback/AdminStates';
 import { ShopScopeProvider } from '../shops/ShopScopeProvider';
 import { ShopSwitcher } from '../shops/ShopSwitcher';
 import { AdminRoutes } from './routes';
@@ -28,7 +31,9 @@ function AdminAppContent() {
         shopControl={<ShopSwitcher />}
         onLogout={() => void session.logout()}
       >
-        <AdminRoutes principal={principal} />
+        <Suspense fallback={<LoadingState title="Loading management workspace" />}>
+          <AdminRoutes principal={principal} />
+        </Suspense>
       </AdminShell>
     </ShopScopeProvider>
   );

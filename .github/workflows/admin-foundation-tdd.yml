@@ -73,6 +73,19 @@ jobs:
       - name: Admin OWNER bootstrap invariant
         run: node scripts/test-admin-owner-bootstrap.mjs
 
+  dependency-audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Classify npm audit findings
+        run: node scripts/report-admin-dependency-audit.mjs
+
   contracts:
     runs-on: ubuntu-24.04
     steps:
@@ -104,6 +117,17 @@ jobs:
         run: npm run test:admin-security
       - name: Admin Vercel deployment contract
         run: npm run test:admin-deployment
+      - name: Runtime workspace import negative regressions
+        run: node scripts/test-admin-runtime-import-regressions.mjs
+      - name: Admin production import-graph smoke
+        run: npm run test:admin-runtime
+      - name: Admin runtime isolation and retry regressions
+        run: >-
+          npx vitest run
+          apps/admin/server/dispatcherIsolation.test.ts
+          apps/admin/server/observability.test.ts
+          apps/admin/src/app/queryClient.test.ts
+          apps/admin/src/dashboard/OwnerSummaryCard.test.tsx
       - name: Admin contracts typecheck
         run: npx tsc --noEmit -p packages/admin-contracts/tsconfig.json
       - name: Admin server and API typecheck
@@ -112,3 +136,5 @@ jobs:
         run: npm run typecheck -w @tux/admin
       - name: Admin app build
         run: npm run build -w @tux/admin
+      - name: Admin initial bundle budget
+        run: node scripts/test-admin-bundle-budget.mjs

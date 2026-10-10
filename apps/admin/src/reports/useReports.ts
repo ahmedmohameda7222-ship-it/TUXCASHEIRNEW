@@ -111,7 +111,15 @@ export type ReportConfigDraft =
       readonly expectedVersion: number;
     };
 
-export function useReports(shopId: string | undefined, filters: ReportFilters) {
+export const REPORT_CONFIG_STALE_TIME_MS = 5 * 60_000;
+export const REPORT_FILTER_OPTIONS_STALE_TIME_MS = 15 * 60_000;
+
+export function useReports(
+  shopId: string | undefined,
+  filters: ReportFilters,
+  filterOptionsEnabled: boolean,
+  configEnabled = true,
+) {
   const session = useAdminSession();
   const cache = useQueryClient();
   const namespace =
@@ -142,7 +150,8 @@ export function useReports(shopId: string | undefined, filters: ReportFilters) {
   });
   const configQuery = useQuery({
     queryKey: ['admin', 'reports', namespace, 'config', shopId],
-    enabled: Boolean(shopId),
+    staleTime: REPORT_CONFIG_STALE_TIME_MS,
+    enabled: Boolean(shopId && configEnabled),
     queryFn: () =>
       adminFetch<ReportConfigResponse>(
         `/api/admin/reports?view=configuration&shopId=${encodeURIComponent(shopId!)}`,
@@ -150,7 +159,8 @@ export function useReports(shopId: string | undefined, filters: ReportFilters) {
   });
   const optionsQuery = useQuery({
     queryKey: ['admin', 'reports', namespace, 'filter-options', shopId],
-    enabled: Boolean(shopId),
+    staleTime: REPORT_FILTER_OPTIONS_STALE_TIME_MS,
+    enabled: Boolean(shopId && filterOptionsEnabled),
     queryFn: () =>
       adminFetch<{
         options: Readonly<Record<string, readonly { id: string; label: string }[]>>;

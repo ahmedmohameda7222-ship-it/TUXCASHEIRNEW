@@ -32,12 +32,14 @@ export function ReportFilters({
   canCompareShops,
   allShopIds,
   options,
+  onExpand,
 }: {
   value: ReportQueryFilters;
   onChange(next: ReportQueryFilters): void;
   canCompareShops: boolean;
   allShopIds: readonly string[];
   options: Readonly<Record<string, readonly { id: string; label: string }[]>>;
+  onExpand(): void;
 }) {
   const set = <K extends keyof ReportQueryFilters>(key: K, next: ReportQueryFilters[K]) =>
     onChange({ ...value, [key]: next, offset: 0 });
@@ -189,7 +191,12 @@ export function ReportFilters({
         </label>
       ) : null}
       {extraFields.length > 0 || statuses.length > 0 ? (
-        <details className="tux-report-context">
+        <details
+          className="tux-report-context"
+          onToggle={(event) => {
+            if (event.currentTarget.open) onExpand();
+          }}
+        >
           <summary>More filters</summary>
           <div className="tux-report-context__fields">
             {extraFields

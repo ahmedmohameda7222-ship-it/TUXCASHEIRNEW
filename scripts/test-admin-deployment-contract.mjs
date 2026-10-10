@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import * as nodeModule from 'node:module';
 
 const adminVercelPath = 'apps/admin/vercel.json';
 const menuVercelPath = 'apps/menu/vercel.json';
@@ -103,6 +104,83 @@ for (const directory of ['apps/admin/api', 'apps/admin/server']) {
       throw new Error(
         `Admin Vercel runtime code must use @tux/admin-contracts only through type-only imports: ${absolutePath}`,
       );
+    }
+  }
+}
+
+// For Node 20 compatibility, use installed TypeScript if the built-in parser
+// is unavailable. CI checkout-only jobs use Node 24 and need no installation.
+const legacyTypeScript =
+  typeof nodeModule.stripTypeScriptTypes === 'function'
+    ? null
+    : (await import('typescript')).default;
+
+function stripRuntimeTypes(source) {
+  if (typeof nodeModule.stripTypeScriptTypes === 'function') {
+    return nodeModule.stripTypeScriptTypes(source, { mode: 'transform' });
+  }
+  return legacyTypeScript.transpileModule(source, {
+    compilerOptions: {
+      module: legacyTypeScript.ModuleKind.ESNext,
+      target: legacyTypeScript.ScriptTarget.ES2022,
+      verbatimModuleSyntax: true,
+    },
+  }).outputText;
+}
+
+// Strip type-only syntax with Node's built-in TypeScript parser, so the guard
+// also works in checkout-only CI jobs that deliberately do not run npm ci.
+// Inspect the resulting runtime imports, including side effects and import().
+const adminManifest = JSON.parse(fs.readFileSync('apps/admin/package.json', 'utf8'));
+const packagedSources = adminConfig.functions?.['api/**/*.ts']?.includeFiles;
+const includes = Array.isArray(packagedSources)
+  ? packagedSources
+  : typeof packagedSources === 'string'
+    ? [packagedSources]
+    : [];
+
+function assertRuntimeWorkspaceImport(specifier, sourcePath) {
+  if (!specifier.startsWith('@tux/')) return;
+  const match = /^(@tux\/[^/]+)/.exec(specifier);
+  if (!match) throw new Error(`Invalid workspace import: ${specifier}`);
+  const packageName = match[1];
+  if (packageName === '@tux/admin-contracts') {
+    throw new Error(`Runtime import of type-only Admin contracts: ${sourcePath}`);
+  }
+  if (!Object.hasOwn(adminManifest.dependencies ?? {}, packageName)) {
+    throw new Error(`Undeclared Admin runtime workspace dependency ${packageName}: ${sourcePath}`);
+  }
+  const packageDirectory = packageName.slice('@tux/'.length);
+  const manifestPath = `packages/${packageDirectory}/package.json`;
+  if (!fs.existsSync(manifestPath)) {
+    throw new Error(`Unknown Admin runtime workspace package: ${packageName}`);
+  }
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  if (/\.ts["']/.test(JSON.stringify(manifest.exports ?? {}))) {
+    const sourcePattern = `../../packages/${packageDirectory}/src/**`;
+    if (!includes.includes(sourcePattern)) {
+      throw new Error(`Missing Admin Vercel runtime source packaging for ${packageName}: ${sourcePattern}`);
+    }
+  }
+}
+
+for (const directory of ['apps/admin/api', 'apps/admin/server']) {
+  for (const fileName of collectTsFiles(directory)) {
+    if (fileName.endsWith('.test.ts') || fileName.includes('.source.test.')) continue;
+    const filePath = path.join(directory, fileName);
+    const runtimeSource = stripRuntimeTypes(fs.readFileSync(filePath, 'utf8'));
+    // Type-only named imports become `import {} from ...`: these are inert.
+    for (const match of runtimeSource.matchAll(/\bimport\s+(?!\()(?:([^;]*?)\s+from\s+)?['"](@tux\/[^'"]+)['"]/gs)) {
+      const bindings = match[1]?.trim();
+      if (bindings && /^\{\s*\}$/.test(bindings)) continue;
+      assertRuntimeWorkspaceImport(match[2], filePath);
+    }
+    for (const match of runtimeSource.matchAll(/\bexport\s+(\*|\{[^}]*\})\s+from\s+['"](@tux\/[^'"]+)['"]/g)) {
+      if (/^\{\s*\}$/.test(match[1])) continue;
+      assertRuntimeWorkspaceImport(match[2], filePath);
+    }
+    for (const match of runtimeSource.matchAll(/\bimport\s*\(\s*['"](@tux\/[^'"]+)['"]/g)) {
+      assertRuntimeWorkspaceImport(match[1], filePath);
     }
   }
 }
