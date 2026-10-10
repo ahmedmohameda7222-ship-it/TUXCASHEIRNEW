@@ -1,5 +1,5 @@
-import { DomainInvariantError } from './errors';
-import { moneyMinor, type MoneyMinor } from './money';
+import { DomainInvariantError } from './errors.js';
+import { moneyMinor, type MoneyMinor } from './money.js';
 
 export interface TenderSuggestion {
   readonly totalMinor: MoneyMinor;
