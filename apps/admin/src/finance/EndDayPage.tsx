@@ -122,7 +122,7 @@ export function EndDayPage() {
           }
         />
       ) : null}
-      {days.length === 0 && !operations.daysQuery.isLoading ? (
+      {days.length === 0 && !operations.daysQuery.isLoading && !operations.daysQuery.isError ? (
         <EmptyState
           title="No business day recorded"
           description="An Operations Business Day is required for an X report."
