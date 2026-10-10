@@ -1,24 +1,59 @@
+import { lazy } from 'react';
 import type { AdminPermission, AdminSessionPrincipal } from '@tux/admin-contracts';
 import { Link, useLocation } from 'wouter';
 
-import { ApprovalsPage } from '../approvals/ApprovalsPage';
-import { AuditPage } from '../audit/AuditPage';
-import { CatalogPage } from '../catalog/CatalogPage';
-import { PublishReviewPage } from '../catalog/PublishReviewPage';
+const ApprovalsPage = lazy(() =>
+  import('../approvals/ApprovalsPage').then((module) => ({ default: module.ApprovalsPage })),
+);
+const AuditPage = lazy(() =>
+  import('../audit/AuditPage').then((module) => ({ default: module.AuditPage })),
+);
+const CatalogPage = lazy(() =>
+  import('../catalog/CatalogPage').then((module) => ({ default: module.CatalogPage })),
+);
+const PublishReviewPage = lazy(() =>
+  import('../catalog/PublishReviewPage').then((module) => ({ default: module.PublishReviewPage })),
+);
 import { PageScaffold } from '../components/layout/PageScaffold';
-import { HomeDashboard } from '../dashboard/HomeDashboard';
-import { CustomersPage } from '../customers/CustomersPage';
-import { DeliveryPage } from '../delivery/DeliveryPage';
-import { InventoryPage } from '../inventory/InventoryPage';
-import { FinancePage } from '../finance/FinancePage';
-import { ExpensesPage } from '../finance/ExpensesPage';
-import { SettlementsPage } from '../finance/SettlementsPage';
-import { EndDayPage } from '../finance/EndDayPage';
-import { OrdersPage } from '../orders/OrdersPage';
-import { PurchasingPage } from '../purchasing/PurchasingPage';
-import { ReportsPage } from '../reports/ReportsPage';
-import { SettingsPage } from '../settings/SettingsPage';
-import { StaffPage } from '../staff/StaffPage';
+const HomeDashboard = lazy(() =>
+  import('../dashboard/HomeDashboard').then((module) => ({ default: module.HomeDashboard })),
+);
+const CustomersPage = lazy(() =>
+  import('../customers/CustomersPage').then((module) => ({ default: module.CustomersPage })),
+);
+const DeliveryPage = lazy(() =>
+  import('../delivery/DeliveryPage').then((module) => ({ default: module.DeliveryPage })),
+);
+const InventoryPage = lazy(() =>
+  import('../inventory/InventoryPage').then((module) => ({ default: module.InventoryPage })),
+);
+const FinancePage = lazy(() =>
+  import('../finance/FinancePage').then((module) => ({ default: module.FinancePage })),
+);
+const ExpensesPage = lazy(() =>
+  import('../finance/ExpensesPage').then((module) => ({ default: module.ExpensesPage })),
+);
+const SettlementsPage = lazy(() =>
+  import('../finance/SettlementsPage').then((module) => ({ default: module.SettlementsPage })),
+);
+const EndDayPage = lazy(() =>
+  import('../finance/EndDayPage').then((module) => ({ default: module.EndDayPage })),
+);
+const OrdersPage = lazy(() =>
+  import('../orders/OrdersPage').then((module) => ({ default: module.OrdersPage })),
+);
+const PurchasingPage = lazy(() =>
+  import('../purchasing/PurchasingPage').then((module) => ({ default: module.PurchasingPage })),
+);
+const ReportsPage = lazy(() =>
+  import('../reports/ReportsPage').then((module) => ({ default: module.ReportsPage })),
+);
+const SettingsPage = lazy(() =>
+  import('../settings/SettingsPage').then((module) => ({ default: module.SettingsPage })),
+);
+const StaffPage = lazy(() =>
+  import('../staff/StaffPage').then((module) => ({ default: module.StaffPage })),
+);
 
 export type AdminRouteDefinition = {
   path: string;
