@@ -28,8 +28,10 @@ try {
   fs.writeFileSync(probePath, "import type { SafeType } from '@tux/undeclared-runtime';\n");
   checkContract(true);
 
+  // Named import with only type specifiers still emits a side-effect import.
+  // Unlike `import type`, it requires the runtime package and must be rejected.
   fs.writeFileSync(probePath, "import { type SafeType } from '@tux/undeclared-runtime';\n");
-  checkContract(true);
+  checkContract(false, 'Undeclared Admin runtime workspace dependency');
 
   fs.writeFileSync(probePath, "void import('@tux/undeclared-runtime');\n");
   checkContract(false, 'Undeclared Admin runtime workspace dependency');
