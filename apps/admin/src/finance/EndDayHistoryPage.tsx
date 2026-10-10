@@ -66,7 +66,11 @@ export function EndDayHistoryPage({ shopId, canAdjust }: { shopId: string; canAd
           }
         />
       ) : null}
-      {history?.snapshots.length === 0 ? <p>No financial Z snapshots finalized yet.</p> : null}
+      {!operations.dayHistoryQuery.isLoading &&
+      !operations.dayHistoryQuery.isError &&
+      history?.snapshots.length === 0 ? (
+        <p>No financial Z snapshots finalized yet.</p>
+      ) : null}
       <ul className="tux-finance-ledger-list">
         {(history?.snapshots ?? []).map((snapshot) => {
           const adjustments = (history?.adjustments ?? []).filter(
