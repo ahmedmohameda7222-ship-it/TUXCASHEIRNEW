@@ -153,7 +153,6 @@ type CanonicalDeliveryOrderRow = {
   id: string;
   shop_id: string;
   display_order_no?: number | string;
-  display_order_label?: string | null;
   updated_at: string;
 };
 
@@ -321,7 +320,7 @@ export function createDeliveryStore(client: AdminSupabaseClient): DeliveryStore 
           client,
           'orders',
           new URLSearchParams({
-            select: 'id,shop_id,display_order_no,display_order_label,updated_at',
+            select: 'id,shop_id,display_order_no,updated_at',
             shop_id: `eq.${input.shopId}`,
             order_type_behavior_snapshot: 'eq.DELIVERY',
             status: 'in.(ACTIVE,DONE)',
@@ -333,7 +332,7 @@ export function createDeliveryStore(client: AdminSupabaseClient): DeliveryStore 
               'shops',
               new URLSearchParams({
                 select: 'id,name',
-                business_id: `eq.${input.businessId}`,
+                // Principal shopIds are already scoped to the authenticated business.
                 id: `in.(${input.shopIds.join(',')})`,
                 order: 'name.asc,id.asc',
               }),
@@ -350,9 +349,9 @@ export function createDeliveryStore(client: AdminSupabaseClient): DeliveryStore 
           ...(canonical?.display_order_no === undefined
             ? {}
             : { displayOrderNo: safeInteger(canonical.display_order_no) }),
-          ...(canonical?.display_order_label === undefined
+          ...(canonical?.display_order_no === undefined
             ? {}
-            : { displayOrderLabel: canonical.display_order_label }),
+            : { displayOrderLabel: `#${safeInteger(canonical.display_order_no)}` }),
           shopId: row.shop_id,
           riderId: row.rider_id,
           state: row.state,
@@ -368,9 +367,9 @@ export function createDeliveryStore(client: AdminSupabaseClient): DeliveryStore 
             ...(row.display_order_no === undefined
               ? {}
               : { displayOrderNo: safeInteger(row.display_order_no) }),
-            ...(row.display_order_label === undefined
+            ...(row.display_order_no === undefined
               ? {}
-              : { displayOrderLabel: row.display_order_label }),
+              : { displayOrderLabel: `#${safeInteger(row.display_order_no)}` }),
             shopId: row.shop_id,
             riderId: null,
             state: 'UNASSIGNED',
