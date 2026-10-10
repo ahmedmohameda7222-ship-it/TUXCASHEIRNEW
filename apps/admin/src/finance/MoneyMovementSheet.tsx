@@ -33,7 +33,7 @@ export function MoneyMovementSheet({
   const [reason, setReason] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const operations = useFinanceOperations(shopId, undefined);
+  const operations = useFinanceOperations(shopId, undefined, []);
   const active = accounts.filter(
     (account) => account.active && (canManageCapital || account.shopId !== null),
   );
