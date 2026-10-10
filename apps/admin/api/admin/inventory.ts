@@ -31,6 +31,7 @@ import {
 } from '../../server/http.js';
 import { readAdminSessionToken } from '../../server/session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
+import { adminRequestOperation } from '../../server/observability.js';
 
 const uuidSchema = z.string().uuid();
 const microsSchema = z.number().int().safe();
@@ -697,7 +698,7 @@ async function executeCommand(
   }
 }
 
-function handleFailure(response: AdminResponse, error: unknown): void {
+function handleFailure(response: AdminResponse, error: unknown, request: AdminRequest): void {
   if (error instanceof AdminAuthError) {
     sendJson(response, error.status, { error: error.code });
     return;
@@ -726,11 +727,11 @@ function handleFailure(response: AdminResponse, error: unknown): void {
       sendJson(response, 403, { error: 'permission_forbidden' });
       return;
     }
-    console.error('Admin inventory database request failed', { status: error.status });
+    console.error('Admin inventory database request failed', { resource: 'inventory', operation: adminRequestOperation(request), status: error.status });
     sendJson(response, 502, { error: 'admin_backend_unavailable' });
     return;
   }
-  console.error('Admin inventory request failed');
+  console.error('Admin inventory request failed', { resource: 'inventory', operation: adminRequestOperation(request), status: 500 });
   sendJson(response, 500, { error: 'admin_request_failed' });
 }
 
@@ -777,6 +778,6 @@ export default async function handler(
     const result = await executeCommand(client, context, command);
     sendJson(response, commandFailureStatus(result), result);
   } catch (error) {
-    handleFailure(response, error);
+    handleFailure(response, error, request);
   }
 }
