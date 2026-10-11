@@ -182,7 +182,7 @@ export function ShopCopyPreviewPanel({
       </form>
       {error ? <p role="alert">{error}</p> : null}
       {copiedKeys !== null ? (
-        <p role="status">{copiedKeys} settings copied as draft overrides. Publish this shop\'s settings to activate the changes for future orders.</p>
+        <p role="status">{copiedKeys} settings copied as draft overrides. Publish the target shop settings to activate changes for future orders.</p>
       ) : null}
       {preview?.ok ? (
         <div role="status">
