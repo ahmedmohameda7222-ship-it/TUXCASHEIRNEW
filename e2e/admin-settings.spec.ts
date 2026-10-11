@@ -25,6 +25,8 @@ async function mockSettings(
   role: 'OWNER' | 'MANAGER' = 'OWNER',
 ) {
   let settingsVersion = 7;
+  let shopLifecycleState: 'ACTIVE' | 'SUSPENDED' = 'ACTIVE';
+  let shopLifecycleRevision = 1;
   let orderType = {
     id: orderTypeId,
     name: 'Take Away',
@@ -87,8 +89,9 @@ async function mockSettings(
           shop: {
             id: shopId,
             name: 'TUX Maadi',
-            lifecycleState: 'ACTIVE',
-            active: true,
+            lifecycleState: shopLifecycleState,
+            lifecycleRevision: shopLifecycleRevision,
+            active: shopLifecycleState === 'ACTIVE',
             address: 'Road 9, Maadi',
             contactPhone: '+201000000000',
             latitude: 29.9602,
@@ -260,6 +263,24 @@ async function mockSettings(
           settingsVersion,
           operationsConfigurationVersion: 20 + settingsVersion,
         }),
+      });
+      return;
+    }
+
+    if (command.type === 'shop.lifecycle.update') {
+      expect(command).toMatchObject({
+        shopId,
+        expectedState: shopLifecycleState,
+        expectedLifecycleRevision: shopLifecycleRevision,
+      });
+      const newState = command.targetState;
+      expect(['ACTIVE', 'SUSPENDED']).toContain(newState);
+      shopLifecycleState = newState as 'ACTIVE' | 'SUSPENDED';
+      shopLifecycleRevision += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, lifecycleRevision: shopLifecycleRevision }),
       });
       return;
     }
@@ -460,6 +481,40 @@ test('shop management does not offer assignment access without staff management 
   await mockSettings(page);
   await page.goto('/settings/shop');
   await expect(page.getByRole('link', { name: 'Manage staff assignments' })).toHaveCount(0);
+});
+
+test('suspends a shop through version-fenced trusted lifecycle authority', async ({ page }) => {
+  const { commands } = await mockSettings(page, ['settings.manage', 'shops.manage']);
+  await page.goto('/settings/shop');
+  await expect(page.getByRole('button', { name: 'Suspend shop' })).toBeVisible();
+  await page.getByRole('button', { name: 'Suspend shop' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toEqual({
+    type: 'shop.lifecycle.update',
+    shopId,
+    expectedState: 'ACTIVE',
+    targetState: 'SUSPENDED',
+    expectedLifecycleRevision: 1,
+  });
+  await expect(page.getByRole('button', { name: 'Reactivate shop' })).toBeVisible();
+  await page.getByRole('button', { name: 'Reactivate shop' }).click();
+  await expect.poll(() => commands.length).toBe(2);
+  expect(commands[1]).toEqual({
+    type: 'shop.lifecycle.update',
+    shopId,
+    expectedState: 'SUSPENDED',
+    targetState: 'ACTIVE',
+    expectedLifecycleRevision: 2,
+  });
+});
+
+test('shop lifecycle transitions are unavailable without shop management permission', async ({
+  page,
+}) => {
+  await mockSettings(page);
+  await page.goto('/settings/shop');
+  await expect(page.getByRole('button', { name: 'Suspend shop' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Reactivate shop' })).toHaveCount(0);
 });
 
 test('confirms archive before routing shop lifecycle management through the trusted BFF', async ({
