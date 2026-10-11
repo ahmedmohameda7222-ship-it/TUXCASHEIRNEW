@@ -12,6 +12,7 @@
   "scripts": {
     "dev:operations": "npm run build:domain && npm run dev -w @tux/operations",
     "dev:admin": "npm run build:domain && npm run dev -w @tux/admin",
+    "dev:admin:fixtures": "node scripts/start-admin-fixtures.mjs",
     "build": "npm run build:domain && npm run build --workspaces --if-present",
     "build:admin": "npm run build:domain && npm run build -w @tux/admin",
     "typecheck": "npm run typecheck --workspaces --if-present && tsc --noEmit -p tsconfig.api.json && npm run typecheck:e2e",
