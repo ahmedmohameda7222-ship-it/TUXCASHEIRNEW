@@ -177,6 +177,12 @@ export function PurchasingPage() {
                 canManage={canManage}
                 canReceive={canReceive}
                 ordering={purchasing.orderPurchaseOrder.isPending}
+                updating={purchasing.updatePurchaseOrder.isPending}
+                onUpdate={(input, onSuccess) => purchasing.updatePurchaseOrder.mutate({
+                  purchaseOrderId: selected.id,
+                  expectedVersion: selected.version,
+                  ...input,
+                }, {onSuccess})}
                 onOrder={() =>
                   purchasing.orderPurchaseOrder.mutate({
                     purchaseOrderId: selected.id,
