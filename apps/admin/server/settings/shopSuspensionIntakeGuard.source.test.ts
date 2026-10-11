@@ -10,7 +10,7 @@ const migrationsDir = resolve(
 const migration = join(migrationsDir, '20261011215542_admin_suspended_shop_intake_guard.sql');
 
 describe('suspended shop intake integrity', () => {
-  it('blocks inconsistent intake from every writer, including legacy operational-state commands', () => {
+  it('rejects suspended intake from every writer', () => {
     const sql = readFileSync(migration, 'utf8');
     expect(sql).toContain('ADD CONSTRAINT shops_suspended_intake_closed_ck');
     expect(sql).toContain("lifecycle_state <> 'SUSPENDED'");
