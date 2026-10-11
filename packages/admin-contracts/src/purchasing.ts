@@ -65,6 +65,10 @@ export type AdminPurchasingInventoryItem = {
   readonly id: string;
   readonly name: string;
   readonly unitLabel: string;
+  readonly purchaseUnits: readonly {
+    readonly label: string;
+    readonly baseMicrosPerPurchaseUnit: number;
+  }[];
 };
 
 export type AdminPurchasingWorkspace = {
