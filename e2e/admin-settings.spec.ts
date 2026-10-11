@@ -689,6 +689,36 @@ test('confirms archive before routing shop lifecycle management through the trus
   expect(commands[0]).toEqual({ type: 'shop.delete-or-archive', shopId });
 });
 
+test('new shop can refresh the authorized shop list without reloading the app', async ({
+  page,
+}) => {
+  await mockSettings(page, ['settings.manage', 'shops.manage']);
+  let sessionRequests = 0;
+  await page.route('**/api/admin/session', async (route) => {
+    sessionRequests += 1;
+    await route.fallback();
+  });
+  const newShopId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  await page.route('**/api/admin/shop-create', async (route) => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers()['x-tux-admin-csrf']).toBe(csrfToken);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, shopId: newShopId, idempotentReplay: false }),
+    });
+  });
+
+  await page.goto('/settings/shop');
+  await page.getByRole('button', { name: 'Add new shop' }).click();
+  await page.getByLabel('New shop name').fill('Second Shop');
+  await page.getByRole('button', { name: 'Create shop', exact: true }).click();
+  await expect(page.getByText(`Shop created: ${newShopId}`, { exact: false })).toBeVisible();
+  const requestsBeforeRefresh = sessionRequests;
+  await page.getByRole('button', { name: 'Refresh available shops' }).click();
+  await expect.poll(() => sessionRequests).toBeGreaterThan(requestsBeforeRefresh);
+});
+
 test('previews explicitly selected configuration without mutating either shop', async ({
   page,
 }) => {
