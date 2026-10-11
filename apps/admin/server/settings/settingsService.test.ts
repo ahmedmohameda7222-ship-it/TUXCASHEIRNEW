@@ -214,6 +214,34 @@ describe('Admin settings service', () => {
     });
   });
 
+  it('creates payment methods using the refund-aware trusted RPC with explicit policy', async () => {
+    const rpc = vi.fn(async () => ({ ok: true, editVersion: 1 }));
+    const settingsStore = createSupabaseSettingsStore({ rpc } as unknown as AdminSupabaseClient);
+    await expect(
+      settingsStore.createPaymentMethod({
+        employeeId: 'employee-1',
+        shopId: 'shop-1',
+        displayName: 'Non-refundable voucher',
+        logicType: 'OTHER',
+        active: true,
+        sortOrder: 40,
+        channel: 'POS',
+        requiresReference: true,
+        manualConfirmationRequired: true,
+        refundAllowed: false,
+        expectedSettingsVersion: 3,
+        commandId: 'create-payment-1',
+      }),
+    ).resolves.toEqual({ ok: true, editVersion: 1 });
+    expect(rpc).toHaveBeenCalledWith(
+      'create_admin_payment_method_v2',
+      expect.objectContaining({
+        p_refund_allowed: false,
+        p_command_id: 'create-payment-1',
+      }),
+    );
+  });
+
   it('filters payment methods by active state and POS/ONLINE channel', () => {
     const methods = [
       { id: 'cash', displayName: 'Cash', active: true, channel: 'BOTH' as const },

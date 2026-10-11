@@ -127,6 +127,7 @@ describe('Admin settings API contract', () => {
       channel: 'POS',
       requiresReference: false,
       manualConfirmationRequired: false,
+      refundAllowed: false,
       expectedSettingsVersion: 4,
       commandId: 'pm-command-1',
     };
@@ -134,9 +135,11 @@ describe('Admin settings API contract', () => {
     expect(settingsCommandSchema.safeParse({ ...command, logicType: 'CUSTOM' }).success).toBe(
       false,
     );
-    expect(settingsCommandSchema.safeParse({ ...command, refundAllowed: false }).success).toBe(
+    expect(settingsCommandSchema.safeParse({ ...command, refundAllowed: 'false' }).success).toBe(
       false,
     );
+    const { refundAllowed: _refundAllowed, ...missingRefundPolicy } = command;
+    expect(settingsCommandSchema.safeParse(missingRefundPolicy).success).toBe(false);
     expect(
       settingsCommandSchema.safeParse({ ...command, requiresReconciliation: false }).success,
     ).toBe(false);

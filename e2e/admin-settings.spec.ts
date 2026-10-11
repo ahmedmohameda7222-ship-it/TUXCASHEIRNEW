@@ -253,7 +253,7 @@ async function mockSettings(
         shopId,
         expectedSettingsVersion: settingsVersion,
       });
-      expect(command).not.toHaveProperty('refundAllowed');
+      expect(command.refundAllowed).toBe(false);
       expect(command).not.toHaveProperty('requiresReconciliation');
       expect(command).not.toHaveProperty('integrationReference');
       await route.fulfill({
@@ -455,6 +455,7 @@ test('creates payment methods with a retry-safe trusted settings command', async
   await page.getByLabel('Payment type').selectOption('DIGITAL');
   await page.getByLabel('New method availability').selectOption('BOTH');
   await page.getByLabel('Require payment reference').check();
+  await page.getByLabel('Refunds allowed for new payments').uncheck();
   await page.getByRole('button', { name: 'Create payment method' }).click();
   await expect.poll(() => commands.length).toBe(1);
   expect(commands[0]).toMatchObject({
@@ -465,6 +466,7 @@ test('creates payment methods with a retry-safe trusted settings command', async
     channel: 'BOTH',
     requiresReference: true,
     manualConfirmationRequired: false,
+    refundAllowed: false,
     expectedSettingsVersion: 7,
   });
   expect(typeof commands[0]?.commandId).toBe('string');
