@@ -34,7 +34,6 @@ function settingsStore(
     upsertBusinessDefault,
     upsertShopOverride: vi.fn(),
     restoreShopOverride: vi.fn(),
-    restoreShopOverride: vi.fn(),
     upsertReasonCode: vi.fn(),
     createOrderType: vi.fn(),
     updateOrderType: vi.fn(),

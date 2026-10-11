@@ -286,12 +286,6 @@ export const settingsCommandSchema = z.union([
   z.object({ type: z.literal('shop.delete-or-archive'), shopId: uuidSchema }).strict(),
   settingWriteCommandSchema('setting.default.upsert'),
   settingWriteCommandSchema('setting.override.upsert'),
-  z.object({
-    type: z.literal('setting.override.restore'),
-    shopId: uuidSchema,
-    settingKey: settingKeySchema,
-    expectedVersion: expectedEditVersionSchema,
-  }).strict(),
   z
     .object({
       type: z.literal('setting.override.restore'),
@@ -454,9 +448,6 @@ export default async function handler(
         return;
       case 'setting.override.upsert':
         sendJson(response, 200, { ...(await service.upsertShopOverride(command, principal)) });
-        return;
-      case 'setting.override.restore':
-        sendJson(response, 200, { ...(await service.restoreShopOverride(command, principal)) });
         return;
       case 'setting.override.restore':
         sendJson(response, 200, { ...(await service.restoreShopOverride(command, principal)) });
