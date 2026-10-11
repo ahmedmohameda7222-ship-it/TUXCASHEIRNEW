@@ -289,6 +289,18 @@ export const settingsCommandSchema = z.union([
   reasonCodeWriteCommandSchema,
   z
     .object({
+      type: z.literal('order-type.create'),
+      shopId: uuidSchema,
+      name: orderTypeNameSchema,
+      behavior: orderBehaviorSchema,
+      active: z.boolean(),
+      sortOrder: sortOrderSchema,
+      expectedSettingsVersion: expectedSettingsVersionSchema,
+      commandId: z.string().trim().min(1).max(160),
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal('order-type.update'),
       shopId: uuidSchema,
       orderTypeId: uuidSchema,
@@ -431,6 +443,9 @@ export default async function handler(
         return;
       case 'reason-code.upsert':
         sendJson(response, 200, { ...(await service.upsertReasonCode(command, principal)) });
+        return;
+      case 'order-type.create':
+        sendJson(response, 200, { ...(await service.createOrderType(command, principal)) });
         return;
       case 'order-type.update':
         sendJson(response, 200, { ...(await service.updateOrderType(command, principal)) });
