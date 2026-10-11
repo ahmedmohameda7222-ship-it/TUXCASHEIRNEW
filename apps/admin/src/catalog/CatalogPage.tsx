@@ -96,6 +96,7 @@ export function CatalogPage() {
   const actionError = mutationMessage(
     catalog.resumeDraft.error ??
       catalog.prepareProductDraft.error ??
+      catalog.prepareDefinitionsDraft.error ??
       catalog.saveProduct.error ??
       catalog.saveDefinitions.error ??
       catalog.setAvailability.error,
@@ -103,6 +104,7 @@ export function CatalogPage() {
   const busy =
     catalog.resumeDraft.isPending ||
     catalog.prepareProductDraft.isPending ||
+    catalog.prepareDefinitionsDraft.isPending ||
     catalog.saveProduct.isPending ||
     catalog.saveDefinitions.isPending ||
     catalog.setAvailability.isPending;
@@ -190,7 +192,17 @@ export function CatalogPage() {
       primaryAction={
         <div className="admin-catalog-new-product-controls">
           {canEdit ? <button className="admin-secondary-button" type="button" disabled={busy}
-            onClick={() => {setDefinitionsOpen((open)=>!open);setUnsavedProduct(null);navigate('/catalog/products');}}>
+            onClick={() => {
+              if (definitionsOpen) {
+                setDefinitionsOpen(false);
+                return;
+              }
+              void catalog.prepareDefinitionsDraft.mutateAsync().then(() => {
+                setUnsavedProduct(null);
+                navigate('/catalog/products');
+                setDefinitionsOpen(true);
+              }).catch(() => undefined);
+            }}>
             {definitionsOpen ? 'Back to products' : 'Manage categories & extras'}
           </button> : null}
           <label>
