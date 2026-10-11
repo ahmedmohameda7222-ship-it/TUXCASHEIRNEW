@@ -57,13 +57,6 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
       <p className="admin-settings-muted">
         Choose where each payment method is available and what staff must enter at checkout.
       </p>
-      <div className="admin-callout" role="status">
-        <strong>Refund policy editing is not available yet.</strong>
-        <span>
-          Existing refund rules remain unchanged. Refund controls will appear here when that
-          workflow is available to staff.
-        </span>
-      </div>
       <div className="admin-settings-list">
         {workspace.paymentMethods.map((method) => {
           if (draft?.paymentMethodId === method.id) {
@@ -185,6 +178,18 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
                   <label className="admin-check-field">
                     <input
                       type="checkbox"
+                      checked={draft.refundAllowed}
+                      disabled={updating}
+                      onChange={(event) => {
+                        const refundAllowed = event.currentTarget.checked;
+                        setDraft((current) => current ? { ...current, refundAllowed } : current);
+                      }}
+                    />
+                    <span>Refund allowed</span>
+                  </label>
+                  <label className="admin-check-field">
+                    <input
+                      type="checkbox"
                       checked={draft.manualConfirmationRequired}
                       disabled={updating}
                       onChange={(event) => {
@@ -240,6 +245,7 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
               <div className="admin-settings-tags">
                 {method.requiresReference ? <span>Reference required</span> : null}
                 {method.manualConfirmationRequired ? <span>Manual confirmation</span> : null}
+                <span>{method.refundAllowed ? 'Refunds allowed' : 'Refunds disabled'}</span>
                 {method.requiresReconciliation ? <span>Reconciled</span> : null}
               </div>
             </div>
