@@ -143,6 +143,21 @@ export function usePurchasing(shopId: string | undefined) {
     onSuccess: invalidate,
   });
 
+  const replaceDraftPurchaseOrderLines = useMutation({
+    mutationFn: async (input: {
+      purchaseOrderId: string; expectedVersion: number;
+      lines: readonly {
+        inventoryItemId: string; purchaseUnitLabel: string;
+        orderedPurchaseUnitsMicros: number; expectedPurchaseUnitCostMinor: number;
+      }[];
+    }) => {
+      return postRetained('po.lines.replace', input, (commandId) => ({
+        type: 'po.lines.replace', shopId: shopId!, ...input, commandId,
+      }));
+    },
+    onSuccess: invalidate,
+  });
+
   const cancelPurchaseOrder = useMutation({
     mutationFn: async (input: {purchaseOrderId: string; expectedVersion: number}) => {
       return postRetained('po.cancel', input, (commandId) => ({
@@ -209,6 +224,7 @@ export function usePurchasing(shopId: string | undefined) {
     manageSupplier,
     createPurchaseOrder,
     updatePurchaseOrder,
+    replaceDraftPurchaseOrderLines,
     cancelPurchaseOrder,
     orderPurchaseOrder,
     receivePurchase,
