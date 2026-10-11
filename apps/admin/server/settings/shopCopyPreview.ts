@@ -31,6 +31,7 @@ export type SettingsCopyPreviewResult =
         settingKey: string;
         sourceValue: unknown;
         source: 'shop' | 'business';
+        sourceExpectedVersion: number;
         targetValue: unknown | null;
         targetSource: 'shop' | 'business' | 'unset';
         targetExpectedVersion: number | null;
@@ -83,6 +84,7 @@ export function buildSettingsCopyPreview(
         settingKey,
         sourceValue: from.row.value,
         source: from.source as 'shop' | 'business',
+        sourceExpectedVersion: from.row.version,
         targetValue: to.row?.value ?? null,
         targetSource: to.source,
         targetExpectedVersion: targetOverride?.version ?? null,
