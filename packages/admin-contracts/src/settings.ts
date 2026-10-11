@@ -296,6 +296,19 @@ export type OrderTypeEditInput = {
   expectedEditVersion: number;
 };
 
+export type PaymentMethodCreateInput = {
+  shopId: string;
+  displayName: string;
+  logicType: AdminPaymentMethodDetail['logicType'];
+  active: boolean;
+  sortOrder: number;
+  channel: PaymentMethodChannel;
+  requiresReference: boolean;
+  manualConfirmationRequired: boolean;
+  expectedSettingsVersion: number;
+  commandId: string;
+};
+
 export type PaymentMethodEditInput = {
   shopId: string;
   paymentMethodId: string;
@@ -325,4 +338,5 @@ export type SettingsCommand =
   | ({ type: 'reason-code.upsert' } & ReasonCodeWriteInput)
   | ({ type: 'order-type.create' } & OrderTypeCreateInput)
   | ({ type: 'order-type.update' } & OrderTypeEditInput)
+  | ({ type: 'payment-method.create' } & PaymentMethodCreateInput)
   | ({ type: 'payment-method.update' } & PaymentMethodEditInput);
