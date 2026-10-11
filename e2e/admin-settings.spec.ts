@@ -19,7 +19,10 @@ const ownerSession = {
 };
 
 // Keep mutable payment fixtures aligned with the published Admin settings contract.
-async function mockSettings(page: Page, permissions: string[] = ownerSession.principal.permissions) {
+async function mockSettings(
+  page: Page,
+  permissions: string[] = ownerSession.principal.permissions,
+) {
   let settingsVersion = 7;
   let orderType = {
     id: orderTypeId,

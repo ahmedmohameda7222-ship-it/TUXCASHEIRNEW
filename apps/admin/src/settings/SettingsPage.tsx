@@ -162,7 +162,7 @@ function SectionContent(
       return (
         <ShopsPage
           workspace={workspace}
-          canAssignStaff={canAssignStaff}
+          canAssignStaff={canAssignStaff === true}
           onUpdateOperationalState={(draft) => void onUpdateOperationalState(draft)}
           onUpdateIdentity={onUpdateShopIdentity}
           onUpsertWeeklyHours={onUpsertWeeklyHours}
