@@ -19,6 +19,8 @@ export function PurchaseOrderPage({
   ordering,
   updating,
   onUpdate,
+  cancelling,
+  onCancel,
   onOrder,
   onReceive,
   onReturn,
@@ -29,6 +31,8 @@ export function PurchaseOrderPage({
   ordering: boolean;
   updating: boolean;
   onUpdate(input: {reference: string | null; expectedDeliveryDate: string | null}, onSuccess: () => void): void;
+  cancelling: boolean;
+  onCancel(): void;
   onOrder(): void;
   onReceive(): void;
   onReturn(): void;
@@ -36,9 +40,11 @@ export function PurchaseOrderPage({
   const [editing, setEditing] = useState(false);
   const [reference, setReference] = useState(order.reference ?? '');
   const [expectedDate, setExpectedDate] = useState(order.expectedDeliveryDate ?? '');
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   useEffect(() => {
     setEditing(false);
+    setConfirmCancel(false);
     setReference(order.reference ?? '');
     setExpectedDate(order.expectedDeliveryDate ?? '');
   }, [order.id, order.version, order.reference, order.expectedDeliveryDate]);
@@ -96,6 +102,16 @@ export function PurchaseOrderPage({
         ))}
       </div>
       <div className="admin-inventory-page-actions">
+        {(order.status === 'DRAFT' || order.status === 'ORDERED') && canManage ? (
+          confirmCancel ? (
+            <div className="admin-form-grid">
+              <strong>Cancel this purchase order?</strong>
+              <span>Cancellation keeps purchase history and cannot be undone.</span>
+              <button className="admin-secondary-button" type="button" disabled={cancelling} onClick={onCancel}>Confirm cancel purchase order</button>
+              <button className="admin-secondary-button" type="button" disabled={cancelling} onClick={() => setConfirmCancel(false)}>Keep purchase order</button>
+            </div>
+          ) : <button className="admin-secondary-button" type="button" disabled={cancelling} onClick={() => setConfirmCancel(true)}>Cancel purchase order</button>
+        ) : null}
         {order.status === 'DRAFT' && canManage ? (
           <button
             className="admin-primary-button"
