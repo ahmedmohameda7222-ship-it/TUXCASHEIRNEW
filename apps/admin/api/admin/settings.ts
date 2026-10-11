@@ -414,7 +414,9 @@ export default async function handler(
   request: AdminRequest,
   response: AdminResponse,
 ): Promise<void> {
-  const resource = new URL(request.url ?? '/', 'http://admin.local').searchParams.get('__adminResource');
+  const resource = new URL(request.url ?? '/', 'http://admin.local').searchParams.get(
+    '__adminResource',
+  );
   if (resource === 'shop-create') return handleShopCreateRoute(request, response);
   if (resource === 'shop-copy-preview') return handleShopCopyPreviewRoute(request, response);
   if (resource === 'payment-zone-rules') return handlePaymentZoneRulesRoute(request, response);

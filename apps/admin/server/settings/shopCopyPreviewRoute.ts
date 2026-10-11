@@ -1,9 +1,5 @@
 import { z } from 'zod';
-import {
-  AdminAuthError,
-  loadAdminSession,
-  requireSessionCsrf,
-} from '../adminAuthService.js';
+import { AdminAuthError, loadAdminSession, requireSessionCsrf } from '../adminAuthService.js';
 import { AdminAuthorizationError } from '../authorization.js';
 import { getAdminServerEnv } from '../env.js';
 import {
@@ -16,10 +12,7 @@ import {
 } from '../http.js';
 import { readAdminSessionToken } from '../session.js';
 import { buildSettingsCopyPreview } from './shopCopyPreview.js';
-import {
-  createSettingsService,
-  createSupabaseSettingsStore,
-} from './settingsService.js';
+import { createSettingsService, createSupabaseSettingsStore } from './settingsService.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../supabaseAdmin.js';
 
 export const shopCopyPreviewSchema = z

@@ -1,15 +1,8 @@
 import type { AdminSessionPrincipal } from '@tux/admin-contracts';
 import { z } from 'zod';
 
-import {
-  AdminAuthError,
-  loadAdminSession,
-  requireSessionCsrf,
-} from '../adminAuthService.js';
-import {
-  AdminAuthorizationError,
-  requireBusinessWidePermission,
-} from '../authorization.js';
+import { AdminAuthError, loadAdminSession, requireSessionCsrf } from '../adminAuthService.js';
+import { AdminAuthorizationError, requireBusinessWidePermission } from '../authorization.js';
 import { getAdminServerEnv } from '../env.js';
 import {
   firstHeader,
