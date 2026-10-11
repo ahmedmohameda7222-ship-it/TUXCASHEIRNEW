@@ -1,6 +1,6 @@
 import {readFileSync} from 'node:fs';
 import {describe,expect,it} from 'vitest';
-const sql=readFileSync(new URL('../../../../supabase/migrations/20261011042500_admin_order_type_create.sql',import.meta.url),'utf8');
+const sql=readFileSync(new URL('../../../../supabase/migrations/20261011042028_admin_order_type_create.sql',import.meta.url),'utf8');
 
 describe('order-type creation authority',()=>{
   it('requires trusted shop settings authorization, version guard and deterministic replay',()=>{
