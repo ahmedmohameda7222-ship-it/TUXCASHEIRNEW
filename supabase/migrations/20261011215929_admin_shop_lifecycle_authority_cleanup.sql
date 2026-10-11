@@ -2,7 +2,6 @@
 -- A later migration accidentally introduced an unused parallel signature and version column.
 -- Refuse cleanup if any data was recorded by that parallel authority.
 BEGIN;
-BEGIN;
 LOCK TABLE public.admin_shop_lifecycle_commands IN ACCESS EXCLUSIVE MODE;
 LOCK TABLE public.shops IN ACCESS EXCLUSIVE MODE;
 DO $guard$
@@ -21,5 +20,4 @@ ALTER TABLE public.shops DROP COLUMN lifecycle_edit_version;
 
 -- The canonical function (uuid,uuid,bigint,text,text) and its lifecycle_revision remain intact.
 -- The applied archive historical-audit guard from the prior migration is retained.
-COMMIT;
 COMMIT;
