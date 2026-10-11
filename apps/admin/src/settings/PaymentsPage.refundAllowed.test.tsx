@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { PaymentsPage } from './PaymentsPage';
 
 describe('payment-method refund permission trust boundary', () => {
-  it('does not let staff edit an unenforced policy flag', () => {
+  it('describes that refund policy changes affect new payments, not historical transactions', () => {
     const workspace = {
       settingsVersion: 3,
       paymentMethods: [
@@ -25,8 +25,7 @@ describe('payment-method refund permission trust boundary', () => {
     const html = renderToStaticMarkup(
       <PaymentsPage workspace={workspace} updating={false} onCreate={vi.fn()} onUpdate={vi.fn()} />,
     );
-    expect(html).toContain('Refund permissions are read-only');
-    expect(html).not.toContain('checked={draft.refundAllowed}');
-    expect(html).not.toContain('Refund allowed</span>');
+    expect(html).toContain('Changes affect future payments only');
+    expect(html).toContain('Refunds allowed for new payments');
   });
 });

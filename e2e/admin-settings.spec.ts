@@ -509,6 +509,26 @@ test('changes refund policy with a captured settings and row CAS', async ({ page
   });
 });
 
+test('updates refund eligibility for future payments using trusted version-fenced authority', async ({
+  page,
+}) => {
+  const { commands } = await mockSettings(page);
+  await page.goto('/settings/payments');
+  await page.getByRole('button', { name: 'Edit Cash' }).click();
+  await page.getByLabel('Refunds allowed for new payments').uncheck();
+  await page.getByRole('button', { name: 'Save payment method' }).click();
+
+  await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);
+  expect(commands[0]).toMatchObject({
+    type: 'payment-method.update',
+    shopId,
+    paymentMethodId,
+    refundAllowed: false,
+    expectedSettingsVersion: 7,
+    expectedEditVersion: 5,
+  });
+});
+
 test('deactivates an existing reason code through the trusted settings command', async ({
   page,
 }) => {

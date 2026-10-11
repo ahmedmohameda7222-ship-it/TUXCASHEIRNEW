@@ -98,9 +98,8 @@ export function buildPaymentMethodUpdateCommand(
   requireWorkspaceShop(shopId, workspace);
   const row = workspace.paymentMethods.find((method) => method.id === draft.paymentMethodId);
   if (!row) throw new SettingsUiError('payment_method_not_loaded');
-  // refundAllowed is an approved canonical policy but is deliberately preserved, not edited,
-  // until the trusted refund boundary consumes the transaction's immutable payment snapshot.
-  // Build the command explicitly so hostile/legacy callers cannot smuggle protected semantics.
+  // Trusted DB payment snapshots and refund triggers enforce this setting for new payments;
+  // never forward client-supplied logicType or reconciliation semantics.
   return {
     type: 'payment-method.update',
     shopId,
@@ -111,7 +110,7 @@ export function buildPaymentMethodUpdateCommand(
     channel: draft.channel,
     requiresReference: draft.requiresReference,
     manualConfirmationRequired: draft.manualConfirmationRequired,
-    refundAllowed: row.refundAllowed,
+    refundAllowed: draft.refundAllowed,
     expectedSettingsVersion: draft.expectedSettingsVersion,
     expectedEditVersion: draft.expectedEditVersion,
   };

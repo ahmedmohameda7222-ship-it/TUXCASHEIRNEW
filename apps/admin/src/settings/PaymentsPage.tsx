@@ -73,7 +73,7 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
         Choose where each payment method is available and what staff must enter at checkout.
       </p>
       <p className="admin-settings-muted">
-        Refund permissions are read-only until the trusted order-refund boundary enforces them.
+        Refund eligibility is captured when a payment is taken. Changes affect future payments only.
       </p>
       <div className="admin-settings-row__main">
         <button
@@ -360,6 +360,18 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                     />
                     <span>Manual confirmation</span>
                   </label>
+                  <label className="admin-check-field">
+                    <input
+                      type="checkbox"
+                      checked={draft.refundAllowed}
+                      disabled={updating}
+                      onChange={(event) => {
+                        const refundAllowed = event.currentTarget.checked;
+                        setDraft((current) => (current ? { ...current, refundAllowed } : current));
+                      }}
+                    />
+                    <span>Refunds allowed for new payments</span>
+                  </label>
                 </div>
                 <div className="admin-settings-row__main">
                   <button className="admin-primary-button" type="submit" disabled={updating}>
@@ -405,6 +417,11 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                 {method.requiresReference ? <span>Reference required</span> : null}
                 {method.manualConfirmationRequired ? <span>Manual confirmation</span> : null}
                 {method.requiresReconciliation ? <span>Reconciled</span> : null}
+                <span>
+                  {method.refundAllowed
+                    ? 'Refunds allowed for new payments'
+                    : 'Refunds disabled for new payments'}
+                </span>
               </div>
             </div>
           );

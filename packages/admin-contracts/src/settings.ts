@@ -318,7 +318,7 @@ export type PaymentMethodEditInput = {
   channel: PaymentMethodChannel;
   requiresReference: boolean;
   manualConfirmationRequired: boolean;
-  /** Canonical final-product policy. Editing remains locked until the trusted refund boundary enforces it. */
+  /** Trusted payment snapshots enforce this policy for future payments; history is immutable. */
   refundAllowed: boolean;
   expectedSettingsVersion: number;
   expectedEditVersion: number;
