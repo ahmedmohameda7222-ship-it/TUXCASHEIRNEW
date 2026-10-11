@@ -342,7 +342,9 @@ export function SettingsPage() {
           reasonCodeUpdating={settings.upsertReasonCode.isPending}
           onCreateOrderType={(draft) => settings.createOrderType.mutateAsync(draft)}
           onUpdateOrderType={(draft) => settings.updateOrderType.mutateAsync(draft)}
-          orderTypeUpdating={settings.updateOrderType.isPending || settings.createOrderType.isPending}
+          orderTypeUpdating={
+            settings.updateOrderType.isPending || settings.createOrderType.isPending
+          }
           onUpdatePaymentMethod={(draft) => settings.updatePaymentMethod.mutateAsync(draft)}
           paymentMethodUpdating={settings.updatePaymentMethod.isPending}
         />

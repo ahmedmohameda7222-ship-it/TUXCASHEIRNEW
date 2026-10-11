@@ -27,17 +27,24 @@ function lineFor(item: AdminPurchasingInventoryItem | undefined, key: number): D
 }
 
 export function DraftPurchaseOrderLinesEditor({
-  order, inventoryItems, pending, onSave, onCancel,
+  order,
+  inventoryItems,
+  pending,
+  onSave,
+  onCancel,
 }: {
   order: AdminPurchaseOrder;
   inventoryItems: readonly AdminPurchasingInventoryItem[];
   pending: boolean;
-  onSave(lines: readonly {
-    inventoryItemId: string;
-    purchaseUnitLabel: string;
-    orderedPurchaseUnitsMicros: number;
-    expectedPurchaseUnitCostMinor: number;
-  }[], onSuccess: () => void): void;
+  onSave(
+    lines: readonly {
+      inventoryItemId: string;
+      purchaseUnitLabel: string;
+      orderedPurchaseUnitsMicros: number;
+      expectedPurchaseUnitCostMinor: number;
+    }[],
+    onSuccess: () => void,
+  ): void;
   onCancel(): void;
 }) {
   const nextKey = useRef(order.lines.length + 1);
@@ -60,7 +67,9 @@ export function DraftPurchaseOrderLinesEditor({
   const validationError = validatePurchaseOrderLines(prepared, inventoryItems);
 
   function update(key: number, changes: Partial<DraftLine>) {
-    setRows((current) => current.map((line) => line.key === key ? {...line,...changes} : line));
+    setRows((current) =>
+      current.map((line) => (line.key === key ? { ...line, ...changes } : line)),
+    );
     setError(null);
   }
 
@@ -83,47 +92,118 @@ export function DraftPurchaseOrderLinesEditor({
   if (order.status !== 'DRAFT') return null;
 
   return (
-    <form className="admin-form-grid" aria-label="Edit draft purchase order lines" onSubmit={submit}>
+    <form
+      className="admin-form-grid"
+      aria-label="Edit draft purchase order lines"
+      onSubmit={submit}
+    >
       <h3>Draft purchase order lines</h3>
       <p>These definitions can be corrected only before ordering or receiving.</p>
-      {rows.map((row,index)=>{
-        const item = inventoryItems.find((candidate)=>candidate.id===row.inventoryItemId);
-        return <fieldset className="admin-form-grid" key={row.key}>
-          <legend>Line {index+1}</legend>
-          <label>Inventory item
-            <select value={row.inventoryItemId} disabled={pending} onChange={(event)=>{
-              const selected=inventoryItems.find((candidate)=>candidate.id===event.currentTarget.value);
-              update(row.key,{inventoryItemId:selected?.id??'',purchaseUnitLabel:selected?.purchaseUnits[0]?.label??''});
-            }}>
-              {inventoryItems.map((candidate)=><option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
-            </select>
-          </label>
-          <label>Purchase unit
-            <select value={row.purchaseUnitLabel} disabled={pending}
-              onChange={(event)=>update(row.key,{purchaseUnitLabel:event.currentTarget.value})}>
-              {(item?.purchaseUnits??[]).map((unit)=><option key={unit.label} value={unit.label}>{unit.label}</option>)}
-            </select>
-          </label>
-          <label>Quantity
-            <input inputMode="decimal" value={row.quantity} required disabled={pending}
-              onChange={(event)=>update(row.key,{quantity:event.currentTarget.value})}/>
-          </label>
-          <label>Expected unit cost (EGP)
-            <input inputMode="decimal" value={row.cost} required disabled={pending}
-              onChange={(event)=>update(row.key,{cost:event.currentTarget.value})}/>
-          </label>
-          {rows.length>1 ? <button className="admin-secondary-button" type="button" disabled={pending}
-            onClick={()=>setRows((current)=>current.filter((entry)=>entry.key!==row.key))}>Remove line {index+1}</button> : null}
-        </fieldset>;
+      {rows.map((row, index) => {
+        const item = inventoryItems.find((candidate) => candidate.id === row.inventoryItemId);
+        return (
+          <fieldset className="admin-form-grid" key={row.key}>
+            <legend>Line {index + 1}</legend>
+            <label>
+              Inventory item
+              <select
+                value={row.inventoryItemId}
+                disabled={pending}
+                onChange={(event) => {
+                  const selected = inventoryItems.find(
+                    (candidate) => candidate.id === event.currentTarget.value,
+                  );
+                  update(row.key, {
+                    inventoryItemId: selected?.id ?? '',
+                    purchaseUnitLabel: selected?.purchaseUnits[0]?.label ?? '',
+                  });
+                }}
+              >
+                {inventoryItems.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Purchase unit
+              <select
+                value={row.purchaseUnitLabel}
+                disabled={pending}
+                onChange={(event) =>
+                  update(row.key, { purchaseUnitLabel: event.currentTarget.value })
+                }
+              >
+                {(item?.purchaseUnits ?? []).map((unit) => (
+                  <option key={unit.label} value={unit.label}>
+                    {unit.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Quantity
+              <input
+                inputMode="decimal"
+                value={row.quantity}
+                required
+                disabled={pending}
+                onChange={(event) => update(row.key, { quantity: event.currentTarget.value })}
+              />
+            </label>
+            <label>
+              Expected unit cost (EGP)
+              <input
+                inputMode="decimal"
+                value={row.cost}
+                required
+                disabled={pending}
+                onChange={(event) => update(row.key, { cost: event.currentTarget.value })}
+              />
+            </label>
+            {rows.length > 1 ? (
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  setRows((current) => current.filter((entry) => entry.key !== row.key))
+                }
+              >
+                Remove line {index + 1}
+              </button>
+            ) : null}
+          </fieldset>
+        );
       })}
-      <button className="admin-secondary-button" type="button" disabled={pending||rows.length>=500}
-        onClick={()=>setRows((current)=>[...current,lineFor(inventoryItems[0],nextKey.current++)])}>
+      <button
+        className="admin-secondary-button"
+        type="button"
+        disabled={pending || rows.length >= 500}
+        onClick={() =>
+          setRows((current) => [...current, lineFor(inventoryItems[0], nextKey.current++)])
+        }
+      >
         Add line
       </button>
-      {error||validationError ? <p role="alert">{error??validationError}</p> : null}
+      {error || validationError ? <p role="alert">{error ?? validationError}</p> : null}
       <div className="admin-inventory-page-actions">
-        <button className="admin-primary-button" type="submit" disabled={pending||inventoryItems.length===0}>Save draft lines</button>
-        <button className="admin-secondary-button" type="button" disabled={pending} onClick={onCancel}>Cancel editing</button>
+        <button
+          className="admin-primary-button"
+          type="submit"
+          disabled={pending || inventoryItems.length === 0}
+        >
+          Save draft lines
+        </button>
+        <button
+          className="admin-secondary-button"
+          type="button"
+          disabled={pending}
+          onClick={onCancel}
+        >
+          Cancel editing
+        </button>
       </div>
     </form>
   );

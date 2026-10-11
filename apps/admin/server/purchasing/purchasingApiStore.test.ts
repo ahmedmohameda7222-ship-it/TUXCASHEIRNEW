@@ -23,15 +23,16 @@ describe('Admin purchasing workspace pagination', () => {
           ? [{ id: 'item-1', name: 'Bread', unit_label: 'piece', active: true }]
           : [];
       }
-      if (table === 'suppliers' || table === 'purchase_orders' || table === 'purchase_order_lines') return [];
+      if (table === 'suppliers' || table === 'purchase_orders' || table === 'purchase_order_lines')
+        return [];
       throw new Error('unexpected table: ' + table);
     });
-    const workspace = await createPurchasingStore({ select } as unknown as AdminSupabaseClient)
-      .loadWorkspace('shop-a', 'business-1');
+    const workspace = await createPurchasingStore({
+      select,
+    } as unknown as AdminSupabaseClient).loadWorkspace('shop-a', 'business-1');
     expect(workspace.inventoryItems[0]?.purchaseUnits).toHaveLength(1_206);
     expect(offsets).toEqual(['0', '1000', '1205']);
   });
-
 
   it('keeps actionable purchase orders accessible beyond the 500-row history window', async () => {
     const recent = Array.from({ length: 500 }, (_, index) => ({

@@ -19,15 +19,21 @@ export interface PurchasingStore {
   createSupplier(
     input: CreateSupplierInput & { employeeId: string; businessId: string },
   ): Promise<PurchasingCommandResult>;
-  manageSupplier(input: ManageSupplierInput & {employeeId: string}): Promise<PurchasingCommandResult>;
+  manageSupplier(
+    input: ManageSupplierInput & { employeeId: string },
+  ): Promise<PurchasingCommandResult>;
   createPurchaseOrder(
     input: CreatePurchaseOrderInput & { employeeId: string; businessId: string },
   ): Promise<PurchasingCommandResult>;
   updatePurchaseOrder(
     input: UpdatePurchaseOrderInput & { employeeId: string },
   ): Promise<PurchasingCommandResult>;
-  replaceDraftPurchaseOrderLines(input: ReplaceDraftPurchaseOrderLinesInput & {employeeId: string}): Promise<PurchasingCommandResult>;
-  cancelPurchaseOrder(input: CancelPurchaseOrderInput & {employeeId: string}): Promise<PurchasingCommandResult>;
+  replaceDraftPurchaseOrderLines(
+    input: ReplaceDraftPurchaseOrderLinesInput & { employeeId: string },
+  ): Promise<PurchasingCommandResult>;
+  cancelPurchaseOrder(
+    input: CancelPurchaseOrderInput & { employeeId: string },
+  ): Promise<PurchasingCommandResult>;
   orderPurchaseOrder(input: {
     employeeId: string;
     shopId: string;
@@ -70,7 +76,7 @@ export function createPurchasingService(store: PurchasingStore) {
       principal: AdminSessionPrincipal,
     ): Promise<PurchasingCommandResult> {
       requireBusinessWidePermission(principal, 'purchasing.manage', input.shopId);
-      return store.manageSupplier({...input, employeeId: principal.employeeId});
+      return store.manageSupplier({ ...input, employeeId: principal.employeeId });
     },
 
     async createPurchaseOrder(
@@ -98,7 +104,7 @@ export function createPurchasingService(store: PurchasingStore) {
       principal: AdminSessionPrincipal,
     ): Promise<PurchasingCommandResult> {
       requirePermission(principal, 'purchasing.manage', input.shopId);
-      return store.replaceDraftPurchaseOrderLines({...input, employeeId: principal.employeeId});
+      return store.replaceDraftPurchaseOrderLines({ ...input, employeeId: principal.employeeId });
     },
 
     async cancelPurchaseOrder(
@@ -106,7 +112,7 @@ export function createPurchasingService(store: PurchasingStore) {
       principal: AdminSessionPrincipal,
     ): Promise<PurchasingCommandResult> {
       requirePermission(principal, 'purchasing.manage', input.shopId);
-      return store.cancelPurchaseOrder({...input, employeeId: principal.employeeId});
+      return store.cancelPurchaseOrder({ ...input, employeeId: principal.employeeId });
     },
 
     async orderPurchaseOrder(

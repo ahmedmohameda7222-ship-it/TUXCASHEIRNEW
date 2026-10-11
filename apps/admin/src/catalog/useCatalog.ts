@@ -20,7 +20,12 @@ import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
 import type { ProductEditorDraft } from './ProductEditor';
 import { applyProductAdvancedDraft } from './catalogAdvancedDraft';
-import { catalogDefinitionsFromBundle, reorderCatalogDefinitionsInBundle, upsertCatalogDefinitionInBundle, type CatalogDefinitionCollection } from './catalogDefinitionsDraft';
+import {
+  catalogDefinitionsFromBundle,
+  reorderCatalogDefinitionsInBundle,
+  upsertCatalogDefinitionInBundle,
+  type CatalogDefinitionCollection,
+} from './catalogDefinitionsDraft';
 
 export type ActiveCatalogDraft = {
   draftId: string;
@@ -410,32 +415,45 @@ export function useCatalog(shopId: string | undefined) {
         ? reorderCatalogDefinitionsInBundle(draft.bundleJson, input.collection, input.orderedIds)
         : upsertCatalogDefinitionInBundle(draft.bundleJson, input.collection, input.definition!);
       const previous = input.definition
-        ? catalogDefinitionsFromBundle(draft.bundleJson, input.collection)
-          .find((definition) => definition['id'] === input.definition?.['id'])
+        ? catalogDefinitionsFromBundle(draft.bundleJson, input.collection).find(
+            (definition) => definition['id'] === input.definition?.['id'],
+          )
         : undefined;
-      const priceChanged = input.collection === 'modifiers' && input.definition !== undefined &&
+      const priceChanged =
+        input.collection === 'modifiers' &&
+        input.definition !== undefined &&
         previous?.['priceMinor'] !== input.definition['priceMinor'];
       const saved = await adminFetch<CatalogDraftSaveResult>(
         '/api/admin/catalog',
         {
           method: 'POST',
           body: JSON.stringify({
-            type: 'draft.save', draftId: draft.draftId,
-            shopId, expectedDraftRevision: draft.draftRevision,
-            changes: [{
-              kind: 'bundle.replace', bundleJson: nextBundle,
-              changedPaths: input.collection === 'modifiers'
-                ? (priceChanged ? ['modifiers', 'modifiers[].priceMinor'] : ['modifiers'])
-                : ['categories'],
-            }],
+            type: 'draft.save',
+            draftId: draft.draftId,
+            shopId,
+            expectedDraftRevision: draft.draftRevision,
+            changes: [
+              {
+                kind: 'bundle.replace',
+                bundleJson: nextBundle,
+                changedPaths:
+                  input.collection === 'modifiers'
+                    ? priceChanged
+                      ? ['modifiers', 'modifiers[].priceMinor']
+                      : ['modifiers']
+                    : ['categories'],
+              },
+            ],
           }),
         },
         csrfTokenForMutation(session),
       );
       if (!saved.ok) throw new CatalogUiError(saved.code);
       const nextDraft: ActiveCatalogDraft = {
-        draftId: draft.draftId, draftRevision: saved.draftRevision,
-        basePublishVersion: saved.basePublishVersion, bundleJson: nextBundle,
+        draftId: draft.draftId,
+        draftRevision: saved.draftRevision,
+        basePublishVersion: saved.basePublishVersion,
+        bundleJson: nextBundle,
       };
       activeDraftRef.current = nextDraft;
       return nextDraft;

@@ -97,19 +97,29 @@ export function useInventory(shopId: string | undefined, inventoryItemId: string
 
   const manageDefinition = useMutation({
     mutationFn: async (input: {
-      type: 'item.create' | 'item.update' | 'item.archive' | 'item.restore'
-        | 'conversion.create' | 'conversion.update' | 'conversion.archive' | 'conversion.restore';
+      type:
+        | 'item.create'
+        | 'item.update'
+        | 'item.archive'
+        | 'item.restore'
+        | 'conversion.create'
+        | 'conversion.update'
+        | 'conversion.archive'
+        | 'conversion.restore';
       entityId: string | null;
       expectedVersion: number | null;
       payload: Record<string, unknown>;
     }) => {
       return postRetained('inventory.definition.' + input.type, input, (commandId) => ({
-        ...input, shopId: shopId!, commandId,
+        ...input,
+        shopId: shopId!,
+        commandId,
       }));
     },
     onSuccess: async () => {
       await invalidate();
-      if (shopId) await queryClient.invalidateQueries({queryKey:['admin','purchasing',shopId]});
+      if (shopId)
+        await queryClient.invalidateQueries({ queryKey: ['admin', 'purchasing', shopId] });
     },
   });
 

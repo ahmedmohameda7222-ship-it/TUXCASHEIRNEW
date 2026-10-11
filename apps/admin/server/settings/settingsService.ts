@@ -509,7 +509,7 @@ export function createSettingsService(store: SettingsStore) {
       principal: AdminSessionPrincipal,
     ): Promise<CanonicalSettingsRowEditResult> {
       requirePermission(principal, 'settings.manage', input.shopId);
-      return store.createOrderType({employeeId: principal.employeeId, ...input});
+      return store.createOrderType({ employeeId: principal.employeeId, ...input });
     },
 
     async updateOrderType(
@@ -754,8 +754,14 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
     },
 
     async createOrderType({
-      employeeId, shopId, name, behavior, active, sortOrder,
-      expectedSettingsVersion, commandId,
+      employeeId,
+      shopId,
+      name,
+      behavior,
+      active,
+      sortOrder,
+      expectedSettingsVersion,
+      commandId,
     }) {
       const result = await client.rpc<unknown>('create_admin_order_type_v1', {
         p_employee_id: employeeId,

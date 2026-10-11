@@ -15,11 +15,20 @@ export function SuppliersPage({
   canManage: boolean;
   canManageLifecycle: boolean;
   pending: boolean;
-  onManage(input: {
-    type: 'supplier.update' | 'supplier.archive' | 'supplier.restore';
-    supplierId: string; expectedVersion: number;
-    payload: {name?: string; contactName?: string | null; phone?: string | null; email?: string | null};
-  }, onSuccess: () => void): void;
+  onManage(
+    input: {
+      type: 'supplier.update' | 'supplier.archive' | 'supplier.restore';
+      supplierId: string;
+      expectedVersion: number;
+      payload: {
+        name?: string;
+        contactName?: string | null;
+        phone?: string | null;
+        email?: string | null;
+      };
+    },
+    onSuccess: () => void,
+  ): void;
   onCreate(
     input: { name: string; contactName: string | null; phone: string | null; email: string | null },
     onSuccess: () => void,
@@ -59,7 +68,15 @@ export function SuppliersPage({
       <div className="admin-catalog-editor__section-heading">
         <h2 id="purchasing-suppliers-heading">Suppliers</h2>
         {canManage ? (
-          <button className="admin-secondary-button" type="button" onClick={() => {clearDraft();setEditingSupplier(null);setOpen(true);}}>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={() => {
+              clearDraft();
+              setEditingSupplier(null);
+              setOpen(true);
+            }}
+          >
             Add supplier
           </button>
         ) : null}
@@ -81,13 +98,30 @@ export function SuppliersPage({
             <span>{supplier.active ? 'Active' : 'Archived'}</span>
             {canManageLifecycle && typeof supplier.version === 'number' ? (
               <div className="admin-inventory-page-actions">
-                <button className="admin-secondary-button" type="button" disabled={pending}
-                  onClick={() => beginEdit(supplier)}>Edit {supplier.name}</button>
-                <button className="admin-secondary-button" type="button" disabled={pending}
-                  onClick={() => onManage({
-                    type: supplier.active ? 'supplier.archive' : 'supplier.restore',
-                    supplierId: supplier.id, expectedVersion: supplier.version!, payload: {},
-                  }, () => undefined)}>
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  disabled={pending}
+                  onClick={() => beginEdit(supplier)}
+                >
+                  Edit {supplier.name}
+                </button>
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  disabled={pending}
+                  onClick={() =>
+                    onManage(
+                      {
+                        type: supplier.active ? 'supplier.archive' : 'supplier.restore',
+                        supplierId: supplier.id,
+                        expectedVersion: supplier.version!,
+                        payload: {},
+                      },
+                      () => undefined,
+                    )
+                  }
+                >
                   {supplier.active ? 'Archive' : 'Restore'} {supplier.name}
                 </button>
               </div>
@@ -100,7 +134,11 @@ export function SuppliersPage({
           open={open}
           variant="sheet"
           title={editingSupplier ? 'Edit supplier' : 'Add supplier'}
-          description={editingSupplier ? 'Update this business supplier without changing past purchase orders.' : 'Create a supplier record for purchasing at this shop.'}
+          description={
+            editingSupplier
+              ? 'Update this business supplier without changing past purchase orders.'
+              : 'Create a supplier record for purchasing at this shop.'
+          }
           onOpenChange={(nextOpen) => {
             if (!pending) setOpen(nextOpen);
           }}
@@ -122,11 +160,20 @@ export function SuppliersPage({
                 setEditingSupplier(null);
                 setOpen(false);
               };
-              if (editingSupplier && canManageLifecycle && typeof editingSupplier.version === 'number') {
-                onManage({
-                  type: 'supplier.update', supplierId: editingSupplier.id,
-                  expectedVersion: editingSupplier.version, payload,
-                }, onSuccess);
+              if (
+                editingSupplier &&
+                canManageLifecycle &&
+                typeof editingSupplier.version === 'number'
+              ) {
+                onManage(
+                  {
+                    type: 'supplier.update',
+                    supplierId: editingSupplier.id,
+                    expectedVersion: editingSupplier.version,
+                    payload,
+                  },
+                  onSuccess,
+                );
               } else if (!editingSupplier) {
                 onCreate(payload, onSuccess);
               }

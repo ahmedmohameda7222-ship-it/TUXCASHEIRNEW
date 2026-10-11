@@ -185,8 +185,16 @@ export function InventoryPage() {
       primaryAction={
         <div className="admin-inventory-page-actions">
           {canManageDefinitions ? (
-            <button className="admin-primary-button" type="button"
-              onClick={() => { setDefinitionItemId(null); setDefinitionOpen(true); setMode('detail'); navigate('/inventory'); }}>
+            <button
+              className="admin-primary-button"
+              type="button"
+              onClick={() => {
+                setDefinitionItemId(null);
+                setDefinitionOpen(true);
+                setMode('detail');
+                navigate('/inventory');
+              }}
+            >
               Add inventory item
             </button>
           ) : null}
@@ -255,13 +263,16 @@ export function InventoryPage() {
           item={items.find((item) => item.id === definitionItemId) ?? null}
           pending={inventory.manageDefinition.isPending}
           onClose={() => setDefinitionOpen(false)}
-          onCommand={(input, onSuccess) => inventory.manageDefinition.mutate(input, {
-            onSuccess: (result) => {
-              if (!result.ok) return;
-              onSuccess(result.entityId);
-              if (input.type === 'item.create' && result.entityId) navigate(detailPath('/inventory', result.entityId));
-            },
-          })}
+          onCommand={(input, onSuccess) =>
+            inventory.manageDefinition.mutate(input, {
+              onSuccess: (result) => {
+                if (!result.ok) return;
+                onSuccess(result.entityId);
+                if (input.type === 'item.create' && result.entityId)
+                  navigate(detailPath('/inventory', result.entityId));
+              },
+            })
+          }
         />
       ) : mode === 'stocktake-select' ? (
         <section
@@ -423,26 +434,38 @@ export function InventoryPage() {
                 <InventoryItemPage
                   item={selectedItem}
                   actions={
-                    (canManageDefinitions || (canAdjust && selectedItem.active)) ? (
+                    canManageDefinitions || (canAdjust && selectedItem.active) ? (
                       <>
-                        {canManageDefinitions ? <button className="admin-secondary-button" type="button"
-                          onClick={() => { setDefinitionItemId(selectedItem.id); setDefinitionOpen(true); }}>
-                          Edit item
-                        </button> : null}
-                        {canAdjust && selectedItem.active ? <button
-                          className="admin-secondary-button"
-                          type="button"
-                          onClick={() => setItemAction('adjust')}
-                        >
-                          Adjust stock
-                        </button> : null}
-                        {canAdjust && selectedItem.active ? <button
-                          className="admin-secondary-button"
-                          type="button"
-                          onClick={() => setItemAction('waste')}
-                        >
-                          Record waste
-                        </button> : null}
+                        {canManageDefinitions ? (
+                          <button
+                            className="admin-secondary-button"
+                            type="button"
+                            onClick={() => {
+                              setDefinitionItemId(selectedItem.id);
+                              setDefinitionOpen(true);
+                            }}
+                          >
+                            Edit item
+                          </button>
+                        ) : null}
+                        {canAdjust && selectedItem.active ? (
+                          <button
+                            className="admin-secondary-button"
+                            type="button"
+                            onClick={() => setItemAction('adjust')}
+                          >
+                            Adjust stock
+                          </button>
+                        ) : null}
+                        {canAdjust && selectedItem.active ? (
+                          <button
+                            className="admin-secondary-button"
+                            type="button"
+                            onClick={() => setItemAction('waste')}
+                          >
+                            Record waste
+                          </button>
+                        ) : null}
                       </>
                     ) : undefined
                   }

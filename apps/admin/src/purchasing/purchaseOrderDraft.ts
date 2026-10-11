@@ -31,19 +31,29 @@ export function formatPurchaseMicros(value: number): string {
   if (!Number.isSafeInteger(value) || value < 0) throw new Error('invalid_micros');
   const n = BigInt(value);
   const whole = n / 1_000_000n;
-  const fractional = String(n % 1_000_000n).padStart(6, '0').replace(/0+$/, '');
+  const fractional = String(n % 1_000_000n)
+    .padStart(6, '0')
+    .replace(/0+$/, '');
   return fractional ? `${whole}.${fractional}` : String(whole);
 }
 
-export function calculatePurchaseOrderSubtotalMinor(lines: readonly PurchaseOrderDraftLine[]): number {
+export function calculatePurchaseOrderSubtotalMinor(
+  lines: readonly PurchaseOrderDraftLine[],
+): number {
   let sum = 0n;
   for (const line of lines) {
-    if (!Number.isSafeInteger(line.orderedPurchaseUnitsMicros) ||
-        !Number.isSafeInteger(line.expectedPurchaseUnitCostMinor) ||
-        line.orderedPurchaseUnitsMicros <= 0 || line.expectedPurchaseUnitCostMinor < 0) {
+    if (
+      !Number.isSafeInteger(line.orderedPurchaseUnitsMicros) ||
+      !Number.isSafeInteger(line.expectedPurchaseUnitCostMinor) ||
+      line.orderedPurchaseUnitsMicros <= 0 ||
+      line.expectedPurchaseUnitCostMinor < 0
+    ) {
       throw new Error('invalid_purchase_order_line');
     }
-    sum += (BigInt(line.orderedPurchaseUnitsMicros) * BigInt(line.expectedPurchaseUnitCostMinor) + 500_000n) / 1_000_000n;
+    sum +=
+      (BigInt(line.orderedPurchaseUnitsMicros) * BigInt(line.expectedPurchaseUnitCostMinor) +
+        500_000n) /
+      1_000_000n;
   }
   if (sum > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('purchase_order_subtotal_overflow');
   return Number(sum);
@@ -62,10 +72,16 @@ export function validatePurchaseOrderLines(
     if (!item.purchaseUnits?.some((unit) => unit.label.trim().toLocaleLowerCase('en') === label)) {
       return `Line ${index + 1}: select a supported purchase unit.`;
     }
-    if (!Number.isSafeInteger(line.orderedPurchaseUnitsMicros) || line.orderedPurchaseUnitsMicros <= 0) {
+    if (
+      !Number.isSafeInteger(line.orderedPurchaseUnitsMicros) ||
+      line.orderedPurchaseUnitsMicros <= 0
+    ) {
       return `Line ${index + 1}: enter a positive quantity.`;
     }
-    if (!Number.isSafeInteger(line.expectedPurchaseUnitCostMinor) || line.expectedPurchaseUnitCostMinor < 0) {
+    if (
+      !Number.isSafeInteger(line.expectedPurchaseUnitCostMinor) ||
+      line.expectedPurchaseUnitCostMinor < 0
+    ) {
       return `Line ${index + 1}: enter a valid expected cost.`;
     }
     const key = item.id;

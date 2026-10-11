@@ -31,26 +31,39 @@ export function upsertCatalogDefinitionInBundle(
   const shopId = definition['shopId'];
   const name = definition['name'];
   const sortOrder = definition['sortOrder'];
-  if (typeof id !== 'string' || !id || typeof shopId !== 'string' || !shopId
-      || typeof name !== 'string' || !name.trim() || name.length > 160
-      || typeof definition['active'] !== 'boolean'
-      || typeof sortOrder !== 'number' || !Number.isSafeInteger(sortOrder) || sortOrder < 0) {
+  if (
+    typeof id !== 'string' ||
+    !id ||
+    typeof shopId !== 'string' ||
+    !shopId ||
+    typeof name !== 'string' ||
+    !name.trim() ||
+    name.length > 160 ||
+    typeof definition['active'] !== 'boolean' ||
+    typeof sortOrder !== 'number' ||
+    !Number.isSafeInteger(sortOrder) ||
+    sortOrder < 0
+  ) {
     throw new Error('invalid_catalog_definition');
   }
-  if (collection === 'modifiers' &&
-      (typeof definition['priceMinor'] !== 'number' ||
-       !Number.isSafeInteger(definition['priceMinor']) ||
-       definition['priceMinor'] < 0)) {
+  if (
+    collection === 'modifiers' &&
+    (typeof definition['priceMinor'] !== 'number' ||
+      !Number.isSafeInteger(definition['priceMinor']) ||
+      definition['priceMinor'] < 0)
+  ) {
     throw new Error('invalid_modifier_price');
   }
-  if (collection === 'categories' &&
-      (definition['description'] !== null && typeof definition['description'] !== 'string')) {
+  if (
+    collection === 'categories' &&
+    definition['description'] !== null &&
+    typeof definition['description'] !== 'string'
+  ) {
     throw new Error('invalid_catalog_category');
   }
 
-  const firstKnownShop = (
-    ['categories', 'products', 'modifiers'] as const
-  ).flatMap((key) => Array.isArray(snapshot[key]) ? (snapshot[key] as CatalogJsonValue[]) : [])
+  const firstKnownShop = (['categories', 'products', 'modifiers'] as const)
+    .flatMap((key) => (Array.isArray(snapshot[key]) ? (snapshot[key] as CatalogJsonValue[]) : []))
     .map((value) => objectValue(value)['shopId'])
     .find((value) => typeof value === 'string');
   if (firstKnownShop !== undefined && firstKnownShop !== shopId) {
@@ -82,9 +95,12 @@ export function reorderCatalogDefinitionsInBundle(
   const snapshot = objectValue(bundle['snapshot']);
   const current = catalogDefinitionsFromBundle(bundle, collection);
   const ids = new Set(current.map((item) => item['id']));
-  if (ids.size !== current.length || ids.size !== orderedIds.length ||
-      new Set(orderedIds).size !== orderedIds.length ||
-      orderedIds.some((id) => !ids.has(id))) {
+  if (
+    ids.size !== current.length ||
+    ids.size !== orderedIds.length ||
+    new Set(orderedIds).size !== orderedIds.length ||
+    orderedIds.some((id) => !ids.has(id))
+  ) {
     throw new Error('invalid_catalog_definition_order');
   }
   const byId = new Map(current.map((item) => [item['id'], item]));

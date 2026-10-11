@@ -36,11 +36,19 @@ export function PurchaseOrderPage({
   updating: boolean;
   inventoryItems?: readonly AdminPurchasingInventoryItem[];
   replacing?: boolean;
-  onReplaceLines?(lines: readonly {
-    inventoryItemId: string; purchaseUnitLabel: string;
-    orderedPurchaseUnitsMicros: number; expectedPurchaseUnitCostMinor: number;
-  }[], onSuccess: () => void): void;
-  onUpdate(input: {reference: string | null; expectedDeliveryDate: string | null}, onSuccess: () => void): void;
+  onReplaceLines?(
+    lines: readonly {
+      inventoryItemId: string;
+      purchaseUnitLabel: string;
+      orderedPurchaseUnitsMicros: number;
+      expectedPurchaseUnitCostMinor: number;
+    }[],
+    onSuccess: () => void,
+  ): void;
+  onUpdate(
+    input: { reference: string | null; expectedDeliveryDate: string | null },
+    onSuccess: () => void,
+  ): void;
   cancelling: boolean;
   onCancel(): void;
   onOrder(): void;
@@ -83,24 +91,51 @@ export function PurchaseOrderPage({
       </dl>
       {order.status === 'DRAFT' && canManage ? (
         editing ? (
-          <form className="admin-form-grid" onSubmit={(event) => {
-            event.preventDefault();
-            onUpdate({reference: reference.trim() || null, expectedDeliveryDate: expectedDate || null}, () => setEditing(false));
-          }}>
+          <form
+            className="admin-form-grid"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onUpdate(
+                { reference: reference.trim() || null, expectedDeliveryDate: expectedDate || null },
+                () => setEditing(false),
+              );
+            }}
+          >
             <label>
               Reference
-              <input value={reference} maxLength={240} onChange={(event) => setReference(event.currentTarget.value)} />
+              <input
+                value={reference}
+                maxLength={240}
+                onChange={(event) => setReference(event.currentTarget.value)}
+              />
             </label>
             <label>
               Expected delivery
-              <input type="date" value={expectedDate} onChange={(event) => setExpectedDate(event.currentTarget.value)} />
+              <input
+                type="date"
+                value={expectedDate}
+                onChange={(event) => setExpectedDate(event.currentTarget.value)}
+              />
             </label>
             <div className="admin-inventory-page-actions">
-              <button className="admin-primary-button" type="submit" disabled={updating}>Save draft</button>
-              <button className="admin-secondary-button" type="button" disabled={updating} onClick={() => setEditing(false)}>Cancel editing</button>
+              <button className="admin-primary-button" type="submit" disabled={updating}>
+                Save draft
+              </button>
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={updating}
+                onClick={() => setEditing(false)}
+              >
+                Cancel editing
+              </button>
             </div>
           </form>
-        ) : <button className="admin-secondary-button" type="button" onClick={() => setEditing(true)}>Edit draft</button>
+        ) : (
+          <button className="admin-secondary-button" type="button" onClick={() => setEditing(true)}>
+            Edit draft
+          </button>
+        )
       ) : null}
       {canManage && order.status === 'DRAFT' && onReplaceLines ? (
         editingLines ? (
@@ -112,8 +147,16 @@ export function PurchaseOrderPage({
             onCancel={() => setEditingLines(false)}
             onSave={onReplaceLines}
           />
-        ) : <button className="admin-secondary-button" type="button" disabled={replacing}
-          onClick={() => setEditingLines(true)}>Edit draft lines</button>
+        ) : (
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={replacing}
+            onClick={() => setEditingLines(true)}
+          >
+            Edit draft lines
+          </button>
+        )
       ) : null}
       <div className="admin-card-grid">
         {order.lines.map((line) => (
@@ -132,10 +175,33 @@ export function PurchaseOrderPage({
             <div className="admin-form-grid">
               <strong>Cancel this purchase order?</strong>
               <span>Cancellation keeps purchase history and cannot be undone.</span>
-              <button className="admin-secondary-button" type="button" disabled={cancelling} onClick={onCancel}>Confirm cancel purchase order</button>
-              <button className="admin-secondary-button" type="button" disabled={cancelling} onClick={() => setConfirmCancel(false)}>Keep purchase order</button>
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={cancelling}
+                onClick={onCancel}
+              >
+                Confirm cancel purchase order
+              </button>
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={cancelling}
+                onClick={() => setConfirmCancel(false)}
+              >
+                Keep purchase order
+              </button>
             </div>
-          ) : <button className="admin-secondary-button" type="button" disabled={cancelling} onClick={() => setConfirmCancel(true)}>Cancel purchase order</button>
+          ) : (
+            <button
+              className="admin-secondary-button"
+              type="button"
+              disabled={cancelling}
+              onClick={() => setConfirmCancel(true)}
+            >
+              Cancel purchase order
+            </button>
+          )
         ) : null}
         {order.status === 'DRAFT' && canManage ? (
           <button

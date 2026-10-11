@@ -97,12 +97,16 @@ export function usePurchasing(shopId: string | undefined) {
       supplierId: string;
       expectedVersion: number;
       payload: {
-        name?: string; contactName?: string | null;
-        phone?: string | null; email?: string | null;
+        name?: string;
+        contactName?: string | null;
+        phone?: string | null;
+        email?: string | null;
       };
     }) => {
       return postRetained(input.type, input, (commandId) => ({
-        ...input, shopId: shopId!, commandId,
+        ...input,
+        shopId: shopId!,
+        commandId,
       }));
     },
     onSuccess: invalidate,
@@ -145,23 +149,32 @@ export function usePurchasing(shopId: string | undefined) {
 
   const replaceDraftPurchaseOrderLines = useMutation({
     mutationFn: async (input: {
-      purchaseOrderId: string; expectedVersion: number;
+      purchaseOrderId: string;
+      expectedVersion: number;
       lines: readonly {
-        inventoryItemId: string; purchaseUnitLabel: string;
-        orderedPurchaseUnitsMicros: number; expectedPurchaseUnitCostMinor: number;
+        inventoryItemId: string;
+        purchaseUnitLabel: string;
+        orderedPurchaseUnitsMicros: number;
+        expectedPurchaseUnitCostMinor: number;
       }[];
     }) => {
       return postRetained('po.lines.replace', input, (commandId) => ({
-        type: 'po.lines.replace', shopId: shopId!, ...input, commandId,
+        type: 'po.lines.replace',
+        shopId: shopId!,
+        ...input,
+        commandId,
       }));
     },
     onSuccess: invalidate,
   });
 
   const cancelPurchaseOrder = useMutation({
-    mutationFn: async (input: {purchaseOrderId: string; expectedVersion: number}) => {
+    mutationFn: async (input: { purchaseOrderId: string; expectedVersion: number }) => {
       return postRetained('po.cancel', input, (commandId) => ({
-        type: 'po.cancel', shopId: shopId!, ...input, commandId,
+        type: 'po.cancel',
+        shopId: shopId!,
+        ...input,
+        commandId,
       }));
     },
     onSuccess: invalidate,

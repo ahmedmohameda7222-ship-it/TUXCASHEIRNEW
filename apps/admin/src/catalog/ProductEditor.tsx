@@ -1,4 +1,8 @@
-import type { CatalogCategorySummary, CatalogJsonObject, CatalogProductDetail } from '@tux/admin-contracts';
+import type {
+  CatalogCategorySummary,
+  CatalogJsonObject,
+  CatalogProductDetail,
+} from '@tux/admin-contracts';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'wouter';
 
@@ -154,7 +158,18 @@ export function ProductEditor({
       isCombo: comboEnabled,
       sortOrder: Number(sortOrder),
     };
-  }, [bestSeller, canPrice, description, name, price, product, visible, selectedCategoryId, comboEnabled, sortOrder]);
+  }, [
+    bestSeller,
+    canPrice,
+    description,
+    name,
+    price,
+    product,
+    visible,
+    selectedCategoryId,
+    comboEnabled,
+    sortOrder,
+  ]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -164,7 +179,8 @@ export function ProductEditor({
       priceMinor: canPrice ? parseEgpToMinor(price) : product.priceMinor,
     };
     if (!next.name) throw new Error('invalid_product_name');
-    if (!next.categoryId || !Number.isSafeInteger(next.sortOrder) || next.sortOrder < 0) throw new Error('invalid_product_menu_structure');
+    if (!next.categoryId || !Number.isSafeInteger(next.sortOrder) || next.sortOrder < 0)
+      throw new Error('invalid_product_menu_structure');
     const advanced = advancedModel
       ? buildProductAdvancedDraft({
           shopId: product.shopId,
@@ -237,8 +253,13 @@ export function ProductEditor({
             disabled={readOnly || categories.length === 0}
             onChange={(event) => setSelectedCategoryId(event.currentTarget.value)}
           >
-            {categories.filter((category) => category.active || category.id === selectedCategoryId)
-              .map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+            {categories
+              .filter((category) => category.active || category.id === selectedCategoryId)
+              .map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
           </select>
         </label>
         <label className="admin-check-field">
@@ -256,8 +277,14 @@ export function ProductEditor({
         </label>
         <label className="admin-field">
           <span>Sort order</span>
-          <input type="number" min={0} step={1} value={sortOrder} disabled={readOnly}
-            onChange={(event) => setSortOrder(event.currentTarget.value)}/>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={sortOrder}
+            disabled={readOnly}
+            onChange={(event) => setSortOrder(event.currentTarget.value)}
+          />
         </label>
       </section>
 

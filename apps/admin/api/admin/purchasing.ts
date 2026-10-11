@@ -40,42 +40,74 @@ const microsSchema = z.number().int().safe().positive();
 const moneySchema = z.number().int().safe().nonnegative();
 
 const commandSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('po.lines.replace'), shopId: uuidSchema,
-    purchaseOrderId: uuidSchema, expectedVersion: z.number().int().positive(),
-    commandId: commandIdSchema,
-    lines: z.array(z.object({
-      inventoryItemId: uuidSchema,
-      purchaseUnitLabel: z.string().trim().min(1).max(120),
-      orderedPurchaseUnitsMicros: microsSchema,
-      expectedPurchaseUnitCostMinor: moneySchema,
-    }).strict()).min(1).max(500),
-  }).strict(),
-  z.object({
-    type: z.literal('supplier.update'), shopId: uuidSchema, supplierId: uuidSchema,
-    expectedVersion: z.number().int().positive(), commandId: commandIdSchema,
-    payload: z.object({
-      name: z.string().trim().min(1).max(160), contactName: nullableText, phone: nullableText,
-      email: z.string().trim().email().max(240).nullable(),
-    }).strict(),
-  }).strict(),
-  z.object({
-    type: z.literal('supplier.archive'), shopId: uuidSchema, supplierId: uuidSchema,
-    expectedVersion: z.number().int().positive(), commandId: commandIdSchema,
-    payload: z.object({}).strict(),
-  }).strict(),
-  z.object({
-    type: z.literal('supplier.restore'), shopId: uuidSchema, supplierId: uuidSchema,
-    expectedVersion: z.number().int().positive(), commandId: commandIdSchema,
-    payload: z.object({}).strict(),
-  }).strict(),
-  z.object({
-    type: z.literal('po.cancel'),
-    shopId: uuidSchema,
-    purchaseOrderId: uuidSchema,
-    expectedVersion: z.number().int().positive(),
-    commandId: commandIdSchema,
-  }).strict(),
+  z
+    .object({
+      type: z.literal('po.lines.replace'),
+      shopId: uuidSchema,
+      purchaseOrderId: uuidSchema,
+      expectedVersion: z.number().int().positive(),
+      commandId: commandIdSchema,
+      lines: z
+        .array(
+          z
+            .object({
+              inventoryItemId: uuidSchema,
+              purchaseUnitLabel: z.string().trim().min(1).max(120),
+              orderedPurchaseUnitsMicros: microsSchema,
+              expectedPurchaseUnitCostMinor: moneySchema,
+            })
+            .strict(),
+        )
+        .min(1)
+        .max(500),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('supplier.update'),
+      shopId: uuidSchema,
+      supplierId: uuidSchema,
+      expectedVersion: z.number().int().positive(),
+      commandId: commandIdSchema,
+      payload: z
+        .object({
+          name: z.string().trim().min(1).max(160),
+          contactName: nullableText,
+          phone: nullableText,
+          email: z.string().trim().email().max(240).nullable(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('supplier.archive'),
+      shopId: uuidSchema,
+      supplierId: uuidSchema,
+      expectedVersion: z.number().int().positive(),
+      commandId: commandIdSchema,
+      payload: z.object({}).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('supplier.restore'),
+      shopId: uuidSchema,
+      supplierId: uuidSchema,
+      expectedVersion: z.number().int().positive(),
+      commandId: commandIdSchema,
+      payload: z.object({}).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('po.cancel'),
+      shopId: uuidSchema,
+      purchaseOrderId: uuidSchema,
+      expectedVersion: z.number().int().positive(),
+      commandId: commandIdSchema,
+    })
+    .strict(),
   z
     .object({
       type: z.literal('supplier.create'),
@@ -421,24 +453,29 @@ async function loadPurchaseOrderLines(
 export function createPurchasingStore(client: AdminSupabaseClient): PurchasingStore {
   return {
     async loadWorkspace(shopId, businessId): Promise<AdminPurchasingWorkspace> {
-      const [supplierRows, recentPurchaseOrderRows, actionablePurchaseOrderRows, inventoryRows, conversionRows] =
-        await Promise.all([
-          loadSupplierRows(client, businessId),
-          client.select<PurchaseOrderRow[]>(
-            'purchase_orders',
-            new URLSearchParams({
-              select:
-                'id,shop_id,supplier_id,status,reference,expected_delivery_date,version,ordered_at,created_at,updated_at',
-              business_id: `eq.${businessId}`,
-              shop_id: `eq.${shopId}`,
-              order: 'created_at.desc,id.desc',
-              limit: String(PURCHASE_ORDER_HISTORY_LIMIT),
-            }),
-          ),
-          loadActionablePurchaseOrders(client, businessId, shopId),
-          loadPurchasableInventoryItems(client, shopId),
-          loadActivePurchaseUnitConversions(client, shopId),
-        ]);
+      const [
+        supplierRows,
+        recentPurchaseOrderRows,
+        actionablePurchaseOrderRows,
+        inventoryRows,
+        conversionRows,
+      ] = await Promise.all([
+        loadSupplierRows(client, businessId),
+        client.select<PurchaseOrderRow[]>(
+          'purchase_orders',
+          new URLSearchParams({
+            select:
+              'id,shop_id,supplier_id,status,reference,expected_delivery_date,version,ordered_at,created_at,updated_at',
+            business_id: `eq.${businessId}`,
+            shop_id: `eq.${shopId}`,
+            order: 'created_at.desc,id.desc',
+            limit: String(PURCHASE_ORDER_HISTORY_LIMIT),
+          }),
+        ),
+        loadActionablePurchaseOrders(client, businessId, shopId),
+        loadPurchasableInventoryItems(client, shopId),
+        loadActivePurchaseUnitConversions(client, shopId),
+      ]);
 
       const purchaseOrdersById = new Map<string, PurchaseOrderRow>();
       for (const row of [...recentPurchaseOrderRows, ...actionablePurchaseOrderRows]) {
@@ -496,10 +533,11 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
           for (const conversion of conversionRows) {
             if (conversion.inventory_item_id !== row.id) continue;
             const key = conversion.purchase_unit_label.trim().toLowerCase();
-            if (!units.has(key)) units.set(key, {
-              label: conversion.purchase_unit_label,
-              baseMicrosPerPurchaseUnit: safeInteger(conversion.base_micros_per_purchase_unit),
-            });
+            if (!units.has(key))
+              units.set(key, {
+                label: conversion.purchase_unit_label,
+                baseMicrosPerPurchaseUnit: safeInteger(conversion.base_micros_per_purchase_unit),
+              });
           }
           return {
             id: row.id,

@@ -19,8 +19,12 @@ function store(overrides: Partial<PurchasingStore> = {}): PurchasingStore {
       purchaseOrders: [],
     }),
     manageSupplier: vi.fn().mockResolvedValue({ ok: true, supplierId: 'supplier-1', version: 2 }),
-    replaceDraftPurchaseOrderLines: vi.fn().mockResolvedValue({ ok: true, purchaseOrderId: 'po-1', status: 'DRAFT', version: 2 }),
-    cancelPurchaseOrder: vi.fn().mockResolvedValue({ ok: true, purchaseOrderId: 'po-1', status: 'CANCELLED', version: 2 }),
+    replaceDraftPurchaseOrderLines: vi
+      .fn()
+      .mockResolvedValue({ ok: true, purchaseOrderId: 'po-1', status: 'DRAFT', version: 2 }),
+    cancelPurchaseOrder: vi
+      .fn()
+      .mockResolvedValue({ ok: true, purchaseOrderId: 'po-1', status: 'CANCELLED', version: 2 }),
     createSupplier: vi.fn().mockResolvedValue({
       ok: true,
       supplierId: 'supplier-1',

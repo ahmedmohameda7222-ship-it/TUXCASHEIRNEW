@@ -156,7 +156,8 @@ describe('Admin settings service', () => {
       ok: true,
     });
     expect(createOrderType).toHaveBeenCalledWith({
-      ...input, employeeId: 'employee-1',
+      ...input,
+      employeeId: 'employee-1',
     });
   });
 

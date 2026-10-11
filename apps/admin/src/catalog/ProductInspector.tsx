@@ -1,4 +1,8 @@
-import type { CatalogCategorySummary, CatalogJsonObject, CatalogProductDetail } from '@tux/admin-contracts';
+import type {
+  CatalogCategorySummary,
+  CatalogJsonObject,
+  CatalogProductDetail,
+} from '@tux/admin-contracts';
 
 import { ProductEditor, type ProductEditorDraft } from './ProductEditor';
 

@@ -57,9 +57,10 @@ export function OrdersPage() {
   );
   const ordersApi = useOrders(shopId, selectedId, filters, timeRange.error === null);
   const rows = useMemo(
-    () => timeRange.error === null
-      ? (ordersApi.searchQuery.data?.pages.flatMap((page) => page.rows) ?? [])
-      : [],
+    () =>
+      timeRange.error === null
+        ? (ordersApi.searchQuery.data?.pages.flatMap((page) => page.rows) ?? [])
+        : [],
     [ordersApi.searchQuery.data, timeRange.error],
   );
 
@@ -94,7 +95,10 @@ export function OrdersPage() {
       title="Orders"
       description="Search order history and complete controlled cancellation, refund or return actions."
     >
-      <details className="admin-orders-filters" open={Boolean(query || status || source || fromInput || toInput)}>
+      <details
+        className="admin-orders-filters"
+        open={Boolean(query || status || source || fromInput || toInput)}
+      >
         <summary>Search and filters</summary>
         <section className="admin-catalog-editor__section is-compact" aria-label="Order filters">
           <label className="admin-field">
@@ -135,8 +139,15 @@ export function OrdersPage() {
               onChange={(event) => setToInput(event.currentTarget.value)}
             />
           </label>
-          {(fromInput || toInput) ? (
-            <button className="admin-secondary-button" type="button" onClick={() => { setFromInput(''); setToInput(''); }}>
+          {fromInput || toInput ? (
+            <button
+              className="admin-secondary-button"
+              type="button"
+              onClick={() => {
+                setFromInput('');
+                setToInput('');
+              }}
+            >
               Clear date filters
             </button>
           ) : null}

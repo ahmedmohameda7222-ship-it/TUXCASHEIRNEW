@@ -62,8 +62,14 @@ export interface AdminInventoryUnitConversion {
 }
 
 export type InventoryDefinitionAction =
-  | 'item.create' | 'item.update' | 'item.archive' | 'item.restore'
-  | 'conversion.create' | 'conversion.update' | 'conversion.archive' | 'conversion.restore';
+  | 'item.create'
+  | 'item.update'
+  | 'item.archive'
+  | 'item.restore'
+  | 'conversion.create'
+  | 'conversion.update'
+  | 'conversion.archive'
+  | 'conversion.restore';
 
 export type AdminInventoryDefinitionCommand = {
   readonly type: InventoryDefinitionAction;
