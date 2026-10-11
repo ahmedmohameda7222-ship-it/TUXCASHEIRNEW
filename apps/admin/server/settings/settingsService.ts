@@ -94,6 +94,7 @@ type ShopRow = {
   id: string;
   name: string;
   lifecycle_state: string;
+  lifecycle_revision?: number | string;
   active: boolean;
   address_text: string | null;
   contact_phone: string | null;
@@ -249,6 +250,9 @@ function mapShop(row: ShopRow): AdminShopSettingsSummary {
     id: row.id,
     name: row.name,
     lifecycleState: readLifecycle(row.lifecycle_state),
+    ...(row.lifecycle_revision === undefined
+      ? {}
+      : { lifecycleRevision: safeInteger(row.lifecycle_revision, 1) }),
     active: row.active,
     address: row.address_text,
     contactPhone: row.contact_phone,
@@ -597,7 +601,7 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
           'shops',
           new URLSearchParams({
             select:
-              'id,name,lifecycle_state,active,address_text,contact_phone,latitude,longitude,timezone,temporary_closed,online_orders_paused',
+              'id,name,lifecycle_state,lifecycle_revision,active,address_text,contact_phone,latitude,longitude,timezone,temporary_closed,online_orders_paused',
             id: `eq.${shopId}`,
             limit: '1',
           }),
