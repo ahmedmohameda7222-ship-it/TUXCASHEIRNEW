@@ -30,6 +30,7 @@ async function mockSettings(
     feeMinor: number;
     sortOrder: number;
   }[] = [],
+  authorizedShopIds: string[] = [shopId],
 ) {
   let settingsVersion = 7;
   let shopLifecycleState: 'ACTIVE' | 'SUSPENDED' = 'ACTIVE';
@@ -81,7 +82,7 @@ async function mockSettings(
       contentType: 'application/json',
       body: JSON.stringify({
         ...ownerSession,
-        principal: { ...ownerSession.principal, permissions, role },
+        principal: { ...ownerSession.principal, permissions, role, shopIds: authorizedShopIds },
       }),
     });
   });
@@ -686,4 +687,55 @@ test('confirms archive before routing shop lifecycle management through the trus
 
   await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);
   expect(commands[0]).toEqual({ type: 'shop.delete-or-archive', shopId });
+});
+
+test('previews explicitly selected configuration without mutating either shop', async ({ page }) => {
+  const sourceShopId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
+  const { commands } = await mockSettings(page, ['settings.manage'], 'OWNER', [], [shopId, sourceShopId]);
+  const previews: Record<string, unknown>[] = [];
+  await page.route('**/api/admin/shop-copy-preview', async (route) => {
+    const request = route.request();
+    expect(request.method()).toBe('POST');
+    expect(request.headers()['x-tux-admin-csrf']).toBe(csrfToken);
+    previews.push(request.postDataJSON() as Record<string, unknown>);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        sourceSettingsVersion: 3,
+        targetSettingsVersion: 7,
+        changes: [{
+          settingKey: 'checkout.taxBps',
+          sourceValue: 1500,
+          source: 'shop',
+          targetValue: 1400,
+          targetSource: 'business',
+          targetExpectedVersion: null,
+          wouldChange: true,
+        }],
+      }),
+    });
+  });
+
+  await page.goto('/settings/shop');
+  await expect(page.getByRole('heading', { name: 'Selective settings copy preview' })).toBeVisible();
+  await page.getByLabel('Source shop').selectOption(sourceShopId);
+  await page.getByRole('checkbox', { name: 'Receipt configuration' }).check();
+  await page.getByRole('button', { name: 'Preview selected configuration' }).click();
+  await expect.poll(() => previews.length).toBe(1);
+  expect(previews[0]).toEqual({
+    sourceShopId,
+    targetShopId: shopId,
+    selectedDomains: ['checkout', 'receipts'],
+    expectedTargetSettingsVersion: 7,
+  });
+  await expect(page.getByRole('status')).toContainText('Nothing has been copied');
+  expect(commands).toHaveLength(0);
+});
+
+test('does not offer cross-shop copy when no other authorized source shop exists', async ({ page }) => {
+  await mockSettings(page, ['settings.manage']);
+  await page.goto('/settings/shop');
+  await expect(page.getByRole('heading', { name: 'Selective settings copy preview' })).toHaveCount(0);
 });
