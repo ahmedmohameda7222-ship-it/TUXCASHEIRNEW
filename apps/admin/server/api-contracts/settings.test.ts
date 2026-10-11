@@ -112,6 +112,36 @@ describe('Admin settings API contract', () => {
     ).toBe(false);
   });
 
+  it('accepts only safe payment-method creation fields with an idempotent command', () => {
+    const command = {
+      type: 'payment-method.create',
+      shopId,
+      displayName: 'Cash on Delivery',
+      logicType: 'CASH',
+      active: true,
+      sortOrder: 20,
+      channel: 'POS',
+      requiresReference: false,
+      manualConfirmationRequired: false,
+      expectedSettingsVersion: 4,
+      commandId: 'pm-command-1',
+    };
+    expect(settingsCommandSchema.safeParse(command).success).toBe(true);
+    expect(settingsCommandSchema.safeParse({ ...command, logicType: 'CUSTOM' }).success).toBe(false);
+    expect(settingsCommandSchema.safeParse({ ...command, refundAllowed: false }).success).toBe(
+      false,
+    );
+    expect(
+      settingsCommandSchema.safeParse({ ...command, requiresReconciliation: false }).success,
+    ).toBe(false);
+    expect(
+      settingsCommandSchema.safeParse({ ...command, integrationReference: 'terminal-1' }).success,
+    ).toBe(false);
+    expect(
+      settingsCommandSchema.safeParse({ ...command, expectedSettingsVersion: -1 }).success,
+    ).toBe(false);
+  });
+
   it('rejects unknown setting keys and key-specific malformed values', () => {
     const base = {
       type: 'setting.override.upsert',
