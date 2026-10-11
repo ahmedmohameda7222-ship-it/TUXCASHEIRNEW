@@ -27,6 +27,14 @@ export function parsePurchaseMoneyMinor(value: string): number | null {
   return parseFixed(value, 2, true);
 }
 
+export function formatPurchaseMicros(value: number): string {
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error('invalid_micros');
+  const n = BigInt(value);
+  const whole = n / 1_000_000n;
+  const fractional = String(n % 1_000_000n).padStart(6, '0').replace(/0+$/, '');
+  return fractional ? `${whole}.${fractional}` : String(whole);
+}
+
 export function calculatePurchaseOrderSubtotalMinor(lines: readonly PurchaseOrderDraftLine[]): number {
   let sum = 0n;
   for (const line of lines) {
