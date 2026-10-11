@@ -60,6 +60,7 @@ function store(overrides: Partial<SettingsStore> = {}): SettingsStore {
       reasonCodeId: input.reasonCodeId ?? 'reason-code-1',
       version: 1,
     })),
+    createOrderType: vi.fn(async () => ({ ok: true as const, editVersion: 1 })),
     updateOrderType: vi.fn(async () => ({ ok: true as const, editVersion: 2 })),
     updatePaymentMethod: vi.fn(async () => ({ ok: true as const, editVersion: 2 })),
     ...overrides,
@@ -136,6 +137,26 @@ describe('Admin settings service', () => {
       settingKey: 'receipt.orderPrefix',
       value: 'MD-',
       expectedVersion: 2,
+    });
+  });
+
+  it('authorizes order type creation with an expected settings version and command ID', async () => {
+    const createOrderType = vi.fn(async () => ({ ok: true as const, editVersion: 1 }));
+    const service = createSettingsService(store({ createOrderType }));
+    const input = {
+      shopId: 'shop-1',
+      name: 'Counter pickup',
+      behavior: 'TAKE_AWAY' as const,
+      active: true,
+      sortOrder: 30,
+      expectedSettingsVersion: 4,
+      commandId: 'retry-safe-create-id',
+    };
+    await expect(service.createOrderType(input, owner)).resolves.toMatchObject({
+      ok: true,
+    });
+    expect(createOrderType).toHaveBeenCalledWith({
+      ...input, employeeId: 'employee-1',
     });
   });
 
