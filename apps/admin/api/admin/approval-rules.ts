@@ -1,4 +1,4 @@
-import { ADMIN_PERMISSIONS, type AdminSessionPrincipal } from '@tux/admin-contracts';
+import type { AdminSessionPrincipal } from '@tux/admin-contracts';
 import { z } from 'zod';
 
 import {
@@ -12,6 +12,7 @@ import {
   requirePermission,
 } from '../../server/authorization.js';
 import { getAdminServerEnv } from '../../server/env.js';
+import { APPROVAL_RULE_PERMISSION_KEYS } from '../../server/approvals/approvalRulePermissions.js';
 import {
   firstHeader,
   readJsonObject,
@@ -55,7 +56,7 @@ export const approvalRuleWriteSchema = z
       .min(1)
       .max(120)
       .regex(/^[A-Za-z][A-Za-z0-9_.-]*$/),
-    requesterPermission: z.enum(ADMIN_PERMISSIONS),
+    requesterPermission: z.enum(APPROVAL_RULE_PERMISSION_KEYS),
     approverPermission: z.literal('approvals.review'),
     requiresSecondPerson: z.boolean(),
     requiresRequesterRepin: z.boolean(),
