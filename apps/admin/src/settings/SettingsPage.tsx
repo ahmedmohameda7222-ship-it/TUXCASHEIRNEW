@@ -23,6 +23,7 @@ import {
   type SettingOverrideUpdateDraft,
   type SettingRestoreDraft,
   type ShopIdentityUpdateDraft,
+  type ShopLifecycleUpdateDraft,
   type ShopOperationalStateUpdateDraft,
   type ShopSpecialHoursUpdateDraft,
   type ShopWeeklyHoursUpdateDraft,
@@ -42,6 +43,9 @@ export type SettingsWorkspaceViewProps = {
   workspace: AdminSettingsWorkspace;
   section: SettingsSection;
   canAssignStaff?: boolean;
+  canManageShopLifecycle?: boolean;
+  onUpdateShopLifecycle?: (draft: ShopLifecycleUpdateDraft) => void | Promise<void>;
+  shopLifecycleUpdating?: boolean;
   canManageBusinessDefaults?: boolean;
   onUpdateBusinessDefault?: (draft: SettingOverrideUpdateDraft) => void | Promise<void>;
   businessDefaultUpdating?: boolean;
@@ -158,6 +162,9 @@ function SectionContent(
     onUpsertSpecialHours,
     shopManagementUpdating,
     canAssignStaff,
+    canManageShopLifecycle,
+    onUpdateShopLifecycle,
+    shopLifecycleUpdating,
     canManageBusinessDefaults,
     onUpdateBusinessDefault,
     businessDefaultUpdating,
@@ -182,6 +189,9 @@ function SectionContent(
         <ShopsPage
           workspace={workspace}
           canAssignStaff={canAssignStaff === true}
+          canManageLifecycle={canManageShopLifecycle === true}
+          onUpdateLifecycle={onUpdateShopLifecycle}
+          lifecycleUpdating={shopLifecycleUpdating === true}
           onUpdateOperationalState={(draft) => void onUpdateOperationalState(draft)}
           onUpdateIdentity={onUpdateShopIdentity}
           onUpsertWeeklyHours={onUpsertWeeklyHours}
@@ -363,6 +373,9 @@ export function SettingsPage() {
           workspace={workspace}
           section={section}
           canAssignStaff={principal.permissions.includes('staff.manage')}
+          canManageShopLifecycle={principal.permissions.includes('shops.manage')}
+          onUpdateShopLifecycle={(draft) => settings.updateShopLifecycle.mutateAsync(draft)}
+          shopLifecycleUpdating={settings.updateShopLifecycle.isPending}
           canManageBusinessDefaults={canManageBusinessDefaults}
           onUpdateBusinessDefault={(draft) => settings.updateBusinessDefault.mutateAsync(draft)}
           businessDefaultUpdating={settings.updateBusinessDefault.isPending}

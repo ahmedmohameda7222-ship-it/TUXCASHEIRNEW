@@ -10,6 +10,7 @@ import { SettingsSchedulePanel } from './SettingsSchedulePanel';
 import type {
   ShopIdentityUpdateDraft,
   ShopSpecialHoursUpdateDraft,
+  ShopLifecycleUpdateDraft,
   ShopWeeklyHoursUpdateDraft,
 } from './useSettings';
 
@@ -489,6 +490,9 @@ export function ShopsPage({
   onUpsertSpecialHours,
   onDeleteOrArchive,
   canAssignStaff = false,
+  canManageLifecycle = false,
+  onUpdateLifecycle,
+  lifecycleUpdating = false,
   busy = false,
 }: {
   workspace: AdminSettingsWorkspace;
@@ -498,6 +502,9 @@ export function ShopsPage({
   onUpsertSpecialHours?: (draft: ShopSpecialHoursUpdateDraft) => void | Promise<void>;
   onDeleteOrArchive?: () => void;
   canAssignStaff?: boolean;
+  canManageLifecycle?: boolean;
+  onUpdateLifecycle?: ((draft: ShopLifecycleUpdateDraft) => void | Promise<void>) | undefined;
+  lifecycleUpdating?: boolean;
   busy?: boolean;
 }) {
   const shop = workspace.shop;
@@ -606,6 +613,34 @@ export function ShopsPage({
           <a className="admin-secondary-button" href="/staff">
             Manage staff assignments
           </a>
+        </div>
+      ) : null}
+
+      {canManageLifecycle &&
+      shop.lifecycleState !== 'ARCHIVED' &&
+      typeof shop.lifecycleRevision === 'number' &&
+      onUpdateLifecycle ? (
+        <div className="admin-settings-card">
+          <strong>Shop lifecycle</strong>
+          <p className="admin-field__help">
+            Suspending stops new intake. Reactivation leaves online orders paused and the shop
+            temporarily closed until separately reopened.
+          </p>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={busy || lifecycleUpdating}
+            onClick={() => {
+              if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined) return;
+              void onUpdateLifecycle({
+                expectedState: shop.lifecycleState,
+                targetState: shop.lifecycleState === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE',
+                expectedLifecycleRevision: shop.lifecycleRevision,
+              });
+            }}
+          >
+            {shop.lifecycleState === 'ACTIVE' ? 'Suspend shop' : 'Reactivate shop'}
+          </button>
         </div>
       ) : null}
 
