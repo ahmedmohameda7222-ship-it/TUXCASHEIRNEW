@@ -86,7 +86,8 @@ export function SettingOverrideEditor({
 }: SettingOverrideEditorProps) {
   const resolved = resolveWorkspaceSetting(workspace, settingKey);
   const resolvedRaw = formatValue ? formatValue(resolved.value) : initialText(resolved.value, kind);
-  const resolvedExpectedVersion = resolved.source === 'shop' ? resolved.version : null;
+  const resolvedExpectedVersion =
+    resolved.source === (scope === 'business' ? 'business' : 'shop') ? resolved.version : null;
   const latestResolvedRef = useRef({
     raw: resolvedRaw,
     expectedVersion: resolvedExpectedVersion,
@@ -126,10 +127,10 @@ export function SettingOverrideEditor({
   }
 
   async function restoreInherited() {
-    if (!onRestore || resolvedExpectedVersion === null || updating) return;
+    if (!onRestore || editor.expectedVersion === null || updating) return;
     setError(null);
     try {
-      await onRestore({ settingKey, expectedVersion: resolvedExpectedVersion });
+      await onRestore({ settingKey, expectedVersion: editor.expectedVersion });
       const inheritedValue = workspace.businessDefaults.find((row) => row.key === settingKey)?.value;
       const raw = formatValue
         ? formatValue(inheritedValue)
