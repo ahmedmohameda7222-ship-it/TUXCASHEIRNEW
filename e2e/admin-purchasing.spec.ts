@@ -74,7 +74,14 @@ async function mockPurchasing(
         body: JSON.stringify({
           shopId,
           suppliers,
-          inventoryItems: [{ id: itemId, name: 'Beef', unitLabel: 'kg' }],
+          inventoryItems: [
+            {
+              id: itemId,
+              name: 'Beef',
+              unitLabel: 'kg',
+              purchaseUnits: [{ label: 'case', baseMicrosPerPurchaseUnit }],
+            },
+          ],
           purchaseOrders: [
             {
               id: poId,
