@@ -1,0 +1,107 @@
+import { expect, test, type Page } from '@playwright/test';
+
+const shopId = 'c5579c9a-b2f2-5aa2-b1ed-a3a9b2492b46';
+const ruleId = '3a7bd7ed-f722-4f91-bc32-4549a4897937';
+const csrfToken = 'a'.repeat(64);
+
+const existing = {
+  id: ruleId,
+  shopId,
+  actionType: 'inventory.adjust',
+  requesterPermission: 'inventory.adjust',
+  approverPermission: 'approvals.review',
+  requiresSecondPerson: true,
+  requiresRequesterRepin: false,
+  expiresAfterSeconds: 86400,
+  thresholdContext: { minimumQuantityImpact: 1000 },
+  active: true,
+  editVersion: 4,
+};
+
+async function mockRules(page: Page, role: 'OWNER' | 'MANAGER' = 'OWNER') {
+  const writes: Record<string, unknown>[] = [];
+  const rules = [{ ...existing }];
+  await page.route('**/api/admin/session', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        principal: {
+          employeeId: '33333333-3333-4333-8333-333333333333',
+          businessId: '44444444-4444-4444-8444-444444444444',
+          role,
+          permissions: ['settings.manage'],
+          shopIds: [shopId],
+        },
+        csrfToken,
+      }),
+    }),
+  );
+  await page.route('**/api/admin/approval-rules', async (route) => {
+    const request = route.request();
+    if (request.method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ rules }),
+      });
+      return;
+    }
+    expect(request.method()).toBe('POST');
+    expect(request.headers()['x-tux-admin-csrf']).toBe(csrfToken);
+    const command = request.postDataJSON() as Record<string, unknown>;
+    writes.push(command);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, ruleId, editVersion: 5 }),
+    });
+  });
+  return { writes };
+}
+
+test('edits approval rule with a typed threshold and captured revision', async ({ page }) => {
+  const { writes } = await mockRules(page);
+  await page.goto('/approvals/rules');
+  await expect(page.getByRole('heading', { name: 'Approval rules' })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit rule inventory.adjust' }).click();
+  await page.getByLabel('Rule threshold value').fill('2500');
+  await page.getByLabel('Rule expiry').fill('3600');
+  await page.getByRole('button', { name: 'Save approval rule' }).click();
+  await expect.poll(() => writes.length).toBe(1);
+  expect(writes[0]).toMatchObject({
+    type: 'rule.upsert',
+    ruleId,
+    shopId,
+    actionType: 'inventory.adjust',
+    requesterPermission: 'inventory.adjust',
+    approverPermission: 'approvals.review',
+    expiresAfterSeconds: 3600,
+    threshold: { kind: 'minimumQuantityImpact', value: 2500 },
+    expectedVersion: 4,
+  });
+});
+
+test('shop managers cannot create business-wide approval policies', async ({ page }) => {
+  await mockRules(page, 'MANAGER');
+  await page.goto('/approvals/rules');
+  await expect(page.getByRole('heading', { name: 'Approval rules' })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Business-wide' })).toHaveCount(0);
+  await expect(page.getByLabel('Rule scope')).toHaveValue(shopId);
+});
+
+test('does not expose an editable form for an unsupported legacy threshold', async ({ page }) => {
+  await mockRules(page);
+  await page.route('**/api/admin/approval-rules', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        rules: [{ ...existing, thresholdContext: { unrecognizedThreshold: 1 } }],
+      }),
+    }),
+  );
+  await page.goto('/approvals/rules');
+  await expect(page.getByText('Unsupported legacy threshold — editing disabled')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit rule inventory.adjust' })).toBeDisabled();
+});
