@@ -394,6 +394,10 @@ export function useCatalog(shopId: string | undefined) {
       const nextBundle = upsertCatalogDefinitionInBundle(
         draft.bundleJson, input.collection, input.definition,
       );
+      const previous = catalogDefinitionsFromBundle(draft.bundleJson, input.collection)
+        .find((definition) => definition['id'] === input.definition['id']);
+      const priceChanged = input.collection === 'modifiers' &&
+        previous?.['priceMinor'] !== input.definition['priceMinor'];
       const saved = await adminFetch<CatalogDraftSaveResult>(
         '/api/admin/catalog',
         {
@@ -404,7 +408,8 @@ export function useCatalog(shopId: string | undefined) {
             changes: [{
               kind: 'bundle.replace', bundleJson: nextBundle,
               changedPaths: input.collection === 'modifiers'
-                ? ['modifiers', 'modifiers[].priceMinor'] : ['categories'],
+                ? (priceChanged ? ['modifiers', 'modifiers[].priceMinor'] : ['modifiers'])
+                : ['categories'],
             }],
           }),
         },
