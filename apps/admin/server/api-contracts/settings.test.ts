@@ -58,6 +58,33 @@ describe('Admin settings API contract', () => {
     ).toBe(true);
   });
 
+  it('accepts only a version-checked known-key inheritance restore', () => {
+    expect(
+      settingsCommandSchema.safeParse({
+        type: 'setting.override.restore',
+        shopId,
+        settingKey: 'receipt.orderPrefix',
+        expectedVersion: 4,
+      }).success,
+    ).toBe(true);
+    expect(
+      settingsCommandSchema.safeParse({
+        type: 'setting.override.restore',
+        shopId,
+        settingKey: 'receipt.orderPrefix',
+        expectedVersion: null,
+      }).success,
+    ).toBe(false);
+    expect(
+      settingsCommandSchema.safeParse({
+        type: 'setting.override.restore',
+        shopId,
+        settingKey: 'checkout.unsupportedFlag',
+        expectedVersion: 4,
+      }).success,
+    ).toBe(false);
+  });
+
   it('rejects unknown setting keys and key-specific malformed values', () => {
     const base = {
       type: 'setting.override.upsert',

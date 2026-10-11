@@ -20,6 +20,7 @@ import type {
   ResolvedSetting,
   SettingWriteInput,
   SettingRestoreInput,
+  SettingRestoreInput,
   SettingWriteResult,
   SettingsChannelContext,
   SettingsPublishResult,
@@ -74,6 +75,12 @@ export interface SettingsStore {
     expectedVersion: number | null;
   }): Promise<SettingWriteResult>;
   restoreShopOverride(input: { employeeId: string } & SettingRestoreInput): Promise<SettingWriteResult>;
+  restoreShopOverride(input: {
+    employeeId: string;
+    shopId: string;
+    settingKey: string;
+    expectedVersion: number;
+  }): Promise<SettingWriteResult>;
   upsertReasonCode(
     input: { employeeId: string } & ReasonCodeWriteInput,
   ): Promise<ReasonCodeWriteResult>;
@@ -506,6 +513,14 @@ export function createSettingsService(store: SettingsStore) {
       return store.restoreShopOverride({ employeeId: principal.employeeId, ...input });
     },
 
+    async restoreShopOverride(
+      input: SettingRestoreInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<SettingWriteResult> {
+      requirePermission(principal, 'settings.manage', input.shopId);
+      return store.restoreShopOverride({ employeeId: principal.employeeId, ...input });
+    },
+
     async upsertReasonCode(
       input: ReasonCodeWriteInput,
       principal: AdminSessionPrincipal,
@@ -735,6 +750,16 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
         p_shop_id: shopId,
         p_setting_key: settingKey,
         p_value_json: value,
+        p_expected_version: expectedVersion,
+      });
+      return parseSettingWriteResult(result);
+    },
+
+    async restoreShopOverride({ employeeId, shopId, settingKey, expectedVersion }) {
+      const result = await client.rpc<unknown>('restore_shop_setting_override_v1', {
+        p_employee_id: employeeId,
+        p_shop_id: shopId,
+        p_setting_key: settingKey,
         p_expected_version: expectedVersion,
       });
       return parseSettingWriteResult(result);

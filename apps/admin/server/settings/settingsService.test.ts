@@ -56,6 +56,7 @@ function store(overrides: Partial<SettingsStore> = {}): SettingsStore {
     upsertBusinessDefault: vi.fn(async () => ({ ok: true as const, version: 1 })),
     upsertShopOverride: vi.fn(async () => ({ ok: true as const, version: 1 })),
     restoreShopOverride: vi.fn(async () => ({ ok: true as const, version: 1 })),
+    restoreShopOverride: vi.fn(async () => ({ ok: true as const, version: 1 })),
     upsertReasonCode: vi.fn(async (input) => ({
       ok: true as const,
       reasonCodeId: input.reasonCodeId ?? 'reason-code-1',
