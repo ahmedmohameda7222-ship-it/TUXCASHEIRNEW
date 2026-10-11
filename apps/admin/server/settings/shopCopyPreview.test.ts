@@ -65,8 +65,8 @@ describe('selective shop settings copy preview', () => {
     expect(() => buildSettingsCopyPreview(source, source, ['checkout'], 7)).toThrow(
       'source_and_target_must_differ',
     );
-    expect(() =>
-      buildSettingsCopyPreview(source, target, ['inventory' as 'checkout'], 11),
-    ).toThrow('unsupported_copy_domain');
+    expect(() => buildSettingsCopyPreview(source, target, ['inventory' as 'checkout'], 11)).toThrow(
+      'unsupported_copy_domain',
+    );
   });
 });

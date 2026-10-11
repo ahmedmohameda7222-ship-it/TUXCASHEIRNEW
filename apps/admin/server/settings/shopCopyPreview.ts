@@ -57,7 +57,9 @@ export function buildSettingsCopyPreview(
   if (source.shop.id === target.shop.id) throw new Error('source_and_target_must_differ');
   if (
     domains.length === 0 ||
-    domains.some((domain) => !Object.prototype.hasOwnProperty.call(COPYABLE_SETTING_DOMAINS, domain))
+    domains.some(
+      (domain) => !Object.prototype.hasOwnProperty.call(COPYABLE_SETTING_DOMAINS, domain),
+    )
   ) {
     throw new Error('unsupported_copy_domain');
   }

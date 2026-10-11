@@ -34,8 +34,6 @@ describe('shop selective settings copy preview contract', () => {
       shopCopyPreviewSchema.safeParse({ ...input, selectedDomains: ['checkout', 'checkout'] })
         .success,
     ).toBe(false);
-    expect(
-      shopCopyPreviewSchema.safeParse({ ...input, forceOverwrite: true }).success,
-    ).toBe(false);
+    expect(shopCopyPreviewSchema.safeParse({ ...input, forceOverwrite: true }).success).toBe(false);
   });
 });

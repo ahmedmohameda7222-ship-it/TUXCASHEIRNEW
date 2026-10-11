@@ -1,28 +1,49 @@
 import { z } from 'zod';
-import { AdminAuthError, loadAdminSession, requireSessionCsrf } from '../../server/adminAuthService.js';
+import {
+  AdminAuthError,
+  loadAdminSession,
+  requireSessionCsrf,
+} from '../../server/adminAuthService.js';
 import { AdminAuthorizationError } from '../../server/authorization.js';
 import { getAdminServerEnv } from '../../server/env.js';
 import {
-  firstHeader, readJsonObject, requireSameOrigin, sendJson,
-  type AdminRequest, type AdminResponse,
+  firstHeader,
+  readJsonObject,
+  requireSameOrigin,
+  sendJson,
+  type AdminRequest,
+  type AdminResponse,
 } from '../../server/http.js';
 import { readAdminSessionToken } from '../../server/session.js';
 import { buildSettingsCopyPreview } from '../../server/settings/shopCopyPreview.js';
-import { createSettingsService, createSupabaseSettingsStore } from '../../server/settings/settingsService.js';
+import {
+  createSettingsService,
+  createSupabaseSettingsStore,
+} from '../../server/settings/settingsService.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
 
-export const shopCopyPreviewSchema = z.object({
-  sourceShopId: z.string().uuid(),
-  targetShopId: z.string().uuid(),
-  selectedDomains: z.array(z.enum(['checkout', 'receipts'])).min(1).max(2),
-  expectedTargetSettingsVersion: z.number().int().nonnegative(),
-}).strict().refine((value) => value.sourceShopId !== value.targetShopId, {
-  message: 'source_and_target_must_differ',
-}).refine((value) => new Set(value.selectedDomains).size === value.selectedDomains.length, {
-  message: 'duplicate_copy_domain',
-});
+export const shopCopyPreviewSchema = z
+  .object({
+    sourceShopId: z.string().uuid(),
+    targetShopId: z.string().uuid(),
+    selectedDomains: z
+      .array(z.enum(['checkout', 'receipts']))
+      .min(1)
+      .max(2),
+    expectedTargetSettingsVersion: z.number().int().nonnegative(),
+  })
+  .strict()
+  .refine((value) => value.sourceShopId !== value.targetShopId, {
+    message: 'source_and_target_must_differ',
+  })
+  .refine((value) => new Set(value.selectedDomains).size === value.selectedDomains.length, {
+    message: 'duplicate_copy_domain',
+  });
 
-export default async function handler(request: AdminRequest, response: AdminResponse): Promise<void> {
+export default async function handler(
+  request: AdminRequest,
+  response: AdminResponse,
+): Promise<void> {
   if (request.method !== 'POST') {
     response.setHeader('allow', 'POST');
     sendJson(response, 405, { error: 'method_not_allowed' });
@@ -44,7 +65,10 @@ export default async function handler(request: AdminRequest, response: AdminResp
     const source = await service.loadSettingsWorkspace(parsed.data.sourceShopId, session.principal);
     const target = await service.loadSettingsWorkspace(parsed.data.targetShopId, session.principal);
     const result = buildSettingsCopyPreview(
-      source, target, parsed.data.selectedDomains, parsed.data.expectedTargetSettingsVersion,
+      source,
+      target,
+      parsed.data.selectedDomains,
+      parsed.data.expectedTargetSettingsVersion,
     );
     sendJson(response, result.ok ? 200 : 409, { ...result });
   } catch (error) {

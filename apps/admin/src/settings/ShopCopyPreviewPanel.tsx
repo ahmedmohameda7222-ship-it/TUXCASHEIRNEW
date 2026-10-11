@@ -15,7 +15,12 @@ type CopyChange = {
 };
 type CopyPreview =
   | { ok: false; code: string; currentVersion?: number }
-  | { ok: true; sourceSettingsVersion: number; targetSettingsVersion: number; changes: CopyChange[] };
+  | {
+      ok: true;
+      sourceSettingsVersion: number;
+      targetSettingsVersion: number;
+      changes: CopyChange[];
+    };
 
 export function ShopCopyPreviewPanel({
   targetShopId,
@@ -75,8 +80,8 @@ export function ShopCopyPreviewPanel({
     <section className="admin-settings-card" aria-labelledby="shop-copy-preview-title">
       <h3 id="shop-copy-preview-title">Selective settings copy preview</h3>
       <p className="admin-field__help">
-        Compare explicitly selected checkout or receipt settings from another authorized shop.
-        This preview does not modify either shop. Catalog requires its separate draft/publish authority.
+        Compare explicitly selected checkout or receipt settings from another authorized shop. This
+        preview does not modify either shop. Catalog requires its separate draft/publish authority.
       </p>
       <form onSubmit={(event) => void submit(event)}>
         <label className="admin-field">
@@ -90,7 +95,9 @@ export function ShopCopyPreviewPanel({
             }}
           >
             {sourceShopIds.map((id) => (
-              <option value={id} key={id}>{id}</option>
+              <option value={id} key={id}>
+                {id}
+              </option>
             ))}
           </select>
         </label>
@@ -113,27 +120,40 @@ export function ShopCopyPreviewPanel({
           />
           Receipt configuration
         </label>
-        <button className="admin-secondary-button" type="submit" disabled={pending || domains.length === 0}>
+        <button
+          className="admin-secondary-button"
+          type="submit"
+          disabled={pending || domains.length === 0}
+        >
           {pending ? 'Comparing…' : 'Preview selected configuration'}
         </button>
       </form>
       {error ? <p role="alert">{error}</p> : null}
       {preview?.ok ? (
         <div role="status">
-          <p>Read-only preview: source settings version {preview.sourceSettingsVersion}, target settings version {preview.targetSettingsVersion}.</p>
+          <p>
+            Read-only preview: source settings version {preview.sourceSettingsVersion}, target
+            settings version {preview.targetSettingsVersion}.
+          </p>
           {preview.changes.filter((row) => row.wouldChange).length === 0 ? (
             <p>No configuration differences in the selected domains.</p>
           ) : (
             <ul>
-              {preview.changes.filter((row) => row.wouldChange).map((row) => (
-                <li key={row.settingKey}>
-                  <strong>{row.settingKey}</strong>: {JSON.stringify(row.targetValue)} → {JSON.stringify(row.sourceValue)}
-                  {' '}({row.targetSource} → {row.source}; target row version {row.targetExpectedVersion ?? 'unset'})
-                </li>
-              ))}
+              {preview.changes
+                .filter((row) => row.wouldChange)
+                .map((row) => (
+                  <li key={row.settingKey}>
+                    <strong>{row.settingKey}</strong>: {JSON.stringify(row.targetValue)} →{' '}
+                    {JSON.stringify(row.sourceValue)} ({row.targetSource} → {row.source}; target row
+                    version {row.targetExpectedVersion ?? 'unset'})
+                  </li>
+                ))}
             </ul>
           )}
-          <p>Nothing has been copied. Applying selected changes requires a separate reviewed, version-fenced action.</p>
+          <p>
+            Nothing has been copied. Applying selected changes requires a separate reviewed,
+            version-fenced action.
+          </p>
         </div>
       ) : null}
     </section>
