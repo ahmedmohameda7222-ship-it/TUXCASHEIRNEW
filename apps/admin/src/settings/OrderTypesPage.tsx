@@ -2,12 +2,13 @@ import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
 import { useState, type FormEvent } from 'react';
 
 import { sortOrderAfterMove } from './settingsModel';
-import type { OrderTypeUpdateDraft } from './useSettings';
+import type { OrderTypeCreateDraft, OrderTypeUpdateDraft } from './useSettings';
 
 export type OrderTypesPageProps = {
   workspace: AdminSettingsWorkspace;
   updating: boolean;
   onUpdate(draft: OrderTypeUpdateDraft): void | Promise<void>;
+  onCreate(draft: OrderTypeCreateDraft): void | Promise<void>;
 };
 
 function behaviorLabel(behavior: AdminSettingsWorkspace['orderTypes'][number]['behavior']): string {
@@ -17,8 +18,22 @@ function behaviorLabel(behavior: AdminSettingsWorkspace['orderTypes'][number]['b
   return 'Other';
 }
 
-export function OrderTypesPage({ workspace, updating, onUpdate }: OrderTypesPageProps) {
+export function OrderTypesPage({ workspace, updating, onUpdate, onCreate }: OrderTypesPageProps) {
   const [draft, setDraft] = useState<OrderTypeUpdateDraft | null>(null);
+  const [createDraft, setCreateDraft] = useState<OrderTypeCreateDraft | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  async function createOrderType(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!createDraft || updating || !createDraft.name.trim()) return;
+    setError(null);
+    try {
+      await onCreate({ ...createDraft, name: createDraft.name.trim() });
+      setCreateDraft(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Order type creation failed.');
+    }
+  }
+
 
   function beginEdit(orderType: AdminSettingsWorkspace['orderTypes'][number]) {
     setDraft({
@@ -53,6 +68,49 @@ export function OrderTypesPage({ workspace, updating, onUpdate }: OrderTypesPage
       <p className="admin-settings-muted">
         Choose the name, behavior, availability, and display position for each order type.
       </p>
+      <div className="admin-settings-row__main">
+        <button className="admin-primary-button" type="button" disabled={updating || createDraft !== null}
+          onClick={() => setCreateDraft({
+            commandId: crypto.randomUUID(),
+            name: '',
+            behavior: 'TAKE_AWAY',
+            active: true,
+            sortOrder: workspace.orderTypes.reduce((max, type) => Math.max(max, type.sortOrder), 0) + 10,
+            expectedSettingsVersion: workspace.settingsVersion,
+          })}>Add order type</button>
+      </div>
+      {createDraft ? (
+        <form className="admin-settings-row admin-settings-row--stack" onSubmit={(event) => void createOrderType(event)}>
+          <label className="admin-field">Order type name
+            <input required maxLength={120} value={createDraft.name} disabled={updating}
+              onChange={(event) => setCreateDraft((current) => current ? {...current,name:event.currentTarget.value} : current)} />
+          </label>
+          <label className="admin-field">Behavior
+            <select value={createDraft.behavior} disabled={updating}
+              onChange={(event) => setCreateDraft((current) => current ? {...current,behavior:event.currentTarget.value as OrderTypeCreateDraft['behavior']} : current)}>
+              <option value="TAKE_AWAY">Take Away</option>
+              <option value="DINE_IN">Dine In</option>
+              <option value="DELIVERY">Delivery</option>
+              <option value="OTHER">Other</option>
+            </select>
+          </label>
+          <label className="admin-check-field">
+            <input type="checkbox" checked={createDraft.active} disabled={updating}
+              onChange={(event) => setCreateDraft((current) => current ? {...current,active:event.currentTarget.checked} : current)}/>
+            <span>Active</span>
+          </label>
+          <label className="admin-field">Sort order
+            <input type="number" min={0} step={1} value={createDraft.sortOrder} disabled={updating}
+              onChange={(event) => setCreateDraft((current) => current ? {...current,sortOrder:Number(event.currentTarget.value)} : current)}/>
+          </label>
+          <div className="admin-settings-row__main">
+            <button className="admin-primary-button" type="submit" disabled={updating}>Create order type</button>
+            <button className="admin-secondary-button" type="button" disabled={updating}
+              onClick={() => setCreateDraft(null)}>Cancel creation</button>
+          </div>
+        </form>
+      ) : null}
+      {error ? <p role="alert">{error}</p> : null}
       <div className="admin-settings-list">
         {workspace.orderTypes.map((orderType) => {
           if (draft?.orderTypeId === orderType.id) {
