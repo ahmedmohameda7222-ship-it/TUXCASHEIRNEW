@@ -15,6 +15,7 @@ import { ShopsPage } from './ShopsPage';
 import './settings.css';
 import {
   useSettings,
+  type OrderTypeCreateDraft,
   type OrderTypeUpdateDraft,
   type PaymentMethodUpdateDraft,
   type ReasonCodeUpdateDraft,
@@ -46,6 +47,7 @@ export type SettingsWorkspaceViewProps = {
   settingOverrideUpdating: boolean;
   onUpsertReasonCode(draft: ReasonCodeUpdateDraft): void | Promise<void>;
   reasonCodeUpdating: boolean;
+  onCreateOrderType(draft: OrderTypeCreateDraft): void | Promise<void>;
   onUpdateOrderType(draft: OrderTypeUpdateDraft): void | Promise<void>;
   orderTypeUpdating: boolean;
   onUpdatePaymentMethod(draft: PaymentMethodUpdateDraft): void | Promise<void>;
@@ -145,6 +147,7 @@ function SectionContent(
     settingOverrideUpdating,
     onUpsertReasonCode,
     reasonCodeUpdating,
+    onCreateOrderType,
     onUpdateOrderType,
     orderTypeUpdating,
     onUpdatePaymentMethod,
@@ -170,6 +173,7 @@ function SectionContent(
         <OrderTypesPage
           workspace={workspace}
           onUpdate={onUpdateOrderType}
+          onCreate={onCreateOrderType}
           updating={orderTypeUpdating}
         />
       );
@@ -336,8 +340,9 @@ export function SettingsPage() {
           settingOverrideUpdating={settings.updateSettingOverride.isPending}
           onUpsertReasonCode={(draft) => settings.upsertReasonCode.mutateAsync(draft)}
           reasonCodeUpdating={settings.upsertReasonCode.isPending}
+          onCreateOrderType={(draft) => settings.createOrderType.mutateAsync(draft)}
           onUpdateOrderType={(draft) => settings.updateOrderType.mutateAsync(draft)}
-          orderTypeUpdating={settings.updateOrderType.isPending}
+          orderTypeUpdating={settings.updateOrderType.isPending || settings.createOrderType.isPending}
           onUpdatePaymentMethod={(draft) => settings.updatePaymentMethod.mutateAsync(draft)}
           paymentMethodUpdating={settings.updatePaymentMethod.isPending}
         />
