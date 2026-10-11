@@ -28,6 +28,21 @@ describe('Admin settings API contract', () => {
     ).toBe(true);
   });
 
+  it('requires a version-fenced ACTIVE/SUSPENDED shop lifecycle transition', () => {
+    const base = {
+      type: 'shop.lifecycle.update',
+      shopId,
+      lifecycleState: 'SUSPENDED',
+      expectedLifecycleVersion: 1,
+    };
+    expect(settingsCommandSchema.safeParse(base).success).toBe(true);
+    expect(settingsCommandSchema.safeParse({ ...base, lifecycleState: 'ACTIVE' }).success).toBe(true);
+    expect(settingsCommandSchema.safeParse({ ...base, lifecycleState: 'ARCHIVED' }).success).toBe(false);
+    expect(settingsCommandSchema.safeParse({ ...base, expectedLifecycleVersion: 0 }).success).toBe(false);
+    expect(settingsCommandSchema.safeParse({ ...base, expectedLifecycleVersion: null }).success).toBe(false);
+    expect(settingsCommandSchema.safeParse({ ...base, businessId: shopId }).success).toBe(false);
+  });
+
   it('accepts strict business-default and shop-override writes', () => {
     expect(
       settingsCommandSchema.safeParse({
