@@ -207,7 +207,7 @@ export function ShopCopyPreviewPanel({
           )}
           <p>
             Applying copies only the selected changed settings as unpublished target overrides.
-            Publish this shop\'s settings afterward. Catalog, inventory and history are not copied.
+            Publish the target shop settings afterward. Catalog, inventory and history are not copied.
           </p>
           <button
             className="admin-primary-button"

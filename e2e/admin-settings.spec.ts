@@ -741,6 +741,9 @@ test('previews explicitly selected configuration without mutating either shop', 
       contentType: 'application/json',
       body: JSON.stringify({
         ok: true,
+        sourceShopId,
+        targetShopId: shopId,
+        selectedDomains: ['checkout', 'receipts'],
         sourceSettingsVersion: 3,
         targetSettingsVersion: 7,
         changes: [
@@ -748,6 +751,7 @@ test('previews explicitly selected configuration without mutating either shop', 
             settingKey: 'checkout.taxBps',
             sourceValue: 1500,
             source: 'shop',
+            sourceExpectedVersion: 2,
             targetValue: 1400,
             targetSource: 'business',
             targetExpectedVersion: null,
@@ -772,7 +776,90 @@ test('previews explicitly selected configuration without mutating either shop', 
     selectedDomains: ['checkout', 'receipts'],
     expectedTargetSettingsVersion: 7,
   });
-  await expect(page.getByRole('status')).toContainText('Nothing has been copied');
+  await expect(page.getByRole('status')).toContainText('Applying copies only the selected');
+  expect(commands).toHaveLength(0);
+});
+
+test('applies only reviewed settings through the atomic trusted copy RPC', async ({ page }) => {
+  const sourceShopId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
+  const { commands } = await mockSettings(
+    page,
+    ['settings.manage'],
+    'OWNER',
+    [],
+    [shopId, sourceShopId],
+  );
+  const requests: Record<string, unknown>[] = [];
+  await page.route('**/api/admin/shop-copy-preview', async (route) => {
+    const request = route.request();
+    expect(request.headers()['x-tux-admin-csrf']).toBe(csrfToken);
+    const command = request.postDataJSON() as Record<string, unknown>;
+    requests.push(command);
+    if (command.type === 'settings-copy.apply') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          updatedKeys: ['checkout.taxBps'],
+          publishRequired: true,
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        sourceShopId,
+        targetShopId: shopId,
+        selectedDomains: ['checkout'],
+        sourceSettingsVersion: 3,
+        targetSettingsVersion: 7,
+        changes: [
+          {
+            settingKey: 'checkout.taxBps',
+            sourceValue: 1500,
+            source: 'shop',
+            sourceExpectedVersion: 2,
+            targetValue: 1400,
+            targetSource: 'business',
+            targetExpectedVersion: null,
+            wouldChange: true,
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto('/settings/shop');
+  await page.getByLabel('Source shop').selectOption(sourceShopId);
+  await page.getByRole('button', { name: 'Preview selected configuration' }).click();
+  await expect(page.getByRole('button', { name: 'Apply selected settings' })).toBeVisible();
+  await page.getByRole('button', { name: 'Apply selected settings' }).click();
+  await expect.poll(() => requests.length).toBe(2);
+  expect(requests[1]).toEqual({
+    type: 'settings-copy.apply',
+    sourceShopId,
+    targetShopId: shopId,
+    selectedDomains: ['checkout'],
+    expectedSourceSettingsVersion: 3,
+    expectedTargetSettingsVersion: 7,
+    expectedChanges: [
+      {
+        settingKey: 'checkout.taxBps',
+        sourceValue: 1500,
+        source: 'shop',
+        sourceExpectedVersion: 2,
+        targetValue: 1400,
+        targetSource: 'business',
+        targetExpectedVersion: null,
+        wouldChange: true,
+      },
+    ],
+  });
+  await expect(page.getByText(/1 settings copied as draft overrides/)).toBeVisible();
   expect(commands).toHaveLength(0);
 });
 
