@@ -37,6 +37,7 @@ function settingsStore(
     upsertReasonCode: vi.fn(),
     createOrderType: vi.fn(),
     updateOrderType: vi.fn(),
+    createPaymentMethod: vi.fn(),
     updatePaymentMethod: vi.fn(),
   } as SettingsStore;
 }
