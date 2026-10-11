@@ -41,6 +41,24 @@ const moneySchema = z.number().finite().nonnegative();
 
 const commandSchema = z.discriminatedUnion('type', [
   z.object({
+    type: z.literal('supplier.update'), shopId: uuidSchema, supplierId: uuidSchema,
+    expectedVersion: z.number().int().positive(), commandId: commandIdSchema,
+    payload: z.object({
+      name: z.string().trim().min(1).max(160), contactName: nullableText, phone: nullableText,
+      email: z.string().trim().email().max(240).nullable(),
+    }).strict(),
+  }).strict(),
+  z.object({
+    type: z.literal('supplier.archive'), shopId: uuidSchema, supplierId: uuidSchema,
+    expectedVersion: z.number().int().positive(), commandId: commandIdSchema,
+    payload: z.object({}).strict(),
+  }).strict(),
+  z.object({
+    type: z.literal('supplier.restore'), shopId: uuidSchema, supplierId: uuidSchema,
+    expectedVersion: z.number().int().positive(), commandId: commandIdSchema,
+    payload: z.object({}).strict(),
+  }).strict(),
+  z.object({
     type: z.literal('po.cancel'),
     shopId: uuidSchema,
     purchaseOrderId: uuidSchema,
@@ -151,6 +169,7 @@ type SupplierRow = {
   phone: string | null;
   email: string | null;
   active: boolean;
+  version: number | string;
 };
 
 type PurchaseOrderRow = {
@@ -269,7 +288,7 @@ async function loadSupplierRows(
     const page = await client.select<SupplierRow[]>(
       'suppliers',
       new URLSearchParams({
-        select: 'id,business_id,name,contact_name,phone,email,active',
+        select: 'id,business_id,name,contact_name,phone,email,active,version',
         business_id: `eq.${businessId}`,
         order: 'name.asc,id.asc',
         limit: String(SUPPLIER_PAGE_SIZE),
@@ -423,6 +442,7 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
         phone: row.phone,
         email: row.email,
         active: row.active,
+        version: safeInteger(row.version),
       }));
       const supplierNames = new Map(suppliers.map((supplier) => [supplier.id, supplier.name]));
       const itemNames = new Map(
@@ -509,6 +529,18 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
         p_contact_name: input.contactName,
         p_phone: input.phone,
         p_email: input.email,
+        p_command_id: input.commandId,
+      });
+    },
+
+    manageSupplier(input) {
+      return client.rpc<PurchasingCommandResult>('manage_supplier_v1', {
+        p_employee_id: input.employeeId,
+        p_shop_id: input.shopId,
+        p_supplier_id: input.supplierId,
+        p_expected_version: input.expectedVersion,
+        p_action: input.type,
+        p_payload: input.payload,
         p_command_id: input.commandId,
       });
     },
@@ -653,6 +685,11 @@ export default async function handler(
     switch (command.type) {
       case 'supplier.create':
         result = await service.createSupplier(command, context.principal);
+        break;
+      case 'supplier.update':
+      case 'supplier.archive':
+      case 'supplier.restore':
+        result = await service.manageSupplier(command, context.principal);
         break;
       case 'po.create':
         result = await service.createPurchaseOrder(command, context.principal);
