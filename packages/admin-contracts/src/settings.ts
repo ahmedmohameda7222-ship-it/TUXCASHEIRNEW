@@ -305,6 +305,8 @@ export type PaymentMethodCreateInput = {
   channel: PaymentMethodChannel;
   requiresReference: boolean;
   manualConfirmationRequired: boolean;
+  /** Snapshot policy, enforced by the trusted refund path on future payments. */
+  refundAllowed: boolean;
   expectedSettingsVersion: number;
   commandId: string;
 };

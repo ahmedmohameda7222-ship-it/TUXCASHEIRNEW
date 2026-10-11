@@ -849,10 +849,11 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
       channel,
       requiresReference,
       manualConfirmationRequired,
+      refundAllowed,
       expectedSettingsVersion,
       commandId,
     }) {
-      const result = await client.rpc<unknown>('create_admin_payment_method_v1', {
+      const result = await client.rpc<unknown>('create_admin_payment_method_v2', {
         p_employee_id: employeeId,
         p_shop_id: shopId,
         p_display_name: displayName,
@@ -862,6 +863,7 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
         p_channel: channel,
         p_requires_reference: requiresReference,
         p_manual_confirmation_required: manualConfirmationRequired,
+        p_refund_allowed: refundAllowed,
         p_expected_settings_version: expectedSettingsVersion,
         p_command_id: commandId,
       });

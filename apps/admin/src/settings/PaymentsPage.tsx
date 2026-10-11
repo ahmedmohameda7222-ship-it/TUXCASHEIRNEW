@@ -94,6 +94,7 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
               channel: 'POS',
               requiresReference: false,
               manualConfirmationRequired: false,
+              refundAllowed: true,
               expectedSettingsVersion: workspace.settingsVersion,
             })
           }
@@ -207,6 +208,19 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                 }
               />
               <span>Require manual confirmation</span>
+            </label>
+            <label className="admin-check-field">
+              <input
+                type="checkbox"
+                checked={createDraft.refundAllowed}
+                disabled={updating}
+                onChange={(event) =>
+                  setCreateDraft((current) =>
+                    current ? { ...current, refundAllowed: event.currentTarget.checked } : current,
+                  )
+                }
+              />
+              <span>Refunds allowed for new payments</span>
             </label>
           </div>
           {error ? <p className="admin-field__error">{error}</p> : null}

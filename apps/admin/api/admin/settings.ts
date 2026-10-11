@@ -346,6 +346,7 @@ export const settingsCommandSchema = z.union([
       channel: paymentChannelSchema,
       requiresReference: z.boolean(),
       manualConfirmationRequired: z.boolean(),
+      refundAllowed: z.boolean(),
       expectedSettingsVersion: expectedSettingsVersionSchema,
       commandId: z.string().trim().min(1).max(160),
     })
