@@ -204,6 +204,22 @@ async function mockSettings(
       return;
     }
 
+    if (command.type === 'payment-method.create') {
+      expect(command).toMatchObject({
+        shopId,
+        expectedSettingsVersion: settingsVersion,
+      });
+      expect(command).not.toHaveProperty('refundAllowed');
+      expect(command).not.toHaveProperty('requiresReconciliation');
+      expect(command).not.toHaveProperty('integrationReference');
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, paymentMethodId: 'created-method', editVersion: 1 }),
+      });
+      return;
+    }
+
     if (command.type === 'payment-method.update') {
       expect(command).toMatchObject({
         shopId,
@@ -357,6 +373,29 @@ test('edits checkout and receipt overrides with CAS, then publishes settings', a
     shopId,
     expectedSettingsVersion: 7,
   });
+});
+
+test('creates payment methods with a retry-safe trusted settings command', async ({ page }) => {
+  const { commands } = await mockSettings(page);
+  await page.goto('/settings/payments');
+  await page.getByRole('button', { name: 'Add payment method' }).click();
+  await page.getByLabel('New payment method name').fill('Mobile Wallet');
+  await page.getByLabel('Payment type').selectOption('DIGITAL');
+  await page.getByLabel('New method availability').selectOption('BOTH');
+  await page.getByLabel('Require payment reference').check();
+  await page.getByRole('button', { name: 'Create payment method' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'payment-method.create',
+    shopId,
+    displayName: 'Mobile Wallet',
+    logicType: 'DIGITAL',
+    channel: 'BOTH',
+    requiresReference: true,
+    manualConfirmationRequired: false,
+    expectedSettingsVersion: 7,
+  });
+  expect(typeof commands[0]?.commandId).toBe('string');
 });
 
 test('edits payment flags and preserves the settings CAS boundary', async ({ page }) => {
