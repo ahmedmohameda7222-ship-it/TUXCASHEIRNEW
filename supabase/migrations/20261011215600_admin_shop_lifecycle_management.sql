@@ -4,7 +4,7 @@ DO $guard$ BEGIN
  IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.shops'::regclass AND conname='shops_lifecycle_edit_version_positive') THEN
   ALTER TABLE public.shops ADD CONSTRAINT shops_lifecycle_edit_version_positive CHECK (lifecycle_edit_version > 0);
  END IF;
-END $guard$;
+END; $guard$;
 CREATE TABLE IF NOT EXISTS public.admin_shop_lifecycle_commands (
  business_id uuid NOT NULL,
  shop_id uuid NOT NULL,
@@ -78,7 +78,7 @@ BEGIN
    business_id,shop_id,command_id,requested_state,expected_version,resulting_version)
  VALUES(v_business_id,p_shop_id,p_command_id,p_desired_state,p_expected_version,v_version);
  RETURN jsonb_build_object('ok',true,'lifecycleVersion',v_version);
-END $fn$;
+END; $fn$;
 REVOKE ALL ON FUNCTION public.update_admin_shop_lifecycle_v1(uuid,uuid,text,bigint,uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.update_admin_shop_lifecycle_v1(uuid,uuid,text,bigint,uuid) TO service_role;
 
