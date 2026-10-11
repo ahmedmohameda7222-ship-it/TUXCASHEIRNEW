@@ -144,6 +144,19 @@ async function mockSettings(
       return;
     }
 
+    if (command.type === 'setting.override.restore') {
+      const currentIndex = shopOverrides.findIndex((row) => row.key === command.settingKey);
+      expect(currentIndex).toBeGreaterThanOrEqual(0);
+      expect(command.expectedVersion).toBe(shopOverrides[currentIndex]?.version);
+      const [removed] = shopOverrides.splice(currentIndex, 1);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, version: removed?.version }),
+      });
+      return;
+    }
+
     if (command.type === 'setting.override.upsert') {
       const settingKey = String(command.settingKey);
       const current = shopOverrides.find((row) => row.key === settingKey);
@@ -412,6 +425,23 @@ test('shop managers cannot access the business defaults editor', async ({ page }
   await expect(page.getByRole('heading', { name: 'Business defaults' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Business defaults' })).toHaveCount(0);
   await expect(page.getByRole('alert')).toContainText('business-wide settings');
+});
+
+test('restoring inheritance deletes the shop override rather than copying a default', async ({
+  page,
+}) => {
+  const { commands } = await mockSettings(page);
+  await page.goto('/settings/receipts');
+  await expect(page.getByLabel('Order prefix')).toHaveValue('MD-');
+  await page.getByRole('button', { name: 'Restore inherited value: Order prefix' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toEqual({
+    type: 'setting.override.restore',
+    shopId,
+    settingKey: 'receipt.orderPrefix',
+    expectedVersion: 4,
+  });
+  await expect(page.getByLabel('Order prefix')).toHaveValue('TUX-');
 });
 
 test('shop management exposes canonical staff assignment only for staff managers', async ({
