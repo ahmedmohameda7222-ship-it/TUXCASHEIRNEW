@@ -1,4 +1,5 @@
-import type { AdminPurchaseOrder } from '@tux/admin-contracts';
+import type { AdminPurchaseOrder, AdminPurchasingInventoryItem } from '@tux/admin-contracts';
+import { DraftPurchaseOrderLinesEditor } from './DraftPurchaseOrderLinesEditor';
 import { useEffect, useState } from 'react';
 
 function units(value: number, unitLabel: string): string {
@@ -19,6 +20,9 @@ export function PurchaseOrderPage({
   ordering,
   updating,
   onUpdate,
+  inventoryItems = [],
+  replacing = false,
+  onReplaceLines,
   cancelling,
   onCancel,
   onOrder,
@@ -30,6 +34,12 @@ export function PurchaseOrderPage({
   canReceive: boolean;
   ordering: boolean;
   updating: boolean;
+  inventoryItems?: readonly AdminPurchasingInventoryItem[];
+  replacing?: boolean;
+  onReplaceLines?(lines: readonly {
+    inventoryItemId: string; purchaseUnitLabel: string;
+    orderedPurchaseUnitsMicros: number; expectedPurchaseUnitCostMinor: number;
+  }[], onSuccess: () => void): void;
   onUpdate(input: {reference: string | null; expectedDeliveryDate: string | null}, onSuccess: () => void): void;
   cancelling: boolean;
   onCancel(): void;
@@ -38,12 +48,14 @@ export function PurchaseOrderPage({
   onReturn(): void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [editingLines, setEditingLines] = useState(false);
   const [reference, setReference] = useState(order.reference ?? '');
   const [expectedDate, setExpectedDate] = useState(order.expectedDeliveryDate ?? '');
   const [confirmCancel, setConfirmCancel] = useState(false);
 
   useEffect(() => {
     setEditing(false);
+    setEditingLines(false);
     setConfirmCancel(false);
     setReference(order.reference ?? '');
     setExpectedDate(order.expectedDeliveryDate ?? '');
@@ -89,6 +101,19 @@ export function PurchaseOrderPage({
             </div>
           </form>
         ) : <button className="admin-secondary-button" type="button" onClick={() => setEditing(true)}>Edit draft</button>
+      ) : null}
+      {canManage && order.status === 'DRAFT' && onReplaceLines ? (
+        editingLines ? (
+          <DraftPurchaseOrderLinesEditor
+            key={order.id + ':' + order.version}
+            order={order}
+            inventoryItems={inventoryItems}
+            pending={replacing}
+            onCancel={() => setEditingLines(false)}
+            onSave={onReplaceLines}
+          />
+        ) : <button className="admin-secondary-button" type="button" disabled={replacing}
+          onClick={() => setEditingLines(true)}>Edit draft lines</button>
       ) : null}
       <div className="admin-card-grid">
         {order.lines.map((line) => (
