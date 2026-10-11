@@ -11,6 +11,7 @@ import { CancelOrderSheet } from './CancelOrderSheet';
 import { OrderDetailPage } from './OrderDetailPage';
 import { RefundReturnPage } from './RefundReturnPage';
 import { useOrders, type OrderSearchFilters } from './useOrders';
+import { toOrderTimeRange } from './orderDateRange';
 
 type ActionMode = 'cancel' | 'refund' | 'return' | null;
 
@@ -38,6 +39,9 @@ export function OrdersPage() {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<AdminOrderStatus | ''>('');
   const [source, setSource] = useState<AdminOrderSource | ''>('');
+  const [fromInput, setFromInput] = useState('');
+  const [toInput, setToInput] = useState('');
+  const timeRange = useMemo(() => toOrderTimeRange(fromInput, toInput), [fromInput, toInput]);
   const [action, setAction] = useState<ActionMode>(null);
 
   const filters = useMemo<OrderSearchFilters>(
@@ -45,16 +49,18 @@ export function OrdersPage() {
       query,
       statuses: status ? [status] : [],
       source: source || null,
-      from: null,
-      to: null,
+      from: timeRange.from,
+      to: timeRange.to,
       limit: 50,
     }),
-    [query, source, status],
+    [query, source, status, timeRange.from, timeRange.to],
   );
-  const ordersApi = useOrders(shopId, selectedId, filters);
+  const ordersApi = useOrders(shopId, selectedId, filters, timeRange.error === null);
   const rows = useMemo(
-    () => ordersApi.searchQuery.data?.pages.flatMap((page) => page.rows) ?? [],
-    [ordersApi.searchQuery.data],
+    () => timeRange.error === null
+      ? (ordersApi.searchQuery.data?.pages.flatMap((page) => page.rows) ?? [])
+      : [],
+    [ordersApi.searchQuery.data, timeRange.error],
   );
 
   if (!shopId) {
@@ -88,7 +94,7 @@ export function OrdersPage() {
       title="Orders"
       description="Search order history and complete controlled cancellation, refund or return actions."
     >
-      <details className="admin-orders-filters" open={Boolean(query || status || source)}>
+      <details className="admin-orders-filters" open={Boolean(query || status || source || fromInput || toInput)}>
         <summary>Search and filters</summary>
         <section className="admin-catalog-editor__section is-compact" aria-label="Order filters">
           <label className="admin-field">
@@ -113,6 +119,28 @@ export function OrdersPage() {
             </select>
           </label>
           <label className="admin-field">
+            <span>From date/time (local)</span>
+            <input
+              type="datetime-local"
+              value={fromInput}
+              onChange={(event) => setFromInput(event.currentTarget.value)}
+            />
+          </label>
+          <label className="admin-field">
+            <span>To date/time (local)</span>
+            <input
+              type="datetime-local"
+              value={toInput}
+              min={fromInput || undefined}
+              onChange={(event) => setToInput(event.currentTarget.value)}
+            />
+          </label>
+          {(fromInput || toInput) ? (
+            <button className="admin-secondary-button" type="button" onClick={() => { setFromInput(''); setToInput(''); }}>
+              Clear date filters
+            </button>
+          ) : null}
+          <label className="admin-field">
             <span>Source</span>
             <select
               value={source}
@@ -126,6 +154,7 @@ export function OrdersPage() {
         </section>
       </details>
 
+      {timeRange.error ? <p role="alert">{timeRange.error}</p> : null}
       {actionError ? <p role="alert">{actionError}</p> : null}
 
       <ResponsiveMasterDetail
@@ -152,7 +181,8 @@ export function OrdersPage() {
             ) : null}
             {rows.length === 0 &&
             !ordersApi.searchQuery.isLoading &&
-            !ordersApi.searchQuery.isError ? (
+            !ordersApi.searchQuery.isError &&
+            !timeRange.error ? (
               <EmptyState
                 title="No matching orders"
                 description="Adjust the search or filters for this shop."
