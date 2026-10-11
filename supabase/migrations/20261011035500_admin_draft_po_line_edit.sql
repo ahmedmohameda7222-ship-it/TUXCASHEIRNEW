@@ -56,6 +56,12 @@ BEGIN
   IF jsonb_typeof(v_line)<>'object' OR
     v_line-'inventoryItemId'-'purchaseUnitLabel'-'orderedPurchaseUnitsMicros'-'expectedPurchaseUnitCostMinor'<>'{}'::jsonb THEN
    RETURN jsonb_build_object('ok',false,'code','invalid_purchase_order_line');END IF;
+  IF jsonb_typeof(v_line->'orderedPurchaseUnitsMicros') <> 'number'
+      OR jsonb_typeof(v_line->'expectedPurchaseUnitCostMinor') <> 'number'
+      OR (v_line->>'orderedPurchaseUnitsMicros')::numeric <>
+         trunc((v_line->>'orderedPurchaseUnitsMicros')::numeric) THEN
+    RETURN jsonb_build_object('ok',false,'code','invalid_purchase_order_line');
+  END IF;
   v_item:=(v_line->>'inventoryItemId')::uuid;
   v_q:=(v_line->>'orderedPurchaseUnitsMicros')::bigint;
   v_cost:=(v_line->>'expectedPurchaseUnitCostMinor')::numeric;
