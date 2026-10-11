@@ -23,7 +23,7 @@ describe('payment-method refund permission trust boundary', () => {
       ],
     } as unknown as AdminSettingsWorkspace;
     const html = renderToStaticMarkup(
-      <PaymentsPage workspace={workspace} updating={false} onUpdate={vi.fn()} />,
+      <PaymentsPage workspace={workspace} updating={false} onCreate={vi.fn()} onUpdate={vi.fn()} />,
     );
     expect(html).toContain('Refund permissions are read-only');
     expect(html).not.toContain('checked={draft.refundAllowed}');
