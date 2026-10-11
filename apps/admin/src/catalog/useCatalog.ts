@@ -342,6 +342,15 @@ export function useCatalog(shopId: string | undefined) {
     },
   });
 
+  const prepareDefinitionsDraft = useMutation({
+    mutationFn: () => loadOrCreateDraftForShop('Menu definitions'),
+    onSuccess(draft) {
+      setActiveDraft(draft);
+      setDraftProducts(productsFromBundle(draft.bundleJson));
+      setDraftInvalidatedByLiveChange(false);
+    },
+  });
+
   const saveProduct = useMutation({
     mutationFn: async (input: ProductEditorDraft) => {
       const { product } = input;
@@ -464,6 +473,7 @@ export function useCatalog(shopId: string | undefined) {
     draftInvalidatedByLiveChange,
     resumeDraft,
     prepareProductDraft,
+    prepareDefinitionsDraft,
     saveProduct,
     saveDefinitions,
     setAvailability,
