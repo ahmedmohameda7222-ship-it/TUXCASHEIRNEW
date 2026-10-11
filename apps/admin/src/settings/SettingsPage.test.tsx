@@ -9,6 +9,7 @@ import {
   type SettingsSection,
 } from './SettingsPage';
 import { ReceiptsPage } from './ReceiptsPage';
+import { ShopsPage } from './ShopsPage';
 import { ReasonCodesPage } from './ReasonCodesPage';
 
 const workspace: AdminSettingsWorkspace = {
@@ -197,6 +198,36 @@ describe('Settings workspace', () => {
     expect(html).toContain('Customer changed mind');
     expect(html).toContain('Order cancellation');
     expect(html).not.toContain('v4');
+  });
+
+  it('disables operational intake toggles while a shop is suspended', () => {
+    const suspended = {
+      ...workspace,
+      shop: {
+        ...workspace.shop,
+        lifecycleState: 'SUSPENDED' as const,
+        active: false,
+        temporaryClosed: true,
+        onlineOrdersPaused: true,
+      },
+    };
+    const suspendedHtml = renderToStaticMarkup(
+      <ShopsPage
+        workspace={suspended}
+        onUpdateOperationalState={noop}
+        busy={false}
+      />,
+    );
+    expect(suspendedHtml.match(/<input[^>]*type="checkbox"[^>]*disabled=""/g)).toHaveLength(2);
+
+    const activeHtml = renderToStaticMarkup(
+      <ShopsPage
+        workspace={workspace}
+        onUpdateOperationalState={noop}
+        busy={false}
+      />,
+    );
+    expect(activeHtml.match(/<input[^>]*type="checkbox"[^>]*disabled=""/g)).toBeNull();
   });
 
   it('renders real shop, fulfillment, payment and editable checkout configuration', () => {
