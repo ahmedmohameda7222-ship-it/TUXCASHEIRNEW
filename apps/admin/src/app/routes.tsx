@@ -2,6 +2,9 @@ import { lazy } from 'react';
 import type { AdminPermission, AdminSessionPrincipal } from '@tux/admin-contracts';
 import { Link, useLocation } from 'wouter';
 
+const ApprovalRulesPage = lazy(() =>
+  import('../approvals/ApprovalRulesPage').then((module) => ({ default: module.ApprovalRulesPage })),
+);
 const ApprovalsPage = lazy(() =>
   import('../approvals/ApprovalsPage').then((module) => ({ default: module.ApprovalsPage })),
 );
@@ -77,6 +80,7 @@ export const ADMIN_ROUTES: readonly AdminRouteDefinition[] = [
   { path: '/whatsapp', label: 'WhatsApp', permission: 'whatsapp.view' },
   { path: '/settings', label: 'Settings', permission: 'settings.manage' },
   { path: '/approvals', label: 'Approvals', permission: 'approvals.review' },
+  { path: '/approvals/rules', label: 'Approval rules', permission: 'settings.manage' },
   { path: '/audit', label: 'Audit Log', permission: 'audit.view' },
   { path: '/more', label: 'More' },
 ] as const;
@@ -119,6 +123,7 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   if (route.path === '/') return <HomeDashboard />;
   if (route.path === '/catalog/products') return <CatalogPage />;
   if (route.path === '/settings') return <SettingsPage />;
+  if (route.path === '/approvals/rules') return <ApprovalRulesPage />;
   if (route.path === '/approvals') return <ApprovalsPage />;
   if (route.path === '/audit') return <AuditPage />;
   if (route.path === '/inventory') return <InventoryPage />;
