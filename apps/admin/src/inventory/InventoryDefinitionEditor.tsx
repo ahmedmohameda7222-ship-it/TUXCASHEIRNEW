@@ -1,6 +1,6 @@
 import type { AdminInventoryDefinitionCommand, AdminInventoryItem, AdminInventoryUnitConversion } from '@tux/admin-contracts';
 import { useEffect, useState, type FormEvent } from 'react';
-import { parsePurchaseDecimalMicros } from '../purchasing/purchaseOrderDraft';
+import { formatPurchaseMicros, parsePurchaseDecimalMicros } from '../purchasing/purchaseOrderDraft';
 
 type DefinitionInput = Pick<AdminInventoryDefinitionCommand, 'type' | 'entityId' | 'expectedVersion' | 'payload'>;
 
@@ -15,7 +15,7 @@ function conversionToDraft(conversion: AdminInventoryUnitConversion): Conversion
   return {
     id: conversion.id, expectedVersion: conversion.definitionVersion,
     label: conversion.purchaseUnitLabel,
-    baseQuantity: String(conversion.baseMicrosPerPurchaseUnit / 1_000_000),
+    baseQuantity: formatPurchaseMicros(conversion.baseMicrosPerPurchaseUnit),
   };
 }
 
@@ -37,7 +37,7 @@ export function InventoryDefinitionEditor({
   const [unitLabel, setUnitLabel] = useState(item?.unitLabel ?? '');
   const [trackingMode, setTrackingMode] = useState(item?.trackingMode ?? 'RECIPE_TRACKED');
   const [threshold, setThreshold] = useState(item?.lowStockThresholdMicros === null || item?.lowStockThresholdMicros === undefined
-    ? '' : String(item.lowStockThresholdMicros / 1_000_000));
+    ? '' : formatPurchaseMicros(item.lowStockThresholdMicros));
   const [conversion, setConversion] = useState<ConversionDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -131,7 +131,7 @@ export function InventoryDefinitionEditor({
             {(item.conversions ?? []).map((entry) => (
               <div className="admin-inventory-list__header" key={entry.id}>
                 <div><strong>{entry.purchaseUnitLabel}</strong>
-                  <small>1 {entry.purchaseUnitLabel} = {entry.baseMicrosPerPurchaseUnit / 1_000_000} {item.unitLabel} · {entry.active ? 'Active' : 'Archived'}</small>
+                  <small>1 {entry.purchaseUnitLabel} = {formatPurchaseMicros(entry.baseMicrosPerPurchaseUnit)} {item.unitLabel} · {entry.active ? 'Active' : 'Archived'}</small>
                 </div>
                 <div className="admin-inventory-page-actions">
                   <button className="admin-secondary-button" type="button" disabled={pending} onClick={() => setConversion(conversionToDraft(entry))}>Edit</button>
