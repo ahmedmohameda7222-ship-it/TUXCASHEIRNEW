@@ -1,0 +1,47 @@
+name: PR 119 Approval Rules Scoped Formatter
+
+on:
+  push:
+    branches:
+      - fix/admin-plans1-7-functional-completeness
+    paths:
+      - '.github/workflows/admin-pr119-approval-rule-formatter.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Apply canonical Prettier only to approval-rule corrections
+        run: npx prettier --write "apps/admin/api/admin/approval-rules.ts" "apps/admin/server/api-contracts/approvalRulesManagement.test.ts" "apps/admin/server/approvals/approvalRulesMigration.source.test.ts" "apps/admin/src/approvals/ApprovalRulesPage.tsx" "apps/admin/src/approvals/ApprovalsPage.tsx" "apps/admin/src/app/approvalRuleRoute.test.ts" "apps/admin/src/app/routes.tsx" "e2e/admin-approval-rules.spec.ts"
+      - name: Commit formatted source without relaxing CI
+        run: |
+          git add -u -- apps/admin/api/admin/approval-rules.ts apps/admin/server/api-contracts/approvalRulesManagement.test.ts apps/admin/server/approvals/approvalRulesMigration.source.test.ts apps/admin/src/approvals/ApprovalRulesPage.tsx apps/admin/src/approvals/ApprovalsPage.tsx apps/admin/src/app/approvalRuleRoute.test.ts apps/admin/src/app/routes.tsx e2e/admin-approval-rules.spec.ts
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'style(admin): format approval-rule correction files'
+            for attempt in 1 2 3; do
+              git fetch origin fix/admin-plans1-7-functional-completeness
+              git rebase origin/fix/admin-plans1-7-functional-completeness
+              if git push origin HEAD:refs/heads/fix/admin-plans1-7-functional-completeness; then
+                break
+              fi
+              if [ "$attempt" -eq 3 ]; then exit 1; fi
+            done
+          fi
