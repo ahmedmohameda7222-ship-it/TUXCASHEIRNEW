@@ -260,6 +260,16 @@ export type ReasonCodeWriteInput = {
   expectedVersion: number | null;
 };
 
+export type OrderTypeCreateInput = {
+  shopId: string;
+  name: string;
+  behavior: AdminOrderTypeConfiguration['behavior'];
+  active: boolean;
+  sortOrder: number;
+  expectedSettingsVersion: number;
+  commandId: string;
+};
+
 export type OrderTypeEditInput = {
   shopId: string;
   orderTypeId: string;
@@ -296,5 +306,6 @@ export type SettingsCommand =
   | ({ type: 'setting.default.upsert' } & SettingWriteInput)
   | ({ type: 'setting.override.upsert' } & SettingWriteInput)
   | ({ type: 'reason-code.upsert' } & ReasonCodeWriteInput)
+  | ({ type: 'order-type.create' } & OrderTypeCreateInput)
   | ({ type: 'order-type.update' } & OrderTypeEditInput)
   | ({ type: 'payment-method.update' } & PaymentMethodEditInput);
