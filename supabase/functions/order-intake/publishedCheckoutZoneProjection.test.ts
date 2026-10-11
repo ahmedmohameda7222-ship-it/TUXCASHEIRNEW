@@ -71,7 +71,7 @@ const publishedBundle = {
 };
 
 describe('published Admin checkout restrictions consumed by online order intake', () => {
-  it('projects the immutable payment-zone restrictions from the canonical Operations bundle', () => {
+  it('projects published payment-zone restrictions from the Operations bundle', () => {
     const authority = projectPublishedCheckoutAuthority(publishedBundle, shopId);
     expect(authority.shopId).toBe(shopId);
     expect(authority.configurationVersion).toBe(10);
@@ -83,8 +83,9 @@ describe('published Admin checkout restrictions consumed by online order intake'
   });
 
   it('rejects a published bundle for a different shop before interpreting its policy', () => {
-    expect(() =>
-      projectPublishedCheckoutAuthority(publishedBundle, '44444444-4444-4444-8444-444444444444'),
-    ).toThrow(/different shop/i);
+    const wrongShopId = '44444444-4444-4444-8444-444444444444';
+    expect(() => projectPublishedCheckoutAuthority(publishedBundle, wrongShopId)).toThrow(
+      /different shop/i,
+    );
   });
 });
