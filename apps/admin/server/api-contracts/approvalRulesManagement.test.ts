@@ -1,4 +1,7 @@
+import { ADMIN_PERMISSIONS } from '@tux/admin-contracts';
 import { describe, expect, it } from 'vitest';
+
+import { APPROVAL_RULE_PERMISSION_KEYS } from '../approvals/approvalRulePermissions';
 
 import {
   approvalRuleWriteSchema,
@@ -31,6 +34,10 @@ const owner = {
 };
 
 describe('approval rule management boundary', () => {
+  it('keeps the server runtime-safe allowlist in sync with canonical Admin permissions', () => {
+    expect(APPROVAL_RULE_PERMISSION_KEYS).toEqual(ADMIN_PERMISSIONS);
+  });
+
   it('accepts an explicitly typed threshold with CAS for creation and update', () => {
     expect(approvalRuleWriteSchema.safeParse(ruleInput).success).toBe(true);
     expect(
