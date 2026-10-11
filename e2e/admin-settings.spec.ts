@@ -22,6 +22,7 @@ const ownerSession = {
 async function mockSettings(
   page: Page,
   permissions: string[] = ownerSession.principal.permissions,
+  role: 'OWNER' | 'MANAGER' = 'OWNER',
 ) {
   let settingsVersion = 7;
   let orderType = {
@@ -68,7 +69,7 @@ async function mockSettings(
       contentType: 'application/json',
       body: JSON.stringify({
         ...ownerSession,
-        principal: { ...ownerSession.principal, permissions },
+        principal: { ...ownerSession.principal, permissions, role },
       }),
     });
   });
@@ -385,6 +386,32 @@ test('business administrators edit canonical business defaults without changing 
     value: 1550,
     expectedVersion: 1,
   });
+});
+
+test('business default editor uses default value and CAS rather than shop override', async ({
+  page,
+}) => {
+  const { commands } = await mockSettings(page);
+  await page.goto('/settings/business-defaults');
+  await expect(page.getByLabel('Order prefix')).toHaveValue('TUX-');
+  await page.getByLabel('Order prefix').fill('HQ-');
+  await page.getByRole('button', { name: 'Save business default: Order prefix' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toEqual({
+    type: 'setting.default.upsert',
+    shopId,
+    settingKey: 'receipt.orderPrefix',
+    value: 'HQ-',
+    expectedVersion: 1,
+  });
+});
+
+test('shop managers cannot access the business defaults editor', async ({ page }) => {
+  await mockSettings(page, ['settings.manage'], 'MANAGER');
+  await page.goto('/settings/business-defaults');
+  await expect(page.getByRole('heading', { name: 'Business defaults' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Business defaults' })).toHaveCount(0);
+  await expect(page.getByRole('alert')).toContainText('business-wide settings');
 });
 
 test('shop management exposes canonical staff assignment only for staff managers', async ({
