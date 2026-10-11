@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { shopCreateCommandSchema } from '../../api/admin/shop-create';
+import { shopCreateCommandSchema } from '../settings/shopCreateRoute';
 
 const valid = {
   contextShopId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',

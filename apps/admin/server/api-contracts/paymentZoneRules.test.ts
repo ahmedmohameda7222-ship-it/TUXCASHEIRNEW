@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertPaymentZoneScope,
   paymentZoneRuleCommandSchema,
-} from '../../api/admin/payment-zone-rules';
+} from '../settings/paymentZoneRulesRoute';
 
 const shopId = '11111111-1111-4111-8111-111111111111';
 const paymentMethodId = '22222222-2222-4222-8222-222222222222';

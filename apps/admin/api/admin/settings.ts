@@ -1,3 +1,6 @@
+import handleShopCreateRoute from '../../server/settings/shopCreateRoute.js';
+import handleShopCopyPreviewRoute from '../../server/settings/shopCopyPreviewRoute.js';
+import handlePaymentZoneRulesRoute from '../../server/settings/paymentZoneRulesRoute.js';
 import type { AdminSessionPrincipal, SettingsCommand } from '@tux/admin-contracts';
 import { z } from 'zod';
 
@@ -411,6 +414,10 @@ export default async function handler(
   request: AdminRequest,
   response: AdminResponse,
 ): Promise<void> {
+  const resource = new URL(request.url ?? '/', 'http://admin.local').searchParams.get('__adminResource');
+  if (resource === 'shop-create') return handleShopCreateRoute(request, response);
+  if (resource === 'shop-copy-preview') return handleShopCopyPreviewRoute(request, response);
+  if (resource === 'payment-zone-rules') return handlePaymentZoneRulesRoute(request, response);
   if (request.method !== 'GET' && request.method !== 'POST') {
     response.setHeader('allow', 'GET, POST');
     sendJson(response, 405, { error: 'method_not_allowed' });

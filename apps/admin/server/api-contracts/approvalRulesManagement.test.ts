@@ -7,7 +7,7 @@ import {
   approvalRuleWriteSchema,
   requireApprovalRuleManagement,
   thresholdContextFromDraft,
-} from '../../api/admin/approval-rules';
+} from '../approvals/approvalRulesRoute';
 
 const shopId = 'c5579c9a-b2f2-5aa2-b1ed-a3a9b2492b46';
 const ruleInput = {

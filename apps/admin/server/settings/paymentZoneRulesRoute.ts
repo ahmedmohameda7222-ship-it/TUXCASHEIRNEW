@@ -5,9 +5,9 @@ import {
   AdminAuthError,
   loadAdminSession,
   requireSessionCsrf,
-} from '../../server/adminAuthService.js';
-import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
-import { getAdminServerEnv } from '../../server/env.js';
+} from '../adminAuthService.js';
+import { AdminAuthorizationError, requirePermission } from '../authorization.js';
+import { getAdminServerEnv } from '../env.js';
 import {
   firstHeader,
   readJsonObject,
@@ -15,9 +15,9 @@ import {
   sendJson,
   type AdminRequest,
   type AdminResponse,
-} from '../../server/http.js';
-import { readAdminSessionToken } from '../../server/session.js';
-import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
+} from '../http.js';
+import { readAdminSessionToken } from '../session.js';
+import { AdminSupabaseClient, AdminSupabaseError } from '../supabaseAdmin.js';
 
 const uuid = z.string().uuid();
 

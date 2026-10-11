@@ -5,12 +5,12 @@ import {
   AdminAuthError,
   loadAdminSession,
   requireSessionCsrf,
-} from '../../server/adminAuthService.js';
+} from '../adminAuthService.js';
 import {
   AdminAuthorizationError,
   requireBusinessWidePermission,
-} from '../../server/authorization.js';
-import { getAdminServerEnv } from '../../server/env.js';
+} from '../authorization.js';
+import { getAdminServerEnv } from '../env.js';
 import {
   firstHeader,
   readJsonObject,
@@ -18,9 +18,9 @@ import {
   sendJson,
   type AdminRequest,
   type AdminResponse,
-} from '../../server/http.js';
-import { readAdminSessionToken } from '../../server/session.js';
-import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
+} from '../http.js';
+import { readAdminSessionToken } from '../session.js';
+import { AdminSupabaseClient, AdminSupabaseError } from '../supabaseAdmin.js';
 
 export const shopCreateCommandSchema = z
   .object({

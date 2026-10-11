@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { shopCopyPreviewSchema } from '../../api/admin/shop-copy-preview';
+import { shopCopyPreviewSchema } from '../settings/shopCopyPreviewRoute';
 
 const sourceShopId = '11111111-1111-4111-8111-111111111111';
 const targetShopId = '22222222-2222-4222-8222-222222222222';
