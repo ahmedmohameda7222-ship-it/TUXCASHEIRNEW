@@ -3,8 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { PaymentsPage } from './PaymentsPage';
 
-describe('payment-method refund permission', () => {
-  it('exposes the approved per-method refund setting instead of an unavailable-policy notice', () => {
+describe('payment-method refund permission trust boundary', () => {
+  it('does not let staff edit an unenforced policy flag', () => {
     const workspace = {
       settingsVersion: 3,
       paymentMethods: [{
@@ -14,7 +14,8 @@ describe('payment-method refund permission', () => {
       }],
     } as unknown as AdminSettingsWorkspace;
     const html = renderToStaticMarkup(<PaymentsPage workspace={workspace} updating={false} onUpdate={vi.fn()} />);
-    expect(html).toContain('Refunds allowed');
-    expect(html).not.toContain('Refund policy editing is not available yet');
+    expect(html).toContain('Refund permissions are read-only');
+    expect(html).not.toContain('checked={draft.refundAllowed}');
+    expect(html).not.toContain('Refund allowed</span>');
   });
 });
