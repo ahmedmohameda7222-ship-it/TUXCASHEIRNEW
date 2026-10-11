@@ -37,9 +37,20 @@ const dateSchema = z
   .regex(/^\d{4}-\d{2}-\d{2}$/)
   .nullable();
 const microsSchema = z.number().int().safe().positive();
-const moneySchema = z.number().finite().nonnegative();
+const moneySchema = z.number().int().safe().nonnegative();
 
 const commandSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('po.lines.replace'), shopId: uuidSchema,
+    purchaseOrderId: uuidSchema, expectedVersion: z.number().int().positive(),
+    commandId: commandIdSchema,
+    lines: z.array(z.object({
+      inventoryItemId: uuidSchema,
+      purchaseUnitLabel: z.string().trim().min(1).max(120),
+      orderedPurchaseUnitsMicros: microsSchema,
+      expectedPurchaseUnitCostMinor: moneySchema,
+    }).strict()).min(1).max(500),
+  }).strict(),
   z.object({
     type: z.literal('supplier.update'), shopId: uuidSchema, supplierId: uuidSchema,
     expectedVersion: z.number().int().positive(), commandId: commandIdSchema,
@@ -569,6 +580,17 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
       });
     },
 
+    replaceDraftPurchaseOrderLines(input) {
+      return client.rpc<PurchasingCommandResult>('replace_draft_purchase_order_lines_v1', {
+        p_employee_id: input.employeeId,
+        p_shop_id: input.shopId,
+        p_purchase_order_id: input.purchaseOrderId,
+        p_expected_version: input.expectedVersion,
+        p_lines: input.lines,
+        p_command_id: input.commandId,
+      });
+    },
+
     cancelPurchaseOrder(input) {
       return client.rpc<PurchasingCommandResult>('cancel_purchase_order_v1', {
         p_employee_id: input.employeeId,
@@ -696,6 +718,9 @@ export default async function handler(
         break;
       case 'po.update':
         result = await service.updatePurchaseOrder(command, context.principal);
+        break;
+      case 'po.lines.replace':
+        result = await service.replaceDraftPurchaseOrderLines(command, context.principal);
         break;
       case 'po.cancel':
         result = await service.cancelPurchaseOrder(command, context.principal);
