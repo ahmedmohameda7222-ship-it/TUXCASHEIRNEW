@@ -135,6 +135,7 @@ function renderSection(section: SettingsSection): string {
       settingOverrideUpdating={false}
       onUpsertReasonCode={noop}
       reasonCodeUpdating={false}
+      onCreateOrderType={noop}
       onUpdateOrderType={noop}
       orderTypeUpdating={false}
       onUpdatePaymentMethod={noop}
@@ -213,6 +214,7 @@ describe('Settings workspace', () => {
     expect(orderTypes).toContain('Delivery');
     expect(orderTypes).not.toContain('sort 20');
     expect(orderTypes).toContain('Edit Take Away');
+    expect(orderTypes).toContain('Add order type');
 
     const payments = renderSection('payments');
     expect(payments).toContain('Cash');
