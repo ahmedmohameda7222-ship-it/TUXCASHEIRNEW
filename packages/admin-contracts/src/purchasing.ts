@@ -109,6 +109,13 @@ export type UpdatePurchaseOrderInput = {
   readonly expectedDeliveryDate: string | null;
 };
 
+export type CancelPurchaseOrderInput = {
+  readonly shopId: string;
+  readonly purchaseOrderId: string;
+  readonly expectedVersion: number;
+  readonly commandId: string;
+};
+
 export type ReceivePurchaseInput = {
   readonly shopId: string;
   readonly purchaseOrderId: string;
