@@ -6,6 +6,7 @@ import { PageScaffold } from '../components/layout/PageScaffold';
 import { ConfirmationDialog } from '../components/overlay/AdminDialog';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { BusinessDefaultsPage } from './BusinessDefaultsPage';
+import { CreateShopPanel } from './CreateShopPanel';
 import { CheckoutPage } from './CheckoutPage';
 import { OrderTypesPage } from './OrderTypesPage';
 import { PaymentsPage } from './PaymentsPage';
@@ -44,6 +45,7 @@ export type SettingsWorkspaceViewProps = {
   workspace: AdminSettingsWorkspace;
   section: SettingsSection;
   canAssignStaff?: boolean;
+  canCreateShop?: boolean;
   canManageShopLifecycle?: boolean;
   onUpdateShopLifecycle?: (draft: ShopLifecycleUpdateDraft) => void | Promise<void>;
   shopLifecycleUpdating?: boolean;
@@ -164,6 +166,7 @@ function SectionContent(
     onUpsertSpecialHours,
     shopManagementUpdating,
     canAssignStaff,
+    canCreateShop,
     canManageShopLifecycle,
     onUpdateShopLifecycle,
     shopLifecycleUpdating,
@@ -189,7 +192,9 @@ function SectionContent(
       return <Overview workspace={workspace} />;
     case 'shop':
       return (
-        <ShopsPage
+        <>
+          {canCreateShop ? <CreateShopPanel contextShopId={workspace.shop.id} /> : null}
+          <ShopsPage
           workspace={workspace}
           canAssignStaff={canAssignStaff === true}
           canManageLifecycle={canManageShopLifecycle === true}
@@ -201,7 +206,8 @@ function SectionContent(
           onUpsertSpecialHours={onUpsertSpecialHours}
           onDeleteOrArchive={() => void onDeleteOrArchiveShop()}
           busy={operationalStateUpdating || shopManagementUpdating || deletingOrArchivingShop}
-        />
+          />
+        </>
       );
     case 'business-defaults':
       return canManageBusinessDefaults && onUpdateBusinessDefault ? (
@@ -381,6 +387,10 @@ export function SettingsPage() {
             principal.permissions.includes('staff.view')
           }
           canManageShopLifecycle={principal.permissions.includes('shops.manage')}
+          canCreateShop={
+            (principal.role === 'OWNER' || principal.role === 'ADMIN') &&
+            principal.permissions.includes('shops.manage')
+          }
           onUpdateShopLifecycle={(draft) => settings.updateShopLifecycle.mutateAsync(draft)}
           shopLifecycleUpdating={settings.updateShopLifecycle.isPending}
           canManageBusinessDefaults={canManageBusinessDefaults}
