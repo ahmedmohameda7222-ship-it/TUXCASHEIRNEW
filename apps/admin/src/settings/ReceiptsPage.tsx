@@ -2,7 +2,7 @@ import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
 
 import { SettingOverrideEditor } from './SettingOverrideEditor';
 import { displaySettingValue, resolveWorkspaceSetting, settingSourceLabel } from './settingsModel';
-import type { SettingOverrideUpdateDraft } from './useSettings';
+import type { SettingOverrideUpdateDraft, SettingRestoreDraft } from './useSettings';
 
 const RECEIPT_SEQUENCE_MAX = 2_147_483_647;
 
@@ -11,11 +11,13 @@ export function ReceiptsPage({
   onUpdate,
   updating,
   scope = 'shop',
+  onRestore,
 }: {
   workspace: AdminSettingsWorkspace;
   onUpdate(draft: SettingOverrideUpdateDraft): void | Promise<void>;
   updating: boolean;
   scope?: 'shop' | 'business';
+  onRestore?: (draft: SettingRestoreDraft) => void | Promise<void>;
 }) {
   const resetPolicy = resolveWorkspaceSetting(workspace, 'receipt.sequenceResetPolicy');
 
@@ -40,6 +42,7 @@ export function ReceiptsPage({
           updating={updating}
           onUpdate={onUpdate}
           scope={scope}
+          onRestore={onRestore}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -49,6 +52,7 @@ export function ReceiptsPage({
           updating={updating}
           onUpdate={onUpdate}
           scope={scope}
+          onRestore={onRestore}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -61,6 +65,7 @@ export function ReceiptsPage({
           updating={updating}
           onUpdate={onUpdate}
           scope={scope}
+          onRestore={onRestore}
         />
         <article
           className="admin-catalog-editor__section is-compact"

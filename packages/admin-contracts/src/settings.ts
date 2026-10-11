@@ -176,6 +176,12 @@ export type ShopManagementWriteResult =
   | { ok: false; code: 'stale_settings_version'; currentVersion: number }
   | { ok: false; code: string };
 
+export type SettingRestoreInput = {
+  shopId: string;
+  settingKey: string;
+  expectedVersion: number;
+};
+
 export type SettingWriteInput = {
   shopId: string;
   settingKey: string;
@@ -305,6 +311,7 @@ export type SettingsCommand =
   | ({ type: 'shop.delete-or-archive' } & { shopId: string })
   | ({ type: 'setting.default.upsert' } & SettingWriteInput)
   | ({ type: 'setting.override.upsert' } & SettingWriteInput)
+  | ({ type: 'setting.override.restore' } & SettingRestoreInput)
   | ({ type: 'reason-code.upsert' } & ReasonCodeWriteInput)
   | ({ type: 'order-type.create' } & OrderTypeCreateInput)
   | ({ type: 'order-type.update' } & OrderTypeEditInput)

@@ -21,6 +21,7 @@ import {
   type PaymentMethodUpdateDraft,
   type ReasonCodeUpdateDraft,
   type SettingOverrideUpdateDraft,
+  type SettingRestoreDraft,
   type ShopIdentityUpdateDraft,
   type ShopOperationalStateUpdateDraft,
   type ShopSpecialHoursUpdateDraft,
@@ -56,6 +57,7 @@ export type SettingsWorkspaceViewProps = {
   onDeleteOrArchiveShop(): void | Promise<void>;
   deletingOrArchivingShop: boolean;
   onUpdateSettingOverride(draft: SettingOverrideUpdateDraft): void | Promise<void>;
+  onRestoreSettingOverride?: (draft: SettingRestoreDraft) => void | Promise<void>;
   settingOverrideUpdating: boolean;
   onUpsertReasonCode(draft: ReasonCodeUpdateDraft): void | Promise<void>;
   reasonCodeUpdating: boolean;
@@ -162,6 +164,7 @@ function SectionContent(
     onDeleteOrArchiveShop,
     deletingOrArchivingShop,
     onUpdateSettingOverride,
+    onRestoreSettingOverride,
     settingOverrideUpdating,
     onUpsertReasonCode,
     reasonCodeUpdating,
@@ -219,6 +222,7 @@ function SectionContent(
         <CheckoutPage
           workspace={workspace}
           onUpdate={onUpdateSettingOverride}
+          onRestore={onRestoreSettingOverride}
           updating={settingOverrideUpdating}
         />
       );
@@ -227,6 +231,7 @@ function SectionContent(
         <ReceiptsPage
           workspace={workspace}
           onUpdate={onUpdateSettingOverride}
+          onRestore={onRestoreSettingOverride}
           updating={settingOverrideUpdating}
         />
       );
@@ -377,6 +382,7 @@ export function SettingsPage() {
           onDeleteOrArchiveShop={() => setArchiveConfirmOpen(true)}
           deletingOrArchivingShop={settings.deleteOrArchiveShop.isPending}
           onUpdateSettingOverride={(draft) => settings.updateSettingOverride.mutateAsync(draft)}
+          onRestoreSettingOverride={(draft) => settings.restoreSettingOverride.mutateAsync(draft)}
           settingOverrideUpdating={settings.updateSettingOverride.isPending}
           onUpsertReasonCode={(draft) => settings.upsertReasonCode.mutateAsync(draft)}
           reasonCodeUpdating={settings.upsertReasonCode.isPending}

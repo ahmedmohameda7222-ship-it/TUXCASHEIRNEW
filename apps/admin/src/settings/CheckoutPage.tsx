@@ -7,18 +7,20 @@ import {
   parseEgpToMinor,
   parsePercentToBasisPoints,
 } from './settingsModel';
-import type { SettingOverrideUpdateDraft } from './useSettings';
+import type { SettingOverrideUpdateDraft, SettingRestoreDraft } from './useSettings';
 
 export function CheckoutPage({
   workspace,
   onUpdate,
   updating,
   scope = 'shop',
+  onRestore,
 }: {
   workspace: AdminSettingsWorkspace;
   onUpdate(draft: SettingOverrideUpdateDraft): void | Promise<void>;
   updating: boolean;
   scope?: 'shop' | 'business';
+  onRestore?: (draft: SettingRestoreDraft) => void | Promise<void>;
 }) {
   return (
     <section className="admin-settings-section" aria-labelledby="settings-checkout-title">
@@ -47,6 +49,7 @@ export function CheckoutPage({
           updating={updating}
           onUpdate={onUpdate}
           scope={scope}
+          onRestore={onRestore}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -62,6 +65,7 @@ export function CheckoutPage({
           updating={updating}
           onUpdate={onUpdate}
           scope={scope}
+          onRestore={onRestore}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -78,6 +82,7 @@ export function CheckoutPage({
           updating={updating}
           onUpdate={onUpdate}
           scope={scope}
+          onRestore={onRestore}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -87,6 +92,7 @@ export function CheckoutPage({
           updating={updating}
           onUpdate={onUpdate}
           scope={scope}
+          onRestore={onRestore}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -97,6 +103,7 @@ export function CheckoutPage({
           updating={updating}
           onUpdate={onUpdate}
           scope={scope}
+          onRestore={onRestore}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -107,6 +114,7 @@ export function CheckoutPage({
           updating={updating}
           onUpdate={onUpdate}
           scope={scope}
+          onRestore={onRestore}
         />
       </div>
 
