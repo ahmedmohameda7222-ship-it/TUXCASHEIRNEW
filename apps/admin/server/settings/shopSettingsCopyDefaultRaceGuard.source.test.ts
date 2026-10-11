@@ -19,7 +19,7 @@ describe('shop settings copy business-default concurrency', () => {
     expect(sql).toContain('pg_advisory_xact_lock(v_lock)');
     expect(sql).toContain('public.apply_admin_shop_settings_copy_v1');
     expect(sql.indexOf('tux-admin-setting-default:')).toBeLessThan(
-      sql.indexOf('v_source_published'),
+      sql.indexOf('SELECT COALESCE(MAX(s.settings_version), 0) INTO v_source_published'),
     );
     expect(sql).toContain('v_current_preview <> p_expected_changes');
     expect(sql).toContain('public.upsert_shop_setting_override_v1');
