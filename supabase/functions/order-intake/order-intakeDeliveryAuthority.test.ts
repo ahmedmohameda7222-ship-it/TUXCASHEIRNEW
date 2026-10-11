@@ -202,6 +202,30 @@ describe('order-intake trusted delivery routing authority', () => {
     expect(store.inserted).toHaveLength(1);
   });
 
+  it('applies target-shop payment restrictions after trusted delivery fallback', async () => {
+    const store = new MemoryStore();
+    const fallbackZoneId = '66666666-6666-4666-8666-666666666193';
+    store.paymentMethodZoneRules = [
+      { paymentMethodId: CASH_METHOD_ID, deliveryZoneId: fallbackZoneId, allowed: false },
+    ];
+    store.resolveDeliveryRoute.mockResolvedValue({
+      ok: true,
+      shopId: FALLBACK_SHOP_ID,
+      zoneId: fallbackZoneId,
+      zoneName: 'Fallback restricted',
+      feeMinor: 3_500,
+      minimumOrderMinor: 15_000,
+      fallbackUsed: true,
+    });
+
+    const response = await handleOrderIntakeRequest(request(true), store);
+
+    expect(response.status).toBe(409);
+    await expect(errorCode(response)).resolves.toBe('payment_method_unavailable');
+    expect(store.inserted).toHaveLength(0);
+    expect(store.translateRequestToShop).toHaveBeenCalledOnce();
+  });
+
   it('routes an explicitly configured delivery fallback before rejecting a closed primary shop', async () => {
     const store = new MemoryStore();
     store.primaryTemporarilyClosed = true;
