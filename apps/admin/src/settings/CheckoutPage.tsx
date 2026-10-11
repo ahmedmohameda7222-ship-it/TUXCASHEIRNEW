@@ -20,7 +20,7 @@ export function CheckoutPage({
   onUpdate(draft: SettingOverrideUpdateDraft): void | Promise<void>;
   updating: boolean;
   scope?: 'shop' | 'business';
-  onRestore?: (draft: SettingRestoreDraft) => void | Promise<void>;
+  onRestore?: ((draft: SettingRestoreDraft) => void | Promise<void>) | undefined;
 }) {
   return (
     <section className="admin-settings-section" aria-labelledby="settings-checkout-title">
