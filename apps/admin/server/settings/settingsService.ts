@@ -73,7 +73,9 @@ export interface SettingsStore {
     value: unknown;
     expectedVersion: number | null;
   }): Promise<SettingWriteResult>;
-  restoreShopOverride(input: { employeeId: string } & SettingRestoreInput): Promise<SettingWriteResult>;
+  restoreShopOverride(
+    input: { employeeId: string } & SettingRestoreInput,
+  ): Promise<SettingWriteResult>;
   upsertReasonCode(
     input: { employeeId: string } & ReasonCodeWriteInput,
   ): Promise<ReasonCodeWriteResult>;

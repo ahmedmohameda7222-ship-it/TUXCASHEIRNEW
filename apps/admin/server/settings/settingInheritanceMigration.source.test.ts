@@ -3,7 +3,10 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const migrationsDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../supabase/migrations');
+const migrationsDir = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../../../supabase/migrations',
+);
 
 describe('shop setting override inheritance restoration', () => {
   it('uses authorized atomic deletion, audit and monotonic revision fencing', () => {

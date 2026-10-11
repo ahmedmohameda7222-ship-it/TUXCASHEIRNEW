@@ -131,10 +131,10 @@ export function SettingOverrideEditor({
     setError(null);
     try {
       await onRestore({ settingKey, expectedVersion: editor.expectedVersion });
-      const inheritedValue = workspace.businessDefaults.find((row) => row.key === settingKey)?.value;
-      const raw = formatValue
-        ? formatValue(inheritedValue)
-        : initialText(inheritedValue, kind);
+      const inheritedValue = workspace.businessDefaults.find(
+        (row) => row.key === settingKey,
+      )?.value;
+      const raw = formatValue ? formatValue(inheritedValue) : initialText(inheritedValue, kind);
       setEditor({ raw, baselineRaw: raw, expectedVersion: null });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to restore inheritance.');
