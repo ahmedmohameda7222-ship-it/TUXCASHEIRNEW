@@ -16,11 +16,13 @@ export function CheckoutPage({
   updating,
   scope = 'shop',
   onRestore,
+  canManagePaymentZones = false,
 }: {
   workspace: AdminSettingsWorkspace;
   onUpdate(draft: SettingOverrideUpdateDraft): void | Promise<void>;
   updating: boolean;
   scope?: 'shop' | 'business';
+  canManagePaymentZones?: boolean;
   onRestore?: ((draft: SettingRestoreDraft) => void | Promise<void>) | undefined;
 }) {
   return (
@@ -137,7 +139,9 @@ export function CheckoutPage({
           </div>
         )}
       </div>
-      {scope === 'shop' ? <PaymentZoneRulesPanel workspace={workspace} /> : null}
+      {scope === 'shop' && canManagePaymentZones ? (
+        <PaymentZoneRulesPanel workspace={workspace} />
+      ) : null}
     </section>
   );
 }

@@ -52,6 +52,7 @@ export type SettingsWorkspaceViewProps = {
   onUpdateShopLifecycle?: (draft: ShopLifecycleUpdateDraft) => void | Promise<void>;
   shopLifecycleUpdating?: boolean;
   canManageBusinessDefaults?: boolean;
+  canManagePaymentZones?: boolean;
   onUpdateBusinessDefault?: (draft: SettingOverrideUpdateDraft) => void | Promise<void>;
   businessDefaultUpdating?: boolean;
   onSectionChange(section: SettingsSection): void;
@@ -174,6 +175,7 @@ function SectionContent(
     onUpdateShopLifecycle,
     shopLifecycleUpdating,
     canManageBusinessDefaults,
+    canManagePaymentZones,
     onUpdateBusinessDefault,
     businessDefaultUpdating,
     onDeleteOrArchiveShop,
@@ -251,6 +253,7 @@ function SectionContent(
       return (
         <CheckoutPage
           workspace={workspace}
+          canManagePaymentZones={canManagePaymentZones === true}
           onUpdate={onUpdateSettingOverride}
           onRestore={onRestoreSettingOverride}
           updating={settingOverrideUpdating}
@@ -409,6 +412,7 @@ export function SettingsPage() {
           onUpdateShopLifecycle={(draft) => settings.updateShopLifecycle.mutateAsync(draft)}
           shopLifecycleUpdating={settings.updateShopLifecycle.isPending}
           canManageBusinessDefaults={canManageBusinessDefaults}
+          canManagePaymentZones={principal.permissions.includes('settings.manage')}
           onUpdateBusinessDefault={(draft) => settings.updateBusinessDefault.mutateAsync(draft)}
           businessDefaultUpdating={settings.updateBusinessDefault.isPending}
           onSectionChange={(nextSection) => navigate(settingsLocationForSection(nextSection))}
