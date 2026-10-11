@@ -126,6 +126,15 @@ export function usePurchasing(shopId: string | undefined) {
     onSuccess: invalidate,
   });
 
+  const cancelPurchaseOrder = useMutation({
+    mutationFn: async (input: {purchaseOrderId: string; expectedVersion: number}) => {
+      return postRetained('po.cancel', input, (commandId) => ({
+        type: 'po.cancel', shopId: shopId!, ...input, commandId,
+      }));
+    },
+    onSuccess: invalidate,
+  });
+
   const orderPurchaseOrder = useMutation({
     mutationFn: async (input: { purchaseOrderId: string; expectedVersion: number }) => {
       return postRetained('po.order', input, (retainedCommandId) => ({
@@ -182,6 +191,7 @@ export function usePurchasing(shopId: string | undefined) {
     createSupplier,
     createPurchaseOrder,
     updatePurchaseOrder,
+    cancelPurchaseOrder,
     orderPurchaseOrder,
     receivePurchase,
     returnPurchase,
