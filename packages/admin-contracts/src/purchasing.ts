@@ -16,6 +16,7 @@ export type AdminSupplier = {
   readonly phone: string | null;
   readonly email: string | null;
   readonly active: boolean;
+  readonly version?: number;
 };
 
 export type AdminSupplierInventoryItem = {
@@ -85,6 +86,20 @@ export type CreateSupplierInput = {
   readonly contactName: string | null;
   readonly phone: string | null;
   readonly email: string | null;
+};
+
+export type ManageSupplierInput = {
+  readonly shopId: string;
+  readonly supplierId: string;
+  readonly expectedVersion: number;
+  readonly type: 'supplier.update' | 'supplier.archive' | 'supplier.restore';
+  readonly payload: {
+    readonly name?: string;
+    readonly contactName?: string | null;
+    readonly phone?: string | null;
+    readonly email?: string | null;
+  };
+  readonly commandId: string;
 };
 
 export type CreatePurchaseOrderInput = {
