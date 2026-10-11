@@ -87,8 +87,10 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
               logicType: 'CASH',
               active: true,
               sortOrder:
-                workspace.paymentMethods.reduce((max, method) => Math.max(max, method.sortOrder), 0) +
-                10,
+                workspace.paymentMethods.reduce(
+                  (max, method) => Math.max(max, method.sortOrder),
+                  0,
+                ) + 10,
               channel: 'POS',
               requiresReference: false,
               manualConfirmationRequired: false,
@@ -127,7 +129,11 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                 onChange={(event) =>
                   setCreateDraft((current) =>
                     current
-                      ? { ...current, logicType: event.currentTarget.value as PaymentMethodCreateDraft['logicType'] }
+                      ? {
+                          ...current,
+                          logicType: event.currentTarget
+                            .value as PaymentMethodCreateDraft['logicType'],
+                        }
                       : current,
                   )
                 }
@@ -146,7 +152,10 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                 onChange={(event) =>
                   setCreateDraft((current) =>
                     current
-                      ? { ...current, channel: event.currentTarget.value as PaymentMethodCreateDraft['channel'] }
+                      ? {
+                          ...current,
+                          channel: event.currentTarget.value as PaymentMethodCreateDraft['channel'],
+                        }
                       : current,
                   )
                 }
@@ -176,7 +185,9 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                 disabled={updating}
                 onChange={(event) =>
                   setCreateDraft((current) =>
-                    current ? { ...current, requiresReference: event.currentTarget.checked } : current,
+                    current
+                      ? { ...current, requiresReference: event.currentTarget.checked }
+                      : current,
                   )
                 }
               />
