@@ -20,6 +20,7 @@ import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
 import type { ProductEditorDraft } from './ProductEditor';
 import { applyProductAdvancedDraft } from './catalogAdvancedDraft';
+import { catalogDefinitionsFromBundle, upsertCatalogDefinitionInBundle, type CatalogDefinitionCollection } from './catalogDefinitionsDraft';
 
 export type ActiveCatalogDraft = {
   draftId: string;
@@ -206,6 +207,31 @@ export function useCatalog(shopId: string | undefined) {
     return workspace.drafts.filter((draft) => draft.status === 'DRAFT');
   }, [workspaceQuery.data]);
 
+  const categories = useMemo(() => {
+    if (!activeDraft) return workspaceQuery.data?.categories ?? [];
+    return catalogDefinitionsFromBundle(activeDraft.bundleJson, 'categories').map((entry) => ({
+      id: String(entry['id']),
+      shopId: String(entry['shopId']),
+      slug: typeof entry['slug'] === 'string' ? entry['slug'] : null,
+      name: String(entry['name']),
+      description: typeof entry['description'] === 'string' ? entry['description'] : null,
+      sortOrder: Number(entry['sortOrder']),
+      active: entry['active'] === true,
+    }));
+  }, [activeDraft, workspaceQuery.data?.categories]);
+
+  const modifiers = useMemo(() => {
+    if (!activeDraft) return [];
+    return catalogDefinitionsFromBundle(activeDraft.bundleJson, 'modifiers').map((entry) => ({
+      id: String(entry['id']),
+      shopId: String(entry['shopId']),
+      name: String(entry['name']),
+      priceMinor: Number(entry['priceMinor']),
+      sortOrder: Number(entry['sortOrder']),
+      active: entry['active'] === true,
+    }));
+  }, [activeDraft]);
+
   const products = useMemo(() => {
     const merged = new Map<string, CatalogProductDetail>();
     for (const product of workspaceQuery.data?.products ?? []) merged.set(product.id, product);
@@ -244,8 +270,8 @@ export function useCatalog(shopId: string | undefined) {
     return draft;
   }
 
-  async function loadOrCreateDraft(product: CatalogProductDetail): Promise<ActiveCatalogDraft> {
-    if (!shopId || product.shopId !== shopId) throw new CatalogUiError('concrete_shop_required');
+  async function loadOrCreateDraftForShop(label: string): Promise<ActiveCatalogDraft> {
+    if (!shopId) throw new CatalogUiError('concrete_shop_required');
     const workspace = currentWorkspace(queryClient, shopId) ?? workspaceQuery.data;
     if (!workspace) throw new CatalogUiError('catalog_not_loaded');
 
@@ -269,7 +295,7 @@ export function useCatalog(shopId: string | undefined) {
           type: 'draft.create',
           shopId,
           expectedVersion: workspace.currentPublishVersion,
-          title: `Catalog edits · ${product.name}`,
+          title: `Catalog edits · ${label}`,
         }),
       },
       csrfTokenForMutation(session),
@@ -284,6 +310,11 @@ export function useCatalog(shopId: string | undefined) {
     };
     activeDraftRef.current = draft;
     return draft;
+  }
+
+  async function loadOrCreateDraft(product: CatalogProductDetail): Promise<ActiveCatalogDraft> {
+    if (!shopId || product.shopId !== shopId) throw new CatalogUiError('concrete_shop_required');
+    return loadOrCreateDraftForShop(product.name);
   }
 
   const resumeDraft = useMutation({
@@ -353,6 +384,47 @@ export function useCatalog(shopId: string | undefined) {
     },
   });
 
+  const saveDefinitions = useMutation({
+    mutationFn: async (input: {
+      collection: CatalogDefinitionCollection;
+      definition: CatalogJsonObject;
+    }) => {
+      if (!shopId || input.definition['shopId'] !== shopId) throw new CatalogUiError('concrete_shop_required');
+      const draft = await loadOrCreateDraftForShop('Menu definitions');
+      const nextBundle = upsertCatalogDefinitionInBundle(
+        draft.bundleJson, input.collection, input.definition,
+      );
+      const saved = await adminFetch<CatalogDraftSaveResult>(
+        '/api/admin/catalog',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'draft.save', draftId: draft.draftId,
+            shopId, expectedDraftRevision: draft.draftRevision,
+            changes: [{
+              kind: 'bundle.replace', bundleJson: nextBundle,
+              changedPaths: input.collection === 'modifiers'
+                ? ['modifiers', 'modifiers[].priceMinor'] : ['categories'],
+            }],
+          }),
+        },
+        csrfTokenForMutation(session),
+      );
+      if (!saved.ok) throw new CatalogUiError(saved.code);
+      const nextDraft: ActiveCatalogDraft = {
+        draftId: draft.draftId, draftRevision: saved.draftRevision,
+        basePublishVersion: saved.basePublishVersion, bundleJson: nextBundle,
+      };
+      activeDraftRef.current = nextDraft;
+      return nextDraft;
+    },
+    onSuccess(draft) {
+      setActiveDraft(draft);
+      setDraftProducts(productsFromBundle(draft.bundleJson));
+      setDraftInvalidatedByLiveChange(false);
+    },
+  });
+
   const setAvailability = useMutation({
     mutationFn: async ({ productId, soldOut }: { productId: string; soldOut: boolean }) => {
       if (!shopId) throw new CatalogUiError('concrete_shop_required');
@@ -380,12 +452,15 @@ export function useCatalog(shopId: string | undefined) {
   return {
     workspaceQuery,
     products,
+    categories,
+    modifiers,
     activeDraft,
     compatibleDrafts,
     draftInvalidatedByLiveChange,
     resumeDraft,
     prepareProductDraft,
     saveProduct,
+    saveDefinitions,
     setAvailability,
   };
 }
