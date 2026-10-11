@@ -132,7 +132,13 @@ export function ApprovalRulesPage() {
   const principal = session.state.status === 'authenticated' ? session.state.session.principal : null;
   const mayManageBusiness = principal?.role === 'OWNER' || principal?.role === 'ADMIN';
   const authorizedShops = principal?.shopIds ?? [];
-  const [form, setForm] = useState<RuleForm>(() => initialForm(null));
+  const [form, setForm] = useState<RuleForm>(() =>
+    initialForm(
+      session.state.status === 'authenticated'
+        ? session.state.session.principal.shopIds[0] ?? null
+        : null,
+    ),
+  );
   const [formError, setFormError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
 
