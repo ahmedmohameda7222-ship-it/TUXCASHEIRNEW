@@ -36,9 +36,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function parseCreateResult(value: unknown):
-  | { ok: true; shopId: string; idempotentReplay: boolean }
-  | { ok: false; code: string } {
+function parseCreateResult(
+  value: unknown,
+): { ok: true; shopId: string; idempotentReplay: boolean } | { ok: false; code: string } {
   if (!isRecord(value) || typeof value['ok'] !== 'boolean') {
     throw new Error('backend_contract_invalid');
   }
@@ -46,7 +46,10 @@ function parseCreateResult(value: unknown):
     if (typeof value['code'] !== 'string') throw new Error('backend_contract_invalid');
     return { ok: false, code: value['code'] };
   }
-  if (typeof value['shopId'] !== 'string' || !z.string().uuid().safeParse(value['shopId']).success) {
+  if (
+    typeof value['shopId'] !== 'string' ||
+    !z.string().uuid().safeParse(value['shopId']).success
+  ) {
     throw new Error('backend_contract_invalid');
   }
   return {

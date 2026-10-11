@@ -14,7 +14,9 @@ describe('Admin shop creation contract', () => {
   it('accepts only a concrete authorized context and a stable retry key', () => {
     expect(shopCreateCommandSchema.safeParse(valid).success).toBe(true);
     expect(shopCreateCommandSchema.safeParse({ ...valid, commandId: '' }).success).toBe(false);
-    expect(shopCreateCommandSchema.safeParse({ ...valid, contextShopId: 'all-shops' }).success).toBe(false);
+    expect(
+      shopCreateCommandSchema.safeParse({ ...valid, contextShopId: 'all-shops' }).success,
+    ).toBe(false);
   });
 
   it('rejects implicit copy requests, arbitrary business IDs, and unsafe unknown fields', () => {

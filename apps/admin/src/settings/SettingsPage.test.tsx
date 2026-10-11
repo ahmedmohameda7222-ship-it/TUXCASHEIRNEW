@@ -212,20 +212,12 @@ describe('Settings workspace', () => {
       },
     };
     const suspendedHtml = renderToStaticMarkup(
-      <ShopsPage
-        workspace={suspended}
-        onUpdateOperationalState={noop}
-        busy={false}
-      />,
+      <ShopsPage workspace={suspended} onUpdateOperationalState={noop} busy={false} />,
     );
     expect(suspendedHtml.match(/<input[^>]*type="checkbox"[^>]*disabled=""/g)).toHaveLength(2);
 
     const activeHtml = renderToStaticMarkup(
-      <ShopsPage
-        workspace={workspace}
-        onUpdateOperationalState={noop}
-        busy={false}
-      />,
+      <ShopsPage workspace={workspace} onUpdateOperationalState={noop} busy={false} />,
     );
     expect(activeHtml.match(/<input[^>]*type="checkbox"[^>]*disabled=""/g)).toBeNull();
   });

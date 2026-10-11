@@ -11,8 +11,7 @@ type CreateShopDraft = {
 };
 
 type ShopCreateResult =
-  | { ok: true; shopId: string; idempotentReplay: boolean }
-  | { ok: false; code: string };
+  { ok: true; shopId: string; idempotentReplay: boolean } | { ok: false; code: string };
 
 export function CreateShopPanel({ contextShopId }: { contextShopId: string }) {
   const session = useAdminSession();

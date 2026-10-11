@@ -195,17 +195,17 @@ function SectionContent(
         <>
           {canCreateShop ? <CreateShopPanel contextShopId={workspace.shop.id} /> : null}
           <ShopsPage
-          workspace={workspace}
-          canAssignStaff={canAssignStaff === true}
-          canManageLifecycle={canManageShopLifecycle === true}
-          onUpdateLifecycle={onUpdateShopLifecycle}
-          lifecycleUpdating={shopLifecycleUpdating === true}
-          onUpdateOperationalState={(draft) => void onUpdateOperationalState(draft)}
-          onUpdateIdentity={onUpdateShopIdentity}
-          onUpsertWeeklyHours={onUpsertWeeklyHours}
-          onUpsertSpecialHours={onUpsertSpecialHours}
-          onDeleteOrArchive={() => void onDeleteOrArchiveShop()}
-          busy={operationalStateUpdating || shopManagementUpdating || deletingOrArchivingShop}
+            workspace={workspace}
+            canAssignStaff={canAssignStaff === true}
+            canManageLifecycle={canManageShopLifecycle === true}
+            onUpdateLifecycle={onUpdateShopLifecycle}
+            lifecycleUpdating={shopLifecycleUpdating === true}
+            onUpdateOperationalState={(draft) => void onUpdateOperationalState(draft)}
+            onUpdateIdentity={onUpdateShopIdentity}
+            onUpsertWeeklyHours={onUpsertWeeklyHours}
+            onUpsertSpecialHours={onUpsertSpecialHours}
+            onDeleteOrArchive={() => void onDeleteOrArchiveShop()}
+            busy={operationalStateUpdating || shopManagementUpdating || deletingOrArchivingShop}
           />
         </>
       );
