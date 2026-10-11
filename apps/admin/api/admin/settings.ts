@@ -41,6 +41,7 @@ const orderTypeNameSchema = z.string().trim().min(1).max(120);
 const paymentMethodNameSchema = z.string().trim().min(1).max(120);
 const orderBehaviorSchema = z.enum(['TAKE_AWAY', 'DINE_IN', 'DELIVERY', 'OTHER']);
 const paymentChannelSchema = z.enum(['POS', 'ONLINE', 'BOTH']);
+const paymentLogicTypeSchema = z.enum(['CASH', 'CARD', 'DIGITAL', 'OTHER']);
 const serviceKindSchema = z.enum(['OPEN', 'DELIVERY', 'ONLINE']);
 const localTimeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,6})?)?$/);
 const serviceDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -333,6 +334,21 @@ export const settingsCommandSchema = z.union([
     .strict(),
   z
     .object({
+      type: z.literal('payment-method.create'),
+      shopId: uuidSchema,
+      displayName: paymentMethodNameSchema,
+      logicType: paymentLogicTypeSchema,
+      active: z.boolean(),
+      sortOrder: sortOrderSchema,
+      channel: paymentChannelSchema,
+      requiresReference: z.boolean(),
+      manualConfirmationRequired: z.boolean(),
+      expectedSettingsVersion: expectedSettingsVersionSchema,
+      commandId: z.string().trim().min(1).max(160),
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal('payment-method.update'),
       shopId: uuidSchema,
       paymentMethodId: uuidSchema,
@@ -474,6 +490,9 @@ export default async function handler(
         return;
       case 'order-type.update':
         sendJson(response, 200, { ...(await service.updateOrderType(command, principal)) });
+        return;
+      case 'payment-method.create':
+        sendJson(response, 200, { ...(await service.createPaymentMethod(command, principal)) });
         return;
       case 'payment-method.update':
         sendJson(response, 200, { ...(await service.updatePaymentMethod(command, principal)) });
