@@ -3,10 +3,13 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const migrationsDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../supabase/migrations');
+const migrationsDir = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../../../supabase/migrations',
+);
 
 describe('shop lifecycle management', () => {
-  it('enforces server-side shop authority, monotonic CAS, audit, and service-only RPC grants', () => {
+  it('requires shop authority, monotonic CAS, audit and service-only RPC grants', () => {
     const matches = readdirSync(migrationsDir).filter((name) =>
       name.endsWith('_admin_shop_lifecycle_management.sql'),
     );
