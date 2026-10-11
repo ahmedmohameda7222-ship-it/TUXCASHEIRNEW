@@ -21,7 +21,7 @@ type SettingOverrideEditorProps = {
   updating: boolean;
   scope?: 'shop' | 'business';
   onUpdate(draft: SettingOverrideUpdateDraft): void | Promise<void>;
-  onRestore?: (draft: SettingRestoreDraft) => void | Promise<void>;
+  onRestore?: ((draft: SettingRestoreDraft) => void | Promise<void>) | undefined;
 };
 
 export type SettingEditorState = {
