@@ -51,6 +51,7 @@ export function PurchasingPage() {
     purchasing.manageSupplier,
     purchasing.createPurchaseOrder,
     purchasing.updatePurchaseOrder,
+    purchasing.replaceDraftPurchaseOrderLines,
     purchasing.cancelPurchaseOrder,
     purchasing.orderPurchaseOrder,
     purchasing.receivePurchase,
@@ -189,6 +190,11 @@ export function PurchasingPage() {
                 })}
                 ordering={purchasing.orderPurchaseOrder.isPending}
                 updating={purchasing.updatePurchaseOrder.isPending}
+                inventoryItems={workspace.inventoryItems}
+                replacing={purchasing.replaceDraftPurchaseOrderLines.isPending}
+                onReplaceLines={(lines, onSuccess) => purchasing.replaceDraftPurchaseOrderLines.mutate({
+                  purchaseOrderId: selected.id, expectedVersion: selected.version, lines,
+                }, {onSuccess})}
                 onUpdate={(input, onSuccess) => purchasing.updatePurchaseOrder.mutate({
                   purchaseOrderId: selected.id,
                   expectedVersion: selected.version,
