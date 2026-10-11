@@ -68,7 +68,10 @@ export function CreateShopPanel({ contextShopId }: { contextShopId: string }) {
             type="button"
             className="admin-secondary-button"
             disabled={pending}
-            onClick={() => void session.refresh()}
+            onClick={() => {
+              setError(null);
+              void session.refresh().catch(() => setError('Unable to refresh shop access.'));
+            }}
           >
             Refresh available shops
           </button>
