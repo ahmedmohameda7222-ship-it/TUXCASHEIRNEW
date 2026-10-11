@@ -25,6 +25,7 @@ import {
 } from '../../server/settings/settingsService.js';
 import {
   updateShopIdentity,
+  updateShopLifecycle,
   upsertShopSpecialHours,
   upsertShopWeeklyHours,
 } from '../../server/settings/settingsShopManagement.js';
@@ -167,6 +168,16 @@ export const settingsCommandSchema = z.union([
       expectedSettingsVersion: expectedSettingsVersionSchema,
     })
     .strict(),
+  z
+    .object({
+      type: z.literal('shop.lifecycle.update'),
+      shopId: uuidSchema,
+      expectedState: z.enum(['ACTIVE', 'SUSPENDED']),
+      targetState: z.enum(['ACTIVE', 'SUSPENDED']),
+      expectedLifecycleRevision: expectedEditVersionSchema,
+    })
+    .strict()
+    .refine((input) => input.expectedState !== input.targetState),
   z
     .object({
       type: z.literal('shop.identity.update'),
@@ -428,6 +439,9 @@ export default async function handler(
         sendJson(response, 200, {
           ...(await updateShopOperationalState(client, command, principal)),
         });
+        return;
+      case 'shop.lifecycle.update':
+        sendJson(response, 200, { ...(await updateShopLifecycle(client, command, principal)) });
         return;
       case 'shop.identity.update':
         sendJson(response, 200, { ...(await updateShopIdentity(client, command, principal)) });

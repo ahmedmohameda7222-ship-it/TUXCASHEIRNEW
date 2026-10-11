@@ -1,6 +1,7 @@
 import type {
   AdminSessionPrincipal,
   ShopIdentityUpdateInput,
+  ShopLifecycleUpdateInput,
   ShopManagementWriteResult,
   ShopSpecialHoursUpsertInput,
   ShopWeeklyHoursUpsertInput,
@@ -25,10 +26,30 @@ function parseResult(value: unknown): ShopManagementWriteResult {
     };
   }
   if (typeof value['code'] !== 'string') return { ok: false, code: 'backend_contract_invalid' };
+  if (value['code'] === 'stale_shop_lifecycle' && typeof value['currentVersion'] === 'number') {
+    return { ok: false, code: 'stale_shop_lifecycle', currentVersion: value['currentVersion'] };
+  }
   if (value['code'] === 'stale_settings_version' && typeof value['currentVersion'] === 'number') {
     return { ok: false, code: 'stale_settings_version', currentVersion: value['currentVersion'] };
   }
   return { ok: false, code: value['code'] };
+}
+
+export async function updateShopLifecycle(
+  client: AdminSupabaseClient,
+  input: ShopLifecycleUpdateInput,
+  principal: AdminSessionPrincipal,
+): Promise<ShopManagementWriteResult> {
+  requirePermission(principal, 'shops.manage', input.shopId);
+  return parseResult(
+    await client.rpc<unknown>('update_admin_shop_lifecycle_v1', {
+      p_employee_id: principal.employeeId,
+      p_shop_id: input.shopId,
+      p_expected_lifecycle_revision: input.expectedLifecycleRevision,
+      p_expected_state: input.expectedState,
+      p_target_state: input.targetState,
+    }),
+  );
 }
 
 export async function updateShopIdentity(

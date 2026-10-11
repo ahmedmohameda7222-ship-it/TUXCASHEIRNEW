@@ -13,6 +13,7 @@ import type {
   SettingsPublishResult,
   ShopDeleteOrArchiveResult,
   ShopIdentityUpdateInput,
+  ShopLifecycleUpdateInput,
   ShopManagementWriteResult,
   ShopOperationalStateUpdateInput,
   ShopSpecialHoursUpsertInput,
@@ -38,6 +39,7 @@ export type OrderTypeCreateDraft = Omit<OrderTypeCreateInput, 'shopId'>;
 export type PaymentMethodUpdateDraft = Omit<PaymentMethodEditInput, 'shopId'>;
 export type ReasonCodeUpdateDraft = Omit<ReasonCodeWriteInput, 'shopId'>;
 export type ShopOperationalStateUpdateDraft = Omit<ShopOperationalStateUpdateInput, 'shopId'>;
+export type ShopLifecycleUpdateDraft = Omit<ShopLifecycleUpdateInput, 'shopId'>;
 export type ShopIdentityUpdateDraft = Omit<ShopIdentityUpdateInput, 'shopId'>;
 export type ShopWeeklyHoursUpdateDraft = Omit<ShopWeeklyHoursUpsertInput, 'shopId'>;
 export type ShopSpecialHoursUpdateDraft = Omit<ShopSpecialHoursUpsertInput, 'shopId'>;
@@ -308,6 +310,19 @@ export function useSettings(shopId: string | undefined, includeSchedules = false
     onSuccess: invalidateWorkspace,
   });
 
+  const updateShopLifecycle = useMutation({
+    mutationFn: async (draft: ShopLifecycleUpdateDraft): Promise<void> => {
+      if (!shopId) throw new SettingsUiError('concrete_shop_required');
+      const workspace = latestWorkspace();
+      if (
+        workspace.shop.lifecycleState !== draft.expectedState ||
+        workspace.shop.lifecycleRevision !== draft.expectedLifecycleRevision
+      ) throw new SettingsUiError('stale_shop_lifecycle');
+      await postShopManagement({ type: 'shop.lifecycle.update', shopId, ...draft });
+    },
+    onSuccess: invalidateWorkspace,
+  });
+
   const updateShopIdentityMutation = useMutation({
     mutationFn: async (draft: ShopIdentityUpdateDraft): Promise<void> => {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
@@ -466,6 +481,7 @@ export function useSettings(shopId: string | undefined, includeSchedules = false
     scheduleSettingsChange,
     updateOperationalState,
     updateShopIdentity: updateShopIdentityMutation,
+    updateShopLifecycle,
     upsertWeeklyHours,
     upsertSpecialHours,
     updateSettingOverride,
