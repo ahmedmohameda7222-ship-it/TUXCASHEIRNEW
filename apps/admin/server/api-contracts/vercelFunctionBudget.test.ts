@@ -7,9 +7,7 @@ const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 describe('Hobby deployment API entrypoint budget', () => {
   it('fits no more than twelve Vercel serverless functions', () => {
-    const entries = readdirSync(join(appRoot, 'api/admin')).filter((name) =>
-      name.endsWith('.ts'),
-    );
+    const entries = readdirSync(join(appRoot, 'api/admin')).filter((name) => name.endsWith('.ts'));
     expect(entries).toHaveLength(12);
   });
 
