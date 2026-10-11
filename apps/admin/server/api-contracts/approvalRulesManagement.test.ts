@@ -63,9 +63,9 @@ describe('approval rule management boundary', () => {
     expect(thresholdContextFromDraft({ kind: 'minimumMinor', value: 3400 })).toEqual({
       minimumMinor: 3400,
     });
-    expect(
-      thresholdContextFromDraft({ kind: 'minimumQuantityImpact', value: 2000 }),
-    ).toEqual({ minimumQuantityImpact: 2000 });
+    expect(thresholdContextFromDraft({ kind: 'minimumQuantityImpact', value: 2000 })).toEqual({
+      minimumQuantityImpact: 2000,
+    });
   });
 
   it('separates rule configuration authority from approval-decision access', () => {
@@ -76,11 +76,14 @@ describe('approval rule management boundary', () => {
         shopId,
       ),
     ).toThrow('permission_forbidden');
+    expect(() => requireApprovalRuleManagement({ ...owner, role: 'MANAGER' }, null)).toThrow(
+      'permission_forbidden',
+    );
     expect(() =>
-      requireApprovalRuleManagement({ ...owner, role: 'MANAGER' }, null),
-    ).toThrow('permission_forbidden');
-    expect(() =>
-      requireApprovalRuleManagement({ ...owner, role: 'MANAGER' }, '00000000-0000-4000-8000-000000000000'),
+      requireApprovalRuleManagement(
+        { ...owner, role: 'MANAGER' },
+        '00000000-0000-4000-8000-000000000000',
+      ),
     ).toThrow('shop_forbidden');
   });
 });

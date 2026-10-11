@@ -25,14 +25,18 @@ import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAd
 
 const uuidSchema = z.string().uuid();
 const none = z.object({ kind: z.literal('none') }).strict();
-const minimumMinor = z.object({
-  kind: z.literal('minimumMinor'),
-  value: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-}).strict();
-const minimumQuantityImpact = z.object({
-  kind: z.literal('minimumQuantityImpact'),
-  value: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-}).strict();
+const minimumMinor = z
+  .object({
+    kind: z.literal('minimumMinor'),
+    value: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  })
+  .strict();
+const minimumQuantityImpact = z
+  .object({
+    kind: z.literal('minimumQuantityImpact'),
+    value: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  })
+  .strict();
 export const approvalThresholdSchema = z.discriminatedUnion('kind', [
   none,
   minimumMinor,
@@ -40,28 +44,36 @@ export const approvalThresholdSchema = z.discriminatedUnion('kind', [
 ]);
 export type ApprovalThresholdDraft = z.infer<typeof approvalThresholdSchema>;
 
-export const approvalRuleWriteSchema = z.object({
-  type: z.literal('rule.upsert'),
-  ruleId: uuidSchema.nullable(),
-  shopId: uuidSchema.nullable(),
-  actionType: z.string().trim().min(1).max(120).regex(/^[A-Za-z][A-Za-z0-9_.-]*$/),
-  requesterPermission: z.enum(ADMIN_PERMISSIONS),
-  approverPermission: z.literal('approvals.review'),
-  requiresSecondPerson: z.boolean(),
-  requiresRequesterRepin: z.boolean(),
-  expiresAfterSeconds: z.number().int().min(60).max(604_800),
-  threshold: approvalThresholdSchema,
-  active: z.boolean(),
-  expectedVersion: z.number().int().positive().nullable(),
-}).strict().superRefine((value, context) => {
-  if ((value.ruleId === null) !== (value.expectedVersion === null)) {
-    context.addIssue({
-      code: 'custom',
-      path: ['expectedVersion'],
-      message: 'Create requires null revision and update requires a current revision',
-    });
-  }
-});
+export const approvalRuleWriteSchema = z
+  .object({
+    type: z.literal('rule.upsert'),
+    ruleId: uuidSchema.nullable(),
+    shopId: uuidSchema.nullable(),
+    actionType: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .regex(/^[A-Za-z][A-Za-z0-9_.-]*$/),
+    requesterPermission: z.enum(ADMIN_PERMISSIONS),
+    approverPermission: z.literal('approvals.review'),
+    requiresSecondPerson: z.boolean(),
+    requiresRequesterRepin: z.boolean(),
+    expiresAfterSeconds: z.number().int().min(60).max(604_800),
+    threshold: approvalThresholdSchema,
+    active: z.boolean(),
+    expectedVersion: z.number().int().positive().nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if ((value.ruleId === null) !== (value.expectedVersion === null)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['expectedVersion'],
+        message: 'Create requires null revision and update requires a current revision',
+      });
+    }
+  });
 
 export function thresholdContextFromDraft(
   draft: ApprovalThresholdDraft,
@@ -98,9 +110,10 @@ type ApprovalRuleRow = {
 
 function mapRule(row: ApprovalRuleRow) {
   const threshold = row.threshold_context;
-  const context = typeof threshold === 'object' && threshold !== null && !Array.isArray(threshold)
-    ? threshold as Record<string, unknown>
-    : {};
+  const context =
+    typeof threshold === 'object' && threshold !== null && !Array.isArray(threshold)
+      ? (threshold as Record<string, unknown>)
+      : {};
   return {
     id: row.id,
     shopId: row.shop_id,
@@ -167,7 +180,8 @@ export default async function handler(
         return;
       }
       const query = new URLSearchParams({
-        select: 'id,business_id,shop_id,action_type,requester_permission,approver_permission,requires_second_person,requires_requester_repin,expires_after_seconds,threshold_context,active,edit_version',
+        select:
+          'id,business_id,shop_id,action_type,requester_permission,approver_permission,requires_second_person,requires_requester_repin,expires_after_seconds,threshold_context,active,edit_version',
         business_id: `eq.${context.principal.businessId}`,
         order: 'action_type.asc',
         limit: '500',

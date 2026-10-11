@@ -19,8 +19,8 @@ describe('approval rule management route', () => {
     expect(
       routeIsPermitted({ ...base, permissions: ['approvals.review'] }, '/approvals/rules'),
     ).toBe(false);
-    expect(
-      routeIsPermitted({ ...base, permissions: ['settings.manage'] }, '/approvals'),
-    ).toBe(false);
+    expect(routeIsPermitted({ ...base, permissions: ['settings.manage'] }, '/approvals')).toBe(
+      false,
+    );
   });
 });

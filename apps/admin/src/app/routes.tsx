@@ -3,7 +3,9 @@ import type { AdminPermission, AdminSessionPrincipal } from '@tux/admin-contract
 import { Link, useLocation } from 'wouter';
 
 const ApprovalRulesPage = lazy(() =>
-  import('../approvals/ApprovalRulesPage').then((module) => ({ default: module.ApprovalRulesPage })),
+  import('../approvals/ApprovalRulesPage').then((module) => ({
+    default: module.ApprovalRulesPage,
+  })),
 );
 const ApprovalsPage = lazy(() =>
   import('../approvals/ApprovalsPage').then((module) => ({ default: module.ApprovalsPage })),

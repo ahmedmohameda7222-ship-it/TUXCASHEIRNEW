@@ -61,8 +61,10 @@ function editableRule(row: ApprovalRule): RuleForm | null {
   const entry = entries[0];
   if (
     entry &&
-    (entry[0] !== 'minimumMinor' && entry[0] !== 'minimumQuantityImpact' ||
-      typeof entry[1] !== 'number' || !Number.isSafeInteger(entry[1]) || entry[1] <= 0)
+    ((entry[0] !== 'minimumMinor' && entry[0] !== 'minimumQuantityImpact') ||
+      typeof entry[1] !== 'number' ||
+      !Number.isSafeInteger(entry[1]) ||
+      entry[1] <= 0)
   ) {
     return null;
   }
@@ -74,7 +76,7 @@ function editableRule(row: ApprovalRule): RuleForm | null {
     requiresSecondPerson: row.requiresSecondPerson,
     requiresRequesterRepin: row.requiresRequesterRepin,
     expiresAfterSeconds: String(row.expiresAfterSeconds),
-    thresholdKind: entry ? entry[0] as ThresholdKind : 'none',
+    thresholdKind: entry ? (entry[0] as ThresholdKind) : 'none',
     thresholdValue: entry ? String(entry[1]) : '',
     active: row.active,
     expectedVersion: row.editVersion,
@@ -87,8 +89,9 @@ function buildWriteCommand(form: RuleForm) {
     throw new Error('Expiry must be between 60 and 604800 seconds.');
   }
   let threshold:
-    | { kind: 'none' }
-    | { kind: 'minimumMinor' | 'minimumQuantityImpact'; value: number } = { kind: 'none' };
+    { kind: 'none' } | { kind: 'minimumMinor' | 'minimumQuantityImpact'; value: number } = {
+    kind: 'none',
+  };
   if (form.thresholdKind !== 'none') {
     const value = Number(form.thresholdValue);
     if (!Number.isSafeInteger(value) || value <= 0) {
@@ -129,13 +132,14 @@ function thresholdLabel(rule: ApprovalRule): string {
 export function ApprovalRulesPage() {
   const session = useAdminSession();
   const queryClient = useQueryClient();
-  const principal = session.state.status === 'authenticated' ? session.state.session.principal : null;
+  const principal =
+    session.state.status === 'authenticated' ? session.state.session.principal : null;
   const mayManageBusiness = principal?.role === 'OWNER' || principal?.role === 'ADMIN';
   const authorizedShops = principal?.shopIds ?? [];
   const [form, setForm] = useState<RuleForm>(() =>
     initialForm(
       session.state.status === 'authenticated'
-        ? session.state.session.principal.shopIds[0] ?? null
+        ? (session.state.session.principal.shopIds[0] ?? null)
         : null,
     ),
   );
@@ -164,7 +168,7 @@ export function ApprovalRulesPage() {
         throw new Error(
           result.code === 'stale_approval_rule_version'
             ? 'Rule was updated by someone else. Reload before editing.'
-            : result.code ?? 'approval_rule_save_failed',
+            : (result.code ?? 'approval_rule_save_failed'),
         );
       }
       return result;
@@ -253,7 +257,11 @@ export function ApprovalRulesPage() {
               }
             >
               {mayManageBusiness ? <option value="business">Business-wide</option> : null}
-              {authorizedShops.map((id) => <option key={id} value={id}>Shop {id}</option>)}
+              {authorizedShops.map((id) => (
+                <option key={id} value={id}>
+                  Shop {id}
+                </option>
+              ))}
             </select>
           </label>
           <label className="admin-field">
@@ -282,7 +290,9 @@ export function ApprovalRulesPage() {
               }
             >
               {ADMIN_PERMISSIONS.map((permission) => (
-                <option value={permission} key={permission}>{permission}</option>
+                <option value={permission} key={permission}>
+                  {permission}
+                </option>
               ))}
             </select>
           </label>
