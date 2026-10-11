@@ -20,7 +20,7 @@ import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
 import type { ProductEditorDraft } from './ProductEditor';
 import { applyProductAdvancedDraft } from './catalogAdvancedDraft';
-import { catalogDefinitionsFromBundle, upsertCatalogDefinitionInBundle, type CatalogDefinitionCollection } from './catalogDefinitionsDraft';
+import { catalogDefinitionsFromBundle, reorderCatalogDefinitionsInBundle, upsertCatalogDefinitionInBundle, type CatalogDefinitionCollection } from './catalogDefinitionsDraft';
 
 export type ActiveCatalogDraft = {
   draftId: string;
@@ -396,16 +396,24 @@ export function useCatalog(shopId: string | undefined) {
   const saveDefinitions = useMutation({
     mutationFn: async (input: {
       collection: CatalogDefinitionCollection;
-      definition: CatalogJsonObject;
+      definition?: CatalogJsonObject;
+      orderedIds?: readonly string[];
     }) => {
-      if (!shopId || input.definition['shopId'] !== shopId) throw new CatalogUiError('concrete_shop_required');
+      if (!shopId || (input.definition && input.definition['shopId'] !== shopId)) {
+        throw new CatalogUiError('concrete_shop_required');
+      }
+      if (Boolean(input.definition) === Boolean(input.orderedIds)) {
+        throw new CatalogUiError('invalid_catalog_definition_change');
+      }
       const draft = await loadOrCreateDraftForShop('Menu definitions');
-      const nextBundle = upsertCatalogDefinitionInBundle(
-        draft.bundleJson, input.collection, input.definition,
-      );
-      const previous = catalogDefinitionsFromBundle(draft.bundleJson, input.collection)
-        .find((definition) => definition['id'] === input.definition['id']);
-      const priceChanged = input.collection === 'modifiers' &&
+      const nextBundle = input.orderedIds
+        ? reorderCatalogDefinitionsInBundle(draft.bundleJson, input.collection, input.orderedIds)
+        : upsertCatalogDefinitionInBundle(draft.bundleJson, input.collection, input.definition!);
+      const previous = input.definition
+        ? catalogDefinitionsFromBundle(draft.bundleJson, input.collection)
+          .find((definition) => definition['id'] === input.definition?.['id'])
+        : undefined;
+      const priceChanged = input.collection === 'modifiers' && input.definition !== undefined &&
         previous?.['priceMinor'] !== input.definition['priceMinor'];
       const saved = await adminFetch<CatalogDraftSaveResult>(
         '/api/admin/catalog',
