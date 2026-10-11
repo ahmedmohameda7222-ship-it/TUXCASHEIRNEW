@@ -48,6 +48,7 @@ export function PurchasingPage() {
   const workspace = purchasing.workspace.data;
   const mutationError = latestMutationError([
     purchasing.createSupplier,
+    purchasing.manageSupplier,
     purchasing.createPurchaseOrder,
     purchasing.updatePurchaseOrder,
     purchasing.cancelPurchaseOrder,
@@ -108,6 +109,7 @@ export function PurchasingPage() {
   }
 
   const canManage = principal.permissions.includes('purchasing.manage');
+  const canManageLifecycle = canManage && (principal.role === 'OWNER' || principal.role === 'ADMIN');
   const canReceive = principal.permissions.includes('purchasing.receive');
 
   return (
@@ -160,9 +162,13 @@ export function PurchasingPage() {
                   <SuppliersPage
                     suppliers={workspace.suppliers}
                     canManage={canManage}
-                    pending={purchasing.createSupplier.isPending}
+                    canManageLifecycle={canManageLifecycle}
+                    pending={purchasing.createSupplier.isPending || purchasing.manageSupplier.isPending}
                     onCreate={(input, onSuccess) =>
                       purchasing.createSupplier.mutate(input, { onSuccess })
+                    }
+                    onManage={(input, onSuccess) =>
+                      purchasing.manageSupplier.mutate(input, { onSuccess })
                     }
                   />
                 ),
