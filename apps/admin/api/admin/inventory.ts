@@ -40,6 +40,62 @@ const commandIdSchema = z.string().trim().min(1).max(160);
 const noteSchema = z.string().trim().max(500).nullable();
 
 const commandSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('item.create'), shopId: uuidSchema,
+    entityId: z.null(),
+    expectedVersion: z.null(),
+    payload: z.object({name:z.string().trim().min(1).max(160),unitLabel:z.string().trim().min(1).max(80),trackingMode:z.enum(['RECIPE_TRACKED','BULK_MANUAL']),lowStockThresholdMicros:microsSchema.nonnegative().nullable()}).strict(),
+    commandId: commandIdSchema,
+  }).strict(),
+  z.object({
+    type: z.literal('item.update'), shopId: uuidSchema,
+    entityId: uuidSchema,
+    expectedVersion: z.number().int().positive(),
+    payload: z.object({name:z.string().trim().min(1).max(160),unitLabel:z.string().trim().min(1).max(80),trackingMode:z.enum(['RECIPE_TRACKED','BULK_MANUAL']),lowStockThresholdMicros:microsSchema.nonnegative().nullable()}).strict(),
+    commandId: commandIdSchema,
+  }).strict(),
+  z.object({
+    type: z.literal('item.archive'), shopId: uuidSchema,
+    entityId: uuidSchema,
+    expectedVersion: z.number().int().positive(),
+    payload: z.object({}).strict(),
+    commandId: commandIdSchema,
+  }).strict(),
+  z.object({
+    type: z.literal('item.restore'), shopId: uuidSchema,
+    entityId: uuidSchema,
+    expectedVersion: z.number().int().positive(),
+    payload: z.object({}).strict(),
+    commandId: commandIdSchema,
+  }).strict(),
+  z.object({
+    type: z.literal('conversion.create'), shopId: uuidSchema,
+    entityId: z.null(),
+    expectedVersion: z.null(),
+    payload: z.object({inventoryItemId:uuidSchema,purchaseUnitLabel:z.string().trim().min(1).max(120),baseMicrosPerPurchaseUnit:positiveMicrosSchema}).strict(),
+    commandId: commandIdSchema,
+  }).strict(),
+  z.object({
+    type: z.literal('conversion.update'), shopId: uuidSchema,
+    entityId: uuidSchema,
+    expectedVersion: z.number().int().positive(),
+    payload: z.object({purchaseUnitLabel:z.string().trim().min(1).max(120),baseMicrosPerPurchaseUnit:positiveMicrosSchema}).strict(),
+    commandId: commandIdSchema,
+  }).strict(),
+  z.object({
+    type: z.literal('conversion.archive'), shopId: uuidSchema,
+    entityId: uuidSchema,
+    expectedVersion: z.number().int().positive(),
+    payload: z.object({}).strict(),
+    commandId: commandIdSchema,
+  }).strict(),
+  z.object({
+    type: z.literal('conversion.restore'), shopId: uuidSchema,
+    entityId: uuidSchema,
+    expectedVersion: z.number().int().positive(),
+    payload: z.object({}).strict(),
+    commandId: commandIdSchema,
+  }).strict(),
   z
     .object({
       type: z.literal('adjust'),
@@ -141,6 +197,8 @@ export type InventoryItemRow = {
   unit_label: string;
   tracking_mode: string;
   active: boolean;
+  definition_version: number | string;
+  low_stock_threshold_micros: number | string | null;
 };
 
 export type BalanceRow = {
@@ -148,6 +206,15 @@ export type BalanceRow = {
   on_hand_micros: number | string;
   reserved_micros: number | string;
   available_micros: number | string;
+};
+
+type UnitConversionRow = {
+  id: string;
+  inventory_item_id: string;
+  purchase_unit_label: string;
+  base_micros_per_purchase_unit: number | string;
+  active: boolean;
+  definition_version: number | string;
 };
 
 type MovementRow = {
@@ -290,7 +357,7 @@ export async function loadInventoryItemRows(
     const page = await client.select<InventoryItemRow[]>(
       'inventory_items',
       new URLSearchParams({
-        select: 'id,shop_id,name,unit_label,tracking_mode,active',
+        select: 'id,shop_id,name,unit_label,tracking_mode,active,definition_version,low_stock_threshold_micros',
         shop_id: `eq.${shopId}`,
         order: 'name.asc,id.asc',
         limit: String(INVENTORY_ITEM_PAGE_SIZE),
@@ -465,7 +532,7 @@ export async function loadInventoryWorkspace(
 ): Promise<AdminInventoryWorkspace> {
   requirePermission(context.principal, 'inventory.view', shopId);
 
-  const [itemRows, balanceRows, costRows, reasonRows, transferRows, shopRows, supplierRows] =
+  const [itemRows, balanceRows, costRows, reasonRows, transferRows, shopRows, supplierRows, unitRows] =
     await Promise.all([
       loadInventoryItemRows(client, shopId),
       loadInventoryBalanceRows(client, context.principal.employeeId, shopId),
@@ -495,6 +562,15 @@ export async function loadInventoryWorkspace(
           select: 'id,name',
           business_id: `eq.${context.principal.businessId}`,
           order: 'name.asc,id.asc',
+        }),
+      ),
+      client.select<UnitConversionRow[]>(
+        'inventory_unit_conversions',
+        new URLSearchParams({
+          select: 'id,inventory_item_id,purchase_unit_label,base_micros_per_purchase_unit,active,definition_version',
+          shop_id: `eq.${shopId}`,
+          order: 'inventory_item_id.asc,purchase_unit_label.asc',
+          limit: String(INVENTORY_ITEM_PAGE_SIZE),
         }),
       ),
     ]);
@@ -534,6 +610,17 @@ export async function loadInventoryWorkspace(
       unitLabel: row.unit_label,
       trackingMode: row.tracking_mode,
       active: row.active,
+      definitionVersion: safeInteger(row.definition_version),
+      lowStockThresholdMicros: row.low_stock_threshold_micros === null
+        ? null : safeInteger(row.low_stock_threshold_micros),
+      conversions: unitRows.filter((unit) => unit.inventory_item_id === row.id).map((unit) => ({
+        id: unit.id,
+        inventoryItemId: unit.inventory_item_id,
+        purchaseUnitLabel: unit.purchase_unit_label,
+        baseMicrosPerPurchaseUnit: safeInteger(unit.base_micros_per_purchase_unit),
+        active: unit.active,
+        definitionVersion: safeInteger(unit.definition_version),
+      })),
       onHandMicros,
       reservedMicros,
       availableMicros,
@@ -596,7 +683,8 @@ export async function loadInventoryWorkspace(
 
 function commandFailureStatus(result: AdminInventoryCommandResult): number {
   if (result.ok) return 200;
-  if (result.code === 'insufficient_stock' || result.code.includes('conflict')) return 409;
+  if (result.code === 'insufficient_stock' || result.code === 'stale_version' ||
+      result.code === 'inventory_semantic_change_forbidden' || result.code.includes('conflict')) return 409;
   if (result.code.includes('forbidden') || result.code.includes('permission')) return 403;
   if (result.code.includes('not_found')) return 404;
   return 400;
@@ -608,6 +696,24 @@ async function executeCommand(
   command: AdminInventoryCommand,
 ): Promise<AdminInventoryCommandResult> {
   switch (command.type) {
+    case 'item.create':
+    case 'item.update':
+    case 'item.archive':
+    case 'item.restore':
+    case 'conversion.create':
+    case 'conversion.update':
+    case 'conversion.archive':
+    case 'conversion.restore':
+      requirePermission(context.principal, 'purchasing.manage', command.shopId);
+      return client.rpc<AdminInventoryCommandResult>('manage_inventory_definition_v1', {
+        p_employee_id: context.principal.employeeId,
+        p_shop_id: command.shopId,
+        p_action: command.type,
+        p_entity_id: command.entityId,
+        p_expected_version: command.expectedVersion,
+        p_payload: command.payload,
+        p_command_id: command.commandId,
+      });
     case 'adjust': {
       requirePermission(context.principal, 'inventory.adjust', command.shopId);
       if (command.emergencyNegativeOverride) {
