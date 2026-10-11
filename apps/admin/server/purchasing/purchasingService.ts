@@ -4,19 +4,21 @@ import type {
   CreatePurchaseOrderInput,
   CancelPurchaseOrderInput,
   CreateSupplierInput,
+  ManageSupplierInput,
   PurchasingCommandResult,
   ReceivePurchaseInput,
   ReturnPurchaseInput,
   UpdatePurchaseOrderInput,
 } from '@tux/admin-contracts';
 
-import { requirePermission } from '../authorization.js';
+import { requireBusinessWidePermission, requirePermission } from '../authorization.js';
 
 export interface PurchasingStore {
   loadWorkspace(shopId: string, businessId: string): Promise<AdminPurchasingWorkspace>;
   createSupplier(
     input: CreateSupplierInput & { employeeId: string; businessId: string },
   ): Promise<PurchasingCommandResult>;
+  manageSupplier(input: ManageSupplierInput & {employeeId: string}): Promise<PurchasingCommandResult>;
   createPurchaseOrder(
     input: CreatePurchaseOrderInput & { employeeId: string; businessId: string },
   ): Promise<PurchasingCommandResult>;
@@ -59,6 +61,14 @@ export function createPurchasingService(store: PurchasingStore) {
         employeeId: principal.employeeId,
         businessId: principal.businessId,
       });
+    },
+
+    async manageSupplier(
+      input: ManageSupplierInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<PurchasingCommandResult> {
+      requireBusinessWidePermission(principal, 'purchasing.manage', input.shopId);
+      return store.manageSupplier({...input, employeeId: principal.employeeId});
     },
 
     async createPurchaseOrder(
