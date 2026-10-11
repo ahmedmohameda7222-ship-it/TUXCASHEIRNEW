@@ -9,6 +9,7 @@ import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { AdjustStockSheet } from './AdjustStockSheet';
 import { InventoryItemPage } from './InventoryItemPage';
+import { InventoryDefinitionEditor } from './InventoryDefinitionEditor';
 import { RecordWasteSheet } from './RecordWasteSheet';
 import { ReorderSuggestionsPage } from './ReorderSuggestionsPage';
 import { StocktakePage } from './StocktakePage';
@@ -62,6 +63,8 @@ export function InventoryPage() {
   const inventory = useInventory(shopId, selectedItemId);
   const [mode, setMode] = useState<WorkspaceMode>('detail');
   const [itemAction, setItemAction] = useState<ItemAction>(null);
+  const [definitionItemId, setDefinitionItemId] = useState<string | null>(null);
+  const [definitionOpen, setDefinitionOpen] = useState(false);
   const [stocktakeSnapshot, setStocktakeSnapshot] = useState<AdminStocktakeSnapshot | null>(null);
 
   const workspace = inventory.workspaceQuery.data;
@@ -73,6 +76,7 @@ export function InventoryPage() {
     inventory.updateReplenishment,
     inventory.sendTransfer,
     inventory.receiveTransfer,
+    inventory.manageDefinition,
   ]);
   const mutationErrorText = mutationErrorMessage(mutationError);
   const items = workspace?.items ?? [];
@@ -124,6 +128,7 @@ export function InventoryPage() {
   const canStocktake = principal.permissions.includes('inventory.stocktake');
   const canTransfer = principal.permissions.includes('inventory.transfer');
   const canManageReplenishment = principal.permissions.includes('purchasing.manage');
+  const canManageDefinitions = principal.permissions.includes('purchasing.manage');
   const canOverrideNegative =
     principal.role === 'OWNER' && principal.permissions.includes('inventory.override_negative');
 
@@ -179,6 +184,12 @@ export function InventoryPage() {
       description="Review availability, stock counts, waste and transfers for this shop."
       primaryAction={
         <div className="admin-inventory-page-actions">
+          {canManageDefinitions ? (
+            <button className="admin-primary-button" type="button"
+              onClick={() => { setDefinitionItemId(null); setDefinitionOpen(true); setMode('detail'); navigate('/inventory'); }}>
+              Add inventory item
+            </button>
+          ) : null}
           {canStocktake ? (
             <button
               className="admin-primary-button"
@@ -239,7 +250,19 @@ export function InventoryPage() {
           {mutationErrorText}
         </p>
       ) : null}
-      {mode === 'stocktake-select' ? (
+      {definitionOpen && canManageDefinitions ? (
+        <InventoryDefinitionEditor
+          item={items.find((item) => item.id === definitionItemId) ?? null}
+          pending={inventory.manageDefinition.isPending}
+          onClose={() => setDefinitionOpen(false)}
+          onCommand={(input, onSuccess) => inventory.manageDefinition.mutate(input, {
+            onSuccess: (result) => {
+              onSuccess(result.entityId);
+              if (input.type === 'item.create' && result.entityId) navigate(detailPath('/inventory', result.entityId));
+            },
+          })}
+        />
+      ) : mode === 'stocktake-select' ? (
         <section
           className="admin-inventory-workflow"
           aria-labelledby="inventory-stocktake-batch-title"
@@ -399,22 +422,26 @@ export function InventoryPage() {
                 <InventoryItemPage
                   item={selectedItem}
                   actions={
-                    canAdjust && selectedItem.active ? (
+                    (canManageDefinitions || (canAdjust && selectedItem.active)) ? (
                       <>
-                        <button
+                        {canManageDefinitions ? <button className="admin-secondary-button" type="button"
+                          onClick={() => { setDefinitionItemId(selectedItem.id); setDefinitionOpen(true); }}>
+                          Edit item
+                        </button> : null}
+                        {canAdjust && selectedItem.active ? <button
                           className="admin-secondary-button"
                           type="button"
                           onClick={() => setItemAction('adjust')}
                         >
                           Adjust stock
-                        </button>
-                        <button
+                        </button> : null}
+                        {canAdjust && selectedItem.active ? <button
                           className="admin-secondary-button"
                           type="button"
                           onClick={() => setItemAction('waste')}
                         >
                           Record waste
-                        </button>
+                        </button> : null}
                       </>
                     ) : undefined
                   }
