@@ -115,11 +115,10 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                 maxLength={120}
                 value={createDraft.displayName}
                 disabled={updating}
-                onChange={(event) =>
-                  setCreateDraft((current) =>
-                    current ? { ...current, displayName: event.currentTarget.value } : current,
-                  )
-                }
+                onChange={(event) => {
+                  const displayName = event.currentTarget.value;
+                  setCreateDraft((current) => (current ? { ...current, displayName } : current));
+                }}
               />
             </label>
             <label className="admin-field">
@@ -127,17 +126,10 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
               <select
                 value={createDraft.logicType}
                 disabled={updating}
-                onChange={(event) =>
-                  setCreateDraft((current) =>
-                    current
-                      ? {
-                          ...current,
-                          logicType: event.currentTarget
-                            .value as PaymentMethodCreateDraft['logicType'],
-                        }
-                      : current,
-                  )
-                }
+                onChange={(event) => {
+                  const logicType = event.currentTarget.value as PaymentMethodCreateDraft['logicType'];
+                  setCreateDraft((current) => (current ? { ...current, logicType } : current));
+                }}
               >
                 <option value="CASH">Cash</option>
                 <option value="CARD">Card</option>
@@ -150,16 +142,10 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
               <select
                 value={createDraft.channel}
                 disabled={updating}
-                onChange={(event) =>
-                  setCreateDraft((current) =>
-                    current
-                      ? {
-                          ...current,
-                          channel: event.currentTarget.value as PaymentMethodCreateDraft['channel'],
-                        }
-                      : current,
-                  )
-                }
+                onChange={(event) => {
+                  const channel = event.currentTarget.value as PaymentMethodCreateDraft['channel'];
+                  setCreateDraft((current) => (current ? { ...current, channel } : current));
+                }}
               >
                 <option value="POS">In-store</option>
                 <option value="ONLINE">Online</option>
@@ -171,11 +157,10 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                 type="checkbox"
                 checked={createDraft.active}
                 disabled={updating}
-                onChange={(event) =>
-                  setCreateDraft((current) =>
-                    current ? { ...current, active: event.currentTarget.checked } : current,
-                  )
-                }
+                onChange={(event) => {
+                  const active = event.currentTarget.checked;
+                  setCreateDraft((current) => (current ? { ...current, active } : current));
+                }}
               />
               <span>Active on creation</span>
             </label>
@@ -184,13 +169,10 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                 type="checkbox"
                 checked={createDraft.requiresReference}
                 disabled={updating}
-                onChange={(event) =>
-                  setCreateDraft((current) =>
-                    current
-                      ? { ...current, requiresReference: event.currentTarget.checked }
-                      : current,
-                  )
-                }
+                onChange={(event) => {
+                  const requiresReference = event.currentTarget.checked;
+                  setCreateDraft((current) => (current ? { ...current, requiresReference } : current));
+                }}
               />
               <span>Require payment reference</span>
             </label>
@@ -199,13 +181,10 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                 type="checkbox"
                 checked={createDraft.manualConfirmationRequired}
                 disabled={updating}
-                onChange={(event) =>
-                  setCreateDraft((current) =>
-                    current
-                      ? { ...current, manualConfirmationRequired: event.currentTarget.checked }
-                      : current,
-                  )
-                }
+                onChange={(event) => {
+                  const manualConfirmationRequired = event.currentTarget.checked;
+                  setCreateDraft((current) => (current ? { ...current, manualConfirmationRequired } : current));
+                }}
               />
               <span>Require manual confirmation</span>
             </label>
@@ -214,11 +193,10 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                 type="checkbox"
                 checked={createDraft.refundAllowed}
                 disabled={updating}
-                onChange={(event) =>
-                  setCreateDraft((current) =>
-                    current ? { ...current, refundAllowed: event.currentTarget.checked } : current,
-                  )
-                }
+                onChange={(event) => {
+                  const refundAllowed = event.currentTarget.checked;
+                  setCreateDraft((current) => (current ? { ...current, refundAllowed } : current));
+                }}
               />
               <span>Refunds allowed for new payments</span>
             </label>

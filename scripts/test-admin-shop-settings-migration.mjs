@@ -158,22 +158,33 @@ begin
     raise exception 'stale order type row edit was not rejected: %', v_order_edit;
   end if;
 
-  -- refundAllowed is canonical but not editable until the trusted refund boundary enforces it.
+  -- Refund eligibility now snapshots at payment creation and is version-fenced for future payments.
   v_payment_edit := public.update_admin_payment_method_v1(
     '${employeeId}', '${shopId}', '${paymentMethodId}', 'Front Cash', true, 1,
     'BOTH', true, true, false, 0, 1
   );
-  if v_payment_edit ->> 'code' <> 'refund_policy_not_editable_until_enforced' then
-    raise exception 'unenforced refund policy mutation was not rejected: %', v_payment_edit;
+  if coalesce((v_payment_edit ->> 'ok')::boolean, false) is not true
+     or (v_payment_edit ->> 'editVersion')::bigint <> 2 then
+    raise exception 'trusted refund policy edit did not succeed: %', v_payment_edit;
   end if;
 
+  -- A stale client must never restore an older policy with the consumed edit version.
   v_payment_edit := public.update_admin_payment_method_v1(
     '${employeeId}', '${shopId}', '${paymentMethodId}', 'Front Cash', true, 1,
     'BOTH', true, true, true, 0, 1
   );
+  if v_payment_edit ->> 'code' is distinct from 'stale_edit_version'
+     or (v_payment_edit ->> 'currentVersion')::bigint <> 2 then
+    raise exception 'stale refund policy edit was not rejected: %', v_payment_edit;
+  end if;
+
+  v_payment_edit := public.update_admin_payment_method_v1(
+    '${employeeId}', '${shopId}', '${paymentMethodId}', 'Front Cash', true, 1,
+    'BOTH', true, true, true, 0, 2
+  );
   if coalesce((v_payment_edit ->> 'ok')::boolean, false) is not true
-     or (v_payment_edit ->> 'editVersion')::bigint <> 2 then
-    raise exception 'payment method edit failed while preserving refund policy: %', v_payment_edit;
+     or (v_payment_edit ->> 'editVersion')::bigint <> 3 then
+    raise exception 'versioned refund policy restoration failed: %', v_payment_edit;
   end if;
 
   select p.logic_type, p.requires_reconciliation, p.refund_allowed

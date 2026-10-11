@@ -444,7 +444,7 @@ test('restricts a published payment method for a delivery zone through CAS autho
     expectedAllowed: null,
     expectedSettingsVersion: 7,
   });
-  await expect(page.getByRole('button', { name: 'Allow' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Allow', exact: true })).toBeVisible();
 });
 
 test('creates payment methods with a retry-safe trusted settings command', async ({ page }) => {
@@ -499,7 +499,7 @@ test('changes refund policy with a captured settings and row CAS', async ({ page
   const { commands } = await mockSettings(page);
   await page.goto('/settings/payments');
   await page.getByRole('button', { name: 'Edit Cash' }).click();
-  await page.getByLabel('Refund allowed').uncheck();
+  await page.getByLabel('Refunds allowed for new payments').uncheck();
   await page.getByRole('button', { name: 'Save payment method' }).click();
   await expect.poll(() => commands.length).toBe(1);
   expect(commands[0]).toMatchObject({
