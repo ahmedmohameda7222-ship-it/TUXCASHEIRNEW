@@ -14,6 +14,7 @@ import type {
   OrderTypeEditInput,
   OrderTypeCreateInput,
   PaymentMethodChannel,
+  PaymentMethodCreateInput,
   PaymentMethodEditInput,
   ReasonCodeWriteInput,
   ReasonCodeWriteResult,
@@ -84,6 +85,9 @@ export interface SettingsStore {
   ): Promise<CanonicalSettingsRowEditResult>;
   updateOrderType(
     input: { employeeId: string } & OrderTypeEditInput,
+  ): Promise<CanonicalSettingsRowEditResult>;
+  createPaymentMethod(
+    input: { employeeId: string } & PaymentMethodCreateInput,
   ): Promise<CanonicalSettingsRowEditResult>;
   updatePaymentMethod(
     input: { employeeId: string } & PaymentMethodEditInput,
@@ -536,6 +540,14 @@ export function createSettingsService(store: SettingsStore) {
       return store.updateOrderType({ employeeId: principal.employeeId, ...input });
     },
 
+    async createPaymentMethod(
+      input: PaymentMethodCreateInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<CanonicalSettingsRowEditResult> {
+      requirePermission(principal, 'settings.manage', input.shopId);
+      return store.createPaymentMethod({ employeeId: principal.employeeId, ...input });
+    },
+
     async updatePaymentMethod(
       input: PaymentMethodEditInput,
       principal: AdminSessionPrincipal,
@@ -823,6 +835,35 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
         p_sort_order: sortOrder,
         p_expected_settings_version: expectedSettingsVersion,
         p_expected_edit_version: expectedEditVersion,
+      });
+      return parseCanonicalSettingsRowEditResult(result);
+    },
+
+    async createPaymentMethod({
+      employeeId,
+      shopId,
+      displayName,
+      logicType,
+      active,
+      sortOrder,
+      channel,
+      requiresReference,
+      manualConfirmationRequired,
+      expectedSettingsVersion,
+      commandId,
+    }) {
+      const result = await client.rpc<unknown>('create_admin_payment_method_v1', {
+        p_employee_id: employeeId,
+        p_shop_id: shopId,
+        p_display_name: displayName,
+        p_logic_type: logicType,
+        p_active: active,
+        p_sort_order: sortOrder,
+        p_channel: channel,
+        p_requires_reference: requiresReference,
+        p_manual_confirmation_required: manualConfirmationRequired,
+        p_expected_settings_version: expectedSettingsVersion,
+        p_command_id: commandId,
       });
       return parseCanonicalSettingsRowEditResult(result);
     },
