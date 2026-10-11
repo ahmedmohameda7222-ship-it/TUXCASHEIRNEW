@@ -13,6 +13,7 @@ import { PaymentsPage } from './PaymentsPage';
 import { ReasonCodesPage } from './ReasonCodesPage';
 import { ReceiptsPage } from './ReceiptsPage';
 import { SettingsScheduleActionProvider } from './SettingsSchedulePanel';
+import { ShopCopyPreviewPanel } from './ShopCopyPreviewPanel';
 import { ShopsPage } from './ShopsPage';
 import './settings.css';
 import {
@@ -46,6 +47,7 @@ export type SettingsWorkspaceViewProps = {
   section: SettingsSection;
   canAssignStaff?: boolean;
   canCreateShop?: boolean;
+  shopCopySourceIds?: readonly string[];
   canManageShopLifecycle?: boolean;
   onUpdateShopLifecycle?: (draft: ShopLifecycleUpdateDraft) => void | Promise<void>;
   shopLifecycleUpdating?: boolean;
@@ -167,6 +169,7 @@ function SectionContent(
     shopManagementUpdating,
     canAssignStaff,
     canCreateShop,
+    shopCopySourceIds,
     canManageShopLifecycle,
     onUpdateShopLifecycle,
     shopLifecycleUpdating,
@@ -194,6 +197,13 @@ function SectionContent(
       return (
         <>
           {canCreateShop ? <CreateShopPanel contextShopId={workspace.shop.id} /> : null}
+          {shopCopySourceIds && shopCopySourceIds.length > 0 ? (
+            <ShopCopyPreviewPanel
+              targetShopId={workspace.shop.id}
+              expectedTargetSettingsVersion={workspace.settingsVersion}
+              sourceShopIds={shopCopySourceIds}
+            />
+          ) : null}
           <ShopsPage
             workspace={workspace}
             canAssignStaff={canAssignStaff === true}
@@ -387,6 +397,11 @@ export function SettingsPage() {
             principal.permissions.includes('staff.view')
           }
           canManageShopLifecycle={principal.permissions.includes('shops.manage')}
+          shopCopySourceIds={
+            principal.permissions.includes('settings.manage')
+              ? principal.shopIds.filter((id) => id !== workspace.shop.id)
+              : []
+          }
           canCreateShop={
             (principal.role === 'OWNER' || principal.role === 'ADMIN') &&
             principal.permissions.includes('shops.manage')
