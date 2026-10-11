@@ -23,7 +23,13 @@ async function mockSettings(
   page: Page,
   permissions: string[] = ownerSession.principal.permissions,
   role: 'OWNER' | 'MANAGER' = 'OWNER',
-  deliveryZones: { id: string; name: string; active: boolean; feeMinor: number; sortOrder: number }[] = [],
+  deliveryZones: {
+    id: string;
+    name: string;
+    active: boolean;
+    feeMinor: number;
+    sortOrder: number;
+  }[] = [],
 ) {
   let settingsVersion = 7;
   let shopLifecycleState: 'ACTIVE' | 'SUSPENDED' = 'ACTIVE';
@@ -66,7 +72,8 @@ async function mockSettings(
   ];
   const commands: Record<string, unknown>[] = [];
   const paymentZoneCommands: Record<string, unknown>[] = [];
-  const paymentZoneRules: { paymentMethodId: string; deliveryZoneId: string; allowed: boolean }[] = [];
+  const paymentZoneRules: { paymentMethodId: string; deliveryZoneId: string; allowed: boolean }[] =
+    [];
 
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
@@ -422,7 +429,9 @@ test('restricts a published payment method for a delivery zone through CAS autho
     [{ id: zoneId, name: 'Maadi', active: true, feeMinor: 3000, sortOrder: 10 }],
   );
   await page.goto('/settings/checkout');
-  await expect(page.getByRole('heading', { name: 'Delivery-zone payment restrictions' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Delivery-zone payment restrictions' }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Restrict' }).click();
   await expect.poll(() => paymentZoneCommands.length).toBe(1);
   expect(paymentZoneCommands[0]).toEqual({

@@ -66,7 +66,11 @@ export function PaymentZoneRulesPanel({ workspace }: { workspace: AdminSettingsW
       </p>
       {rules.isLoading ? <p>Loading payment restrictions…</p> : null}
       {rules.isError ? <p role="alert">Unable to load payment restrictions.</p> : null}
-      {error ? <p className="admin-field__error" role="alert">{error}</p> : null}
+      {error ? (
+        <p className="admin-field__error" role="alert">
+          {error}
+        </p>
+      ) : null}
       {workspace.deliveryZones.length === 0 || workspace.paymentMethods.length === 0 ? (
         <p className="admin-settings-muted">
           Add delivery zones and payment methods before configuring restrictions.
@@ -78,14 +82,15 @@ export function PaymentZoneRulesPanel({ workspace }: { workspace: AdminSettingsW
             workspace.paymentMethods.map((method) => {
               const rule = rules.data.rules.find(
                 (candidate) =>
-                  candidate.deliveryZoneId === zone.id &&
-                  candidate.paymentMethodId === method.id,
+                  candidate.deliveryZoneId === zone.id && candidate.paymentMethodId === method.id,
               );
               const allowed = rule?.allowed !== false;
               return (
                 <div className="admin-settings-row" key={`${zone.id}:${method.id}`}>
                   <div>
-                    <strong>{zone.name} — {method.displayName}</strong>
+                    <strong>
+                      {zone.name} — {method.displayName}
+                    </strong>
                     <span>{allowed ? 'Allowed for this zone' : 'Restricted for this zone'}</span>
                   </div>
                   <button

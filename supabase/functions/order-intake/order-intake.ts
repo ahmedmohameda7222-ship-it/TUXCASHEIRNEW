@@ -687,8 +687,7 @@ function publishedCheckoutPolicyError(
   if (!isPublishedOnlineOrderingOpenAt(authority, now)) {
     return errorResponse(409, ONLINE_ORDERING_OUTSIDE_HOURS);
   }
-  const fulfillmentServiceKind =
-    request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'OPEN';
+  const fulfillmentServiceKind = request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'OPEN';
   if (!isPublishedServiceKindOpenAt(authority, fulfillmentServiceKind, now)) {
     return errorResponse(409, 'fulfillment_outside_hours');
   }
@@ -867,10 +866,7 @@ export async function handleOrderIntakeRequest(
           revalidated.zoneId !== resolved.zoneId ||
           !revalidated.fallbackUsed
         ) {
-          return errorResponse(
-            409,
-            revalidated.ok ? 'delivery_unavailable' : revalidated.code,
-          );
+          return errorResponse(409, revalidated.ok ? 'delivery_unavailable' : revalidated.code);
         }
         resolved = revalidated;
       }

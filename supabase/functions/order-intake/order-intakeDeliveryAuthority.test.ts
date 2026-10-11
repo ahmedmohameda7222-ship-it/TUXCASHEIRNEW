@@ -25,25 +25,49 @@ function catalog(shopId = SHOP_ID): OnlineOrderCatalogAuthority {
   return {
     shop: { id: shopId, active: true },
     categories: [{ id: categoryId, shopId, active: true }],
-    products: [{
-      id: productId, shopId, categoryId, name: 'Delivery Burger',
-      priceMinor: 19_000, active: true, soldOut: false, isCombo: false,
-    }],
-    modifiers: [], productModifierLinks: [], comboBeverageOptions: [],
+    products: [
+      {
+        id: productId,
+        shopId,
+        categoryId,
+        name: 'Delivery Burger',
+        priceMinor: 19_000,
+        active: true,
+        soldOut: false,
+        isCombo: false,
+      },
+    ],
+    modifiers: [],
+    productModifierLinks: [],
+    comboBeverageOptions: [],
   };
 }
 
 function authority(shopId = SHOP_ID): OnlineOrderPublishedCheckoutAuthority {
   return {
-    shopId, configurationVersion: 19, settingsVersion: 19,
-    lifecycleState: 'ACTIVE', temporaryClosed: false, onlineOrdersPaused: false,
-    minimumOrderMinor: 0, serviceChargeBps: 0, taxBps: 0, requireCustomerPhone: false,
-    weeklyHours: [], specialHours: [],
+    shopId,
+    configurationVersion: 19,
+    settingsVersion: 19,
+    lifecycleState: 'ACTIVE',
+    temporaryClosed: false,
+    onlineOrdersPaused: false,
+    minimumOrderMinor: 0,
+    serviceChargeBps: 0,
+    taxBps: 0,
+    requireCustomerPhone: false,
+    weeklyHours: [],
+    specialHours: [],
     orderTypes: [{ behavior: 'DELIVERY', active: true }],
-    paymentMethods: [{
-      id: CASH_METHOD_ID, displayName: 'Cash', logicType: 'CASH', active: true,
-      channel: 'BOTH', integrationReference: null,
-    }],
+    paymentMethods: [
+      {
+        id: CASH_METHOD_ID,
+        displayName: 'Cash',
+        logicType: 'CASH',
+        active: true,
+        channel: 'BOTH',
+        integrationReference: null,
+      },
+    ],
   };
 }
 
@@ -52,9 +76,7 @@ class MemoryStore implements OnlineOrderIntakeStore {
   readonly rows = new Map<string, OnlineOrderStoredRequest>();
   readonly resolveDeliveryRoute = vi.fn();
   readonly translateRequestToShop = vi.fn(
-    async (
-      input: Parameters<NonNullable<OnlineOrderIntakeStore['translateRequestToShop']>>[0],
-    ) => {
+    async (input: Parameters<NonNullable<OnlineOrderIntakeStore['translateRequestToShop']>>[0]) => {
       if (input.requestedShopId !== SHOP_ID || input.targetShopId !== FALLBACK_SHOP_ID) {
         return null;
       }
@@ -77,7 +99,8 @@ class MemoryStore implements OnlineOrderIntakeStore {
   );
   primaryTemporarilyClosed = false;
   primaryCatalogActive = true;
-  paymentMethodZoneRules: { paymentMethodId: string; deliveryZoneId: string; allowed: boolean }[] = [];
+  paymentMethodZoneRules: { paymentMethodId: string; deliveryZoneId: string; allowed: boolean }[] =
+    [];
 
   async loadCatalog(shopId: string) {
     if (shopId !== SHOP_ID && shopId !== FALLBACK_SHOP_ID) return null;
@@ -100,8 +123,11 @@ class MemoryStore implements OnlineOrderIntakeStore {
   async insertPending(record: OnlineOrderPendingInsert): Promise<void> {
     this.inserted.push(record);
     this.rows.set(`${record.requestedShopId}:${record.idempotencyKey}`, {
-      id: record.id, shopId: record.shopId, idempotencyKey: record.idempotencyKey,
-      requestSha256: record.requestSha256, status: 'PENDING',
+      id: record.id,
+      shopId: record.shopId,
+      idempotencyKey: record.idempotencyKey,
+      requestSha256: record.requestSha256,
+      status: 'PENDING',
     });
   }
 }
@@ -111,13 +137,22 @@ function request(includeLocation: boolean): Request {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      schemaVersion: 1, shopId: SHOP_ID, idempotencyKey: IDEMPOTENCY_KEY,
+      schemaVersion: 1,
+      shopId: SHOP_ID,
+      idempotencyKey: IDEMPOTENCY_KEY,
       customer: { name: 'Delivery Customer', phone: '01012345678', address: 'Maadi, Cairo' },
-      fulfillmentPreference: 'DELIVERY', paymentPreference: 'CASH',
-      items: [{
-        productId: PRODUCT_ID, quantity: 1, addonProductIds: [], modifierSelections: [],
-        comboBeverageProductId: null, note: null,
-      }],
+      fulfillmentPreference: 'DELIVERY',
+      paymentPreference: 'CASH',
+      items: [
+        {
+          productId: PRODUCT_ID,
+          quantity: 1,
+          addonProductIds: [],
+          modifierSelections: [],
+          comboBeverageProductId: null,
+          note: null,
+        },
+      ],
       orderNote: null,
       ...(includeLocation ? { deliveryLocation: { latitude: 29.9602, longitude: 31.2569 } } : {}),
     }),
@@ -145,35 +180,50 @@ describe('order-intake trusted delivery routing authority', () => {
     const response = await handleOrderIntakeRequest(request(true), store);
     expect(response.status).toBe(409);
     await expect(errorCode(response)).resolves.toBe('delivery_unavailable');
-    expect(store.resolveDeliveryRoute).toHaveBeenCalledWith(expect.objectContaining({
-      requestedShopId: SHOP_ID, latitude: 29.9602, longitude: 31.2569, subtotalMinor: 19_000,
-    }));
+    expect(store.resolveDeliveryRoute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestedShopId: SHOP_ID,
+        latitude: 29.9602,
+        longitude: 31.2569,
+        subtotalMinor: 19_000,
+      }),
+    );
     expect(store.inserted).toHaveLength(0);
   });
 
   it('persists only the trusted zone, fee and minimum returned by the server', async () => {
     const store = new MemoryStore();
     store.resolveDeliveryRoute.mockResolvedValue({
-      ok: true, shopId: SHOP_ID, zoneId: '66666666-6666-4666-8666-666666666191',
-      zoneName: 'Maadi Core', feeMinor: 3_000, minimumOrderMinor: 15_000, fallbackUsed: false,
+      ok: true,
+      shopId: SHOP_ID,
+      zoneId: '66666666-6666-4666-8666-666666666191',
+      zoneName: 'Maadi Core',
+      feeMinor: 3_000,
+      minimumOrderMinor: 15_000,
+      fallbackUsed: false,
     });
     const response = await handleOrderIntakeRequest(request(true), store);
     expect(response.status).toBe(202);
     expect(store.inserted).toHaveLength(1);
     expect(store.inserted[0]).toMatchObject({
-      shopId: SHOP_ID, deliveryZoneId: '66666666-6666-4666-8666-666666666191',
-      deliveryFeeMinor: 3_000, deliveryMinimumOrderMinor: 15_000, deliveryFallbackUsed: false,
+      shopId: SHOP_ID,
+      deliveryZoneId: '66666666-6666-4666-8666-666666666191',
+      deliveryFeeMinor: 3_000,
+      deliveryMinimumOrderMinor: 15_000,
+      deliveryFallbackUsed: false,
     });
   });
 
   it('enforces published delivery-zone payment restrictions before persisting an order', async () => {
     const store = new MemoryStore();
     const deniedZoneId = '66666666-6666-4666-8666-666666666191';
-    store.paymentMethodZoneRules = [{
-      paymentMethodId: CASH_METHOD_ID,
-      deliveryZoneId: deniedZoneId,
-      allowed: false,
-    }];
+    store.paymentMethodZoneRules = [
+      {
+        paymentMethodId: CASH_METHOD_ID,
+        deliveryZoneId: deniedZoneId,
+        allowed: false,
+      },
+    ];
     store.resolveDeliveryRoute.mockResolvedValue({
       ok: true,
       shopId: SHOP_ID,

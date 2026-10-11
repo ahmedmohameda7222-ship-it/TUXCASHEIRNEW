@@ -33,10 +33,7 @@ export const paymentZoneRuleCommandSchema = z
   })
   .strict();
 
-export function assertPaymentZoneScope(
-  principal: AdminSessionPrincipal,
-  shopId: string,
-): void {
+export function assertPaymentZoneScope(principal: AdminSessionPrincipal, shopId: string): void {
   requirePermission(principal, 'settings.manage', shopId);
 }
 
@@ -140,8 +137,13 @@ export default async function handler(
       p_expected_allowed: parsed.data.expectedAllowed,
       p_expected_settings_version: parsed.data.expectedSettingsVersion,
     });
-    if (typeof value !== 'object' || value === null || Array.isArray(value) ||
-      !('ok' in value) || typeof value.ok !== 'boolean') {
+    if (
+      typeof value !== 'object' ||
+      value === null ||
+      Array.isArray(value) ||
+      !('ok' in value) ||
+      typeof value.ok !== 'boolean'
+    ) {
       sendJson(response, 502, { error: 'backend_contract_invalid' });
       return;
     }
@@ -149,8 +151,8 @@ export default async function handler(
       sendJson(response, 200, { ok: true });
       return;
     }
-    const code = 'code' in value && typeof value.code === 'string'
-      ? value.code : 'backend_contract_invalid';
+    const code =
+      'code' in value && typeof value.code === 'string' ? value.code : 'backend_contract_invalid';
     sendJson(response, 200, { ok: false, code });
   } catch (error) {
     fail(response, error);

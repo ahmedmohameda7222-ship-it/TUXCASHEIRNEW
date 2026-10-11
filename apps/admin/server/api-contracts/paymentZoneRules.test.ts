@@ -43,11 +43,11 @@ describe('Admin payment-zone policy API', () => {
 
   it('rejects managers lacking settings authority and out-of-scope shops', () => {
     expect(() => assertPaymentZoneScope(principal, shopId)).not.toThrow();
-    expect(() =>
-      assertPaymentZoneScope({ ...principal, permissions: [] }, shopId),
-    ).toThrow('permission_forbidden');
-    expect(() =>
-      assertPaymentZoneScope(principal, '44444444-4444-4444-8444-444444444444'),
-    ).toThrow('shop_forbidden');
+    expect(() => assertPaymentZoneScope({ ...principal, permissions: [] }, shopId)).toThrow(
+      'permission_forbidden',
+    );
+    expect(() => assertPaymentZoneScope(principal, '44444444-4444-4444-8444-444444444444')).toThrow(
+      'shop_forbidden',
+    );
   });
 });
