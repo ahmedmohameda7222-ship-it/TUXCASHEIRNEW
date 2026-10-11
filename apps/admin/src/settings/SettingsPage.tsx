@@ -280,17 +280,19 @@ export function SettingsWorkspaceView({
           Overview
         </button>
         {sections
-          .filter((item) => item.id !== 'business-defaults' || sectionProps.canManageBusinessDefaults)
+          .filter(
+            (item) => item.id !== 'business-defaults' || sectionProps.canManageBusinessDefaults,
+          )
           .map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            aria-current={section === item.id ? 'page' : undefined}
-            onClick={() => onSectionChange(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
+            <button
+              key={item.id}
+              type="button"
+              aria-current={section === item.id ? 'page' : undefined}
+              onClick={() => onSectionChange(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
       </nav>
       <SectionContent section={section} workspace={workspace} {...sectionProps} />
     </main>

@@ -24,11 +24,21 @@ export function BusinessDefaultsPage({
         </div>
       </div>
       <p className="admin-field__help">
-        These defaults apply to shops that have not configured an override. Save changes here,
-        then publish settings for each affected shop before future orders use them.
+        These defaults apply to shops that have not configured an override. Save changes here, then
+        publish settings for each affected shop before future orders use them.
       </p>
-      <CheckoutPage workspace={defaultsWorkspace} onUpdate={onUpdate} updating={updating} scope="business" />
-      <ReceiptsPage workspace={defaultsWorkspace} onUpdate={onUpdate} updating={updating} scope="business" />
+      <CheckoutPage
+        workspace={defaultsWorkspace}
+        onUpdate={onUpdate}
+        updating={updating}
+        scope="business"
+      />
+      <ReceiptsPage
+        workspace={defaultsWorkspace}
+        onUpdate={onUpdate}
+        updating={updating}
+        scope="business"
+      />
     </section>
   );
 }
