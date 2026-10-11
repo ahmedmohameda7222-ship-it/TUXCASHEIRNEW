@@ -2,6 +2,7 @@ import type {
   AdminPurchasingWorkspace,
   AdminSessionPrincipal,
   CreatePurchaseOrderInput,
+  CancelPurchaseOrderInput,
   CreateSupplierInput,
   PurchasingCommandResult,
   ReceivePurchaseInput,
@@ -22,6 +23,7 @@ export interface PurchasingStore {
   updatePurchaseOrder(
     input: UpdatePurchaseOrderInput & { employeeId: string },
   ): Promise<PurchasingCommandResult>;
+  cancelPurchaseOrder(input: CancelPurchaseOrderInput & {employeeId: string}): Promise<PurchasingCommandResult>;
   orderPurchaseOrder(input: {
     employeeId: string;
     shopId: string;
@@ -77,6 +79,14 @@ export function createPurchasingService(store: PurchasingStore) {
     ): Promise<PurchasingCommandResult> {
       requirePermission(principal, 'purchasing.manage', input.shopId);
       return store.updatePurchaseOrder({ ...input, employeeId: principal.employeeId });
+    },
+
+    async cancelPurchaseOrder(
+      input: CancelPurchaseOrderInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<PurchasingCommandResult> {
+      requirePermission(principal, 'purchasing.manage', input.shopId);
+      return store.cancelPurchaseOrder({...input, employeeId: principal.employeeId});
     },
 
     async orderPurchaseOrder(
