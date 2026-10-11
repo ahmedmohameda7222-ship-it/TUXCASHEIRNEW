@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { upsertCatalogDefinitionInBundle } from './catalogDefinitionsDraft';
+import { reorderCatalogDefinitionsInBundle, upsertCatalogDefinitionInBundle } from './catalogDefinitionsDraft';
 
 const bundle={
   snapshot:{
@@ -12,6 +12,22 @@ const bundle={
 };
 
 describe('catalog definition draft persistence',()=>{
+  it('reorders even zero-based category positions without ties or partial draft writes',()=>{
+    const input = {...bundle, snapshot:{
+      ...bundle.snapshot,
+      categories:[
+        {...bundle.snapshot.categories[0],sortOrder:0},
+        {id:'category-b',shopId:'shop',name:'Sides',active:true,sortOrder:1},
+      ],
+    }};
+    const ordered = reorderCatalogDefinitionsInBundle(input,'categories',['category-b','category-a']);
+    const categories=(ordered.snapshot as Record<string,unknown>).categories as Array<{id:string;sortOrder:number}>;
+    expect(categories.map(category=>category.id)).toEqual(['category-b','category-a']);
+    expect(categories.map(category=>category.sortOrder)).toEqual([0,10]);
+    expect((input.snapshot.categories as Array<{id:string}>)[0]?.id).toBe('category-a');
+    expect(()=>reorderCatalogDefinitionsInBundle(input,'categories',['category-b','category-b'])).toThrow();
+  });
+
   it('creates or renames categories only in the canonical catalog snapshot',()=>{
     const updated=upsertCatalogDefinitionInBundle(bundle,'categories',{
       id:'category-b',shopId:'shop',slug:'sides',name:'Sides',description:null,active:true,sortOrder:20,
