@@ -69,3 +69,28 @@ export function upsertCatalogDefinitionInBundle(
     },
   };
 }
+
+/**
+ * One draft-bundle replacement repositions every sibling, avoiding order ties
+ * when the first persisted sortOrder is zero or rows have adjacent values.
+ */
+export function reorderCatalogDefinitionsInBundle(
+  bundle: CatalogJsonObject,
+  collection: CatalogDefinitionCollection,
+  orderedIds: readonly string[],
+): CatalogJsonObject {
+  const snapshot = objectValue(bundle['snapshot']);
+  const current = catalogDefinitionsFromBundle(bundle, collection);
+  const ids = new Set(current.map((item) => item['id']));
+  if (ids.size !== current.length || ids.size !== orderedIds.length ||
+      new Set(orderedIds).size !== orderedIds.length ||
+      orderedIds.some((id) => !ids.has(id))) {
+    throw new Error('invalid_catalog_definition_order');
+  }
+  const byId = new Map(current.map((item) => [item['id'], item]));
+  const next = orderedIds.map((id, index) => ({
+    ...byId.get(id)!,
+    sortOrder: index * 10,
+  }));
+  return { ...bundle, snapshot: { ...snapshot, [collection]: next } };
+}
