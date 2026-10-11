@@ -77,6 +77,7 @@ class MemoryStore implements OnlineOrderIntakeStore {
   );
   primaryTemporarilyClosed = false;
   primaryCatalogActive = true;
+  paymentMethodZoneRules: { paymentMethodId: string; deliveryZoneId: string; allowed: boolean }[] = [];
 
   async loadCatalog(shopId: string) {
     if (shopId !== SHOP_ID && shopId !== FALLBACK_SHOP_ID) return null;
@@ -90,6 +91,7 @@ class MemoryStore implements OnlineOrderIntakeStore {
     return {
       ...authority(shopId),
       temporaryClosed: shopId === SHOP_ID ? this.primaryTemporarilyClosed : false,
+      paymentMethodZoneRules: this.paymentMethodZoneRules,
     };
   }
   async findByIdempotency(shopId: string, idempotencyKey: string) {
@@ -162,6 +164,42 @@ describe('order-intake trusted delivery routing authority', () => {
       shopId: SHOP_ID, deliveryZoneId: '66666666-6666-4666-8666-666666666191',
       deliveryFeeMinor: 3_000, deliveryMinimumOrderMinor: 15_000, deliveryFallbackUsed: false,
     });
+  });
+
+  it('enforces published delivery-zone payment restrictions before persisting an order', async () => {
+    const store = new MemoryStore();
+    const deniedZoneId = '66666666-6666-4666-8666-666666666191';
+    store.paymentMethodZoneRules = [{
+      paymentMethodId: CASH_METHOD_ID,
+      deliveryZoneId: deniedZoneId,
+      allowed: false,
+    }];
+    store.resolveDeliveryRoute.mockResolvedValue({
+      ok: true,
+      shopId: SHOP_ID,
+      zoneId: deniedZoneId,
+      zoneName: 'Cash blocked',
+      feeMinor: 3_000,
+      minimumOrderMinor: 15_000,
+      fallbackUsed: false,
+    });
+    const denied = await handleOrderIntakeRequest(request(true), store);
+    expect(denied.status).toBe(409);
+    await expect(errorCode(denied)).resolves.toBe('payment_method_unavailable');
+    expect(store.inserted).toHaveLength(0);
+
+    store.resolveDeliveryRoute.mockResolvedValue({
+      ok: true,
+      shopId: SHOP_ID,
+      zoneId: '66666666-6666-4666-8666-666666666192',
+      zoneName: 'Cash permitted',
+      feeMinor: 3_000,
+      minimumOrderMinor: 15_000,
+      fallbackUsed: false,
+    });
+    const allowed = await handleOrderIntakeRequest(request(true), store);
+    expect(allowed.status).toBe(202);
+    expect(store.inserted).toHaveLength(1);
   });
 
   it('routes an explicitly configured delivery fallback before rejecting a closed primary shop', async () => {
