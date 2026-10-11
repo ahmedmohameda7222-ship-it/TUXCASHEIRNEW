@@ -190,6 +190,12 @@ export function ApprovalsPage() {
       title="Approvals"
       description="Review sensitive Admin requests with distinct-person approval and PIN confirmation."
     >
+      {session.state.status === 'authenticated' &&
+      session.state.session.principal.permissions.includes('settings.manage') ? (
+        <a className="admin-secondary-button" href="/approvals/rules">
+          Manage approval rules
+        </a>
+      ) : null}
       <div className="admin-approvals-toolbar">
         <label className="admin-field">
           <span>Status</span>
