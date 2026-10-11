@@ -86,9 +86,7 @@ export function buildSettingsCopyPreview(
         targetValue: to.row?.value ?? null,
         targetSource: to.source,
         targetExpectedVersion: targetOverride?.version ?? null,
-        wouldChange:
-          targetOverride === undefined ||
-          JSON.stringify(targetOverride.value) !== JSON.stringify(from.row.value),
+        wouldChange: JSON.stringify(to.row?.value ?? null) !== JSON.stringify(from.row.value),
       },
     ];
   });
