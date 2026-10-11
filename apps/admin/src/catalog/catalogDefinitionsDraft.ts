@@ -60,7 +60,7 @@ export function upsertCatalogDefinitionInBundle(
   const index = current.findIndex((candidate) => candidate['id'] === id);
   const next = [...current];
   if (index < 0) next.push(definition);
-  else next[index] = definition;
+  else next[index] = { ...next[index], ...definition };
   return {
     ...bundle,
     snapshot: {
