@@ -372,7 +372,10 @@ export function SettingsPage() {
         <SettingsWorkspaceView
           workspace={workspace}
           section={section}
-          canAssignStaff={principal.permissions.includes('staff.manage')}
+          canAssignStaff={
+            principal.permissions.includes('staff.manage') &&
+            principal.permissions.includes('staff.view')
+          }
           canManageShopLifecycle={principal.permissions.includes('shops.manage')}
           onUpdateShopLifecycle={(draft) => settings.updateShopLifecycle.mutateAsync(draft)}
           shopLifecycleUpdating={settings.updateShopLifecycle.isPending}
