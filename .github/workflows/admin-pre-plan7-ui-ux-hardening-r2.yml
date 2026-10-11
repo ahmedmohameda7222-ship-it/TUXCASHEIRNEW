@@ -24,6 +24,113 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  format-functional-completeness:
+    name: branch-only Prettier corrections
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'fix/admin-plans1-7-functional-completeness' && github.event.pull_request.head.commit.message != 'chore(admin): apply Prettier formatting'
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Format only correction-branch TypeScript files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only --diff-filter=ACM -z origin/main...HEAD -- apps/admin packages/admin-contracts |
+            grep -zE '\.(ts|tsx|js|mjs|css|json)
+    name: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Formatting
+        run: npm run format:check
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit and component tests
+        run: npm run test
+      - name: Admin security boundary
+        run: npm run test:admin-security
+      - name: Admin deployment contract
+        run: npm run test:admin-deployment
+      - name: Migration invariants
+        run: npm run test:migrations
+      - name: Admin production build
+        run: npm run build:admin
+
+  responsive-e2e:
+    name: responsive-e2e
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Admin phone, tablet, and laptop acceptance
+        run: npm run test:e2e:admin
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-pre-plan7-r2-browser-evidence
+          path: |
+            playwright-report-admin
+            test-results
+          if-no-files-found: warn
+          retention-days: 14
+ |
+            xargs -0 -r npx prettier --write
+          if ! git diff --quiet -- apps/admin packages/admin-contracts; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add -A -- apps/admin packages/admin-contracts
+            git commit -m 'chore(admin): apply Prettier formatting'
+            git push origin HEAD:refs/heads/fix/admin-plans1-7-functional-completeness
+          fi
   quality:
     name: quality
     runs-on: ubuntu-24.04
