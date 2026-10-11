@@ -59,10 +59,20 @@ export function CreateShopPanel({ contextShopId }: { contextShopId: string }) {
         inventory, or historical records are automatically copied.
       </p>
       {createdId ? (
-        <p role="status">
-          Shop created: {createdId}. Assign staff and publish its settings before opening
-          operational and online ordering. Refresh your session to select the new shop.
-        </p>
+        <>
+          <p role="status">
+            Shop created: {createdId}. Assign staff and publish its settings before opening
+            operational and online ordering.
+          </p>
+          <button
+            type="button"
+            className="admin-secondary-button"
+            disabled={pending}
+            onClick={() => void session.refresh()}
+          >
+            Refresh available shops
+          </button>
+        </>
       ) : null}
       {error ? <p role="alert">{error}</p> : null}
       {!draft ? (
