@@ -23,6 +23,7 @@ async function mockSettings(
   page: Page,
   permissions: string[] = ownerSession.principal.permissions,
   role: 'OWNER' | 'MANAGER' = 'OWNER',
+  deliveryZones: { id: string; name: string; active: boolean; feeMinor: number; sortOrder: number }[] = [],
 ) {
   let settingsVersion = 7;
   let shopLifecycleState: 'ACTIVE' | 'SUSPENDED' = 'ACTIVE';
@@ -64,6 +65,8 @@ async function mockSettings(
     { key: 'receipt.orderPrefix', value: 'MD-', version: 4 },
   ];
   const commands: Record<string, unknown>[] = [];
+  const paymentZoneCommands: Record<string, unknown>[] = [];
+  const paymentZoneRules: { paymentMethodId: string; deliveryZoneId: string; allowed: boolean }[] = [];
 
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
@@ -73,6 +76,39 @@ async function mockSettings(
         ...ownerSession,
         principal: { ...ownerSession.principal, permissions, role },
       }),
+    });
+  });
+
+  await page.route('**/api/admin/payment-zone-rules**', async (route: Route) => {
+    const request = route.request();
+    if (request.method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ rules: paymentZoneRules }),
+      });
+      return;
+    }
+    const command = request.postDataJSON() as Record<string, unknown>;
+    paymentZoneCommands.push(command);
+    const current = paymentZoneRules.find(
+      (rule) =>
+        rule.paymentMethodId === command.paymentMethodId &&
+        rule.deliveryZoneId === command.deliveryZoneId,
+    );
+    expect(command.expectedAllowed).toBe(current?.allowed ?? null);
+    if (current) current.allowed = command.allowed === true;
+    else {
+      paymentZoneRules.push({
+        paymentMethodId: String(command.paymentMethodId),
+        deliveryZoneId: String(command.deliveryZoneId),
+        allowed: command.allowed === true,
+      });
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true }),
     });
   });
 
@@ -105,7 +141,7 @@ async function mockSettings(
           shopOverrides,
           orderTypes: [orderType],
           paymentMethods: [paymentMethod],
-          deliveryZones: [],
+          deliveryZones,
           reasonCodes: [
             {
               id: 'reason-1',
@@ -314,7 +350,7 @@ async function mockSettings(
     throw new Error(`Unexpected settings command ${JSON.stringify(command)}`);
   });
 
-  return { commands };
+  return { commands, paymentZoneCommands };
 }
 
 for (const viewport of ADMIN_CORE_VIEWPORTS) {
@@ -373,6 +409,32 @@ test('edits checkout and receipt overrides with CAS, then publishes settings', a
     shopId,
     expectedSettingsVersion: 7,
   });
+});
+
+test('restricts a published payment method for a delivery zone through CAS authority', async ({
+  page,
+}) => {
+  const zoneId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const { paymentZoneCommands } = await mockSettings(
+    page,
+    ownerSession.principal.permissions,
+    'OWNER',
+    [{ id: zoneId, name: 'Maadi', active: true, feeMinor: 3000, sortOrder: 10 }],
+  );
+  await page.goto('/settings/checkout');
+  await expect(page.getByRole('heading', { name: 'Delivery-zone payment restrictions' })).toBeVisible();
+  await page.getByRole('button', { name: 'Restrict' }).click();
+  await expect.poll(() => paymentZoneCommands.length).toBe(1);
+  expect(paymentZoneCommands[0]).toEqual({
+    type: 'payment-zone.upsert',
+    shopId,
+    paymentMethodId,
+    deliveryZoneId: zoneId,
+    allowed: false,
+    expectedAllowed: null,
+    expectedSettingsVersion: 7,
+  });
+  await expect(page.getByRole('button', { name: 'Allow' })).toBeVisible();
 });
 
 test('creates payment methods with a retry-safe trusted settings command', async ({ page }) => {
