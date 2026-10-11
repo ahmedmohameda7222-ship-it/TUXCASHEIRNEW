@@ -50,6 +50,7 @@ export function PurchasingPage() {
     purchasing.createSupplier,
     purchasing.createPurchaseOrder,
     purchasing.updatePurchaseOrder,
+    purchasing.cancelPurchaseOrder,
     purchasing.orderPurchaseOrder,
     purchasing.receivePurchase,
     purchasing.returnPurchase,
@@ -176,6 +177,10 @@ export function PurchasingPage() {
                 order={selected}
                 canManage={canManage}
                 canReceive={canReceive}
+                cancelling={purchasing.cancelPurchaseOrder.isPending}
+                onCancel={() => purchasing.cancelPurchaseOrder.mutate({
+                  purchaseOrderId: selected.id, expectedVersion: selected.version,
+                })}
                 ordering={purchasing.orderPurchaseOrder.isPending}
                 updating={purchasing.updatePurchaseOrder.isPending}
                 onUpdate={(input, onSuccess) => purchasing.updatePurchaseOrder.mutate({
