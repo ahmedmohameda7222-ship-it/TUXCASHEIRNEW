@@ -336,6 +336,30 @@ async function loadPurchasableInventoryItems(
   }
 }
 
+async function loadActivePurchaseUnitConversions(
+  client: AdminSupabaseClient,
+  shopId: string,
+): Promise<PurchaseConversionRow[]> {
+  const rows: PurchaseConversionRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.select<PurchaseConversionRow[]>(
+      'inventory_unit_conversions',
+      new URLSearchParams({
+        select: 'inventory_item_id,purchase_unit_label,base_micros_per_purchase_unit',
+        shop_id: `eq.${shopId}`,
+        active: 'eq.true',
+        order: 'inventory_item_id.asc,purchase_unit_label.asc',
+        limit: String(PURCHASABLE_ITEM_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
+    offset += page.length;
+  }
+}
+
 async function loadPurchaseOrderItemMetadata(
   client: AdminSupabaseClient,
   shopId: string,
@@ -413,16 +437,7 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
           ),
           loadActionablePurchaseOrders(client, businessId, shopId),
           loadPurchasableInventoryItems(client, shopId),
-          client.select<PurchaseConversionRow[]>(
-            'inventory_unit_conversions',
-            new URLSearchParams({
-              select: 'inventory_item_id,purchase_unit_label,base_micros_per_purchase_unit',
-              shop_id: `eq.${shopId}`,
-              active: 'eq.true',
-              order: 'inventory_item_id.asc,purchase_unit_label.asc',
-              limit: String(PURCHASABLE_ITEM_PAGE_SIZE),
-            }),
-          ),
+          loadActivePurchaseUnitConversions(client, shopId),
         ]);
 
       const purchaseOrdersById = new Map<string, PurchaseOrderRow>();
