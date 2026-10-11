@@ -4,6 +4,35 @@ import type { AdminSupabaseClient } from '../supabaseAdmin';
 import { createPurchasingStore } from '../../api/admin/purchasing';
 
 describe('Admin purchasing workspace pagination', () => {
+  it('paginates active purchase-unit conversions beyond the PostgREST row cap', async () => {
+    const conversions = Array.from({ length: 1_205 }, (_, index) => ({
+      inventory_item_id: 'item-1',
+      purchase_unit_label: `package-${index}`,
+      base_micros_per_purchase_unit: 1_000_000 * (index + 1),
+    }));
+    const offsets: string[] = [];
+    const select = vi.fn(async (table: string, query: URLSearchParams) => {
+      if (table === 'inventory_unit_conversions') {
+        offsets.push(query.get('offset') ?? 'missing');
+        const offset = Number(query.get('offset') ?? '0');
+        const limit = Math.min(Number(query.get('limit') ?? '1000'), 1000);
+        return conversions.slice(offset, offset + limit);
+      }
+      if (table === 'inventory_items') {
+        return Number(query.get('offset') ?? '0') === 0
+          ? [{ id: 'item-1', name: 'Bread', unit_label: 'piece', active: true }]
+          : [];
+      }
+      if (table === 'suppliers' || table === 'purchase_orders' || table === 'purchase_order_lines') return [];
+      throw new Error('unexpected table: ' + table);
+    });
+    const workspace = await createPurchasingStore({ select } as unknown as AdminSupabaseClient)
+      .loadWorkspace('shop-a', 'business-1');
+    expect(workspace.inventoryItems[0]?.purchaseUnits).toHaveLength(1_206);
+    expect(offsets).toEqual(['0', '1000', '1205']);
+  });
+
+
   it('keeps actionable purchase orders accessible beyond the 500-row history window', async () => {
     const recent = Array.from({ length: 500 }, (_, index) => ({
       id: `recent-${index}`,
