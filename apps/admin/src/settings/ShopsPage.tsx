@@ -541,7 +541,8 @@ export function ShopsPage({
     });
   }, [shop.address, shop.contactPhone, shop.latitude, shop.longitude, shop.name]);
 
-  const operationalStateDisabled = busy || !onUpdateOperationalState;
+  const operationalStateDisabled =
+    busy || shop.lifecycleState !== 'ACTIVE' || !onUpdateOperationalState;
 
   async function saveIdentity(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
