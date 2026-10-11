@@ -43,7 +43,10 @@ export const shopSettingsCopyApplySchema = z
     type: z.literal('settings-copy.apply'),
     sourceShopId: z.string().uuid(),
     targetShopId: z.string().uuid(),
-    selectedDomains: z.array(z.enum(['checkout', 'receipts'])).min(1).max(2),
+    selectedDomains: z
+      .array(z.enum(['checkout', 'receipts']))
+      .min(1)
+      .max(2),
     expectedSourceSettingsVersion: z.number().int().nonnegative(),
     expectedTargetSettingsVersion: z.number().int().nonnegative(),
     expectedChanges: z

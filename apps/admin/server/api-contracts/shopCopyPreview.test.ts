@@ -40,9 +40,7 @@ describe('shop selective settings copy preview contract', () => {
     expect(
       shopSettingsCopyApplySchema.safeParse({
         ...command,
-        expectedChanges: [
-          { ...command.expectedChanges[0], settingKey: 'checkout.unsupported' },
-        ],
+        expectedChanges: [{ ...command.expectedChanges[0], settingKey: 'checkout.unsupported' }],
       }).success,
     ).toBe(false);
     expect(

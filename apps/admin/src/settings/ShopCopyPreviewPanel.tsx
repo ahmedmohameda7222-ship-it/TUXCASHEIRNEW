@@ -182,7 +182,10 @@ export function ShopCopyPreviewPanel({
       </form>
       {error ? <p role="alert">{error}</p> : null}
       {copiedKeys !== null ? (
-        <p role="status">{copiedKeys} settings copied as draft overrides. Publish the target shop settings to activate changes for future orders.</p>
+        <p role="status">
+          {copiedKeys} settings copied as draft overrides. Publish the target shop settings to
+          activate changes for future orders.
+        </p>
       ) : null}
       {preview?.ok ? (
         <div role="status">
@@ -207,7 +210,8 @@ export function ShopCopyPreviewPanel({
           )}
           <p>
             Applying copies only the selected changed settings as unpublished target overrides.
-            Publish the target shop settings afterward. Catalog, inventory and history are not copied.
+            Publish the target shop settings afterward. Catalog, inventory and history are not
+            copied.
           </p>
           <button
             className="admin-primary-button"
