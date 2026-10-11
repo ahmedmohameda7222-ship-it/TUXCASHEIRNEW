@@ -70,6 +70,7 @@ describe('Admin purchasing workspace pagination', () => {
                 phone: null,
                 email: null,
                 active: true,
+                version: 1,
               },
             ]
           : [];
@@ -171,6 +172,7 @@ describe('Admin purchasing workspace pagination', () => {
       phone: null,
       email: null,
       active: true,
+      version: 1,
     }));
     const supplierQueries: URLSearchParams[] = [];
     const select = vi.fn(async (table: string, query: URLSearchParams) => {
