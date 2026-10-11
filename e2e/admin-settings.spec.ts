@@ -468,11 +468,19 @@ test('restoring inheritance deletes the shop override rather than copying a defa
 test('shop management exposes canonical staff assignment only for staff managers', async ({
   page,
 }) => {
-  await mockSettings(page, ['settings.manage', 'staff.manage']);
+  await mockSettings(page, ['settings.manage', 'staff.view', 'staff.manage']);
   await page.goto('/settings/shop');
   const assignmentLink = page.getByRole('link', { name: 'Manage staff assignments' });
   await expect(assignmentLink).toBeVisible();
   await expect(assignmentLink).toHaveAttribute('href', '/staff');
+});
+
+test('shop management hides the staff assignment link when staff viewing is forbidden', async ({
+  page,
+}) => {
+  await mockSettings(page, ['settings.manage', 'staff.manage']);
+  await page.goto('/settings/shop');
+  await expect(page.getByRole('link', { name: 'Manage staff assignments' })).toHaveCount(0);
 });
 
 test('shop management does not offer assignment access without staff management authority', async ({
