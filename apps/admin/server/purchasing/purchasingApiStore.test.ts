@@ -45,6 +45,7 @@ describe('Admin purchasing workspace pagination', () => {
             ]
           : [];
       }
+      if (table === 'inventory_unit_conversions') return [];
       if (table === 'inventory_items') return [];
       if (table === 'purchase_orders') {
         if (query.get('status') === 'in.(DRAFT,ORDERED,PARTIALLY_RECEIVED,RECEIVED)') {
@@ -90,6 +91,7 @@ describe('Admin purchasing workspace pagination', () => {
     };
     const select = vi.fn(async (table: string, query: URLSearchParams) => {
       if (table === 'suppliers') return [];
+      if (table === 'inventory_unit_conversions') return [];
       if (table === 'inventory_items') return [];
       if (table === 'purchase_orders') {
         const status = query.get('status');
@@ -149,8 +151,10 @@ describe('Admin purchasing workspace pagination', () => {
         const requested = Number(query.get('limit') ?? '10000');
         return suppliers.slice(offset, offset + Math.min(requested, 1_000));
       }
+      if (table === 'inventory_unit_conversions') return [];
       if (table === 'purchase_orders') return [];
       if (table === 'purchase_order_lines') return [];
+      if (table === 'inventory_unit_conversions') return [];
       if (table === 'inventory_items') return [];
       throw new Error('unexpected table: ' + table);
     });
@@ -209,6 +213,7 @@ describe('Admin purchasing workspace pagination', () => {
             ]
           : [];
       }
+      if (table === 'inventory_unit_conversions') return [];
       if (table === 'inventory_items') {
         if (query.get('active') === 'eq.true') return [];
         expect(query.get('shop_id')).toBe('eq.shop-a');
@@ -242,8 +247,10 @@ describe('Admin purchasing workspace pagination', () => {
     const itemQueries: URLSearchParams[] = [];
     const select = vi.fn(async (table: string, query: URLSearchParams) => {
       if (table === 'suppliers') return [];
+      if (table === 'inventory_unit_conversions') return [];
       if (table === 'purchase_orders') return [];
       if (table === 'purchase_order_lines') return [];
+      if (table === 'inventory_unit_conversions') return [];
       if (table === 'inventory_items') {
         itemQueries.push(query);
         const offset = Number(query.get('offset') ?? '0');
