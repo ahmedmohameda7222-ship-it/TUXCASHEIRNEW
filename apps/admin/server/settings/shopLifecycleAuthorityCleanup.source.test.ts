@@ -11,9 +11,7 @@ const migrationsDir = resolve(
 describe('single canonical shop lifecycle authority', () => {
   it('preserves the original RPC and removes an unused parallel overload safely', () => {
     const names = readdirSync(migrationsDir);
-    expect(
-      names.some((name) => name.endsWith('_admin_shop_lifecycle_transitions.sql')),
-    ).toBe(true);
+    expect(names.some((name) => name.endsWith('_admin_shop_lifecycle_transitions.sql'))).toBe(true);
     const cleanupName = names.find((name) =>
       name.endsWith('_admin_shop_lifecycle_authority_cleanup.sql'),
     );

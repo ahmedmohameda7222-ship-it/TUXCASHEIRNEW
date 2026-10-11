@@ -44,8 +44,12 @@ describe('Admin settings API contract', () => {
         targetState: 'ACTIVE',
       }).success,
     ).toBe(true);
-    expect(settingsCommandSchema.safeParse({ ...input, targetState: 'ARCHIVED' }).success).toBe(false);
-    expect(settingsCommandSchema.safeParse({ ...input, targetState: 'ACTIVE' }).success).toBe(false);
+    expect(settingsCommandSchema.safeParse({ ...input, targetState: 'ARCHIVED' }).success).toBe(
+      false,
+    );
+    expect(settingsCommandSchema.safeParse({ ...input, targetState: 'ACTIVE' }).success).toBe(
+      false,
+    );
     expect(
       settingsCommandSchema.safeParse({ ...input, expectedLifecycleRevision: 0 }).success,
     ).toBe(false);
@@ -127,7 +131,9 @@ describe('Admin settings API contract', () => {
       commandId: 'pm-command-1',
     };
     expect(settingsCommandSchema.safeParse(command).success).toBe(true);
-    expect(settingsCommandSchema.safeParse({ ...command, logicType: 'CUSTOM' }).success).toBe(false);
+    expect(settingsCommandSchema.safeParse({ ...command, logicType: 'CUSTOM' }).success).toBe(
+      false,
+    );
     expect(settingsCommandSchema.safeParse({ ...command, refundAllowed: false }).success).toBe(
       false,
     );

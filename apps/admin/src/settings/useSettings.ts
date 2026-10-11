@@ -317,7 +317,8 @@ export function useSettings(shopId: string | undefined, includeSchedules = false
       if (
         workspace.shop.lifecycleState !== draft.expectedState ||
         workspace.shop.lifecycleRevision !== draft.expectedLifecycleRevision
-      ) throw new SettingsUiError('stale_shop_lifecycle');
+      )
+        throw new SettingsUiError('stale_shop_lifecycle');
       await postShopManagement({ type: 'shop.lifecycle.update', shopId, ...draft });
     },
     onSuccess: invalidateWorkspace,

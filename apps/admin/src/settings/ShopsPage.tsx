@@ -631,7 +631,8 @@ export function ShopsPage({
             type="button"
             disabled={busy || lifecycleUpdating}
             onClick={() => {
-              if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined) return;
+              if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined)
+                return;
               void onUpdateLifecycle({
                 expectedState: shop.lifecycleState,
                 targetState: shop.lifecycleState === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE',
