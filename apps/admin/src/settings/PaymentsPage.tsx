@@ -127,7 +127,8 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                 value={createDraft.logicType}
                 disabled={updating}
                 onChange={(event) => {
-                  const logicType = event.currentTarget.value as PaymentMethodCreateDraft['logicType'];
+                  const logicType = event.currentTarget
+                    .value as PaymentMethodCreateDraft['logicType'];
                   setCreateDraft((current) => (current ? { ...current, logicType } : current));
                 }}
               >
@@ -171,7 +172,9 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                 disabled={updating}
                 onChange={(event) => {
                   const requiresReference = event.currentTarget.checked;
-                  setCreateDraft((current) => (current ? { ...current, requiresReference } : current));
+                  setCreateDraft((current) =>
+                    current ? { ...current, requiresReference } : current,
+                  );
                 }}
               />
               <span>Require payment reference</span>
@@ -183,7 +186,9 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                 disabled={updating}
                 onChange={(event) => {
                   const manualConfirmationRequired = event.currentTarget.checked;
-                  setCreateDraft((current) => (current ? { ...current, manualConfirmationRequired } : current));
+                  setCreateDraft((current) =>
+                    current ? { ...current, manualConfirmationRequired } : current,
+                  );
                 }}
               />
               <span>Require manual confirmation</span>
