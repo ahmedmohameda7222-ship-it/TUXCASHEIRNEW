@@ -63,6 +63,7 @@ function store(overrides: Partial<SettingsStore> = {}): SettingsStore {
     })),
     createOrderType: vi.fn(async () => ({ ok: true as const, editVersion: 1 })),
     updateOrderType: vi.fn(async () => ({ ok: true as const, editVersion: 2 })),
+    createPaymentMethod: vi.fn(async () => ({ ok: true as const, editVersion: 1 })),
     updatePaymentMethod: vi.fn(async () => ({ ok: true as const, editVersion: 2 })),
     ...overrides,
   };
