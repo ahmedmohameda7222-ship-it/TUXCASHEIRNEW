@@ -17,7 +17,7 @@ export function ReceiptsPage({
   onUpdate(draft: SettingOverrideUpdateDraft): void | Promise<void>;
   updating: boolean;
   scope?: 'shop' | 'business';
-  onRestore?: (draft: SettingRestoreDraft) => void | Promise<void>;
+  onRestore?: ((draft: SettingRestoreDraft) => void | Promise<void>) | undefined;
 }) {
   const resetPolicy = resolveWorkspaceSetting(workspace, 'receipt.sequenceResetPolicy');
 
