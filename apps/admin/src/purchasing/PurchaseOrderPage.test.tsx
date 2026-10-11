@@ -28,6 +28,8 @@ function render(status: AdminPurchaseOrder['status'], canManage = true) {
       ordering={false}
       updating={false}
       onUpdate={vi.fn()}
+      cancelling={false}
+      onCancel={vi.fn()}
       onOrder={vi.fn()}
       onReceive={vi.fn()}
       onReturn={vi.fn()}
@@ -38,6 +40,15 @@ function render(status: AdminPurchaseOrder['status'], canManage = true) {
 describe('purchase order draft metadata editor', () => {
   it('exposes draft editing to purchasing managers', () => {
     expect(render('DRAFT')).toContain('Edit draft');
+  });
+
+  it('shows cancel action only for DRAFT or unreceived ORDERED purchase orders', () => {
+    expect(render('DRAFT')).toContain('Cancel purchase order');
+    expect(render('ORDERED')).toContain('Cancel purchase order');
+    expect(render('PARTIALLY_RECEIVED')).not.toContain('Cancel purchase order');
+    expect(render('RECEIVED')).not.toContain('Cancel purchase order');
+    expect(render('CANCELLED')).not.toContain('Cancel purchase order');
+    expect(render('DRAFT', false)).not.toContain('Cancel purchase order');
   });
 
   it('never exposes draft editing once ordered or to read-only staff', () => {
