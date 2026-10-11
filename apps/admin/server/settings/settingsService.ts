@@ -12,6 +12,7 @@ import type {
   AdminWeeklyHoursConfiguration,
   CanonicalSettingsRowEditResult,
   OrderTypeEditInput,
+  OrderTypeCreateInput,
   PaymentMethodChannel,
   PaymentMethodEditInput,
   ReasonCodeWriteInput,
@@ -74,6 +75,9 @@ export interface SettingsStore {
   upsertReasonCode(
     input: { employeeId: string } & ReasonCodeWriteInput,
   ): Promise<ReasonCodeWriteResult>;
+  createOrderType(
+    input: { employeeId: string } & OrderTypeCreateInput,
+  ): Promise<CanonicalSettingsRowEditResult>;
   updateOrderType(
     input: { employeeId: string } & OrderTypeEditInput,
   ): Promise<CanonicalSettingsRowEditResult>;
@@ -500,6 +504,14 @@ export function createSettingsService(store: SettingsStore) {
       return store.upsertReasonCode({ employeeId: principal.employeeId, ...input });
     },
 
+    async createOrderType(
+      input: OrderTypeCreateInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<CanonicalSettingsRowEditResult> {
+      requirePermission(principal, 'settings.manage', input.shopId);
+      return store.createOrderType({employeeId: principal.employeeId, ...input});
+    },
+
     async updateOrderType(
       input: OrderTypeEditInput,
       principal: AdminSessionPrincipal,
@@ -739,6 +751,23 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
         p_expected_version: expectedVersion,
       });
       return parseReasonCodeWriteResult(result);
+    },
+
+    async createOrderType({
+      employeeId, shopId, name, behavior, active, sortOrder,
+      expectedSettingsVersion, commandId,
+    }) {
+      const result = await client.rpc<unknown>('create_admin_order_type_v1', {
+        p_employee_id: employeeId,
+        p_shop_id: shopId,
+        p_name: name,
+        p_behavior: behavior,
+        p_active: active,
+        p_sort_order: sortOrder,
+        p_expected_settings_version: expectedSettingsVersion,
+        p_command_id: commandId,
+      });
+      return parseCanonicalSettingsRowEditResult(result);
     },
 
     async updateOrderType({
