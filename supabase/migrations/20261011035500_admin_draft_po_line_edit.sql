@@ -19,7 +19,7 @@ DECLARE
  v_factor bigint;v_base_qty numeric;v_previous jsonb;v_result jsonb;
 BEGIN
  v_business:=private.admin_purchasing_authority_v1(p_employee_id,p_shop_id,'purchasing.manage');
- IF jsonb_typeof(p_lines) <> 'array' OR jsonb_array_length(p_lines) NOT BETWEEN 1 AND 500
+ IF p_lines IS NULL OR jsonb_typeof(p_lines) <> 'array' OR jsonb_array_length(p_lines) NOT BETWEEN 1 AND 500
     OR nullif(btrim(coalesce(p_command_id,'')),'') IS NULL OR length(p_command_id)>160 THEN
    RETURN jsonb_build_object('ok',false,'code','invalid_purchase_order_lines');
  END IF;
