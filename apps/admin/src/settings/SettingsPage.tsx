@@ -201,6 +201,7 @@ function SectionContent(
           {canCreateShop ? <CreateShopPanel contextShopId={workspace.shop.id} /> : null}
           {shopCopySourceIds && shopCopySourceIds.length > 0 ? (
             <ShopCopyPreviewPanel
+              key={`${workspace.shop.id}:${workspace.settingsVersion}`}
               targetShopId={workspace.shop.id}
               expectedTargetSettingsVersion={workspace.settingsVersion}
               sourceShopIds={shopCopySourceIds}

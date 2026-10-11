@@ -56,7 +56,14 @@ export default async function handler(
     if (!token) throw new AdminAuthError('session_required', 401);
     const session = await loadAdminSession(token, client);
     requireSessionCsrf(session, firstHeader(request.headers['x-tux-admin-csrf']).trim());
-    const parsed = shopCopyPreviewSchema.safeParse(await readJsonObject(request));
+    let rawCommand: unknown;
+    try {
+      rawCommand = await readJsonObject(request);
+    } catch {
+      sendJson(response, 400, { error: 'invalid_copy_preview_request' });
+      return;
+    }
+    const parsed = shopCopyPreviewSchema.safeParse(rawCommand);
     if (!parsed.success) {
       sendJson(response, 400, { error: 'invalid_copy_preview_request' });
       return;
