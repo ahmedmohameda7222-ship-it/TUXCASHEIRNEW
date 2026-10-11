@@ -19,7 +19,7 @@ const ownerSession = {
 };
 
 // Keep mutable payment fixtures aligned with the published Admin settings contract.
-async function mockSettings(page: Page) {
+async function mockSettings(page: Page, permissions: string[] = ownerSession.principal.permissions) {
   let settingsVersion = 7;
   let orderType = {
     id: orderTypeId,
@@ -63,7 +63,10 @@ async function mockSettings(page: Page) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(ownerSession),
+      body: JSON.stringify({
+        ...ownerSession,
+        principal: { ...ownerSession.principal, permissions },
+      }),
     });
   });
 
@@ -343,6 +346,24 @@ test('deactivates an existing reason code through the trusted settings command',
     active: false,
     expectedVersion: 4,
   });
+});
+
+test('shop management exposes canonical staff assignment only for staff managers', async ({
+  page,
+}) => {
+  await mockSettings(page, ['settings.manage', 'staff.manage']);
+  await page.goto('/settings/shop');
+  const assignmentLink = page.getByRole('link', { name: 'Manage staff assignments' });
+  await expect(assignmentLink).toBeVisible();
+  await expect(assignmentLink).toHaveAttribute('href', '/staff');
+});
+
+test('shop management does not offer assignment access without staff management authority', async ({
+  page,
+}) => {
+  await mockSettings(page);
+  await page.goto('/settings/shop');
+  await expect(page.getByRole('link', { name: 'Manage staff assignments' })).toHaveCount(0);
 });
 
 test('confirms archive before routing shop lifecycle management through the trusted BFF', async ({
