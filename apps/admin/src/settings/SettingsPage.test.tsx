@@ -138,6 +138,7 @@ function renderSection(section: SettingsSection): string {
       onCreateOrderType={noop}
       onUpdateOrderType={noop}
       orderTypeUpdating={false}
+      onCreatePaymentMethod={noop}
       onUpdatePaymentMethod={noop}
       paymentMethodUpdating={false}
     />,
