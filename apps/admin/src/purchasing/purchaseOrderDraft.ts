@@ -14,7 +14,7 @@ function parseFixed(value: string, decimals: number, allowZero: boolean): number
   const [whole, fractional = ''] = trimmed.split('.');
   if (fractional.length > decimals) return null;
   const factor = 10n ** BigInt(decimals);
-  const parsed = BigInt(whole) * factor + BigInt(fractional.padEnd(decimals, '0') || '0');
+  const parsed = BigInt(whole ?? '0') * factor + BigInt(fractional.padEnd(decimals, '0') || '0');
   if (parsed > BigInt(Number.MAX_SAFE_INTEGER) || (!allowZero && parsed === 0n)) return null;
   return Number(parsed);
 }
