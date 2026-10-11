@@ -660,6 +660,9 @@ export default async function handler(
       case 'po.update':
         result = await service.updatePurchaseOrder(command, context.principal);
         break;
+      case 'po.cancel':
+        result = await service.cancelPurchaseOrder(command, context.principal);
+        break;
       case 'po.order':
         result = await service.orderPurchaseOrder(command, context.principal);
         break;
