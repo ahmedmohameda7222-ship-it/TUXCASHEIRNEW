@@ -16,6 +16,11 @@ export async function adminFetch<T>(
   csrfToken?: string,
 ): Promise<T> {
   if (!path.startsWith('/api/admin/')) throw new Error('admin_api_path_required');
+  // Browser-only, explicitly opted-in workspace; never change server authorization or live data.
+  if (import.meta.env.DEV && import.meta.env.VITE_TUX_ADMIN_FIXTURES === 'true') {
+    const { requestLocalAdmin } = await import('../fixtures/localAdminFixtureApi');
+    return requestLocalAdmin<T>(path, init);
+  }
   const method = (init.method ?? 'GET').toUpperCase();
   const headers = new Headers(init.headers);
   headers.set('accept', 'application/json');
