@@ -60,8 +60,8 @@ export function validatePurchaseOrderLines(
     if (!Number.isSafeInteger(line.expectedPurchaseUnitCostMinor) || line.expectedPurchaseUnitCostMinor < 0) {
       return `Line ${index + 1}: enter a valid expected cost.`;
     }
-    const key = `${item.id}:${label}`;
-    if (seen.has(key)) return `Line ${index + 1}: duplicate inventory item and purchase unit.`;
+    const key = item.id;
+    if (seen.has(key)) return `Line ${index + 1}: duplicate inventory item.`;
     seen.add(key);
   }
   return null;
