@@ -47,7 +47,11 @@ export function CatalogDefinitionsEditor({
   canEdit: boolean;
   canPrice: boolean;
   pending: boolean;
-  onSave(input: {collection: CatalogDefinitionCollection; definition: CatalogJsonObject}): Promise<void>;
+  onSave(input: {
+    collection: CatalogDefinitionCollection;
+    definition?: CatalogJsonObject;
+    orderedIds?: readonly string[];
+  }): Promise<void>;
 }) {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -111,24 +115,16 @@ export function CatalogDefinitionsEditor({
     direction: 'up' | 'down',
   ) {
     const entries = collection === 'categories' ? orderedCategories : orderedModifiers;
-    const index = entries.findIndex((entry)=>entry.id===id);
-    const neighbor = entries[index+(direction==='up'?-1:1)];
-    const entry = entries[index];
-    if (!entry || !neighbor) return;
-    const sortOrder = direction==='up'
-      ? Math.max(0, neighbor.sortOrder-1)
-      : neighbor.sortOrder+1;
-    if (collection==='categories') {
-      void persist(collection,{
-        id:entry.id,shopId,name:entry.name,description:(entry as CatalogCategorySummary).description,
-        slug:(entry as CatalogCategorySummary).slug,active:entry.active,sortOrder,
-      });
-    } else {
-      void persist(collection,{
-        id:entry.id,shopId,name:entry.name,priceMinor:(entry as CatalogModifierDefinition).priceMinor,
-        active:entry.active,sortOrder,
-      });
-    }
+    const index = entries.findIndex((entry) => entry.id === id);
+    const neighborIndex = index + (direction === 'up' ? -1 : 1);
+    if (index < 0 || neighborIndex < 0 || neighborIndex >= entries.length) return;
+    const orderedIds = entries.map((entry) => entry.id);
+    const moved = orderedIds[index]!;
+    orderedIds[index] = orderedIds[neighborIndex]!;
+    orderedIds[neighborIndex] = moved;
+    void onSave({ collection, orderedIds }).catch(() => {
+      setError('The draft order could not be saved. Refresh and retry.');
+    });
   }
 
   return (
