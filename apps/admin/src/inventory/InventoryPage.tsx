@@ -257,6 +257,7 @@ export function InventoryPage() {
           onClose={() => setDefinitionOpen(false)}
           onCommand={(input, onSuccess) => inventory.manageDefinition.mutate(input, {
             onSuccess: (result) => {
+              if (!result.ok) return;
               onSuccess(result.entityId);
               if (input.type === 'item.create' && result.entityId) navigate(detailPath('/inventory', result.entityId));
             },
