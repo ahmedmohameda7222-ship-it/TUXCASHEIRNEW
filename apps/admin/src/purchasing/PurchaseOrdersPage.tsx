@@ -1,29 +1,44 @@
-import { useMemo, useState } from 'react';
-
 import type {
   AdminPurchaseOrder,
   AdminPurchasingInventoryItem,
   AdminSupplier,
 } from '@tux/admin-contracts';
+import { useMemo, useRef, useState } from 'react';
+
 import { AdminDialog } from '../components/overlay/AdminDialog';
+import {
+  calculatePurchaseOrderSubtotalMinor,
+  parsePurchaseDecimalMicros,
+  parsePurchaseMoneyMinor,
+  validatePurchaseOrderLines,
+} from './purchaseOrderDraft';
 
 function statusLabel(status: AdminPurchaseOrder['status']): string {
-  return status
-    .replaceAll('_', ' ')
-    .toLowerCase()
-    .replace(/^./, (letter) => letter.toUpperCase());
+  return status.replaceAll('_', ' ').toLowerCase().replace(/^./, (letter) => letter.toUpperCase());
 }
 
-function baseMicros(value: string): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
-  return Math.round(parsed * 1_000_000);
+type DraftLine = {
+  key: number;
+  inventoryItemId: string;
+  purchaseUnitLabel: string;
+  quantity: string;
+  unitCost: string;
+};
+
+function newLine(key: number, items: readonly AdminPurchasingInventoryItem[]): DraftLine {
+  const first = items[0];
+  return {
+    key,
+    inventoryItemId: first?.id ?? '',
+    purchaseUnitLabel: first?.purchaseUnits[0]?.label ?? first?.unitLabel ?? '',
+    quantity: '',
+    unitCost: '',
+  };
 }
 
-function minorUnits(value: string): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) return 0;
-  return Math.round(parsed * 100);
+function formatEgpMinor(minor: number): string {
+  const amount = BigInt(minor);
+  return `${amount / 100n}.${String(amount % 100n).padStart(2, '0')}`;
 }
 
 export function PurchaseOrdersPage({
@@ -58,40 +73,56 @@ export function PurchaseOrdersPage({
     onSuccess: () => void,
   ): void;
 }) {
-  const activeSuppliers = useMemo(
-    () => suppliers.filter((supplier) => supplier.active),
-    [suppliers],
-  );
+  const activeSuppliers = useMemo(() => suppliers.filter((supplier) => supplier.active), [suppliers]);
   const firstSupplier = activeSuppliers[0]?.id ?? '';
-  const firstItem = inventoryItems[0]?.id ?? '';
   const [supplierId, setSupplierId] = useState(firstSupplier);
-  const [itemId, setItemId] = useState(firstItem);
   const [reference, setReference] = useState('');
   const [expectedDate, setExpectedDate] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [purchaseUnit, setPurchaseUnit] = useState('');
-  const [unitCost, setUnitCost] = useState('');
+  const nextKey = useRef(2);
+  const [lines, setLines] = useState<DraftLine[]>(() => [newLine(1, inventoryItems)]);
+  const [formError, setFormError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
   const selectedSupplierId = activeSuppliers.some((supplier) => supplier.id === supplierId)
     ? supplierId
     : firstSupplier;
-  const selectedItemId = inventoryItems.some((item) => item.id === itemId) ? itemId : firstItem;
-  const unitLabel = useMemo(
-    () => inventoryItems.find((item) => item.id === selectedItemId)?.unitLabel ?? 'unit',
-    [inventoryItems, selectedItemId],
-  );
+
+  const preparedLines = lines.map((line) => ({
+    inventoryItemId: line.inventoryItemId,
+    purchaseUnitLabel: line.purchaseUnitLabel,
+    orderedPurchaseUnitsMicros: parsePurchaseDecimalMicros(line.quantity) ?? 0,
+    expectedPurchaseUnitCostMinor: parsePurchaseMoneyMinor(line.unitCost) ?? -1,
+  }));
+  const lineError = validatePurchaseOrderLines(preparedLines, inventoryItems);
+  const subtotal = lineError === null
+    ? (() => {
+        try {
+          return calculatePurchaseOrderSubtotalMinor(preparedLines);
+        } catch {
+          return null;
+        }
+      })()
+    : null;
+
+  function resetForm() {
+    setReference('');
+    setExpectedDate('');
+    setLines([newLine(nextKey.current++, inventoryItems)]);
+    setFormError(null);
+    setCreateOpen(false);
+  }
+
+  function updateLine(key: number, changes: Partial<DraftLine>) {
+    setLines((current) => current.map((line) => line.key === key ? { ...line, ...changes } : line));
+    setFormError(null);
+  }
 
   return (
     <section aria-labelledby="purchase-orders-heading">
       <div className="admin-catalog-editor__section-heading">
         <h2 id="purchase-orders-heading">Purchase orders</h2>
         {canManage ? (
-          <button
-            className="admin-primary-button"
-            type="button"
-            onClick={() => setCreateOpen(true)}
-          >
+          <button className="admin-primary-button" type="button" onClick={() => setCreateOpen(true)}>
             New purchase order
           </button>
         ) : null}
@@ -99,9 +130,7 @@ export function PurchaseOrdersPage({
       <div className="admin-inventory-list">
         {purchaseOrders.map((order) => (
           <button
-            className={
-              selectedId === order.id ? 'admin-inventory-row is-selected' : 'admin-inventory-row'
-            }
+            className={selectedId === order.id ? 'admin-inventory-row is-selected' : 'admin-inventory-row'}
             type="button"
             key={order.id}
             onClick={() => onSelect(order.id)}
@@ -119,120 +148,96 @@ export function PurchaseOrdersPage({
           open={createOpen}
           variant="sheet"
           title="New purchase order"
-          description="Choose a supplier and add the first item."
-          onOpenChange={(open) => {
-            if (!pending) setCreateOpen(open);
-          }}
+          description="Choose a supplier and add one or more purchase-order lines."
+          onOpenChange={(open) => { if (!pending) setCreateOpen(open); }}
         >
-          <form
-            className="admin-form-grid"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const orderedPurchaseUnitsMicros = baseMicros(quantity);
-              if (!selectedSupplierId || !selectedItemId || orderedPurchaseUnitsMicros <= 0) return;
-              onCreate(
-                {
-                  supplierId: selectedSupplierId,
-                  reference: reference.trim() || null,
-                  expectedDeliveryDate: expectedDate || null,
-                  lines: [
-                    {
-                      inventoryItemId: selectedItemId,
-                      purchaseUnitLabel: purchaseUnit.trim() || unitLabel,
-                      orderedPurchaseUnitsMicros,
-                      expectedPurchaseUnitCostMinor: minorUnits(unitCost),
-                    },
-                  ],
-                },
-                () => {
-                  setReference('');
-                  setExpectedDate('');
-                  setQuantity('');
-                  setPurchaseUnit('');
-                  setUnitCost('');
-                  setCreateOpen(false);
-                },
-              );
-            }}
-          >
+          <form className="admin-form-grid" onSubmit={(event) => {
+            event.preventDefault();
+            const error = !selectedSupplierId
+              ? 'Select a supplier.'
+              : lineError ?? (subtotal === null ? 'Order subtotal is too large.' : null);
+            if (error) {
+              setFormError(error);
+              return;
+            }
+            onCreate({
+              supplierId: selectedSupplierId,
+              reference: reference.trim() || null,
+              expectedDeliveryDate: expectedDate || null,
+              lines: preparedLines,
+            }, resetForm);
+          }}>
             <label>
               Supplier
-              <select
-                value={selectedSupplierId}
-                onChange={(event) => setSupplierId(event.currentTarget.value)}
-              >
+              <select value={selectedSupplierId} onChange={(event) => setSupplierId(event.currentTarget.value)}>
                 {activeSuppliers.map((supplier) => (
-                  <option value={supplier.id} key={supplier.id}>
-                    {supplier.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Inventory item
-              <select
-                value={selectedItemId}
-                onChange={(event) => setItemId(event.currentTarget.value)}
-              >
-                {inventoryItems.map((item) => (
-                  <option value={item.id} key={item.id}>
-                    {item.name}
-                  </option>
+                  <option value={supplier.id} key={supplier.id}>{supplier.name}</option>
                 ))}
               </select>
             </label>
             <label>
               Reference
-              <input
-                value={reference}
-                onChange={(event) => setReference(event.currentTarget.value)}
-              />
+              <input value={reference} onChange={(event) => setReference(event.currentTarget.value)} />
             </label>
             <label>
               Expected delivery
-              <input
-                type="date"
-                value={expectedDate}
-                onChange={(event) => setExpectedDate(event.currentTarget.value)}
-              />
+              <input type="date" value={expectedDate} onChange={(event) => setExpectedDate(event.currentTarget.value)} />
             </label>
-            <label>
-              Order quantity (purchase units)
-              <input
-                inputMode="decimal"
-                value={quantity}
-                onChange={(event) => setQuantity(event.currentTarget.value)}
-              />
-            </label>
-            <label>
-              Purchase unit
-              <input
-                value={purchaseUnit}
-                placeholder={unitLabel}
-                onChange={(event) => setPurchaseUnit(event.currentTarget.value)}
-              />
-            </label>
-            <label>
-              Expected cost per purchase unit (EGP)
-              <input
-                inputMode="decimal"
-                value={unitCost}
-                onChange={(event) => setUnitCost(event.currentTarget.value)}
-              />
-            </label>
-            <button
-              className="admin-primary-button"
-              type="submit"
-              disabled={pending || !selectedSupplierId}
-            >
+            {lines.map((line, index) => {
+              const item = inventoryItems.find((candidate) => candidate.id === line.inventoryItemId);
+              const units = item?.purchaseUnits ?? [];
+              return (
+                <fieldset className="admin-form-grid" key={line.key}>
+                  <legend>Line {index + 1}</legend>
+                  <label>
+                    Inventory item
+                    <select value={line.inventoryItemId} onChange={(event) => {
+                      const selected = inventoryItems.find((candidate) => candidate.id === event.currentTarget.value);
+                      updateLine(line.key, {
+                        inventoryItemId: selected?.id ?? '',
+                        purchaseUnitLabel: selected?.purchaseUnits[0]?.label ?? '',
+                      });
+                    }}>
+                      {inventoryItems.map((candidate) => (
+                        <option key={candidate.id} value={candidate.id}>{candidate.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Purchase unit
+                    <select value={line.purchaseUnitLabel} onChange={(event) => updateLine(line.key, { purchaseUnitLabel: event.currentTarget.value })}>
+                      {units.map((unit) => (
+                        <option key={unit.label} value={unit.label}>{unit.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Quantity (purchase units)
+                    <input inputMode="decimal" required value={line.quantity} onChange={(event) => updateLine(line.key, {quantity: event.currentTarget.value})} />
+                  </label>
+                  <label>
+                    Expected cost per purchase unit (EGP)
+                    <input inputMode="decimal" required value={line.unitCost} onChange={(event) => updateLine(line.key, {unitCost: event.currentTarget.value})} />
+                  </label>
+                  {lines.length > 1 ? (
+                    <button className="admin-secondary-button" type="button" disabled={pending}
+                      onClick={() => { setLines((current) => current.filter((candidate) => candidate.key !== line.key)); setFormError(null); }}>
+                      Remove line {index + 1}
+                    </button>
+                  ) : null}
+                </fieldset>
+              );
+            })}
+            <button className="admin-secondary-button" type="button" disabled={pending || lines.length >= 500 || inventoryItems.length === 0}
+              onClick={() => { setLines((current) => [...current, newLine(nextKey.current++, inventoryItems)]); setFormError(null); }}>
+              Add line
+            </button>
+            {formError ? <p role="alert">{formError}</p> : null}
+            {subtotal !== null ? <p>Expected subtotal: {formatEgpMinor(subtotal)} EGP</p> : null}
+            <button className="admin-primary-button" type="submit" disabled={pending || !selectedSupplierId || inventoryItems.length === 0}>
               Create purchase order
             </button>
-            <button
-              className="admin-secondary-button"
-              type="button"
-              disabled={pending}
-              onClick={() => setCreateOpen(false)}
-            >
+            <button className="admin-secondary-button" type="button" disabled={pending} onClick={() => setCreateOpen(false)}>
               Cancel
             </button>
           </form>
