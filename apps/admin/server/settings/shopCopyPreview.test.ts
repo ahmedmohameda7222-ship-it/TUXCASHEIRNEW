@@ -41,6 +41,20 @@ describe('selective shop settings copy preview', () => {
     expect(result.changes.some((row) => row.settingKey.startsWith('receipt.'))).toBe(false);
   });
 
+  it('does not report a change when both shops already resolve the same inherited value', () => {
+    const inheritingTarget = { ...target, shopOverrides: [] };
+    const result = buildSettingsCopyPreview(source, inheritingTarget, ['checkout'], 11);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.changes.find((row) => row.settingKey === 'checkout.taxBps')).toMatchObject({
+      source: 'business',
+      targetSource: 'business',
+      sourceValue: 1400,
+      targetValue: 1400,
+      wouldChange: false,
+    });
+  });
+
   it('rejects stale targets rather than presenting an obsolete copy plan', () => {
     expect(buildSettingsCopyPreview(source, target, ['checkout'], 10)).toEqual({
       ok: false,
