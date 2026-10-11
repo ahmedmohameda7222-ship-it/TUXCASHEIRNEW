@@ -138,7 +138,8 @@ describe('Admin settings API contract', () => {
     expect(settingsCommandSchema.safeParse({ ...command, refundAllowed: 'false' }).success).toBe(
       false,
     );
-    const { refundAllowed: _refundAllowed, ...missingRefundPolicy } = command;
+    const missingRefundPolicy: Partial<typeof command> = { ...command };
+    delete missingRefundPolicy.refundAllowed;
     expect(settingsCommandSchema.safeParse(missingRefundPolicy).success).toBe(false);
     expect(
       settingsCommandSchema.safeParse({ ...command, requiresReconciliation: false }).success,
