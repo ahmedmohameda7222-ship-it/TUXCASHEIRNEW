@@ -40,6 +40,13 @@ const microsSchema = z.number().int().safe().positive();
 const moneySchema = z.number().finite().nonnegative();
 
 const commandSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('po.cancel'),
+    shopId: uuidSchema,
+    purchaseOrderId: uuidSchema,
+    expectedVersion: z.number().int().positive(),
+    commandId: commandIdSchema,
+  }).strict(),
   z
     .object({
       type: z.literal('supplier.create'),
@@ -527,6 +534,16 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
         p_expected_version: input.expectedVersion,
         p_reference: input.reference,
         p_expected_delivery_date: input.expectedDeliveryDate,
+      });
+    },
+
+    cancelPurchaseOrder(input) {
+      return client.rpc<PurchasingCommandResult>('cancel_purchase_order_v1', {
+        p_employee_id: input.employeeId,
+        p_shop_id: input.shopId,
+        p_purchase_order_id: input.purchaseOrderId,
+        p_expected_version: input.expectedVersion,
+        p_command_id: input.commandId,
       });
     },
 
