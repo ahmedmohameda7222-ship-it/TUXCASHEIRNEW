@@ -53,6 +53,7 @@ export type AdminShopSettingsSummary = {
   id: string;
   name: string;
   lifecycleState: ShopLifecycleState;
+  lifecycleRevision?: number;
   active: boolean;
   address: string | null;
   contactPhone: string | null;
@@ -173,6 +174,7 @@ export type CanonicalSettingsRowEditResult =
 
 export type ShopManagementWriteResult =
   | { ok: true; hoursId?: string; deactivated?: boolean }
+  | { ok: false; code: 'stale_shop_lifecycle'; currentVersion: number }
   | { ok: false; code: 'stale_settings_version'; currentVersion: number }
   | { ok: false; code: string };
 
@@ -187,6 +189,13 @@ export type SettingWriteInput = {
   settingKey: string;
   value: unknown;
   expectedVersion: number | null;
+};
+
+export type ShopLifecycleUpdateInput = {
+  shopId: string;
+  expectedState: 'ACTIVE' | 'SUSPENDED';
+  targetState: 'ACTIVE' | 'SUSPENDED';
+  expectedLifecycleRevision: number;
 };
 
 export type ShopOperationalStateUpdateInput = {
@@ -305,6 +314,7 @@ export type PaymentMethodEditInput = {
 export type SettingsCommand =
   | ({ type: 'settings.publish' } & { shopId: string; expectedSettingsVersion: number })
   | ({ type: 'shop.operational-state.update' } & ShopOperationalStateUpdateInput)
+  | ({ type: 'shop.lifecycle.update' } & ShopLifecycleUpdateInput)
   | ({ type: 'shop.identity.update' } & ShopIdentityUpdateInput)
   | ({ type: 'shop.weekly-hours.upsert' } & ShopWeeklyHoursUpsertInput)
   | ({ type: 'shop.special-hours.upsert' } & ShopSpecialHoursUpsertInput)
