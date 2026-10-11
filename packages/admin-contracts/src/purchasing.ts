@@ -124,6 +124,14 @@ export type UpdatePurchaseOrderInput = {
   readonly expectedDeliveryDate: string | null;
 };
 
+export type ReplaceDraftPurchaseOrderLinesInput = {
+  readonly shopId: string;
+  readonly purchaseOrderId: string;
+  readonly expectedVersion: number;
+  readonly commandId: string;
+  readonly lines: CreatePurchaseOrderInput['lines'];
+};
+
 export type CancelPurchaseOrderInput = {
   readonly shopId: string;
   readonly purchaseOrderId: string;
