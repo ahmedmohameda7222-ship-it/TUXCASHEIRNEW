@@ -125,6 +125,22 @@ async function mockSettings(
     const command = request.postDataJSON() as Record<string, unknown>;
     commands.push(command);
 
+    if (command.type === 'setting.default.upsert') {
+      const settingKey = String(command.settingKey);
+      const current = businessDefaults.find((row) => row.key === settingKey);
+      expect(command.expectedVersion).toBe(current?.version ?? null);
+      if (current) {
+        current.value = command.value as never;
+        current.version += 1;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, version: current?.version ?? 1 }),
+      });
+      return;
+    }
+
     if (command.type === 'setting.override.upsert') {
       const settingKey = String(command.settingKey);
       const current = shopOverrides.find((row) => row.key === settingKey);
@@ -348,6 +364,24 @@ test('deactivates an existing reason code through the trusted settings command',
     family: 'CANCELLATION',
     active: false,
     expectedVersion: 4,
+  });
+});
+
+test('business administrators edit canonical business defaults without changing shop overrides', async ({
+  page,
+}) => {
+  const { commands } = await mockSettings(page);
+  await page.goto('/settings/business-defaults');
+  await expect(page.getByRole('heading', { name: 'Business defaults' })).toBeVisible();
+  await page.getByLabel('Tax / VAT (%)').fill('15.50');
+  await page.getByRole('button', { name: 'Save business default: Tax / VAT (%)' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toEqual({
+    type: 'setting.default.upsert',
+    shopId,
+    settingKey: 'checkout.taxBps',
+    value: 1550,
+    expectedVersion: 1,
   });
 });
 
