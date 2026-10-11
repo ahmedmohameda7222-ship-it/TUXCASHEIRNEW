@@ -689,9 +689,17 @@ test('confirms archive before routing shop lifecycle management through the trus
   expect(commands[0]).toEqual({ type: 'shop.delete-or-archive', shopId });
 });
 
-test('previews explicitly selected configuration without mutating either shop', async ({ page }) => {
+test('previews explicitly selected configuration without mutating either shop', async ({
+  page,
+}) => {
   const sourceShopId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
-  const { commands } = await mockSettings(page, ['settings.manage'], 'OWNER', [], [shopId, sourceShopId]);
+  const { commands } = await mockSettings(
+    page,
+    ['settings.manage'],
+    'OWNER',
+    [],
+    [shopId, sourceShopId],
+  );
   const previews: Record<string, unknown>[] = [];
   await page.route('**/api/admin/shop-copy-preview', async (route) => {
     const request = route.request();
@@ -705,21 +713,25 @@ test('previews explicitly selected configuration without mutating either shop', 
         ok: true,
         sourceSettingsVersion: 3,
         targetSettingsVersion: 7,
-        changes: [{
-          settingKey: 'checkout.taxBps',
-          sourceValue: 1500,
-          source: 'shop',
-          targetValue: 1400,
-          targetSource: 'business',
-          targetExpectedVersion: null,
-          wouldChange: true,
-        }],
+        changes: [
+          {
+            settingKey: 'checkout.taxBps',
+            sourceValue: 1500,
+            source: 'shop',
+            targetValue: 1400,
+            targetSource: 'business',
+            targetExpectedVersion: null,
+            wouldChange: true,
+          },
+        ],
       }),
     });
   });
 
   await page.goto('/settings/shop');
-  await expect(page.getByRole('heading', { name: 'Selective settings copy preview' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Selective settings copy preview' }),
+  ).toBeVisible();
   await page.getByLabel('Source shop').selectOption(sourceShopId);
   await page.getByRole('checkbox', { name: 'Receipt configuration' }).check();
   await page.getByRole('button', { name: 'Preview selected configuration' }).click();
@@ -734,8 +746,12 @@ test('previews explicitly selected configuration without mutating either shop', 
   expect(commands).toHaveLength(0);
 });
 
-test('does not offer cross-shop copy when no other authorized source shop exists', async ({ page }) => {
+test('does not offer cross-shop copy when no other authorized source shop exists', async ({
+  page,
+}) => {
   await mockSettings(page, ['settings.manage']);
   await page.goto('/settings/shop');
-  await expect(page.getByRole('heading', { name: 'Selective settings copy preview' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Selective settings copy preview' })).toHaveCount(
+    0,
+  );
 });
