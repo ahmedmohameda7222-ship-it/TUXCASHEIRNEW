@@ -57,6 +57,8 @@ export function PaymentZoneRulesPanel({ workspace }: { workspace: AdminSettingsW
       setError(cause instanceof Error ? cause.message : 'Unable to update payment policy'),
   });
 
+  const availableRules = rules.data?.rules;
+
   return (
     <section className="admin-settings-subsection" aria-label="Delivery-zone payment restrictions">
       <h3>Delivery-zone payment restrictions</h3>
@@ -76,11 +78,11 @@ export function PaymentZoneRulesPanel({ workspace }: { workspace: AdminSettingsW
           Add delivery zones and payment methods before configuring restrictions.
         </p>
       ) : null}
-      {rules.data ? (
+      {availableRules ? (
         <div className="admin-settings-list">
           {workspace.deliveryZones.map((zone) =>
             workspace.paymentMethods.map((method) => {
-              const rule = rules.data.rules.find(
+              const rule = availableRules.find(
                 (candidate) =>
                   candidate.deliveryZoneId === zone.id && candidate.paymentMethodId === method.id,
               );
