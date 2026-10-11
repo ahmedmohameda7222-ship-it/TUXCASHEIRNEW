@@ -8,6 +8,7 @@ import type {
   PurchasingCommandResult,
   ReceivePurchaseInput,
   ReturnPurchaseInput,
+  ReplaceDraftPurchaseOrderLinesInput,
   UpdatePurchaseOrderInput,
 } from '@tux/admin-contracts';
 
@@ -25,6 +26,7 @@ export interface PurchasingStore {
   updatePurchaseOrder(
     input: UpdatePurchaseOrderInput & { employeeId: string },
   ): Promise<PurchasingCommandResult>;
+  replaceDraftPurchaseOrderLines(input: ReplaceDraftPurchaseOrderLinesInput & {employeeId: string}): Promise<PurchasingCommandResult>;
   cancelPurchaseOrder(input: CancelPurchaseOrderInput & {employeeId: string}): Promise<PurchasingCommandResult>;
   orderPurchaseOrder(input: {
     employeeId: string;
@@ -89,6 +91,14 @@ export function createPurchasingService(store: PurchasingStore) {
     ): Promise<PurchasingCommandResult> {
       requirePermission(principal, 'purchasing.manage', input.shopId);
       return store.updatePurchaseOrder({ ...input, employeeId: principal.employeeId });
+    },
+
+    async replaceDraftPurchaseOrderLines(
+      input: ReplaceDraftPurchaseOrderLinesInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<PurchasingCommandResult> {
+      requirePermission(principal, 'purchasing.manage', input.shopId);
+      return store.replaceDraftPurchaseOrderLines({...input, employeeId: principal.employeeId});
     },
 
     async cancelPurchaseOrder(
