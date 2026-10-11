@@ -19,7 +19,8 @@ describe('canonical payment method creation', () => {
     expect(sql).toContain('pg_advisory_xact_lock');
     expect(sql).toContain('admin_payment_method_create_commands');
     expect(sql).toContain('stale_settings_version');
-    expect(sql).toContain('public.admin_audit_events');
+    expect(sql).toContain('public.append_admin_audit_event_v1');
+    expect(sql).toContain('SETTINGS_PAYMENT_METHOD_CREATED');
     expect(sql).toContain('refund_allowed');
     expect(sql).toContain('true');
     expect(sql).toContain('REVOKE ALL ON FUNCTION public.create_admin_payment_method_v1');
