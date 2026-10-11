@@ -488,6 +488,7 @@ export function ShopsPage({
   onUpsertWeeklyHours,
   onUpsertSpecialHours,
   onDeleteOrArchive,
+  canAssignStaff = false,
   busy = false,
 }: {
   workspace: AdminSettingsWorkspace;
@@ -496,6 +497,7 @@ export function ShopsPage({
   onUpsertWeeklyHours?: (draft: ShopWeeklyHoursUpdateDraft) => void | Promise<void>;
   onUpsertSpecialHours?: (draft: ShopSpecialHoursUpdateDraft) => void | Promise<void>;
   onDeleteOrArchive?: () => void;
+  canAssignStaff?: boolean;
   busy?: boolean;
 }) {
   const shop = workspace.shop;
@@ -594,6 +596,18 @@ export function ShopsPage({
         </div>
         <span className="admin-status-pill">{shop.lifecycleState}</span>
       </div>
+
+      {canAssignStaff ? (
+        <div className="admin-settings-card">
+          <strong>Staff assignments</strong>
+          <p className="admin-field__help">
+            Assign employees to this shop through the existing Staff management workflow.
+          </p>
+          <a className="admin-secondary-button" href="/staff">
+            Manage staff assignments
+          </a>
+        </div>
+      ) : null}
 
       <form className="admin-settings-card" onSubmit={(event) => void saveIdentity(event)}>
         <div className="admin-settings-grid">

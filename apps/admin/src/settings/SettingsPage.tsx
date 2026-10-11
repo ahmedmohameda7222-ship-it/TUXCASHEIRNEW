@@ -32,6 +32,7 @@ export type SettingsSection =
 export type SettingsWorkspaceViewProps = {
   workspace: AdminSettingsWorkspace;
   section: SettingsSection;
+  canAssignStaff?: boolean;
   onSectionChange(section: SettingsSection): void;
   onPublish(): void | Promise<void>;
   publishing: boolean;
@@ -141,6 +142,7 @@ function SectionContent(
     onUpsertWeeklyHours,
     onUpsertSpecialHours,
     shopManagementUpdating,
+    canAssignStaff,
     onDeleteOrArchiveShop,
     deletingOrArchivingShop,
     onUpdateSettingOverride,
@@ -160,6 +162,7 @@ function SectionContent(
       return (
         <ShopsPage
           workspace={workspace}
+          canAssignStaff={canAssignStaff}
           onUpdateOperationalState={(draft) => void onUpdateOperationalState(draft)}
           onUpdateIdentity={onUpdateShopIdentity}
           onUpsertWeeklyHours={onUpsertWeeklyHours}
@@ -267,7 +270,7 @@ export function SettingsWorkspaceView({
 }
 
 export function SettingsPage() {
-  const { scope } = useShopScope();
+  const { scope, principal } = useShopScope();
   const [location, navigate] = useLocation();
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const section = settingsSectionForLocation(location);
@@ -321,6 +324,7 @@ export function SettingsPage() {
         <SettingsWorkspaceView
           workspace={workspace}
           section={section}
+          canAssignStaff={principal.permissions.includes('staff.manage')}
           onSectionChange={(nextSection) => navigate(settingsLocationForSection(nextSection))}
           onPublish={() => settings.publish.mutateAsync()}
           publishing={settings.publish.isPending}
