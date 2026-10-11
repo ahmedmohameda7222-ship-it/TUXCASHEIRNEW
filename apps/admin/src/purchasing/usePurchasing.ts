@@ -91,6 +91,23 @@ export function usePurchasing(shopId: string | undefined) {
     onSuccess: invalidate,
   });
 
+  const manageSupplier = useMutation({
+    mutationFn: async (input: {
+      type: 'supplier.update' | 'supplier.archive' | 'supplier.restore';
+      supplierId: string;
+      expectedVersion: number;
+      payload: {
+        name?: string; contactName?: string | null;
+        phone?: string | null; email?: string | null;
+      };
+    }) => {
+      return postRetained(input.type, input, (commandId) => ({
+        ...input, shopId: shopId!, commandId,
+      }));
+    },
+    onSuccess: invalidate,
+  });
+
   const createPurchaseOrder = useMutation({
     mutationFn: async (input: {
       supplierId: string;
@@ -189,6 +206,7 @@ export function usePurchasing(shopId: string | undefined) {
   return {
     workspace,
     createSupplier,
+    manageSupplier,
     createPurchaseOrder,
     updatePurchaseOrder,
     cancelPurchaseOrder,
