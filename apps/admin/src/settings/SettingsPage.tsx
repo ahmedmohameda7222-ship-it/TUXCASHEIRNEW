@@ -18,6 +18,7 @@ import {
   useSettings,
   type OrderTypeCreateDraft,
   type OrderTypeUpdateDraft,
+  type PaymentMethodCreateDraft,
   type PaymentMethodUpdateDraft,
   type ReasonCodeUpdateDraft,
   type SettingOverrideUpdateDraft,
@@ -68,6 +69,7 @@ export type SettingsWorkspaceViewProps = {
   onCreateOrderType(draft: OrderTypeCreateDraft): void | Promise<void>;
   onUpdateOrderType(draft: OrderTypeUpdateDraft): void | Promise<void>;
   orderTypeUpdating: boolean;
+  onCreatePaymentMethod(draft: PaymentMethodCreateDraft): void | Promise<void>;
   onUpdatePaymentMethod(draft: PaymentMethodUpdateDraft): void | Promise<void>;
   paymentMethodUpdating: boolean;
 };
@@ -178,6 +180,7 @@ function SectionContent(
     onCreateOrderType,
     onUpdateOrderType,
     orderTypeUpdating,
+    onCreatePaymentMethod,
     onUpdatePaymentMethod,
     paymentMethodUpdating,
   } = props;
@@ -223,6 +226,7 @@ function SectionContent(
       return (
         <PaymentsPage
           workspace={workspace}
+          onCreate={onCreatePaymentMethod}
           onUpdate={onUpdatePaymentMethod}
           updating={paymentMethodUpdating}
         />
@@ -407,8 +411,11 @@ export function SettingsPage() {
           orderTypeUpdating={
             settings.updateOrderType.isPending || settings.createOrderType.isPending
           }
+          onCreatePaymentMethod={(draft) => settings.createPaymentMethod.mutateAsync(draft)}
           onUpdatePaymentMethod={(draft) => settings.updatePaymentMethod.mutateAsync(draft)}
-          paymentMethodUpdating={settings.updatePaymentMethod.isPending}
+          paymentMethodUpdating={
+            settings.updatePaymentMethod.isPending || settings.createPaymentMethod.isPending
+          }
         />
       </SettingsScheduleActionProvider>
       <ConfirmationDialog
