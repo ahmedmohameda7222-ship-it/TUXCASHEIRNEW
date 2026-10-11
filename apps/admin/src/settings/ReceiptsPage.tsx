@@ -10,10 +10,12 @@ export function ReceiptsPage({
   workspace,
   onUpdate,
   updating,
+  scope = 'shop',
 }: {
   workspace: AdminSettingsWorkspace;
   onUpdate(draft: SettingOverrideUpdateDraft): void | Promise<void>;
   updating: boolean;
+  scope?: 'shop' | 'business';
 }) {
   const resetPolicy = resolveWorkspaceSetting(workspace, 'receipt.sequenceResetPolicy');
 
@@ -37,6 +39,7 @@ export function ReceiptsPage({
           kind="text"
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -45,6 +48,7 @@ export function ReceiptsPage({
           kind="text"
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -56,6 +60,7 @@ export function ReceiptsPage({
           help="A new starting number takes effect at the next business-day boundary."
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
         />
         <article
           className="admin-catalog-editor__section is-compact"

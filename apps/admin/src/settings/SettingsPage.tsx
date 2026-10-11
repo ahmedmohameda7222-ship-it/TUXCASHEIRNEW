@@ -5,6 +5,7 @@ import { useLocation } from 'wouter';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { ConfirmationDialog } from '../components/overlay/AdminDialog';
 import { useShopScope } from '../shops/ShopScopeProvider';
+import { BusinessDefaultsPage } from './BusinessDefaultsPage';
 import { CheckoutPage } from './CheckoutPage';
 import { OrderTypesPage } from './OrderTypesPage';
 import { PaymentsPage } from './PaymentsPage';
@@ -27,12 +28,22 @@ import {
 } from './useSettings';
 
 export type SettingsSection =
-  'overview' | 'shop' | 'order-types' | 'payments' | 'checkout' | 'receipts' | 'reason-codes';
+  | 'overview'
+  | 'shop'
+  | 'business-defaults'
+  | 'order-types'
+  | 'payments'
+  | 'checkout'
+  | 'receipts'
+  | 'reason-codes';
 
 export type SettingsWorkspaceViewProps = {
   workspace: AdminSettingsWorkspace;
   section: SettingsSection;
   canAssignStaff?: boolean;
+  canManageBusinessDefaults?: boolean;
+  onUpdateBusinessDefault?: (draft: SettingOverrideUpdateDraft) => void | Promise<void>;
+  businessDefaultUpdating?: boolean;
   onSectionChange(section: SettingsSection): void;
   onPublish(): void | Promise<void>;
   publishing: boolean;
@@ -57,6 +68,7 @@ export type SettingsWorkspaceViewProps = {
 
 const sections: readonly { id: SettingsSection; label: string }[] = [
   { id: 'shop', label: 'Shop' },
+  { id: 'business-defaults', label: 'Business defaults' },
   { id: 'order-types', label: 'Order types' },
   { id: 'payments', label: 'Payments' },
   { id: 'checkout', label: 'Checkout' },
@@ -66,6 +78,7 @@ const sections: readonly { id: SettingsSection; label: string }[] = [
 
 const settingsSectionIds = new Set<SettingsSection>([
   'shop',
+  'business-defaults',
   'order-types',
   'payments',
   'checkout',
@@ -143,6 +156,9 @@ function SectionContent(
     onUpsertSpecialHours,
     shopManagementUpdating,
     canAssignStaff,
+    canManageBusinessDefaults,
+    onUpdateBusinessDefault,
+    businessDefaultUpdating,
     onDeleteOrArchiveShop,
     deletingOrArchivingShop,
     onUpdateSettingOverride,
@@ -170,6 +186,16 @@ function SectionContent(
           onDeleteOrArchive={() => void onDeleteOrArchiveShop()}
           busy={operationalStateUpdating || shopManagementUpdating || deletingOrArchivingShop}
         />
+      );
+    case 'business-defaults':
+      return canManageBusinessDefaults && onUpdateBusinessDefault ? (
+        <BusinessDefaultsPage
+          workspace={workspace}
+          onUpdate={onUpdateBusinessDefault}
+          updating={businessDefaultUpdating === true}
+        />
+      ) : (
+        <p role="alert">Business defaults require business-wide settings management access.</p>
       );
     case 'order-types':
       return (
@@ -253,7 +279,9 @@ export function SettingsWorkspaceView({
         >
           Overview
         </button>
-        {sections.map((item) => (
+        {sections
+          .filter((item) => item.id !== 'business-defaults' || sectionProps.canManageBusinessDefaults)
+          .map((item) => (
           <button
             key={item.id}
             type="button"
@@ -305,6 +333,9 @@ export function SettingsPage() {
     );
   }
 
+  const canManageBusinessDefaults =
+    (principal.role === 'OWNER' || principal.role === 'ADMIN') &&
+    principal.permissions.includes('settings.manage');
   const workspace = {
     ...settings.workspaceQuery.data,
     shopConfigSchedules: settings.schedulesQuery.data?.schedules ?? [],
@@ -325,6 +356,9 @@ export function SettingsPage() {
           workspace={workspace}
           section={section}
           canAssignStaff={principal.permissions.includes('staff.manage')}
+          canManageBusinessDefaults={canManageBusinessDefaults}
+          onUpdateBusinessDefault={(draft) => settings.updateBusinessDefault.mutateAsync(draft)}
+          businessDefaultUpdating={settings.updateBusinessDefault.isPending}
           onSectionChange={(nextSection) => navigate(settingsLocationForSection(nextSection))}
           onPublish={() => settings.publish.mutateAsync()}
           publishing={settings.publish.isPending}

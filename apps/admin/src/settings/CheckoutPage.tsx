@@ -13,10 +13,12 @@ export function CheckoutPage({
   workspace,
   onUpdate,
   updating,
+  scope = 'shop',
 }: {
   workspace: AdminSettingsWorkspace;
   onUpdate(draft: SettingOverrideUpdateDraft): void | Promise<void>;
   updating: boolean;
+  scope?: 'shop' | 'business';
 }) {
   return (
     <section className="admin-settings-section" aria-labelledby="settings-checkout-title">
@@ -44,6 +46,7 @@ export function CheckoutPage({
           parseInput={parseEgpToMinor}
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -58,6 +61,7 @@ export function CheckoutPage({
           parseInput={parsePercentToBasisPoints}
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -73,6 +77,7 @@ export function CheckoutPage({
           help="Used for future order totals after settings are published."
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -81,6 +86,7 @@ export function CheckoutPage({
           kind="boolean"
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -90,6 +96,7 @@ export function CheckoutPage({
           help="Applies to future orders; existing orders keep their original total."
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -99,6 +106,7 @@ export function CheckoutPage({
           help="When off, delivery orders use the configured zone fee."
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
         />
       </div>
 

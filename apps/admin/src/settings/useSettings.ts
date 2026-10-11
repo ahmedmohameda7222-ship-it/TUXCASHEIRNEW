@@ -55,6 +55,7 @@ type SettingsWorkspaceBase = Omit<AdminSettingsWorkspace, 'shopConfigSchedules'>
 type OrderTypeUpdateCommand = Extract<SettingsCommand, { type: 'order-type.update' }>;
 type PaymentMethodUpdateCommand = Extract<SettingsCommand, { type: 'payment-method.update' }>;
 type SettingOverrideUpdateCommand = Extract<SettingsCommand, { type: 'setting.override.upsert' }>;
+type BusinessDefaultUpdateCommand = Extract<SettingsCommand, { type: 'setting.default.upsert' }>;
 
 function settingsQueryKey(shopId: string) {
   return ['admin', 'settings', shopId] as const;
@@ -107,6 +108,15 @@ export function buildPaymentMethodUpdateCommand(
     expectedSettingsVersion: draft.expectedSettingsVersion,
     expectedEditVersion: draft.expectedEditVersion,
   };
+}
+
+export function buildBusinessDefaultCommand(
+  shopId: string,
+  workspace: AdminSettingsWorkspace,
+  draft: SettingOverrideUpdateDraft,
+): BusinessDefaultUpdateCommand {
+  requireWorkspaceShop(shopId, workspace);
+  return { type: 'setting.default.upsert', shopId, ...draft };
 }
 
 export function buildSettingOverrideCommand(
@@ -310,6 +320,22 @@ export function useSettings(shopId: string | undefined, includeSchedules = false
     onSuccess: invalidateWorkspace,
   });
 
+  const updateBusinessDefault = useMutation({
+    mutationFn: async (draft: SettingOverrideUpdateDraft): Promise<void> => {
+      if (!shopId) throw new SettingsUiError('concrete_shop_required');
+      const result = await adminFetch<SettingWriteResult>(
+        '/api/admin/settings',
+        {
+          method: 'POST',
+          body: JSON.stringify(buildBusinessDefaultCommand(shopId, latestWorkspace(), draft)),
+        },
+        csrfTokenForMutation(session),
+      );
+      requireSettingWriteSuccess(result);
+    },
+    onSuccess: invalidateWorkspace,
+  });
+
   const updateSettingOverride = useMutation({
     mutationFn: async (draft: SettingOverrideUpdateDraft): Promise<void> => {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
@@ -412,6 +438,7 @@ export function useSettings(shopId: string | undefined, includeSchedules = false
     upsertWeeklyHours,
     upsertSpecialHours,
     updateSettingOverride,
+    updateBusinessDefault,
     upsertReasonCode,
     createOrderType,
     updateOrderType,

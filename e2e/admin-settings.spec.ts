@@ -46,7 +46,7 @@ async function mockSettings(
     integrationReference: null,
     editVersion: 5,
   };
-  const businessDefaults = [
+  const businessDefaults: { key: string; value: unknown; version: number }[] = [
     { key: 'checkout.minimumOrderMinor', value: 3000, version: 1 },
     { key: 'checkout.serviceChargeBps', value: 500, version: 1 },
     { key: 'checkout.taxBps', value: 1400, version: 1 },
@@ -130,8 +130,10 @@ async function mockSettings(
       const current = businessDefaults.find((row) => row.key === settingKey);
       expect(command.expectedVersion).toBe(current?.version ?? null);
       if (current) {
-        current.value = command.value as never;
+        current.value = command.value;
         current.version += 1;
+      } else {
+        businessDefaults.push({ key: settingKey, value: command.value, version: 1 });
       }
       await route.fulfill({
         status: 200,

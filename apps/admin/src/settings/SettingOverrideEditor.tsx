@@ -19,6 +19,7 @@ type SettingOverrideEditorProps = {
   formatValue?(value: unknown): string;
   parseInput?(raw: string): unknown;
   updating: boolean;
+  scope?: 'shop' | 'business';
   onUpdate(draft: SettingOverrideUpdateDraft): void | Promise<void>;
 };
 
@@ -78,6 +79,7 @@ export function SettingOverrideEditor({
   formatValue,
   parseInput,
   updating,
+  scope = 'shop',
   onUpdate,
 }: SettingOverrideEditorProps) {
   const resolved = resolveWorkspaceSetting(workspace, settingKey);
@@ -129,7 +131,7 @@ export function SettingOverrideEditor({
     >
       <div className="admin-catalog-editor__section-heading">
         <div>
-          <p className="admin-catalog-editor__eyebrow">{settingSourceLabel(resolved.source)}</p>
+          <p className="admin-catalog-editor__eyebrow">{scope === 'business' ? 'Business default' : settingSourceLabel(resolved.source)}</p>
           <h3>{label}</h3>
         </div>
       </div>
@@ -167,7 +169,7 @@ export function SettingOverrideEditor({
       {help ? <p className="admin-field__help">{help}</p> : null}
       {error ? <p className="admin-field__error">{error}</p> : null}
       <button className="admin-secondary-button" type="submit" disabled={updating}>
-        {updating ? 'Saving…' : `Save ${label}`}
+        {updating ? 'Saving…' : scope === 'business' ? `Save business default: ${label}` : `Save ${label}`}
       </button>
     </form>
   );
