@@ -4,6 +4,7 @@ import type {
   AdminShopConfigSchedule,
   CanonicalSettingsRowEditResult,
   OrderTypeEditInput,
+  OrderTypeCreateInput,
   PaymentMethodEditInput,
   ReasonCodeWriteInput,
   ReasonCodeWriteResult,
@@ -33,6 +34,7 @@ export class SettingsUiError extends Error {
 }
 
 export type OrderTypeUpdateDraft = Omit<OrderTypeEditInput, 'shopId'>;
+export type OrderTypeCreateDraft = Omit<OrderTypeCreateInput, 'shopId'>;
 export type PaymentMethodUpdateDraft = Omit<PaymentMethodEditInput, 'shopId'>;
 export type ReasonCodeUpdateDraft = Omit<ReasonCodeWriteInput, 'shopId'>;
 export type ShopOperationalStateUpdateDraft = Omit<ShopOperationalStateUpdateInput, 'shopId'>;
@@ -337,6 +339,23 @@ export function useSettings(shopId: string | undefined, includeSchedules = false
     onSuccess: invalidateWorkspace,
   });
 
+  const createOrderType = useMutation({
+    mutationFn: async (draft: OrderTypeCreateDraft): Promise<void> => {
+      if (!shopId) throw new SettingsUiError('concrete_shop_required');
+      requireWorkspaceShop(shopId, latestWorkspace());
+      const result = await adminFetch<CanonicalSettingsRowEditResult>(
+        '/api/admin/settings',
+        {
+          method: 'POST',
+          body: JSON.stringify({ type: 'order-type.create', shopId, ...draft }),
+        },
+        csrfTokenForMutation(session),
+      );
+      requireCanonicalEditSuccess(result);
+    },
+    onSuccess: invalidateWorkspace,
+  });
+
   const updateOrderType = useMutation({
     mutationFn: async (draft: OrderTypeUpdateDraft): Promise<void> => {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
@@ -394,6 +413,7 @@ export function useSettings(shopId: string | undefined, includeSchedules = false
     upsertSpecialHours,
     updateSettingOverride,
     upsertReasonCode,
+    createOrderType,
     updateOrderType,
     updatePaymentMethod,
     deleteOrArchiveShop,
