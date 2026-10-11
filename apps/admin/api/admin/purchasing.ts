@@ -182,6 +182,12 @@ type InventoryItemRow = {
   active: boolean;
 };
 
+type PurchaseConversionRow = {
+  inventory_item_id: string;
+  purchase_unit_label: string;
+  base_micros_per_purchase_unit: number | string;
+};
+
 function safeInteger(value: number | string): number {
   const result = typeof value === 'number' ? value : Number(value);
   if (!Number.isSafeInteger(result)) throw new Error('purchasing_backend_contract_invalid');
@@ -354,7 +360,7 @@ async function loadPurchaseOrderLines(
 export function createPurchasingStore(client: AdminSupabaseClient): PurchasingStore {
   return {
     async loadWorkspace(shopId, businessId): Promise<AdminPurchasingWorkspace> {
-      const [supplierRows, recentPurchaseOrderRows, actionablePurchaseOrderRows, inventoryRows] =
+      const [supplierRows, recentPurchaseOrderRows, actionablePurchaseOrderRows, inventoryRows, conversionRows] =
         await Promise.all([
           loadSupplierRows(client, businessId),
           client.select<PurchaseOrderRow[]>(
@@ -370,6 +376,16 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
           ),
           loadActionablePurchaseOrders(client, businessId, shopId),
           loadPurchasableInventoryItems(client, shopId),
+          client.select<PurchaseConversionRow[]>(
+            'inventory_unit_conversions',
+            new URLSearchParams({
+              select: 'inventory_item_id,purchase_unit_label,base_micros_per_purchase_unit',
+              shop_id: `eq.${shopId}`,
+              active: 'eq.true',
+              order: 'inventory_item_id.asc,purchase_unit_label.asc',
+              limit: String(PURCHASABLE_ITEM_PAGE_SIZE),
+            }),
+          ),
         ]);
 
       const purchaseOrdersById = new Map<string, PurchaseOrderRow>();
@@ -418,11 +434,27 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
       return {
         shopId,
         suppliers,
-        inventoryItems: inventoryRows.map((row) => ({
-          id: row.id,
-          name: row.name,
-          unitLabel: row.unit_label,
-        })),
+        inventoryItems: inventoryRows.map((row) => {
+          const units = new Map<string, { label: string; baseMicrosPerPurchaseUnit: number }>();
+          units.set(row.unit_label.trim().toLowerCase(), {
+            label: row.unit_label,
+            baseMicrosPerPurchaseUnit: 1_000_000,
+          });
+          for (const conversion of conversionRows) {
+            if (conversion.inventory_item_id !== row.id) continue;
+            const key = conversion.purchase_unit_label.trim().toLowerCase();
+            if (!units.has(key)) units.set(key, {
+              label: conversion.purchase_unit_label,
+              baseMicrosPerPurchaseUnit: safeInteger(conversion.base_micros_per_purchase_unit),
+            });
+          }
+          return {
+            id: row.id,
+            name: row.name,
+            unitLabel: row.unit_label,
+            purchaseUnits: [...units.values()],
+          };
+        }),
         purchaseOrders: purchaseOrderRows.map((row) => ({
           id: row.id,
           shopId: row.shop_id,
