@@ -33,6 +33,7 @@ describe('selective shop settings copy preview', () => {
       settingKey: 'checkout.taxBps',
       sourceValue: 1400,
       source: 'business',
+      sourceExpectedVersion: 2,
       targetValue: 1200,
       targetSource: 'shop',
       targetExpectedVersion: 3,
