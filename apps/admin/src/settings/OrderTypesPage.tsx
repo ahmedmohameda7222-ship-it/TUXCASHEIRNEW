@@ -141,21 +141,6 @@ export function OrderTypesPage({ workspace, updating, onUpdate, onCreate }: Orde
             />
             <span>Active</span>
           </label>
-          <label className="admin-field">
-            Sort order
-            <input
-              type="number"
-              min={0}
-              step={1}
-              value={createDraft.sortOrder}
-              disabled={updating}
-              onChange={(event) =>
-                setCreateDraft((current) =>
-                  current ? { ...current, sortOrder: Number(event.currentTarget.value) } : current,
-                )
-              }
-            />
-          </label>
           <div className="admin-settings-row__main">
             <button className="admin-primary-button" type="submit" disabled={updating}>
               Create order type
