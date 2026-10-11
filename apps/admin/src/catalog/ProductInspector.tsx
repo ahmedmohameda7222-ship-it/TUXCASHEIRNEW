@@ -45,7 +45,7 @@ export function ProductInspector({
         )}
       </header>
       <ProductEditor
-        key={`${product.id}:${product.name}:${product.description}:${product.priceMinor}:${product.imageKey}:${product.bestSeller}:${product.soldOut}:${product.active}`}
+        key={`${product.id}:${product.name}:${product.description}:${product.priceMinor}:${product.imageKey}:${product.bestSeller}:${product.soldOut}:${product.active}:${product.categoryId}:${product.isCombo}:${product.sortOrder}`}
         product={product}
         categories={categories}
         canEdit={canEdit}
