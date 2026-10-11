@@ -30,7 +30,7 @@ BEGIN
     p_employee_id,p_shop_id,'settings.manage'
   );
   IF nullif(btrim(coalesce(p_name,'')),'') IS NULL OR length(p_name)>120
-     OR p_behavior NOT IN ('TAKE_AWAY','DINE_IN','DELIVERY','OTHER')
+     OR p_behavior IS NULL OR p_behavior NOT IN ('TAKE_AWAY','DINE_IN','DELIVERY','OTHER')
      OR p_active IS NULL OR p_sort_order IS NULL OR p_sort_order<0
      OR p_expected_settings_version IS NULL OR p_expected_settings_version<0
      OR nullif(btrim(coalesce(p_command_id,'')),'') IS NULL
