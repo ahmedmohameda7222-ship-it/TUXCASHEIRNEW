@@ -2,11 +2,12 @@ import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
 import { useState, type FormEvent } from 'react';
 
 import { sortOrderAfterMove } from './settingsModel';
-import type { PaymentMethodUpdateDraft } from './useSettings';
+import type { PaymentMethodCreateDraft, PaymentMethodUpdateDraft } from './useSettings';
 
 export type PaymentsPageProps = {
   workspace: AdminSettingsWorkspace;
   updating: boolean;
+  onCreate(draft: PaymentMethodCreateDraft): void | Promise<void>;
   onUpdate(draft: PaymentMethodUpdateDraft): void | Promise<void>;
 };
 
@@ -18,8 +19,22 @@ function channelLabel(
   return 'In-store & Online';
 }
 
-export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProps) {
+export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: PaymentsPageProps) {
   const [draft, setDraft] = useState<PaymentMethodUpdateDraft | null>(null);
+  const [createDraft, setCreateDraft] = useState<PaymentMethodCreateDraft | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submitCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!createDraft || updating || !createDraft.displayName.trim()) return;
+    setError(null);
+    try {
+      await onCreate({ ...createDraft, displayName: createDraft.displayName.trim() });
+      setCreateDraft(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to create payment method.');
+    }
+  }
 
   function beginEdit(method: AdminSettingsWorkspace['paymentMethods'][number]) {
     setDraft({
@@ -60,6 +75,148 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
       <p className="admin-settings-muted">
         Refund permissions are read-only until the trusted order-refund boundary enforces them.
       </p>
+      <div className="admin-settings-row__main">
+        <button
+          className="admin-primary-button"
+          type="button"
+          disabled={updating || createDraft !== null}
+          onClick={() =>
+            setCreateDraft({
+              commandId: crypto.randomUUID(),
+              displayName: '',
+              logicType: 'CASH',
+              active: true,
+              sortOrder:
+                workspace.paymentMethods.reduce((max, method) => Math.max(max, method.sortOrder), 0) +
+                10,
+              channel: 'POS',
+              requiresReference: false,
+              manualConfirmationRequired: false,
+              expectedSettingsVersion: workspace.settingsVersion,
+            })
+          }
+        >
+          Add payment method
+        </button>
+      </div>
+      {createDraft ? (
+        <form
+          className="admin-settings-row admin-settings-row--stack"
+          onSubmit={(event) => void submitCreate(event)}
+        >
+          <div className="admin-settings-grid">
+            <label className="admin-field">
+              <span>New payment method name</span>
+              <input
+                required
+                maxLength={120}
+                value={createDraft.displayName}
+                disabled={updating}
+                onChange={(event) =>
+                  setCreateDraft((current) =>
+                    current ? { ...current, displayName: event.currentTarget.value } : current,
+                  )
+                }
+              />
+            </label>
+            <label className="admin-field">
+              <span>Payment type</span>
+              <select
+                value={createDraft.logicType}
+                disabled={updating}
+                onChange={(event) =>
+                  setCreateDraft((current) =>
+                    current
+                      ? { ...current, logicType: event.currentTarget.value as PaymentMethodCreateDraft['logicType'] }
+                      : current,
+                  )
+                }
+              >
+                <option value="CASH">Cash</option>
+                <option value="CARD">Card</option>
+                <option value="DIGITAL">Digital</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </label>
+            <label className="admin-field">
+              <span>New method availability</span>
+              <select
+                value={createDraft.channel}
+                disabled={updating}
+                onChange={(event) =>
+                  setCreateDraft((current) =>
+                    current
+                      ? { ...current, channel: event.currentTarget.value as PaymentMethodCreateDraft['channel'] }
+                      : current,
+                  )
+                }
+              >
+                <option value="POS">In-store</option>
+                <option value="ONLINE">Online</option>
+                <option value="BOTH">In-store &amp; Online</option>
+              </select>
+            </label>
+            <label className="admin-check-field">
+              <input
+                type="checkbox"
+                checked={createDraft.active}
+                disabled={updating}
+                onChange={(event) =>
+                  setCreateDraft((current) =>
+                    current ? { ...current, active: event.currentTarget.checked } : current,
+                  )
+                }
+              />
+              <span>Active on creation</span>
+            </label>
+            <label className="admin-check-field">
+              <input
+                type="checkbox"
+                checked={createDraft.requiresReference}
+                disabled={updating}
+                onChange={(event) =>
+                  setCreateDraft((current) =>
+                    current ? { ...current, requiresReference: event.currentTarget.checked } : current,
+                  )
+                }
+              />
+              <span>Require payment reference</span>
+            </label>
+            <label className="admin-check-field">
+              <input
+                type="checkbox"
+                checked={createDraft.manualConfirmationRequired}
+                disabled={updating}
+                onChange={(event) =>
+                  setCreateDraft((current) =>
+                    current
+                      ? { ...current, manualConfirmationRequired: event.currentTarget.checked }
+                      : current,
+                  )
+                }
+              />
+              <span>Require manual confirmation</span>
+            </label>
+          </div>
+          {error ? <p className="admin-field__error">{error}</p> : null}
+          <div className="admin-settings-row__main">
+            <button className="admin-primary-button" type="submit" disabled={updating}>
+              {updating ? 'Creating…' : 'Create payment method'}
+            </button>
+            <button
+              className="admin-secondary-button"
+              type="button"
+              disabled={updating}
+              onClick={() => {
+                setCreateDraft(null);
+                setError(null);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : null}
       <div className="admin-settings-list">
         {workspace.paymentMethods.map((method) => {
           if (draft?.paymentMethodId === method.id) {
