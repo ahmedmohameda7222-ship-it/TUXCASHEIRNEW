@@ -1,5 +1,6 @@
 import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
 
+import { PaymentZoneRulesPanel } from './PaymentZoneRulesPanel';
 import { SettingOverrideEditor } from './SettingOverrideEditor';
 import {
   formatBasisPointsAsPercent,
@@ -136,6 +137,7 @@ export function CheckoutPage({
           </div>
         )}
       </div>
+      {scope === 'shop' ? <PaymentZoneRulesPanel workspace={workspace} /> : null}
     </section>
   );
 }
