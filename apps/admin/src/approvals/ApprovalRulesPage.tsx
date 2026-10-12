@@ -160,9 +160,7 @@ export function ApprovalRulesPage() {
     queryFn: () => adminFetch<ApprovalRulesResponse>('/api/admin/approval-rules'),
   });
   const availableActions = rulesQuery.data?.availableActions ?? [];
-  const selectedAction = availableActions.find(
-    (action) => action.actionType === form.actionType,
-  );
+  const selectedAction = availableActions.find((action) => action.actionType === form.actionType);
   const write = useMutation({
     mutationFn: async (draft: RuleForm) => {
       if (session.state.status !== 'authenticated') throw new Error('session_required');
@@ -300,8 +298,7 @@ export function ApprovalRulesPage() {
                 setForm((current) => ({
                   ...current,
                   actionType: action?.actionType ?? '',
-                  requesterPermission:
-                    action?.requesterPermission ?? current.requesterPermission,
+                  requesterPermission: action?.requesterPermission ?? current.requesterPermission,
                   thresholdKind: 'none',
                   thresholdValue: '',
                 }));
