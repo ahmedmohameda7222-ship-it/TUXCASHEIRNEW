@@ -29,6 +29,52 @@ function ledgerEvent(id: string, points: number, createdAt: string) {
 }
 
 describe('CRM store canonical customer lineage', () => {
+  it('persists selected automatic customer segments through the trusted promotion v2 command', async () => {
+    const rpc = vi.fn(async () => ({
+      ok: true as const,
+      promotionId: '70000000-0000-4000-8000-000000000001',
+      version: 1,
+      replayed: false,
+    }));
+    const store = createCrmStore({ rpc } as unknown as AdminSupabaseClient);
+    const promotion = {
+      id: null,
+      expectedVersion: null,
+      name: 'VIP promotion',
+      active: true,
+      kind: 'FIXED' as const,
+      percentBasisPoints: null,
+      fixedDiscountMinor: 200,
+      freeProductId: null,
+      startsAt: null,
+      endsAt: null,
+      minimumOrderMinor: 0,
+      shopIds: [shopId],
+      channel: 'BOTH' as const,
+      productIds: [],
+      categoryIds: [],
+      totalUsageLimit: null,
+      perCustomerUsageLimit: null,
+      stackingPolicy: 'ONE_ORDER_LEVEL' as const,
+      targetSegments: ['VIP', 'Loyalty Members'] as const,
+    };
+
+    await store.upsertPromotion({
+      employeeId: survivorId,
+      businessId,
+      shopId,
+      promotion,
+      commandId: 'segment-rule-1',
+    });
+    expect(rpc).toHaveBeenCalledWith(
+      'upsert_admin_promotion_v2',
+      expect.objectContaining({
+        p_segment_targets: ['VIP', 'Loyalty Members'],
+        p_expected_version: null,
+      }),
+    );
+  });
+
   it('shows retired loyalty history while using an unpaginated canonical balance', async () => {
     const survivorEvent = ledgerEvent(
       '40000000-0000-4000-8000-000000000001',
