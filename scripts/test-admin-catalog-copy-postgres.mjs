@@ -79,6 +79,11 @@ business_id,master_product_id,shop_id,canonical_product_id,price_minor,visible,m
 const sourceBundle=sql(`select private.build_admin_catalog_bundle_v1('${S}'::uuid,1,now())::text`,'source bundle');
 const targetBundle=sql(`select private.build_admin_catalog_bundle_v1('${T}'::uuid,1,now())::text`,'target bundle');
 function quoteJson(j){return "'"+j.replaceAll("'","''")+"'::jsonb";}
+sql(`insert into public.operations_configuration_snapshots(
+shop_id,version,bundle_json
+) values
+('${S}',1,${quoteJson(sourceBundle)}),
+('${T}',1,${quoteJson(targetBundle)})`,'operations baseline snapshot fixtures');
 sql(`insert into public.catalog_publish_versions(
 business_id,shop_id,publish_version,operations_configuration_version,source_kind,bundle_json
 ) values
