@@ -270,6 +270,12 @@ export type LinkEmployeeWorkerInput = {
   readonly commandId: string;
 };
 
+export type ProvisionEmployeeWorkerInput = {
+  readonly employeeId: string;
+  readonly shopId: string;
+  readonly commandId: string;
+};
+
 export type SetEmployeeRoleInput = {
   readonly employeeId: string;
   readonly shopId: string;
