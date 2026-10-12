@@ -65,6 +65,7 @@ jobs:
       - run: node scripts/test-admin-production-parity-postgres.mjs
       - run: node scripts/test-admin-workforce-tenant-isolation-postgres.mjs
       - run: node scripts/test-admin-workforce-order-approval-terminal-replay-postgres.mjs
+      - run: node scripts/test-admin-first-operations-worker-provision-postgres.mjs
   employee-pin-security:
     needs: workforce-postgres
     runs-on: ubuntu-latest
