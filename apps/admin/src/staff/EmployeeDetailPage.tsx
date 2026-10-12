@@ -53,6 +53,7 @@ export function EmployeeDetailPage({
   onSectionChange,
   shopId = employee.assignments[0]?.shopId ?? '',
   canManage,
+  canProvisionWorker = false,
   canPay,
   financeAccounts,
   workers,
@@ -65,6 +66,7 @@ export function EmployeeDetailPage({
   onSectionChange(section: StaffDetailSection): void;
   shopId?: string;
   canManage: boolean;
+  canProvisionWorker?: boolean;
   canPay: boolean;
   financeAccounts: readonly StaffFinanceAccountChoice[];
   workers: readonly StaffWorkerChoice[];
@@ -321,6 +323,26 @@ export function EmployeeDetailPage({
                   }
                 >
                   Complete Operations setup
+                </button>
+              </>
+            ) : currentShopSetupRequired && canProvisionWorker && employee.active ? (
+              <>
+                <span>
+                  No unlinked Operations worker exists. Provision one using this employee's
+                  established Admin PIN verifier. If the employee has no PIN, reset it first.
+                </span>
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  onClick={() =>
+                    onCommand({
+                      type: 'employee.provision-worker',
+                      employeeId: employee.id,
+                      shopId,
+                    })
+                  }
+                >
+                  Provision and link Operations worker
                 </button>
               </>
             ) : currentShopSetupRequired && canManage ? (
