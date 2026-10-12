@@ -489,7 +489,9 @@ export function InventoryPage() {
                         { inventoryItemId: selectedItem.id, ...input },
                         {
                           onSuccess: (result) => {
-                            setAdjustmentApprovalPending(result.ok && result.state === 'PENDING_APPROVAL');
+                            setAdjustmentApprovalPending(
+                              result.ok && result.state === 'PENDING_APPROVAL',
+                            );
                             setItemAction(null);
                           },
                         },
