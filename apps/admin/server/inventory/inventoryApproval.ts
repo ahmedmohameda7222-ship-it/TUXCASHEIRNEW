@@ -24,7 +24,11 @@ const payloadSchema = z
   .object({
     shopId: uuid,
     inventoryItemId: uuid,
-    quantityDeltaMicros: z.number().int().safe().refine((v) => v !== 0),
+    quantityDeltaMicros: z
+      .number()
+      .int()
+      .safe()
+      .refine((v) => v !== 0),
     reasonCodeId: uuid,
     note: z.string().trim().max(500).nullable(),
     originalCommandId: z.string().trim().min(1).max(160),
@@ -89,7 +93,6 @@ export function createInventoryAdjustmentApprovalExecutionEntries(deps: {
     },
   ];
 }
-
 
 function stableInventoryApprovalCommandId(
   actor: Pick<AdminApprovalActor, 'businessId' | 'employeeId'>,
@@ -197,9 +200,7 @@ export async function executeOrRequestInventoryAdjustment(
     return {
       ok: false,
       code:
-        typeof request['code'] === 'string'
-          ? request['code']
-          : 'inventory_approval_request_failed',
+        typeof request['code'] === 'string' ? request['code'] : 'inventory_approval_request_failed',
     };
   }
   if (typeof request['requestId'] !== 'string') {

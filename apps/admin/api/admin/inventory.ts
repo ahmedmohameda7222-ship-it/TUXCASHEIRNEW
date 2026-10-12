@@ -18,9 +18,7 @@ import {
 import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
 import type { AdminApprovalActor, AdminApprovalRule, AdminPermission } from '@tux/admin-contracts';
 import { isAdminPermission } from '../../server/adminContractRuntime.js';
-import {
-  createSupabaseApprovalServiceDependencies,
-} from '../../server/approvals/approvalService.js';
+import { createSupabaseApprovalServiceDependencies } from '../../server/approvals/approvalService.js';
 import { verifyApprovalPinWithRateLimit } from '../../server/approvals/approvalPinRateLimit.js';
 import { createAdminPinRateLimitRpc } from '../../server/loginRateLimit.js';
 import { clientFingerprint } from '../../server/http.js';
@@ -778,15 +776,18 @@ async function loadInventoryApprovalRules(
   const rows = await client.select<InventoryApprovalRuleRow[]>(
     'admin_approval_rules',
     new URLSearchParams({
-      select: 'id,business_id,shop_id,action_type,requester_permission,approver_permission,requires_second_person,requires_requester_repin,threshold_context,active',
+      select:
+        'id,business_id,shop_id,action_type,requester_permission,approver_permission,requires_second_person,requires_requester_repin,threshold_context,active',
       business_id: `eq.${businessId}`,
       action_type: 'eq.INVENTORY_ADJUST',
       active: 'eq.true',
     }),
   );
   return rows.map((row) => {
-    if (!isAdminPermission(row.requester_permission) ||
-        !isAdminPermission(row.approver_permission)) {
+    if (
+      !isAdminPermission(row.requester_permission) ||
+      !isAdminPermission(row.approver_permission)
+    ) {
       throw new Error('inventory_approval_rule_permission_invalid');
     }
     return {
@@ -802,7 +803,7 @@ async function loadInventoryApprovalRules(
         typeof row.threshold_context === 'object' &&
         row.threshold_context !== null &&
         !Array.isArray(row.threshold_context)
-          ? row.threshold_context as Readonly<Record<string, unknown>>
+          ? (row.threshold_context as Readonly<Record<string, unknown>>)
           : {},
       active: row.active,
     };
