@@ -171,6 +171,19 @@ begin
     end if;
   end if;
 
+  -- A pending/decided adjustment cannot be posted directly by replaying
+  -- its original command after an administrator changes the approval rule.
+  -- This also prevents an alternate requester from taking the command ID.
+  if nullif(current_setting('tux.inventory_approval_request_id',true),'') is null
+     and exists (
+       select 1 from public.admin_approval_requests a
+       where a.business_id=v_business_id and a.shop_id=p_shop_id
+         and a.action_type='INVENTORY_ADJUST'
+         and a.command_payload->>'originalCommandId'=p_command_id
+     ) then
+    return jsonb_build_object('ok',false,'code','inventory_approval_command_locked');
+  end if;
+
   v_movement_id := gen_random_uuid();
   insert into public.inventory_movements(
     id,
