@@ -162,4 +162,40 @@ describe('staffService', () => {
       actorEmployeeId: ACTOR_ID,
     });
   });
+
+  it('provisions a first Operations worker only through an authorized owner/admin identity', async () => {
+    const provisionEmployeeWorker = vi.fn(async () => ({
+      ok: true as const,
+      workerId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      replayed: false,
+    }));
+    const store = storeFixture({ provisionEmployeeWorker } as Partial<StaffStore>);
+    const service = createStaffService(store);
+    const input = { employeeId: EMPLOYEE_ID, shopId: SHOP_ID, commandId: 'provision-1' };
+    const owner = { ...principal(['staff.manage']), role: 'OWNER' as const };
+
+    await expect(service.provisionEmployeeWorker(input, owner)).resolves.toMatchObject({
+      ok: true,
+      workerId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    });
+    expect(provisionEmployeeWorker).toHaveBeenCalledWith({
+      ...input,
+      actorEmployeeId: ACTOR_ID,
+    });
+  });
+
+  it('denies Operations worker provisioning to managers even with a delegated manage permission', () => {
+    const provisionEmployeeWorker = vi.fn(async () => ({ ok: true as const }));
+    const service = createStaffService(
+      storeFixture({ provisionEmployeeWorker } as Partial<StaffStore>),
+    );
+    expect(() =>
+      service.provisionEmployeeWorker(
+        { employeeId: EMPLOYEE_ID, shopId: SHOP_ID, commandId: 'provision-2' },
+        principal(['staff.manage']),
+      ),
+    ).toThrow(/permission_forbidden/);
+    expect(provisionEmployeeWorker).not.toHaveBeenCalled();
+  });
+
 });
