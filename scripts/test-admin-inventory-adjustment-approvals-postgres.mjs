@@ -33,7 +33,7 @@ create table auth.users(id uuid primary key);
 create function auth.uid() returns uuid language sql stable as $do$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $do$;`, 'fixture reset');
 const migrations = readdirSync(resolve('supabase/migrations'))
   .filter((f) => /^\d+_.+\.sql$/.test(f)).sort();
-const target = '20261012040200_admin_order_rule_shop_precedence.sql';
+const target = '20261012041927_admin_order_rule_shop_precedence.sql';
 const targetIndex = migrations.indexOf(target);
 if (targetIndex < 0) throw new Error('Inventory approval migration missing');
 for (const name of migrations.slice(0,targetIndex+1))
