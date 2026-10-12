@@ -186,7 +186,7 @@ const identity = sql(
 );
 if (identity !== '1,true') throw new Error('Created worker/link credentials drifted: ' + identity);
 sql(
-  "update public.shops set lifecycle_state='SUSPENDED' where id='" + S + "'",
+  "update public.shops set lifecycle_state='SUSPENDED', active=false, temporary_closed=true, online_orders_paused=true where id='" + S + "'",
   'suspended shop fixture',
 );
 deny(call(O, U, S, 'shop-suspended'), 'shop_not_active');
