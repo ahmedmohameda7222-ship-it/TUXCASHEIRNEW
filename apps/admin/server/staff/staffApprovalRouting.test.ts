@@ -88,6 +88,37 @@ const routingInput = {
 } as const;
 
 describe('Workforce approval routing', () => {
+  it('fails closed when a configured payment threshold has no trusted amount', async () => {
+    const { deps, createRequest } = approvalDependencies();
+    const executeDirect = vi.fn(async () => ({ ok: true as const }));
+    const client = {
+      select: vi.fn(async () => [{
+        id: RULE_ID,
+        business_id: BUSINESS_ID,
+        shop_id: SHOP_ID,
+        action_type: 'STAFF_PAYMENT',
+        requester_permission: 'staff.payments',
+        approver_permission: 'approvals.review',
+        requires_second_person: true,
+        requires_requester_repin: false,
+        threshold_context: { minimumMinor: 500 },
+        active: true,
+      }]),
+    } as unknown as AdminSupabaseClient;
+
+    const result = await executeOrRequestStaffApproval(
+      { ...routingInput, actionType: 'STAFF_PAYMENT' },
+      actor(['staff.payments']),
+      client,
+      deps,
+      executeDirect,
+    );
+
+    expect(result).toEqual({ ok: false, code: 'approval_amount_context_required' });
+    expect(executeDirect).not.toHaveBeenCalled();
+    expect(createRequest).not.toHaveBeenCalled();
+  });
+
   it('rejects a configured approval request when the requester lacks the rule permission', async () => {
     const { deps, createRequest } = approvalDependencies();
     const executeDirect = vi.fn(async () => ({ ok: true as const }));
