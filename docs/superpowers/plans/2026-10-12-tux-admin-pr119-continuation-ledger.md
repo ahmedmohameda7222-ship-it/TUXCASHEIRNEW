@@ -41,3 +41,13 @@ This is a continuation record; earlier implementation history is not reconstruct
 ## Operating guardrails
 
 No merge, deployment, PR Ready-for-Review, new PR/branch, force-push, production-data mutation, cross-project database access, fake recipe, or SQL migration application was performed in this continuation. No Plan 8–10 scope implemented. Before Planner handoff, recapture actual PR HEAD, checks, review status and repository/DB migration parity; do not treat this ledger as completion evidence.
+
+## 2026-10-12 — Approval threshold continuation (verification pending)
+
+- Recovered unchanged Draft PR HEAD `9c2e1244d8a56b8f18e5e9b3cce845df967c2c04` before writing.
+- RED regression commits `0fef9c1` and `1d4600d`: missing monetary/quantity context, equality and signed quantity semantics.
+- Boundary correction `21be33e`: staff commands with configured monetary thresholds reject missing/non-integer/negative amount; a configured quantity threshold without a trusted quantity field is rejected, not executed directly.
+- Evaluator correction `bd26785`: a threshold requires supplied finite numeric context; threshold-free rules remain eligible.
+- Staff fail-closed regression `b53c3c5`: missing staff payment amount cannot reach direct execution or approval creation.
+- This is **NOT YET VERIFIED GREEN**. Exact-head Actions had not reported runs for the latest test commit at inspection; no local checkout or authenticated DB integration is available. Do not label this fully fixed until all checks pass and order SQL/RPC paths are reviewed.
+- Cross-shop Catalog copy and first-worker Operations provisioning remain architecturally blocked as documented above; no unsafe raw copying or production fixtures were introduced.
