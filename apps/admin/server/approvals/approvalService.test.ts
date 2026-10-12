@@ -113,6 +113,22 @@ describe('approvalService', () => {
     );
   });
 
+  it('rejects malformed persisted approval thresholds rather than silently treating them as unconditional', () => {
+    const context = { businessId: 'business-1', shopId: 'shop-1', actionType: approvalRule.actionType };
+    for (const thresholdContext of [
+      { minimumMinor: '500' },
+      { minimumMinor: -1 },
+      { minimumMinor: Number.NaN },
+      { minimumQuantityImpact: 0 },
+      { minimumMinor: 500, minimumQuantityImpact: 2 },
+      { unsupportedLegacyThreshold: 500 },
+    ]) {
+      expect(() =>
+        evaluateApprovalRequirement(context, [{ ...approvalRule, thresholdContext }]),
+      ).toThrow('approval_threshold_context_invalid');
+    }
+  });
+
   it('rejects requester self-approval even with a valid PIN', async () => {
     const deps = dependencies();
 
