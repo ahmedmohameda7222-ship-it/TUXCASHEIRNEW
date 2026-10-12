@@ -25,6 +25,24 @@ function employeeRow() {
 }
 
 describe('staffStore', () => {
+  it('creates the worker and link only through the trusted provisioning RPC', async () => {
+    const rpc = vi.fn(async () => ({ ok: true, workerId: WORKER_ID, replayed: false }));
+    const store = createSupabaseStaffStore({ rpc } as unknown as AdminSupabaseClient);
+    const result = await store.provisionEmployeeWorker({
+      actorEmployeeId: EMPLOYEE_ID,
+      employeeId: EMPLOYEE_ID,
+      shopId: SHOP_ID,
+      commandId: 'worker-provision-command',
+    });
+    expect(result).toMatchObject({ ok: true, workerId: WORKER_ID });
+    expect(rpc).toHaveBeenCalledWith('provision_employee_operations_worker_v1', {
+      p_actor_employee_id: EMPLOYEE_ID,
+      p_employee_id: EMPLOYEE_ID,
+      p_shop_id: SHOP_ID,
+      p_command_id: 'worker-provision-command',
+    });
+  });
+
   it('exposes only active finance accounts compatible with the current business/shop scope', async () => {
     const select = vi.fn(async (table: string, params: URLSearchParams) => {
       if (table === 'business_employees') return [employeeRow()];
