@@ -259,9 +259,9 @@ export function PublishReviewPage() {
             <CatalogCopyPanel
               targetShopId={shopId}
               targetPublishVersion={data.currentPublishVersion}
-              draft={preview
-                ? { draftId: preview.draftId, draftRevision: preview.draftRevision }
-                : null}
+              draft={
+                preview ? { draftId: preview.draftId, draftRevision: preview.draftRevision } : null
+              }
               sourceShopIds={principal.shopIds.filter((id) => id !== shopId)}
               canPrice={principal.permissions.includes('catalog.pricing')}
             />

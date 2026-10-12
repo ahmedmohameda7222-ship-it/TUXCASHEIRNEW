@@ -50,18 +50,22 @@ const catalogCopyBaseSchema = z.object({
   expectedSourcePublishVersion: z.number().int().positive(),
   expectedTargetPublishVersion: z.number().int().nonnegative(),
   expectedTargetDraftRevision: z.number().int().positive(),
-  selectedDomains: z.array(z.enum(['productPrices', 'productAvailability']))
-    .min(1).max(2)
+  selectedDomains: z
+    .array(z.enum(['productPrices', 'productAvailability']))
+    .min(1)
+    .max(2)
     .refine((domains) => new Set(domains).size === domains.length),
 });
 
 const catalogCopySchema = z.discriminatedUnion('type', [
   catalogCopyBaseSchema.extend({ type: z.literal('catalog-copy.preview') }).strict(),
-  catalogCopyBaseSchema.extend({
-    type: z.literal('catalog-copy.apply'),
-    previewFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
-    commandId: z.string().trim().min(1).max(160),
-  }).strict(),
+  catalogCopyBaseSchema
+    .extend({
+      type: z.literal('catalog-copy.apply'),
+      previewFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+      commandId: z.string().trim().min(1).max(160),
+    })
+    .strict(),
 ]);
 
 export const catalogViewSchema = z.enum(['workspace', 'publishing', 'recurring-availability']);

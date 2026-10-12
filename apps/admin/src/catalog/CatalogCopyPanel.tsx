@@ -151,10 +151,10 @@ export function CatalogCopyPanel({
     <section className="admin-publish-card" aria-labelledby="catalog-copy-title">
       <h2 id="catalog-copy-title">Selective catalog copy</h2>
       <p className="admin-publish-card__copy">
-        Copy product prices and availability from the published source catalog into this
-        shop's unpublished draft. Products must already share a canonical business master
-        mapping in both shops. Categories, modifiers, recipes and historical data are never
-        copied by this operation.
+        Copy product prices and availability from the published source catalog into this shop's
+        unpublished draft. Products must already share a canonical business master mapping in both
+        shops. Categories, modifiers, recipes and historical data are never copied by this
+        operation.
       </p>
       {draft ? (
         <form onSubmit={(event) => void makePreview(event)}>
@@ -222,13 +222,15 @@ export function CatalogCopyPanel({
                   <strong>{item.productName}</strong>
                   {domains.includes('productPrices') ? (
                     <span>
-                      {' '}Price: {item.priceBeforeMinor} → {item.priceAfterMinor} minor units.
+                      {' '}
+                      Price: {item.priceBeforeMinor} → {item.priceAfterMinor} minor units.
                     </span>
                   ) : null}
                   {domains.includes('productAvailability') ? (
                     <span>
-                      {' '}Active: {String(item.activeBefore)} → {String(item.activeAfter)},
-                      sold out: {String(item.soldOutBefore)} → {String(item.soldOutAfter)}.
+                      {' '}
+                      Active: {String(item.activeBefore)} → {String(item.activeAfter)}, sold out:{' '}
+                      {String(item.soldOutBefore)} → {String(item.soldOutAfter)}.
                     </span>
                   ) : null}
                 </li>
