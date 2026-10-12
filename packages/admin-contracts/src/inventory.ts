@@ -192,6 +192,7 @@ export type AdminInventoryCommand =
       readonly reasonCodeId: string;
       readonly note: string | null;
       readonly emergencyNegativeOverride: boolean;
+      readonly requesterPin?: string;
       readonly commandId: string;
     }
   | {
