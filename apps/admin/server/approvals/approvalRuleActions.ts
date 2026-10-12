@@ -53,6 +53,12 @@ export const APPROVAL_RULE_ACTIONS: readonly ConfigurableApprovalAction[] = [
     thresholdKind: null,
   },
   {
+    actionType: 'INVENTORY_ADJUST',
+    label: 'Inventory adjustment',
+    requesterPermission: 'inventory.adjust',
+    thresholdKind: 'minimumQuantityImpact',
+  },
+  {
     actionType: 'STAFF_PAYMENT',
     label: 'Staff payment',
     requesterPermission: 'staff.payments',
