@@ -243,6 +243,8 @@ export type AdminInventoryCommandResult =
       readonly ok: true;
       readonly idempotentReplay?: boolean;
       readonly movementId?: string;
+      readonly state?: 'PENDING_APPROVAL';
+      readonly approvalRequestId?: string;
       readonly stocktakeId?: string;
       readonly lines?: readonly AdminStocktakeSnapshotLine[];
       readonly transferId?: string;
