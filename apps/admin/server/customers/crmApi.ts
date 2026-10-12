@@ -46,6 +46,21 @@ const promotionSchema = z
     totalUsageLimit: nullablePositiveInteger,
     perCustomerUsageLimit: nullablePositiveInteger,
     stackingPolicy: z.enum(['ONE_ORDER_LEVEL', 'ALLOW_CONFIGURED']),
+    targetSegments: z
+      .array(
+        z.enum([
+          'New',
+          'Returning',
+          'VIP',
+          'Inactive 30 Days',
+          'Inactive 60 Days',
+          'Top Spenders',
+          'Frequent Delivery',
+          'Loyalty Members',
+        ]),
+      )
+      .max(8)
+      .refine((segments) => new Set(segments).size === segments.length),
   })
   .strict();
 

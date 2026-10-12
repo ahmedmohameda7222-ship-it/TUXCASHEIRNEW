@@ -89,6 +89,7 @@ type PromotionRow = {
   total_usage_limit: number | string | null;
   per_customer_usage_limit: number | string | null;
   stacking_policy: AdminPromotion['stackingPolicy'];
+  segment_targets: AdminPromotion['targetSegments'];
   version: number | string;
   updated_at: string;
 };
@@ -280,6 +281,7 @@ function promotionFor(row: PromotionRow): AdminPromotion {
     totalUsageLimit: nullableInteger(row.total_usage_limit),
     perCustomerUsageLimit: nullableInteger(row.per_customer_usage_limit),
     stackingPolicy: row.stacking_policy,
+    targetSegments: row.segment_targets,
     version: safeInteger(row.version),
     updatedAt: row.updated_at,
   };
@@ -434,7 +436,7 @@ export function createCrmStore(client: AdminSupabaseClient): CrmStore {
         'promotion_rules',
         new URLSearchParams({
           select:
-            'id,business_id,name,active,kind,percent_basis_points,fixed_discount_minor,free_product_id,starts_at,ends_at,minimum_order_minor,shop_ids,channel,product_ids,category_ids,total_usage_limit,per_customer_usage_limit,stacking_policy,version,updated_at',
+            'id,business_id,name,active,kind,percent_basis_points,fixed_discount_minor,free_product_id,starts_at,ends_at,minimum_order_minor,shop_ids,channel,product_ids,category_ids,total_usage_limit,per_customer_usage_limit,stacking_policy,segment_targets,version,updated_at',
           business_id: `eq.${input.businessId}`,
           order: 'updated_at.desc,id.desc',
         }),
@@ -471,7 +473,7 @@ export function createCrmStore(client: AdminSupabaseClient): CrmStore {
 
     upsertPromotion(input) {
       const promotion = input.promotion;
-      return client.rpc<AdminPromotionMutationResult>('upsert_admin_promotion_v1', {
+      return client.rpc<AdminPromotionMutationResult>('upsert_admin_promotion_v2', {
         p_employee_id: input.employeeId,
         p_shop_id: input.shopId,
         p_promotion_id: promotion.id,
@@ -491,6 +493,7 @@ export function createCrmStore(client: AdminSupabaseClient): CrmStore {
         p_total_usage_limit: promotion.totalUsageLimit,
         p_per_customer_usage_limit: promotion.perCustomerUsageLimit,
         p_stacking_policy: promotion.stackingPolicy,
+        p_segment_targets: promotion.targetSegments,
         p_expected_version: promotion.expectedVersion,
         p_command_id: input.commandId,
       });

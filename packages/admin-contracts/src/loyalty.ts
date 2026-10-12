@@ -37,15 +37,18 @@ export type AdminLoyaltyLedgerEvent = {
   createdAt: string;
 };
 
-export type AdminCustomerSegment =
-  | 'New'
-  | 'Returning'
-  | 'VIP'
-  | 'Inactive 30 Days'
-  | 'Inactive 60 Days'
-  | 'Top Spenders'
-  | 'Frequent Delivery'
-  | 'Loyalty Members';
+export const AUTOMATIC_CUSTOMER_SEGMENTS = [
+  'New',
+  'Returning',
+  'VIP',
+  'Inactive 30 Days',
+  'Inactive 60 Days',
+  'Top Spenders',
+  'Frequent Delivery',
+  'Loyalty Members',
+] as const;
+
+export type AdminCustomerSegment = (typeof AUTOMATIC_CUSTOMER_SEGMENTS)[number];
 
 export type AdminCustomerSummary = {
   id: string;
@@ -94,6 +97,7 @@ export type AdminPromotion = {
   totalUsageLimit: number | null;
   perCustomerUsageLimit: number | null;
   stackingPolicy: AdminPromotionStackingPolicy;
+  targetSegments: readonly AdminCustomerSegment[];
   version: number;
   updatedAt: string;
 };
