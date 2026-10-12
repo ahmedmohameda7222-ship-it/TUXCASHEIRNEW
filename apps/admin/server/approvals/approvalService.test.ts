@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AdminSupabaseClient } from '../supabaseAdmin';
 import {
   approveRequest,
+  evaluateApprovalRequirement,
   createApprovalCommandRegistry,
   createSupabaseApprovalServiceDependencies,
   requestApproval,
@@ -79,6 +80,14 @@ function dependencies(
 }
 
 describe('approvalService', () => {
+  it('requires a measured amount before a monetary threshold can match', () => {
+    const rule = { ...approvalRule, thresholdContext: { minimumMinor: 500 } };
+    const context = { businessId: 'business-1', shopId: 'shop-1', actionType: rule.actionType };
+    expect(evaluateApprovalRequirement(context, [rule]).required).toBe(false);
+    expect(evaluateApprovalRequirement({ ...context, amountMinor: 499 }, [rule]).required).toBe(false);
+    expect(evaluateApprovalRequirement({ ...context, amountMinor: 500 }, [rule]).required).toBe(true);
+  });
+
   it('rejects requester self-approval even with a valid PIN', async () => {
     const deps = dependencies();
 
