@@ -164,7 +164,7 @@ const fixture = [
 ];
 sql(fixture.join('\n'), 'isolated shop/employee fixtures');
 deny(call(M, E, S, 'manager-attempt'), 'permission_forbidden');
-deny(call(O2, E, S, 'foreign-attempt'), 'permission_forbidden');
+deny(call(O2, E, S, 'foreign-attempt'), 'shop_outside_business');
 deny(call(O, U, S, 'missing-pin'), 'employee_pin_setup_required');
 deny(call(O, E, S2, 'pin-collision'), 'pin_already_in_use');
 const created = call(O, E, S, 'provision-worker-1');
