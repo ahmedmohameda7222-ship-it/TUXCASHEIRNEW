@@ -9,6 +9,7 @@ import {
 } from '../authorization.js';
 import { getAdminServerEnv } from '../env.js';
 import { APPROVAL_RULE_PERMISSION_KEYS } from './approvalRulePermissions.js';
+import { APPROVAL_RULE_ACTIONS, configurableApprovalAction } from './approvalRuleActions.js';
 import {
   firstHeader,
   readJsonObject,
@@ -68,6 +69,29 @@ export const approvalRuleWriteSchema = z
         code: 'custom',
         path: ['expectedVersion'],
         message: 'Create requires null revision and update requires a current revision',
+      });
+    }
+    const action = configurableApprovalAction(value.actionType);
+    if (!action) {
+      context.addIssue({
+        code: 'custom',
+        path: ['actionType'],
+        message: 'unsupported_approval_action',
+      });
+      return;
+    }
+    if (value.requesterPermission !== action.requesterPermission) {
+      context.addIssue({
+        code: 'custom',
+        path: ['requesterPermission'],
+        message: 'approval_action_permission_mismatch',
+      });
+    }
+    if (value.threshold.kind !== 'none' && value.threshold.kind !== action.thresholdKind) {
+      context.addIssue({
+        code: 'custom',
+        path: ['threshold'],
+        message: 'approval_action_threshold_mismatch',
       });
     }
   });
@@ -173,7 +197,7 @@ export default async function handler(
         context.principal.role !== 'ADMIN' &&
         context.principal.shopIds.length === 0
       ) {
-        sendJson(response, 200, { rules: [] });
+        sendJson(response, 200, { rules: [], availableActions: APPROVAL_RULE_ACTIONS });
         return;
       }
       const query = new URLSearchParams({
@@ -187,7 +211,7 @@ export default async function handler(
         query.set('shop_id', `in.(${context.principal.shopIds.join(',')})`);
       }
       const rows = await client.select<ApprovalRuleRow[]>('admin_approval_rules', query);
-      sendJson(response, 200, { rules: rows.map(mapRule) });
+      sendJson(response, 200, { rules: rows.map(mapRule), availableActions: APPROVAL_RULE_ACTIONS });
       return;
     }
 
