@@ -125,7 +125,11 @@ function ruleThresholdMatches(
 ): boolean {
   const minimumMinor = rule.thresholdContext['minimumMinor'];
   if (typeof minimumMinor === 'number' && Number.isFinite(minimumMinor)) {
-    return context.amountMinor !== undefined && Number.isFinite(context.amountMinor) && context.amountMinor >= minimumMinor;
+    return (
+      context.amountMinor !== undefined &&
+      Number.isFinite(context.amountMinor) &&
+      context.amountMinor >= minimumMinor
+    );
   }
 
   const minimumQuantityImpact = rule.thresholdContext['minimumQuantityImpact'];
