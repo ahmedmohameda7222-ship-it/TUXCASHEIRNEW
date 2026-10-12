@@ -9,6 +9,7 @@ import type {
 
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { useShopScope } from '../shops/ShopScopeProvider';
+import { CatalogCopyPanel } from './CatalogCopyPanel';
 import { RecurringAvailabilityEditor } from './RecurringAvailabilityEditor';
 import { ScheduleEditor } from './ScheduleEditor';
 import { VersionHistory } from './VersionHistory';
@@ -253,6 +254,18 @@ export function PublishReviewPage() {
             </div>
             <span className="admin-status-pill">Shop scoped</span>
           </div>
+
+          {canEditCatalog ? (
+            <CatalogCopyPanel
+              targetShopId={shopId}
+              targetPublishVersion={data.currentPublishVersion}
+              draft={preview
+                ? { draftId: preview.draftId, draftRevision: preview.draftRevision }
+                : null}
+              sourceShopIds={principal.shopIds.filter((id) => id !== shopId)}
+              canPrice={principal.permissions.includes('catalog.pricing')}
+            />
+          ) : null}
 
           <RecurringAvailabilityEditor
             workspace={recurring.recurringQuery.data}
