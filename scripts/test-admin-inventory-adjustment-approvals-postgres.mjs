@@ -106,8 +106,12 @@ const decision=rpc(`public.decide_admin_approval_request_v1(
   '${created.requestId}'::uuid,'${A}'::uuid,null,'APPROVE','Approve stock'
 )`,'distinct approver');
 if(!decision.ok)throw new Error('Approval decision '+JSON.stringify(decision));
-const claims=rpc(`public.claim_admin_approval_execution_v1('inventory-test',now(),10,300)`,'claim approval');
-if(!Array.isArray(claims) || !claims.some(x=>x.approvalRequestId===created.requestId))
+const claims=JSON.parse(sql(
+  "select coalesce(jsonb_agg(to_jsonb(claim)), '[]'::jsonb)::text " +
+  "from public.claim_admin_approval_execution_v1('inventory-test',now(),10,300) claim",
+  'claim approval',
+));
+if(!Array.isArray(claims) || !claims.some(x=>x.approval_request_id===created.requestId))
   throw new Error('Approval claim failed '+JSON.stringify(claims));
 const input=(approver=A,quantity=11000000)=>
 `public.execute_approved_admin_inventory_adjustment_v1(
