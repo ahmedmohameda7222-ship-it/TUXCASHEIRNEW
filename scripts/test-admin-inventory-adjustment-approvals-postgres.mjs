@@ -41,13 +41,15 @@ for (const name of migrations.slice(0,targetIndex+1))
 
 // Both trusted financial-control RPCs must select shop-local policy first.
 const shopPrecedence = sql(
-  "select bool_and(strpos(lower(pg_get_functiondef(p.oid)),'desc nulls last')>0)::text " +
-    "from pg_proc p join pg_namespace n on n.oid=p.pronamespace " +
-    "where n.nspname='public' and p.proname in (" +
-    "'request_admin_order_refund_v1','return_admin_order_items_v1')",
+  "select count(*) filter (where position('nulls last' in lower(pg_get_functiondef(p.oid)))>0)::text " +
+    "|| '/' || count(*)::text from pg_proc p " +
+    "join pg_namespace n on n.oid=p.pronamespace " +
+    "where n.nspname='public' and p.proname in " +
+    "('request_admin_order_refund_v1','return_admin_order_items_v1')",
   'refund and return SQL shop precedence',
 );
-if(shopPrecedence!=='t')throw new Error('Trusted refund/return precedence is not NULL-safe');
+if(shopPrecedence!=='2/2')
+  throw new Error('Trusted refund/return precedence is not NULL-safe: '+shopPrecedence);
 
 const B='11111111-1111-4111-8111-111111111111';
 const S='22222222-2222-4222-8222-222222222222';
