@@ -3,7 +3,10 @@ import type { AdminApprovalRule } from '@tux/admin-contracts';
 
 import { configurableApprovalAction } from './approvalRuleActions';
 import { createApprovalExecutionRegistry } from './approvalExecutionService';
-import { createInventoryAdjustmentApprovalExecutionEntries, evaluateInventoryAdjustmentRouting } from '../inventory/inventoryApproval';
+import {
+  createInventoryAdjustmentApprovalExecutionEntries,
+  evaluateInventoryAdjustmentRouting,
+} from '../inventory/inventoryApproval';
 
 describe('high-risk inventory adjustment approval coverage', () => {
   it('exposes a quantity-threshold action only when a durable execution handler exists', () => {
@@ -37,11 +40,7 @@ describe('high-risk inventory adjustment approval coverage', () => {
     };
     const actor = { businessId: 'business-a' };
     const decide = (quantityDeltaMicros: number) =>
-      evaluateInventoryAdjustmentRouting(
-        { shopId: 'shop-a', quantityDeltaMicros },
-        actor,
-        [rule],
-      );
+      evaluateInventoryAdjustmentRouting({ shopId: 'shop-a', quantityDeltaMicros }, actor, [rule]);
     expect(decide(4_999_999)).toEqual({ kind: 'DIRECT' });
     expect(decide(-4_999_999)).toEqual({ kind: 'DIRECT' });
     expect(decide(5_000_000)).toEqual({ kind: 'APPROVAL_REQUIRED', ruleId: 'global' });
@@ -71,12 +70,16 @@ describe('high-risk inventory adjustment approval coverage', () => {
     const shopA = { shopId: 'shop-a', quantityDeltaMicros: 7_000_000 };
     const shopB = { shopId: 'shop-b', quantityDeltaMicros: 7_000_000 };
     const actor = { businessId: 'business-a' };
-    expect(evaluateInventoryAdjustmentRouting(shopA, actor, [global, local]))
-      .toEqual({ kind: 'DIRECT' });
-    expect(evaluateInventoryAdjustmentRouting(shopB, actor, [global, local]))
-      .toEqual({ kind: 'APPROVAL_REQUIRED', ruleId: 'global' });
-    expect(evaluateInventoryAdjustmentRouting(shopA, actor, [{ ...local, active: false }]))
-      .toEqual({ kind: 'DIRECT' });
+    expect(evaluateInventoryAdjustmentRouting(shopA, actor, [global, local])).toEqual({
+      kind: 'DIRECT',
+    });
+    expect(evaluateInventoryAdjustmentRouting(shopB, actor, [global, local])).toEqual({
+      kind: 'APPROVAL_REQUIRED',
+      ruleId: 'global',
+    });
+    expect(evaluateInventoryAdjustmentRouting(shopA, actor, [{ ...local, active: false }])).toEqual(
+      { kind: 'DIRECT' },
+    );
     expect(
       evaluateInventoryAdjustmentRouting(shopA, actor, [
         { ...local, thresholdContext: { minimumQuantityImpact: 0 } },
