@@ -211,7 +211,10 @@ export default async function handler(
         query.set('shop_id', `in.(${context.principal.shopIds.join(',')})`);
       }
       const rows = await client.select<ApprovalRuleRow[]>('admin_approval_rules', query);
-      sendJson(response, 200, { rules: rows.map(mapRule), availableActions: APPROVAL_RULE_ACTIONS });
+      sendJson(response, 200, {
+        rules: rows.map(mapRule),
+        availableActions: APPROVAL_RULE_ACTIONS,
+      });
       return;
     }
 
