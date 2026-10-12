@@ -299,9 +299,12 @@ export interface StaffStore {
   linkEmployeeWorker(
     input: LinkEmployeeWorkerInput & { actorEmployeeId: string },
   ): Promise<StaffCommandResult>;
-  provisionEmployeeWorker(
-    input: { employeeId: string; shopId: string; commandId: string; actorEmployeeId: string },
-  ): Promise<StaffCommandResult>;
+  provisionEmployeeWorker(input: {
+    employeeId: string;
+    shopId: string;
+    commandId: string;
+    actorEmployeeId: string;
+  }): Promise<StaffCommandResult>;
   setEmployeeRole(
     input: SetEmployeeRoleInput & { actorEmployeeId: string },
   ): Promise<StaffCommandResult>;

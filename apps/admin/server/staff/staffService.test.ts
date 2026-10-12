@@ -198,5 +198,4 @@ describe('staffService', () => {
     ).toThrow(/permission_forbidden/);
     expect(provisionEmployeeWorker).not.toHaveBeenCalled();
   });
-
 });
