@@ -1,4 +1,4 @@
-import { ADMIN_PERMISSIONS, type AdminPermission } from '@tux/admin-contracts';
+import type { AdminPermission } from '@tux/admin-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 
@@ -23,7 +23,16 @@ type ApprovalRule = {
   editVersion: number;
 };
 
-type ApprovalRulesResponse = { rules: ApprovalRule[] };
+type ConfigurableApprovalAction = {
+  actionType: string;
+  label: string;
+  requesterPermission: AdminPermission;
+  thresholdKind: 'minimumMinor' | 'minimumQuantityImpact' | null;
+};
+type ApprovalRulesResponse = {
+  rules: ApprovalRule[];
+  availableActions: ConfigurableApprovalAction[];
+};
 
 type RuleForm = {
   ruleId: string | null;
@@ -150,6 +159,8 @@ export function ApprovalRulesPage() {
     queryKey: ['admin', 'approval-rules'],
     queryFn: () => adminFetch<ApprovalRulesResponse>('/api/admin/approval-rules'),
   });
+  const availableActions = rulesQuery.data?.availableActions ?? [];
+  const selectedAction = availableActions.find((action) => action.actionType === form.actionType);
   const write = useMutation({
     mutationFn: async (draft: RuleForm) => {
       if (session.state.status !== 'authenticated') throw new Error('session_required');
@@ -190,7 +201,9 @@ export function ApprovalRulesPage() {
     }
     try {
       const command = buildWriteCommand(form);
-      if (!command.actionType) throw new Error('Action type is required.');
+      if (!availableActions.some((action) => action.actionType === command.actionType)) {
+        throw new Error('Select a supported high-risk action.');
+      }
       write.mutate(form);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Invalid approval rule');
@@ -210,14 +223,18 @@ export function ApprovalRulesPage() {
       ) : null}
       <div className="admin-settings-list">
         {rulesQuery.data?.rules.map((rule) => {
-          const candidate = editableRule(rule);
+          const supportedAction = availableActions.find(
+            (action) => action.actionType === rule.actionType,
+          );
+          const candidate = supportedAction ? editableRule(rule) : null;
           return (
             <div className="admin-settings-row" key={rule.id}>
               <div>
                 <strong>{rule.actionType}</strong>
                 <span>
                   {rule.shopId === null ? 'Business-wide' : `Shop: ${rule.shopId}`} ·{' '}
-                  {rule.active ? 'Enabled' : 'Disabled'} · {thresholdLabel(rule)} · Revision{' '}
+                  {rule.active ? 'Enabled' : 'Disabled'} ·{' '}
+                  {supportedAction ? thresholdLabel(rule) : 'Unsupported legacy action — editing disabled'} · Revision{' '}
                   {rule.editVersion}
                 </span>
               </div>
@@ -266,36 +283,36 @@ export function ApprovalRulesPage() {
           </label>
           <label className="admin-field">
             <span>Action type</span>
-            <input
+            <select
               aria-label="Rule action type"
               value={form.actionType}
-              disabled={write.isPending}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, actionType: event.target.value }))
-              }
+              disabled={editing || write.isPending || rulesQuery.isLoading}
               required
-            />
-          </label>
-          <label className="admin-field">
-            <span>Requester permission</span>
-            <select
-              aria-label="Requester permission"
-              value={form.requesterPermission}
-              disabled={write.isPending}
-              onChange={(event) =>
+              onChange={(event) => {
+                const action = availableActions.find(
+                  (candidate) => candidate.actionType === event.currentTarget.value,
+                );
                 setForm((current) => ({
                   ...current,
-                  requesterPermission: event.target.value as AdminPermission,
-                }))
-              }
+                  actionType: action?.actionType ?? '',
+                  requesterPermission: action?.requesterPermission ?? current.requesterPermission,
+                  thresholdKind: 'none',
+                  thresholdValue: '',
+                }));
+              }}
             >
-              {ADMIN_PERMISSIONS.map((permission) => (
-                <option value={permission} key={permission}>
-                  {permission}
+              <option value="">Select a supported action</option>
+              {availableActions.map((action) => (
+                <option value={action.actionType} key={action.actionType}>
+                  {action.label}
                 </option>
               ))}
             </select>
           </label>
+          <p className="admin-field__help">
+            Requester permission: {selectedAction?.requesterPermission ?? 'Select an action'}
+            . The authority is assigned by the selected trusted command.
+          </p>
           <p className="admin-field__help">Approver permission: approvals.review (fixed).</p>
           <label className="admin-field">
             <span>Expiry (seconds)</span>
@@ -327,8 +344,12 @@ export function ApprovalRulesPage() {
               }
             >
               <option value="none">Every matching action</option>
-              <option value="minimumMinor">Minimum amount (minor EGP units)</option>
-              <option value="minimumQuantityImpact">Minimum quantity impact</option>
+              {selectedAction?.thresholdKind === 'minimumMinor' ? (
+                <option value="minimumMinor">Minimum amount (minor EGP units)</option>
+              ) : null}
+              {selectedAction?.thresholdKind === 'minimumQuantityImpact' ? (
+                <option value="minimumQuantityImpact">Minimum quantity impact</option>
+              ) : null}
             </select>
           </label>
           {form.thresholdKind !== 'none' ? (
@@ -393,7 +414,11 @@ export function ApprovalRulesPage() {
               {write.error instanceof Error ? write.error.message : 'Unable to save approval rule'}
             </p>
           ) : null}
-          <button type="submit" className="admin-primary-button" disabled={write.isPending}>
+          <button
+            type="submit"
+            className="admin-primary-button"
+            disabled={write.isPending || !selectedAction}
+          >
             {write.isPending ? 'Saving…' : editing ? 'Save approval rule' : 'Create approval rule'}
           </button>
           {editing ? (
