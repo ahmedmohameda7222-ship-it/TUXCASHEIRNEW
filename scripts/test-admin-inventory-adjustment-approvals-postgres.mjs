@@ -33,11 +33,21 @@ create table auth.users(id uuid primary key);
 create function auth.uid() returns uuid language sql stable as $do$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $do$;`, 'fixture reset');
 const migrations = readdirSync(resolve('supabase/migrations'))
   .filter((f) => /^\d+_.+\.sql$/.test(f)).sort();
-const target = '20261012040100_admin_inventory_adjustment_approval.sql';
+const target = '20261012040200_admin_order_rule_shop_precedence.sql';
 const targetIndex = migrations.indexOf(target);
 if (targetIndex < 0) throw new Error('Inventory approval migration missing');
 for (const name of migrations.slice(0,targetIndex+1))
   execute(['-f',resolve('supabase/migrations',name)],name);
+
+// Both trusted financial-control RPCs must select shop-local policy first.
+const shopPrecedence = sql(
+  "select bool_and(strpos(pg_get_functiondef(p.oid),'desc nulls last')>0)::text " +
+    "from pg_proc p join pg_namespace n on n.oid=p.pronamespace " +
+    "where n.nspname='public' and p.proname in (" +
+    "'request_admin_order_refund_v1','return_admin_order_items_v1')",
+  'refund and return SQL shop precedence',
+);
+if(shopPrecedence!=='t')throw new Error('Trusted refund/return precedence is not NULL-safe');
 
 const B='11111111-1111-4111-8111-111111111111';
 const S='22222222-2222-4222-8222-222222222222';
