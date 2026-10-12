@@ -111,6 +111,42 @@ describe('approvalService', () => {
     );
   });
 
+  it('handles zero and nonfinite measured amounts and matches values strictly above the minimum', () => {
+    const rule = { ...approvalRule, thresholdContext: { minimumMinor: 500 } };
+    const context = { businessId: 'business-1', shopId: 'shop-1', actionType: rule.actionType };
+    expect(evaluateApprovalRequirement({ ...context, amountMinor: 0 }, [rule]).required).toBe(
+      false,
+    );
+    expect(evaluateApprovalRequirement({ ...context, amountMinor: 501 }, [rule]).required).toBe(
+      true,
+    );
+    expect(
+      evaluateApprovalRequirement({ ...context, amountMinor: Number.POSITIVE_INFINITY }, [rule])
+        .required,
+    ).toBe(false);
+    expect(
+      evaluateApprovalRequirement({ ...context, amountMinor: Number.NaN }, [rule]).required,
+    ).toBe(false);
+  });
+
+  it('isolates business rules and prioritizes a matching shop-specific rule', () => {
+    const globalRule = { ...approvalRule, id: 'business-rule', shopId: null };
+    const shopRule = { ...approvalRule, id: 'shop-rule', shopId: 'shop-1' };
+    const rules = [globalRule, shopRule];
+    const context = { businessId: 'business-1', shopId: 'shop-1', actionType: approvalRule.actionType };
+    expect(evaluateApprovalRequirement(context, rules)).toMatchObject({
+      required: true,
+      ruleId: 'shop-rule',
+    });
+    expect(evaluateApprovalRequirement({ ...context, shopId: 'shop-2' }, rules)).toMatchObject({
+      required: true,
+      ruleId: 'business-rule',
+    });
+    expect(
+      evaluateApprovalRequirement({ ...context, businessId: 'another-business' }, rules).required,
+    ).toBe(false);
+  });
+
   it('rejects malformed persisted approval thresholds rather than silently treating them as unconditional', () => {
     const context = {
       businessId: 'business-1',
