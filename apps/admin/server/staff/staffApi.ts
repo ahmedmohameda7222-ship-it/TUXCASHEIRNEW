@@ -100,6 +100,14 @@ const commandSchema = z.discriminatedUnion('type', [
     .strict(),
   z
     .object({
+      type: z.literal('employee.provision-worker'),
+      employeeId: uuidSchema,
+      shopId: uuidSchema,
+      commandId: commandIdSchema,
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal('employee.pin'),
       employeeId: uuidSchema,
       shopId: uuidSchema,
@@ -444,6 +452,9 @@ export async function handleStaffRequest(
         break;
       case 'employee.link-worker':
         result = await service.linkEmployeeWorker(command, context.principal);
+        break;
+      case 'employee.provision-worker':
+        result = await service.provisionEmployeeWorker(command, context.principal);
         break;
       case 'employee.pin': {
         requirePermission(context.principal, 'staff.manage', command.shopId);
