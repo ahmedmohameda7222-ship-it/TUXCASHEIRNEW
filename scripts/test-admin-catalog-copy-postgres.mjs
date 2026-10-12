@@ -89,12 +89,6 @@ business_id,shop_id,publish_version,operations_configuration_version,source_kind
 ) values
 ('${B}','${S}',1,1,'BASELINE',${quoteJson(sourceBundle)}),
 ('${B}','${T}',1,1,'BASELINE',${quoteJson(targetBundle)})`,'publish fixtures');
-// The synthetic BASELINE publication must have the matching Operations
-// projection. Canonical publish allocates the next Operations version from
-// operations_configuration_snapshots, not from the catalog ledger alone.
-sql(`insert into public.operations_configuration_snapshots(shop_id,version,bundle_json)
-values ('${S}',1,${quoteJson(sourceBundle)}),
-       ('${T}',1,${quoteJson(targetBundle)})`, 'canonical baseline operations projections');
 const draft=rpc(`public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,1,'Copy target')`,'draft create');
 if(!draft.ok || !draft.draftId)throw new Error('Could not create canonical draft: '+JSON.stringify(draft));
 const params=(from=S,to=T,revision=1,sourceVersion=1,domains="array['productPrices','productAvailability']::text[]")=>
