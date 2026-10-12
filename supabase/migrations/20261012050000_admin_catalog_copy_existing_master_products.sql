@@ -229,7 +229,87 @@ declare
   v_result jsonb;
 begin
   if nullif(btrim(p_command_id),'') is null or length(p_command_id)>160 or
-     p_preview_fingerprint !~ '^[0-9a-f]{64}$'
+     p_preview_fingerprint is null or
+     p_preview_fingerprint !~ '^[0-9a-f]{64}
+  then return jsonb_build_object('ok',false,'code','invalid_catalog_copy_apply'); end if;
+  if p_source_shop_id=p_target_shop_id or p_domains is null then
+    return jsonb_build_object('ok',false,'code','invalid_catalog_copy_apply');
+  end if;
+  v_business:=private.assert_admin_catalog_permission_v1(p_employee_id,p_source_shop_id,'catalog.view');
+  v_target_business:=private.assert_admin_catalog_permission_v1(p_employee_id,p_target_shop_id,'catalog.edit');
+  if v_business is distinct from v_target_business then
+    return jsonb_build_object('ok',false,'code','cross_business_copy_forbidden'); end if;
+  perform pg_advisory_xact_lock(hashtextextended(
+    'tux-admin-catalog-copy:'||v_business::text||':'||p_target_shop_id::text||
+    ':'||p_command_id,0
+  ));
+  select * into v_receipt from public.admin_catalog_copy_receipts
+  where business_id=v_business and target_shop_id=p_target_shop_id
+    and command_id=p_command_id for update;
+  if found then
+    if v_receipt.source_shop_id<>p_source_shop_id or
+       v_receipt.target_draft_id<>p_target_draft_id or
+       v_receipt.preview_fingerprint<>p_preview_fingerprint
+    then return jsonb_build_object('ok',false,'code','command_id_conflict'); end if;
+    return v_receipt.result_json||jsonb_build_object('replayed',true);
+  end if;
+  -- Draft lock first, exactly as canonical draft publication does.
+  perform 1 from public.catalog_drafts where id=p_target_draft_id for update;
+  if p_source_shop_id::text<p_target_shop_id::text then
+    perform pg_advisory_xact_lock(hashtextextended('tux-admin-catalog:'||p_source_shop_id::text,0));
+    perform pg_advisory_xact_lock(hashtextextended('tux-admin-catalog:'||p_target_shop_id::text,0));
+  else
+    perform pg_advisory_xact_lock(hashtextextended('tux-admin-catalog:'||p_target_shop_id::text,0));
+    perform pg_advisory_xact_lock(hashtextextended('tux-admin-catalog:'||p_source_shop_id::text,0));
+  end if;
+  v_plan:=private.build_admin_catalog_copy_existing_products_v1(
+    p_employee_id,p_source_shop_id,p_target_shop_id,p_target_draft_id,
+    p_source_publish_version,p_target_publish_version,p_target_draft_revision,p_domains
+  );
+  if v_plan->>'ok' is distinct from 'true' then return v_plan; end if;
+  if v_plan->>'fingerprint'<>p_preview_fingerprint then
+    return jsonb_build_object('ok',false,'code','stale_catalog_copy_preview'); end if;
+  v_saved:=public.apply_catalog_draft_change_v1(
+    p_employee_id,p_target_draft_id,p_target_draft_revision,
+    jsonb_build_object('bundleJson',v_plan->'candidateBundle')
+  );
+  if v_saved->>'ok' is distinct from 'true' then
+    return v_saved; end if;
+  v_result:=jsonb_build_object(
+    'ok',true,'targetDraftId',p_target_draft_id,
+    'draftRevision',v_saved->'draftRevision',
+    'mappedProducts',v_plan->'mappedProducts',
+    'changedProducts',v_plan->'changedProducts',
+    'publishRequired',true,'fingerprint',p_preview_fingerprint
+  );
+  insert into public.admin_catalog_copy_receipts(
+    business_id,target_shop_id,command_id,source_shop_id,target_draft_id,
+    actor_employee_id,preview_fingerprint,result_json
+  ) values (
+    v_business,p_target_shop_id,p_command_id,p_source_shop_id,p_target_draft_id,
+    p_employee_id,p_preview_fingerprint,v_result
+  );
+  perform public.append_admin_audit_event_v1(
+    v_business,p_target_shop_id,p_employee_id,
+    'CATALOG_COPY_STAGED','CATALOG_DRAFT',p_target_draft_id::text,
+    jsonb_build_object('draftRevision',p_target_draft_revision),
+    jsonb_build_object('draftRevision',v_saved->'draftRevision',
+      'sourceShopId',p_source_shop_id,'sourcePublishVersion',p_source_publish_version,
+      'targetPublishVersion',p_target_publish_version,'domains',to_jsonb(p_domains),
+      'mappedProducts',v_plan->'mappedProducts','changedProducts',v_plan->'changedProducts'),
+    'Selective master-mapped product configuration copy',
+    null,null,jsonb_build_object('commandId',p_command_id,'fingerprint',p_preview_fingerprint)
+  );
+  return v_result;
+end;
+$apply$;
+revoke all on function public.apply_admin_catalog_shop_copy_v1(
+  uuid,uuid,uuid,uuid,bigint,bigint,bigint,text[],text,text
+) from public,anon,authenticated;
+grant execute on function public.apply_admin_catalog_shop_copy_v1(
+  uuid,uuid,uuid,uuid,bigint,bigint,bigint,text[],text,text
+) to service_role;
+
   then return jsonb_build_object('ok',false,'code','invalid_catalog_copy_apply'); end if;
   if p_source_shop_id=p_target_shop_id or p_domains is null then
     return jsonb_build_object('ok',false,'code','invalid_catalog_copy_apply');
