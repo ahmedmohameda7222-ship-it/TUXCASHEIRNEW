@@ -1,7 +1,7 @@
+import { AUTOMATIC_CUSTOMER_SEGMENTS } from '@tux/admin-contracts';
 import type {
   AdminPromotion,
-  type AdminCustomerSegment,
-  AUTOMATIC_CUSTOMER_SEGMENTS,
+  AdminCustomerSegment,
   AdminPromotionChannel,
   AdminPromotionKind,
   AdminPromotionStackingPolicy,
