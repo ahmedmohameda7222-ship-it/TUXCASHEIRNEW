@@ -153,6 +153,48 @@ const receiptCount=sql(`select count(*) from public.admin_catalog_copy_receipts 
 if(receiptCount!=='1')throw new Error('Catalog Copy receipt not idempotent');
 const auditCount=sql(`select count(*) from public.admin_audit_events where action_type='CATALOG_COPY_STAGED'`);
 if(auditCount!=='1')throw new Error('Catalog copy audit not append-only or once-only');
+// A second, different command must observe a stale draft revision rather than
+// silently stage over the preceding copy.
+assertDenied(
+  rpc(`public.preview_admin_catalog_shop_copy_v1(${params(S,T,1)})`,
+    'stale target draft CAS'),
+  'stale_draft_revision',
+);
+// Force the last audit INSERT of a new command to fail after the draft write.
+// The entire transaction (draft revision, change record and receipt) must roll
+// back; no partial pending catalog configuration can survive the exception.
+const revision2Preview = rpc(
+  `public.preview_admin_catalog_shop_copy_v1(${params(S,T,2)})`,
+  'second-command preview',
+);
+if(!revision2Preview.ok) throw new Error('Second-copy preview refused: '+JSON.stringify(revision2Preview));
+sql(`create function public.catalog_copy_test_reject_audit() returns trigger
+language plpgsql as $copyfail$ begin
+  if new.action_type='CATALOG_COPY_STAGED' then
+    raise exception 'CATALOG_COPY_FORCED_ROLLBACK_TEST';
+  end if;
+  return new;
+end; $copyfail$;
+create trigger catalog_copy_test_rollback before insert on public.admin_audit_events
+for each row execute function public.catalog_copy_test_reject_audit();`, 'inject isolated audit failure');
+let atomicRollbackObserved = false;
+try {
+  rpc(`public.apply_admin_catalog_shop_copy_v1(${params(S,T,2)},
+    '${revision2Preview.fingerprint}','catalog-copy-rollback')`, 'atomicity failure injection');
+} catch(error) {
+  atomicRollbackObserved = String(error).includes('CATALOG_COPY_FORCED_ROLLBACK_TEST');
+}
+sql('drop trigger catalog_copy_test_rollback on public.admin_audit_events; drop function public.catalog_copy_test_reject_audit();',
+  'remove isolated failure injection');
+if(!atomicRollbackObserved) throw new Error('Injected audit failure did not abort Catalog Copy');
+const unchangedRevision = sql(`select draft_revision from public.catalog_drafts where id='${draft.draftId}'`);
+if(unchangedRevision!=='2') throw new Error('Partial target draft update survived failed catalog audit');
+const noFailedReceipt = sql(`select count(*) from public.admin_catalog_copy_receipts
+where command_id='catalog-copy-rollback'`);
+if(noFailedReceipt!=='0') throw new Error('Failed Catalog Copy persisted a command receipt');
+const auditsAfterFailure = sql(`select count(*) from public.admin_audit_events
+where action_type='CATALOG_COPY_STAGED'`);
+if(auditsAfterFailure!=='1') throw new Error('Failed copy changed immutable audit history');
 for(const role of ['anon','authenticated'])for(const fn of [
  'public.preview_admin_catalog_shop_copy_v1(uuid,uuid,uuid,uuid,bigint,bigint,bigint,text[])',
  'public.apply_admin_catalog_shop_copy_v1(uuid,uuid,uuid,uuid,bigint,bigint,bigint,text[],text,text)',
