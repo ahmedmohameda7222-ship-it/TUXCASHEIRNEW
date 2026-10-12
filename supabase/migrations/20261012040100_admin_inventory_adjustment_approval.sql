@@ -117,7 +117,7 @@ begin
     and r.action_type = 'INVENTORY_ADJUST'
     and r.active
     and (r.shop_id is null or r.shop_id = p_shop_id)
-  order by (r.shop_id = p_shop_id) desc, r.id
+  order by (r.shop_id = p_shop_id) desc nulls last, r.id
   limit 1;
   if found then
     if jsonb_typeof(v_approval_rule.threshold_context) <> 'object'
