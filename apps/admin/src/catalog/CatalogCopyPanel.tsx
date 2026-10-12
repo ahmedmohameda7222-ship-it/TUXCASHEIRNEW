@@ -4,12 +4,22 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
 
-type Domain = 'productPrices' | 'productAvailability';
+type Domain = 'productPrices' | 'productAvailability' | 'categoryOrder' | 'categoryAvailability';
 
 type CopyPreview = {
   ok: true;
   mappedProducts: number;
   changedProducts: number;
+  mappedCategories: number;
+  changedCategories: number;
+  categoryDifferences: Array<{
+    targetCategoryId: string;
+    categoryName: string;
+    sortOrderBefore: number;
+    sortOrderAfter: number;
+    activeBefore: boolean;
+    activeAfter: boolean;
+  }>;
   fingerprint: string;
   expectedSourcePublishVersion: number;
   expectedTargetPublishVersion: number;
@@ -152,9 +162,9 @@ export function CatalogCopyPanel({
       <h2 id="catalog-copy-title">Selective catalog copy</h2>
       <p className="admin-publish-card__copy">
         Copy product prices and availability from the published source catalog into this shop's
-        unpublished draft. Products must already share a canonical business master mapping in both
-        shops. Categories, modifiers, recipes and historical data are never copied by this
-        operation.
+        unpublished draft. Products and categories must already share canonical business master mappings in both
+        shops. Only explicitly selected fields transfer; missing entities, modifiers,
+        recipes and historical data are not copied.
       </p>
       {draft ? (
         <form onSubmit={(event) => void makePreview(event)}>
@@ -196,6 +206,24 @@ export function CatalogCopyPanel({
               Product prices
             </label>
           ) : null}
+          <label className="admin-field">
+            <input
+              type="checkbox"
+              checked={domains.includes('categoryOrder')}
+              disabled={pending}
+              onChange={(event) => toggle('categoryOrder', event.currentTarget.checked)}
+            />
+            Category display order (mapped categories only)
+          </label>
+          <label className="admin-field">
+            <input
+              type="checkbox"
+              checked={domains.includes('categoryAvailability')}
+              disabled={pending}
+              onChange={(event) => toggle('categoryAvailability', event.currentTarget.checked)}
+            />
+            Category availability (mapped categories only)
+          </label>
           <button
             type="submit"
             className="admin-secondary-button"
@@ -213,7 +241,8 @@ export function CatalogCopyPanel({
         <div role="status">
           <p>
             Read-only preview: {preview.mappedProducts} existing master-mapped products,
-            {preview.changedProducts} target products would change.
+            {preview.changedProducts} target products would change; {preview.mappedCategories} mapped
+            categories, {preview.changedCategories} target categories would change.
           </p>
           {preview.differences.length > 0 ? (
             <ul>
@@ -237,6 +266,23 @@ export function CatalogCopyPanel({
               ))}
             </ul>
           ) : null}
+          {preview.categoryDifferences.length > 0 ? (
+            <ul>
+              {preview.categoryDifferences.map((item) => (
+                <li key={item.targetCategoryId}>
+                  <strong>{item.categoryName}</strong>
+                  {domains.includes('categoryOrder') ? (
+                    <span> Order: {item.sortOrderBefore} → {item.sortOrderAfter}.</span>
+                  ) : null}
+                  {domains.includes('categoryAvailability') ? (
+                    <span>
+                      {' '}Active: {String(item.activeBefore)} → {String(item.activeAfter)}.
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <p>
             Source publication {preview.expectedSourcePublishVersion}, target publication{' '}
             {preview.expectedTargetPublishVersion}, draft revision{' '}
@@ -245,7 +291,7 @@ export function CatalogCopyPanel({
           <button
             type="button"
             className="admin-primary-button"
-            disabled={pending || preview.changedProducts === 0}
+            disabled={pending || (preview.changedProducts === 0 && preview.changedCategories === 0)}
             onClick={() => void stageCopy()}
           >
             {pending ? 'Applying…' : 'Apply to target draft'}

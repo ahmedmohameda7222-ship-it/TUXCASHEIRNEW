@@ -51,9 +51,9 @@ const catalogCopyBaseSchema = z.object({
   expectedTargetPublishVersion: z.number().int().nonnegative(),
   expectedTargetDraftRevision: z.number().int().positive(),
   selectedDomains: z
-    .array(z.enum(['productPrices', 'productAvailability']))
+    .array(z.enum(['productPrices', 'productAvailability', 'categoryOrder', 'categoryAvailability']))
     .min(1)
-    .max(2)
+    .max(4)
     .refine((domains) => new Set(domains).size === domains.length),
 });
 
