@@ -133,7 +133,7 @@ export function useInventory(shopId: string | undefined, inventoryItemId: string
       requesterPin?: string;
     }) => {
       // Do not put the PIN in the retained command fingerprint: it is used
-      // as a localStorage key. Only the one-shot HTTPS request may carry it.
+      // as a persistent command key. Only the one-shot HTTPS request may carry it.
       const { requesterPin, ...intent } = input;
       return postRetained('adjust', intent, (retainedCommandId) => ({
         type: 'adjust',
