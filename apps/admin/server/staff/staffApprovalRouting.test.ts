@@ -92,18 +92,20 @@ describe('Workforce approval routing', () => {
     const { deps, createRequest } = approvalDependencies();
     const executeDirect = vi.fn(async () => ({ ok: true as const }));
     const client = {
-      select: vi.fn(async () => [{
-        id: RULE_ID,
-        business_id: BUSINESS_ID,
-        shop_id: SHOP_ID,
-        action_type: 'STAFF_PAYMENT',
-        requester_permission: 'staff.payments',
-        approver_permission: 'approvals.review',
-        requires_second_person: true,
-        requires_requester_repin: false,
-        threshold_context: { minimumMinor: 500 },
-        active: true,
-      }]),
+      select: vi.fn(async () => [
+        {
+          id: RULE_ID,
+          business_id: BUSINESS_ID,
+          shop_id: SHOP_ID,
+          action_type: 'STAFF_PAYMENT',
+          requester_permission: 'staff.payments',
+          approver_permission: 'approvals.review',
+          requires_second_person: true,
+          requires_requester_repin: false,
+          threshold_context: { minimumMinor: 500 },
+          active: true,
+        },
+      ]),
     } as unknown as AdminSupabaseClient;
 
     const result = await executeOrRequestStaffApproval(
