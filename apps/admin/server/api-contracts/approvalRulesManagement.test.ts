@@ -66,7 +66,7 @@ describe('approval rule management boundary', () => {
     }
   });
 
-  it('accepts only implemented high-risk action identities with matching requester authority and threshold context', () => {
+  it('allows only executable approval actions and compatible thresholds', () => {
     for (const invalid of [
       { ...ruleInput, actionType: 'inventory.adjust' },
       { ...ruleInput, actionType: 'invented.high_risk_action' },
