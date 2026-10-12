@@ -9,7 +9,7 @@ import type {
 
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
-import { createRetainedCommandIds } from '../lib/retainedCommandIds';
+import { createRetainedCommandIds, isPendingApprovalResult } from '../lib/retainedCommandIds';
 
 export class InventoryUiError extends Error {
   constructor(readonly code: string) {
@@ -74,7 +74,7 @@ export function useInventory(shopId: string | undefined, inventoryItemId: string
       { method: 'POST', body: JSON.stringify(command) },
       csrfTokenForMutation(session),
     );
-    onAuthoritativeResponse?.();
+    if (!isPendingApprovalResult(result)) onAuthoritativeResponse?.();
     if (!result.ok) throw new InventoryUiError(result.code);
     return result;
   }
@@ -130,12 +130,17 @@ export function useInventory(shopId: string | undefined, inventoryItemId: string
       reasonCodeId: string;
       note: string | null;
       emergencyNegativeOverride: boolean;
+      requesterPin?: string;
     }) => {
-      return postRetained('adjust', input, (retainedCommandId) => ({
+      // Do not put the PIN in the retained command fingerprint: it is used
+      // as a localStorage key. Only the one-shot HTTPS request may carry it.
+      const { requesterPin, ...intent } = input;
+      return postRetained('adjust', intent, (retainedCommandId) => ({
         type: 'adjust',
         shopId: shopId!,
         commandId: retainedCommandId,
-        ...input,
+        ...intent,
+        ...(requesterPin ? { requesterPin } : {}),
       }));
     },
     onSuccess: invalidate,
