@@ -116,23 +116,23 @@ describe('approvalService', () => {
   it(
     'rejects malformed persisted approval thresholds rather than silently treating them as unconditional',
     () => {
-    const context = {
-      businessId: 'business-1',
-      shopId: 'shop-1',
-      actionType: approvalRule.actionType,
-    };
-    for (const thresholdContext of [
-      { minimumMinor: '500' },
-      { minimumMinor: -1 },
-      { minimumMinor: Number.NaN },
-      { minimumQuantityImpact: 0 },
-      { minimumMinor: 500, minimumQuantityImpact: 2 },
-      { unsupportedLegacyThreshold: 500 },
-    ]) {
-      expect(() =>
-        evaluateApprovalRequirement(context, [{ ...approvalRule, thresholdContext }]),
-      ).toThrow('approval_threshold_context_invalid');
-    }
+      const context = {
+        businessId: 'business-1',
+        shopId: 'shop-1',
+        actionType: approvalRule.actionType,
+      };
+      for (const thresholdContext of [
+        { minimumMinor: '500' },
+        { minimumMinor: -1 },
+        { minimumMinor: Number.NaN },
+        { minimumQuantityImpact: 0 },
+        { minimumMinor: 500, minimumQuantityImpact: 2 },
+        { unsupportedLegacyThreshold: 500 },
+      ]) {
+        expect(() =>
+          evaluateApprovalRequirement(context, [{ ...approvalRule, thresholdContext }]),
+        ).toThrow('approval_threshold_context_invalid');
+      }
     },
   );
 
@@ -212,48 +212,48 @@ describe('approvalService', () => {
   it(
     'requires requester re-PIN when the persisted approval rule requires it without persisting the PIN',
     async () => {
-    const sentinelPin = '482731';
-    const verifyEmployeePin = vi.fn(async () => true);
-    const createRequest = vi.fn(async (input) => ({
-      ok: true as const,
-      requestId: 'request-2',
-      status: 'PENDING' as const,
-      persistedPayload: input.commandPayload,
-    }));
-    const deps = dependencies({
-      loadRule: vi.fn(async () => ({ ...approvalRule, requiresRequesterRepin: true })),
-      verifyEmployeePin,
-      createRequest,
-    });
-    const registry = createApprovalCommandRegistry([
-      {
-        actionType: 'SAFE_TEST_COMMAND',
-        containsSecretInput: false,
-        serialize: (input: unknown) => ({ entityId: (input as { entityId: string }).entityId }),
-      },
-    ]);
+      const sentinelPin = '482731';
+      const verifyEmployeePin = vi.fn(async () => true);
+      const createRequest = vi.fn(async (input) => ({
+        ok: true as const,
+        requestId: 'request-2',
+        status: 'PENDING' as const,
+        persistedPayload: input.commandPayload,
+      }));
+      const deps = dependencies({
+        loadRule: vi.fn(async () => ({ ...approvalRule, requiresRequesterRepin: true })),
+        verifyEmployeePin,
+        createRequest,
+      });
+      const registry = createApprovalCommandRegistry([
+        {
+          actionType: 'SAFE_TEST_COMMAND',
+          containsSecretInput: false,
+          serialize: (input: unknown) => ({ entityId: (input as { entityId: string }).entityId }),
+        },
+      ]);
 
-    const result = await requestApproval(
-      {
-        businessId: 'business-1',
-        shopId: 'shop-1',
-        ruleId: 'rule-1',
-        actionType: 'SAFE_TEST_COMMAND',
-        commandId: 'command-1',
-        commandInput: { entityId: 'entity-1' },
-        reason: 'Sensitive action',
-        requesterPin: sentinelPin,
-      },
-      requester,
-      deps,
-      registry,
-    );
+      const result = await requestApproval(
+        {
+          businessId: 'business-1',
+          shopId: 'shop-1',
+          ruleId: 'rule-1',
+          actionType: 'SAFE_TEST_COMMAND',
+          commandId: 'command-1',
+          commandInput: { entityId: 'entity-1' },
+          reason: 'Sensitive action',
+          requesterPin: sentinelPin,
+        },
+        requester,
+        deps,
+        registry,
+      );
 
-    expect(result.ok).toBe(true);
-    expect(verifyEmployeePin).toHaveBeenCalledWith(requester.employeeId, sentinelPin);
-    const persisted = JSON.stringify(createRequest.mock.calls[0]?.[0] ?? {});
-    expect(persisted).not.toContain(sentinelPin);
-    expect(persisted).not.toContain('requesterPin');
+      expect(result.ok).toBe(true);
+      expect(verifyEmployeePin).toHaveBeenCalledWith(requester.employeeId, sentinelPin);
+      const persisted = JSON.stringify(createRequest.mock.calls[0]?.[0] ?? {});
+      expect(persisted).not.toContain(sentinelPin);
+      expect(persisted).not.toContain('requesterPin');
     },
   );
 
