@@ -32,6 +32,7 @@ function storeFixture(overrides: Partial<StaffStore> = {}): StaffStore {
     updateEmployeeProfile: async () => ok(),
     assignEmployeeShop: async () => ok(),
     linkEmployeeWorker: async () => ok(),
+    provisionEmployeeWorker: async () => ok(),
     setEmployeeRole: async () => ok(),
     setEmployeePermission: async () => ok(),
     suspendEmployee: async () => ok(),
