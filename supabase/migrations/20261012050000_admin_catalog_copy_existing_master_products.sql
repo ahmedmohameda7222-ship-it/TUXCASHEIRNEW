@@ -46,6 +46,7 @@ declare
   v_source_count bigint;
   v_mapped_count bigint;
   v_changed_count bigint;
+  v_differences jsonb;
   v_target_version bigint;
   v_source_version bigint;
   v_fingerprint text;
@@ -162,6 +163,21 @@ begin
   join jsonb_array_elements(v_result_products) with ordinality after_item(value,idx)
     on before_item.idx=after_item.idx
   where before_item.value is distinct from after_item.value;
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'targetProductId',old_row.value->>'id',
+    'productName',old_row.value->>'name',
+    'priceBeforeMinor',old_row.value->'priceMinor',
+    'priceAfterMinor',new_row.value->'priceMinor',
+    'activeBefore',old_row.value->'active',
+    'activeAfter',new_row.value->'active',
+    'soldOutBefore',old_row.value->'soldOut',
+    'soldOutAfter',new_row.value->'soldOut'
+  ) order by old_row.ordinality),'[]'::jsonb)
+  into v_differences
+  from jsonb_array_elements(v_target_products) with ordinality old_row(value,ordinality)
+  join jsonb_array_elements(v_result_products) with ordinality new_row(value,ordinality)
+    on old_row.ordinality=new_row.ordinality
+  where old_row.value is distinct from new_row.value;
   v_fingerprint:=encode(extensions.digest(
     jsonb_build_object('business',v_business,'sourceShop',p_source_shop_id,
       'targetShop',p_target_shop_id,'draft',p_target_draft_id,
@@ -176,6 +192,7 @@ begin
     'expectedTargetDraftRevision',p_target_draft_revision,
     'selectedDomains',to_jsonb(p_domains),
     'mappedProducts',v_mapped_count,'changedProducts',v_changed_count,
+    'differences',v_differences,
     'fingerprint',v_fingerprint,'candidateBundle',v_bundle
   );
 end;
