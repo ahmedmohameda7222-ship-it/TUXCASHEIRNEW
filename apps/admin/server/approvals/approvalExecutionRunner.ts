@@ -1,6 +1,11 @@
 import type { AdminOrderFinancialMutationResult } from '@tux/admin-contracts';
 
 import { getAdminServerEnv } from '../env.js';
+import type { AdminInventoryCommandResult } from '@tux/admin-contracts';
+import {
+  createInventoryAdjustmentApprovalExecutionEntries,
+  type ApprovedInventoryAdjustmentExecutionInput,
+} from '../inventory/inventoryApproval.js';
 import {
   createOrderApprovalExecutionEntries,
   type ApprovedRefundExecutionInput,
@@ -110,6 +115,28 @@ export async function runProductionApprovalExecutionRunner(): Promise<ApprovalEx
   const persistence = createSupabaseApprovalExecutionDependencies(client);
   const registry = createApprovalExecutionRegistry([
     ...createOrderApprovalExecutionEntries(createOrderApprovalPersistence(client)),
+    ...createInventoryAdjustmentApprovalExecutionEntries({
+      executeAdjustment(input: ApprovedInventoryAdjustmentExecutionInput) {
+        return client.rpc<AdminInventoryCommandResult>(
+          'execute_approved_admin_inventory_adjustment_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_inventory_item_id: input.inventoryItemId,
+            p_quantity_delta_micros: input.quantityDeltaMicros,
+            p_reason_code_id: input.reasonCodeId,
+            p_note: input.note,
+            p_command_id: input.originalCommandId,
+            p_emergency_negative_override: input.emergencyNegativeOverride,
+            p_expected_definition_version: input.expectedDefinitionVersion,
+            p_expected_movement_count: input.expectedMovementCount,
+          },
+        );
+      },
+    }),
     ...createStaffApprovalExecutionEntries(
       createSupabaseStaffApprovalExecutionDependencies(client),
     ),
