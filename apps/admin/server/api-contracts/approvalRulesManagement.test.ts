@@ -71,17 +71,43 @@ describe('approval rule management boundary', () => {
       { ...ruleInput, actionType: 'inventory.adjust' },
       { ...ruleInput, actionType: 'invented.high_risk_action' },
       { ...ruleInput, actionType: 'EMPLOYEE_ROLE_CHANGE', threshold: { kind: 'none' } },
-      { ...ruleInput, actionType: 'ORDER_REFUND', threshold: { kind: 'minimumQuantityImpact', value: 3 } },
-      { ...ruleInput, actionType: 'ORDER_RETURN', threshold: { kind: 'minimumMinor', value: 1000 } },
-      { ...ruleInput, actionType: 'STAFF_PAYMENT', threshold: { kind: 'minimumQuantityImpact', value: 2 } },
+      {
+        ...ruleInput,
+        actionType: 'ORDER_REFUND',
+        threshold: { kind: 'minimumQuantityImpact', value: 3 },
+      },
+      {
+        ...ruleInput,
+        actionType: 'ORDER_RETURN',
+        threshold: { kind: 'minimumMinor', value: 1000 },
+      },
+      {
+        ...ruleInput,
+        actionType: 'STAFF_PAYMENT',
+        threshold: { kind: 'minimumQuantityImpact', value: 2 },
+      },
     ]) {
       expect(approvalRuleWriteSchema.safeParse(invalid).success).toBe(false);
     }
     for (const valid of [
       { ...ruleInput },
-      { ...ruleInput, actionType: 'ORDER_REFUND', threshold: { kind: 'minimumMinor', value: 1000 } },
-      { ...ruleInput, actionType: 'STAFF_PAYMENT', requesterPermission: 'staff.payments', threshold: { kind: 'minimumMinor', value: 1000 } },
-      { ...ruleInput, actionType: 'EMPLOYEE_ROLE_CHANGE', requesterPermission: 'staff.manage', threshold: { kind: 'none' } },
+      {
+        ...ruleInput,
+        actionType: 'ORDER_REFUND',
+        threshold: { kind: 'minimumMinor', value: 1000 },
+      },
+      {
+        ...ruleInput,
+        actionType: 'STAFF_PAYMENT',
+        requesterPermission: 'staff.payments',
+        threshold: { kind: 'minimumMinor', value: 1000 },
+      },
+      {
+        ...ruleInput,
+        actionType: 'EMPLOYEE_ROLE_CHANGE',
+        requesterPermission: 'staff.manage',
+        threshold: { kind: 'none' },
+      },
     ]) {
       expect(approvalRuleWriteSchema.safeParse(valid).success).toBe(true);
     }
