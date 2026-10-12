@@ -64,6 +64,7 @@ const T = '66000000-0000-4000-8000-000000000001';
 const C = '67000000-0000-4000-8000-000000000001';
 const C2 = '67000000-0000-4000-8000-000000000002';
 const CONTACT = '68000000-0000-4000-8000-000000000001';
+const ZONE = '68000000-0000-4000-8000-000000000002';
 const P = '69000000-0000-4000-8000-000000000001';
 const P2 = '69000000-0000-4000-8000-000000000002';
 
@@ -78,7 +79,9 @@ const setup = [
   "insert into public.business_days(id,shop_id,status,started_at,started_by_worker_id,last_allocated_display_order_no) values ('" +
     D + "','" + S + "','OPEN',now()-interval '40 days','" + W + "',1);",
   "insert into public.order_types(id,shop_id,name,behavior,active,sort_order) values ('" +
-    T + "','" + S + "','Take Away','TAKE_AWAY',true,0);",
+    T + "','" + S + "','Delivery','DELIVERY',true,0);",
+  "insert into public.delivery_zones(id,shop_id,name,fee_minor,active,sort_order) values ('" +
+    ZONE + "','" + S + "','Nearby',0,true,0);",
   "insert into public.business_customers(id,business_id,normalized_phone,display_name) values ('" +
     C + "','" + B + "','+201000000011','Returning Customer'),('" +
     C2 + "','" + B + "','+201000000022','Unmatched Customer');",
@@ -131,10 +134,12 @@ const sqlOrders = "insert into public.orders(" +
   "id,shop_id,business_day_id,display_order_no,idempotency_key,source,status," +
   "operator_worker_id,operator_name_snapshot,order_type_id,order_type_label_snapshot," +
   "order_type_behavior_snapshot,customer_contact_id,customer_name_snapshot," +
-  "normalized_phone_snapshot,items_subtotal_minor,discount_minor,total_minor,created_at,updated_at) " +
+  "normalized_phone_snapshot,address_snapshot,delivery_zone_id,delivery_zone_label_snapshot," +
+  "items_subtotal_minor,discount_minor,total_minor,created_at,updated_at) " +
   "select gen_random_uuid(),'" + S + "','" + D + "',i,'segment-pos-'||i,'POS','DONE','" +
-  W + "','Worker','" + T + "','Take Away','TAKE_AWAY','" + CONTACT +
-  "','Returning Customer','+201000000011',10000,0,10000," +
+  W + "','Worker','" + T + "','Delivery','DELIVERY','" + CONTACT +
+  "','Returning Customer','+201000000011','Fixture address','" + ZONE +
+  "','Nearby',10000,0,10000," +
   "now()-interval '31 days',now()-interval '31 days' from generate_series(1,2) i";
 sql(sqlOrders, 'trusted paid order history');
 if (eligible(C, 'Returning') !== 't') throw new Error('Canonical customer membership did not update');
