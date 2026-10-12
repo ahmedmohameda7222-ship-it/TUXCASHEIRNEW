@@ -162,9 +162,9 @@ export function CatalogCopyPanel({
       <h2 id="catalog-copy-title">Selective catalog copy</h2>
       <p className="admin-publish-card__copy">
         Copy product prices and availability from the published source catalog into this shop's
-        unpublished draft. Products and categories must already share canonical business master mappings in both
-        shops. Only explicitly selected fields transfer; missing entities, modifiers,
-        recipes and historical data are not copied.
+        unpublished draft. Products and categories must already share canonical business master
+        mappings in both shops. Only explicitly selected fields transfer; missing entities,
+        modifiers, recipes and historical data are not copied.
       </p>
       {draft ? (
         <form onSubmit={(event) => void makePreview(event)}>
@@ -241,8 +241,8 @@ export function CatalogCopyPanel({
         <div role="status">
           <p>
             Read-only preview: {preview.mappedProducts} existing master-mapped products,
-            {preview.changedProducts} target products would change; {preview.mappedCategories} mapped
-            categories, {preview.changedCategories} target categories would change.
+            {preview.changedProducts} target products would change; {preview.mappedCategories}{' '}
+            mapped categories, {preview.changedCategories} target categories would change.
           </p>
           {preview.differences.length > 0 ? (
             <ul>
@@ -272,11 +272,15 @@ export function CatalogCopyPanel({
                 <li key={item.targetCategoryId}>
                   <strong>{item.categoryName}</strong>
                   {domains.includes('categoryOrder') ? (
-                    <span> Order: {item.sortOrderBefore} → {item.sortOrderAfter}.</span>
+                    <span>
+                      {' '}
+                      Order: {item.sortOrderBefore} → {item.sortOrderAfter}.
+                    </span>
                   ) : null}
                   {domains.includes('categoryAvailability') ? (
                     <span>
-                      {' '}Active: {String(item.activeBefore)} → {String(item.activeAfter)}.
+                      {' '}
+                      Active: {String(item.activeBefore)} → {String(item.activeAfter)}.
                     </span>
                   ) : null}
                 </li>
