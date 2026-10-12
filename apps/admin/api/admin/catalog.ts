@@ -53,11 +53,11 @@ const catalogCopyBaseSchema = z.object({
   selectedDomains: z.array(z.enum(['productPrices', 'productAvailability']))
     .min(1).max(2)
     .refine((domains) => new Set(domains).size === domains.length),
-}).refine((input) => input.sourceShopId !== input.targetShopId);
+});
 
 const catalogCopySchema = z.discriminatedUnion('type', [
-  catalogCopyBaseSchema.safeExtend({ type: z.literal('catalog-copy.preview') }).strict(),
-  catalogCopyBaseSchema.safeExtend({
+  catalogCopyBaseSchema.extend({ type: z.literal('catalog-copy.preview') }).strict(),
+  catalogCopyBaseSchema.extend({
     type: z.literal('catalog-copy.apply'),
     previewFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
     commandId: z.string().trim().min(1).max(160),
@@ -250,7 +250,7 @@ export default async function handler(
       (rawCommand.type === 'catalog-copy.preview' || rawCommand.type === 'catalog-copy.apply')
     ) {
       const copy = catalogCopySchema.safeParse(rawCommand);
-      if (!copy.success) {
+      if (!copy.success || copy.data.sourceShopId === copy.data.targetShopId) {
         sendJson(response, 400, { error: 'invalid_catalog_copy_request' });
         return;
       }
