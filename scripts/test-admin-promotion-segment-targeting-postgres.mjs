@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const migration = '20261012102000_admin_promotion_segment_targeting.sql';
+const migration = '20261012030454_admin_promotion_segment_targeting.sql';
 if (!existsSync(resolve('supabase/migrations', migration)))
   throw new Error('Missing provisioning migration');
 const db = process.env.TEST_DATABASE_URL;
