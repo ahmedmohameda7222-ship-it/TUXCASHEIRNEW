@@ -102,6 +102,11 @@ const created=rpc(`public.create_admin_approval_request_v1(
   'INVENTORY_ADJUST','${cmd}'::uuid,'${JSON.stringify(payload)}'::jsonb,'Review'
 )`,'create trusted approval request');
 if(!created.ok || !created.requestId)throw new Error('Approval request creation '+JSON.stringify(created));
+sql(`update public.admin_approval_rules set active=false
+  where id in ('${RULE}','${LOCAL}')`, 'temporarily disable approval policy');
+deny(post(11000000,commandId),'inventory_approval_command_locked');
+sql(`update public.admin_approval_rules set active=true
+  where id in ('${RULE}','${LOCAL}')`, 'restore approval policy');
 const decision=rpc(`public.decide_admin_approval_request_v1(
   '${created.requestId}'::uuid,'${A}'::uuid,null,'APPROVE','Approve stock'
 )`,'distinct approver');
