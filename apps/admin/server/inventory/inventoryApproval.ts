@@ -11,7 +11,6 @@ import {
   type ApprovalExecutionRegistryEntry,
 } from '../approvals/approvalExecutionService.js';
 import {
-  evaluateApprovalRequirement,
   createApprovalCommandRegistry,
   requestApproval,
   type ApprovalCommandRegistryEntry,
@@ -31,6 +30,7 @@ const payloadSchema = z
     originalCommandId: z.string().trim().min(1).max(160),
     emergencyNegativeOverride: z.boolean(),
     expectedDefinitionVersion: z.number().int().safe().positive(),
+    expectedMovementCount: z.number().int().safe().nonnegative(),
   })
   .strict();
 
@@ -148,18 +148,11 @@ export function evaluateInventoryAdjustmentRouting(
     return { kind: 'INVALID', code: 'approval_quantity_context_required' };
   }
 
-  const requirement = evaluateApprovalRequirement(
-    {
-      businessId: actor.businessId,
-      shopId: input.shopId,
-      actionType: INVENTORY_ADJUST_APPROVAL_ACTION,
-      quantityImpact: Math.abs(input.quantityDeltaMicros) / 1_000_000,
-    },
-    rules,
-  );
-  return requirement.required
-    ? { kind: 'APPROVAL_REQUIRED', ruleId: requirement.ruleId }
-    : { kind: 'DIRECT' };
+  const minimum = governing.thresholdContext['minimumQuantityImpact'];
+  const required =
+    minimum === undefined ||
+    BigInt(Math.abs(input.quantityDeltaMicros)) >= BigInt(Number(minimum)) * 1_000_000n;
+  return required ? { kind: 'APPROVAL_REQUIRED', ruleId: governing.id } : { kind: 'DIRECT' };
 }
 
 export async function executeOrRequestInventoryAdjustment(
