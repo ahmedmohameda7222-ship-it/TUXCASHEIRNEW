@@ -88,6 +88,17 @@ describe('approvalService', () => {
     expect(evaluateApprovalRequirement({ ...context, amountMinor: 500 }, [rule]).required).toBe(true);
   });
 
+  it('requires measured quantity and respects signed threshold boundaries', () => {
+    const rule = { ...approvalRule, thresholdContext: { minimumQuantityImpact: 3 } };
+    const context = { businessId: 'business-1', shopId: 'shop-1', actionType: rule.actionType };
+    expect(evaluateApprovalRequirement(context, [rule]).required).toBe(false);
+    expect(evaluateApprovalRequirement({ ...context, quantityImpact: -2 }, [rule]).required).toBe(false);
+    expect(evaluateApprovalRequirement({ ...context, quantityImpact: -3 }, [rule]).required).toBe(true);
+    expect(evaluateApprovalRequirement({ ...context, quantityImpact: 4 }, [rule]).required).toBe(true);
+    expect(evaluateApprovalRequirement(context, [{ ...rule, active: false }]).required).toBe(false);
+    expect(evaluateApprovalRequirement(context, [{ ...rule, thresholdContext: {} }]).required).toBe(true);
+  });
+
   it('rejects requester self-approval even with a valid PIN', async () => {
     const deps = dependencies();
 
