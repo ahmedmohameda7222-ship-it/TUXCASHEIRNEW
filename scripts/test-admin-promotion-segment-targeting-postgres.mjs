@@ -50,6 +50,11 @@ function deny(response, code) {
   }
 }
 
+// The preceding loyalty behavior script loads the Plan 5 baseline, not future
+// corrections. Apply this exact forward-only migration to the isolated fixture
+// before asserting targeting behavior; never run it against a remote database.
+file(resolve('supabase/migrations', migration));
+
 const B = '61000000-0000-4000-8000-000000000001';
 const S = '62000000-0000-4000-8000-000000000001';
 const E = '63000000-0000-4000-8000-000000000001';
