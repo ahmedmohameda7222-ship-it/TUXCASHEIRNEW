@@ -131,7 +131,7 @@ test('does not expose an editable form for an unsupported legacy threshold', asy
 test('does not allow creating a policy for an unsupported action', async ({ page }) => {
   const { writes } = await mockRules(page);
   await page.goto('/approvals/rules');
-  await expect(page.getByRole('option', { name: 'Order return' })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Order return' })).toHaveCount(1);
   await expect(page.getByRole('option', { name: 'inventory.adjust' })).toHaveCount(0);
   await page.getByLabel('Rule action type').selectOption('ORDER_REFUND');
   await expect(page.getByText('Requester permission: orders.refund')).toBeVisible();
