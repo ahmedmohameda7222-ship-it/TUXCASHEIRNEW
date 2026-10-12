@@ -13,7 +13,9 @@ const RULE_ID = '44444444-4444-4444-8444-444444444444';
 const REQUEST_ID = '55555555-5555-4555-8555-555555555555';
 const COMMAND_ID = '66666666-6666-4666-8666-666666666666';
 
-function clientWithRoleApprovalRule(): AdminSupabaseClient {
+function clientWithRoleApprovalRule(
+  extraRows: readonly Record<string, unknown>[] = [],
+): AdminSupabaseClient {
   return {
     select: vi.fn(async () => [
       {
@@ -28,6 +30,7 @@ function clientWithRoleApprovalRule(): AdminSupabaseClient {
         threshold_context: {},
         active: true,
       },
+      ...extraRows,
     ]),
   } as unknown as AdminSupabaseClient;
 }
@@ -119,6 +122,42 @@ describe('Workforce approval routing', () => {
     expect(result).toEqual({ ok: false, code: 'approval_amount_context_required' });
     expect(executeDirect).not.toHaveBeenCalled();
     expect(createRequest).not.toHaveBeenCalled();
+  });
+
+  it('honors the shop-specific rule instead of a shadowed business-wide quantity threshold', async () => {
+    const { deps, createRequest } = approvalDependencies();
+    const executeDirect = vi.fn(async () => ({ ok: true as const }));
+    const client = clientWithRoleApprovalRule([
+      {
+        id: '99999999-9999-4999-8999-999999999999',
+        business_id: BUSINESS_ID,
+        shop_id: null,
+        action_type: EMPLOYEE_ROLE_CHANGE_APPROVAL_ACTION,
+        requester_permission: 'staff.manage',
+        approver_permission: 'approvals.review',
+        requires_second_person: true,
+        requires_requester_repin: false,
+        threshold_context: { minimumQuantityImpact: 5 },
+        active: true,
+      },
+    ]);
+
+    const result = await executeOrRequestStaffApproval(
+      routingInput,
+      actor(['staff.manage']),
+      client,
+      deps,
+      executeDirect,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      state: 'PENDING_APPROVAL',
+      approvalRequestId: REQUEST_ID,
+      replayed: false,
+    });
+    expect(createRequest).toHaveBeenCalledOnce();
+    expect(executeDirect).not.toHaveBeenCalled();
   });
 
   it('rejects a configured approval request when the requester lacks the rule permission', async () => {
