@@ -7,8 +7,8 @@ const csrfToken = 'a'.repeat(64);
 const existing = {
   id: ruleId,
   shopId,
-  actionType: 'inventory.adjust',
-  requesterPermission: 'inventory.adjust',
+  actionType: 'ORDER_RETURN',
+  requesterPermission: 'orders.refund',
   approverPermission: 'approvals.review',
   requiresSecondPerson: true,
   requiresRequesterRepin: false,
@@ -17,6 +17,27 @@ const existing = {
   active: true,
   editVersion: 4,
 };
+
+const availableActions = [
+  {
+    actionType: 'ORDER_RETURN',
+    label: 'Order return',
+    requesterPermission: 'orders.refund',
+    thresholdKind: 'minimumQuantityImpact',
+  },
+  {
+    actionType: 'ORDER_REFUND',
+    label: 'Order refund',
+    requesterPermission: 'orders.refund',
+    thresholdKind: 'minimumMinor',
+  },
+  {
+    actionType: 'EMPLOYEE_ROLE_CHANGE',
+    label: 'Employee role change',
+    requesterPermission: 'staff.manage',
+    thresholdKind: null,
+  },
+];
 
 async function mockRules(page: Page, role: 'OWNER' | 'MANAGER' = 'OWNER') {
   const writes: Record<string, unknown>[] = [];
@@ -43,7 +64,7 @@ async function mockRules(page: Page, role: 'OWNER' | 'MANAGER' = 'OWNER') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ rules }),
+        body: JSON.stringify({ rules, availableActions }),
       });
       return;
     }
@@ -64,7 +85,7 @@ test('edits approval rule with a typed threshold and captured revision', async (
   const { writes } = await mockRules(page);
   await page.goto('/approvals/rules');
   await expect(page.getByRole('heading', { name: 'Approval rules' })).toBeVisible();
-  await page.getByRole('button', { name: 'Edit rule inventory.adjust' }).click();
+  await page.getByRole('button', { name: 'Edit rule ORDER_RETURN' }).click();
   await page.getByLabel('Rule threshold value').fill('2500');
   await page.getByLabel('Rule expiry').fill('3600');
   await page.getByRole('button', { name: 'Save approval rule' }).click();
@@ -73,8 +94,8 @@ test('edits approval rule with a typed threshold and captured revision', async (
     type: 'rule.upsert',
     ruleId,
     shopId,
-    actionType: 'inventory.adjust',
-    requesterPermission: 'inventory.adjust',
+    actionType: 'ORDER_RETURN',
+    requesterPermission: 'orders.refund',
     approverPermission: 'approvals.review',
     expiresAfterSeconds: 3600,
     threshold: { kind: 'minimumQuantityImpact', value: 2500 },
@@ -98,10 +119,47 @@ test('does not expose an editable form for an unsupported legacy threshold', asy
       contentType: 'application/json',
       body: JSON.stringify({
         rules: [{ ...existing, thresholdContext: { unrecognizedThreshold: 1 } }],
+        availableActions,
       }),
     }),
   );
   await page.goto('/approvals/rules');
   await expect(page.getByText('Unsupported legacy threshold — editing disabled')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit rule ORDER_RETURN' })).toBeDisabled();
+});
+
+test('does not allow creating a policy for an unsupported action', async ({ page }) => {
+  const { writes } = await mockRules(page);
+  await page.goto('/approvals/rules');
+  await expect(page.getByRole('option', { name: 'Order return' })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'inventory.adjust' })).toHaveCount(0);
+  await page.getByLabel('Rule action type').selectOption('ORDER_REFUND');
+  await expect(page.getByText('Requester permission: orders.refund')).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Minimum quantity impact' })).toHaveCount(0);
+  await page.getByLabel('Rule threshold type').selectOption('minimumMinor');
+  await page.getByLabel('Rule threshold value').fill('1000');
+  await page.getByRole('button', { name: 'Create approval rule' }).click();
+  await expect.poll(() => writes.length).toBe(1);
+  expect(writes[0]).toMatchObject({
+    actionType: 'ORDER_REFUND',
+    requesterPermission: 'orders.refund',
+    threshold: { kind: 'minimumMinor', value: 1000 },
+  });
+});
+
+test('protects an unsupported legacy action from a misleading editable form', async ({ page }) => {
+  await mockRules(page);
+  await page.route('**/api/admin/approval-rules', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        rules: [{ ...existing, actionType: 'inventory.adjust' }],
+        availableActions,
+      }),
+    }),
+  );
+  await page.goto('/approvals/rules');
+  await expect(page.getByText('Unsupported legacy action — editing disabled')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Edit rule inventory.adjust' })).toBeDisabled();
 });
