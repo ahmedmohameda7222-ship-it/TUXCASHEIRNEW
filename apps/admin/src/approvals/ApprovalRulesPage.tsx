@@ -227,17 +227,16 @@ export function ApprovalRulesPage() {
             (action) => action.actionType === rule.actionType,
           );
           const candidate = supportedAction ? editableRule(rule) : null;
+          const ruleLabel = supportedAction
+            ? thresholdLabel(rule)
+            : 'Unsupported legacy action — editing disabled';
           return (
             <div className="admin-settings-row" key={rule.id}>
               <div>
                 <strong>{rule.actionType}</strong>
                 <span>
                   {rule.shopId === null ? 'Business-wide' : `Shop: ${rule.shopId}`} ·{' '}
-                  {rule.active ? 'Enabled' : 'Disabled'} ·{' '}
-                  {supportedAction
-                    ? thresholdLabel(rule)
-                    : 'Unsupported legacy action — editing disabled'}{' '}
-                  · Revision{' '}
+                  {rule.active ? 'Enabled' : 'Disabled'} · {ruleLabel} · Revision{' '}
                   {rule.editVersion}
                 </span>
               </div>
@@ -313,8 +312,10 @@ export function ApprovalRulesPage() {
             </select>
           </label>
           <p className="admin-field__help">
-            Requester permission: {selectedAction?.requesterPermission ?? 'Select an action'}. The
-            authority is assigned by the selected trusted command.
+            Requester permission: {selectedAction?.requesterPermission ?? 'Select an action'}
+          </p>
+          <p className="admin-field__help">
+            The selected action determines required requester authority.
           </p>
           <p className="admin-field__help">Approver permission: approvals.review (fixed).</p>
           <label className="admin-field">
