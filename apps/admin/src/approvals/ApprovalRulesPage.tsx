@@ -160,7 +160,9 @@ export function ApprovalRulesPage() {
     queryFn: () => adminFetch<ApprovalRulesResponse>('/api/admin/approval-rules'),
   });
   const availableActions = rulesQuery.data?.availableActions ?? [];
-  const selectedAction = availableActions.find((action) => action.actionType === form.actionType);
+  const selectedAction = availableActions.find(
+    (action) => action.actionType === form.actionType,
+  );
   const write = useMutation({
     mutationFn: async (draft: RuleForm) => {
       if (session.state.status !== 'authenticated') throw new Error('session_required');
@@ -234,7 +236,10 @@ export function ApprovalRulesPage() {
                 <span>
                   {rule.shopId === null ? 'Business-wide' : `Shop: ${rule.shopId}`} ·{' '}
                   {rule.active ? 'Enabled' : 'Disabled'} ·{' '}
-                  {supportedAction ? thresholdLabel(rule) : 'Unsupported legacy action — editing disabled'} · Revision{' '}
+                  {supportedAction
+                    ? thresholdLabel(rule)
+                    : 'Unsupported legacy action — editing disabled'}{' '}
+                  · Revision{' '}
                   {rule.editVersion}
                 </span>
               </div>
@@ -295,7 +300,8 @@ export function ApprovalRulesPage() {
                 setForm((current) => ({
                   ...current,
                   actionType: action?.actionType ?? '',
-                  requesterPermission: action?.requesterPermission ?? current.requesterPermission,
+                  requesterPermission:
+                    action?.requesterPermission ?? current.requesterPermission,
                   thresholdKind: 'none',
                   thresholdValue: '',
                 }));
@@ -310,8 +316,8 @@ export function ApprovalRulesPage() {
             </select>
           </label>
           <p className="admin-field__help">
-            Requester permission: {selectedAction?.requesterPermission ?? 'Select an action'}
-            . The authority is assigned by the selected trusted command.
+            Requester permission: {selectedAction?.requesterPermission ?? 'Select an action'}. The
+            authority is assigned by the selected trusted command.
           </p>
           <p className="admin-field__help">Approver permission: approvals.review (fixed).</p>
           <label className="admin-field">
