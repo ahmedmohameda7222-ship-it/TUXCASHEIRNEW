@@ -16,6 +16,19 @@ import {
   type AdminSessionContext,
 } from '../../server/adminAuthService.js';
 import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
+import type { AdminApprovalActor, AdminApprovalRule, AdminPermission } from '@tux/admin-contracts';
+import { isAdminPermission } from '../../server/adminContractRuntime.js';
+import {
+  createSupabaseApprovalServiceDependencies,
+} from '../../server/approvals/approvalService.js';
+import { verifyApprovalPinWithRateLimit } from '../../server/approvals/approvalPinRateLimit.js';
+import { createAdminPinRateLimitRpc } from '../../server/loginRateLimit.js';
+import { clientFingerprint } from '../../server/http.js';
+import {
+  executeOrRequestInventoryAdjustment,
+  evaluateInventoryAdjustmentRouting,
+  type InventoryAdjustmentApprovalPayload,
+} from '../../server/inventory/inventoryApproval.js';
 import { getAdminServerEnv } from '../../server/env.js';
 import {
   loadInventoryIntelligence,
@@ -154,6 +167,7 @@ const commandSchema = z.discriminatedUnion('type', [
       reasonCodeId: uuidSchema,
       note: noteSchema,
       emergencyNegativeOverride: z.boolean(),
+      requesterPin: z.string().min(1).max(128).optional(),
       commandId: commandIdSchema,
     })
     .strict(),
@@ -744,6 +758,57 @@ export async function loadInventoryWorkspace(
   };
 }
 
+type InventoryApprovalRuleRow = {
+  id: string;
+  business_id: string;
+  shop_id: string | null;
+  action_type: string;
+  requester_permission: string;
+  approver_permission: string;
+  requires_second_person: boolean;
+  requires_requester_repin: boolean;
+  threshold_context: unknown;
+  active: boolean;
+};
+
+async function loadInventoryApprovalRules(
+  client: AdminSupabaseClient,
+  businessId: string,
+): Promise<readonly AdminApprovalRule[]> {
+  const rows = await client.select<InventoryApprovalRuleRow[]>(
+    'admin_approval_rules',
+    new URLSearchParams({
+      select: 'id,business_id,shop_id,action_type,requester_permission,approver_permission,requires_second_person,requires_requester_repin,threshold_context,active',
+      business_id: `eq.${businessId}`,
+      action_type: 'eq.INVENTORY_ADJUST',
+      active: 'eq.true',
+    }),
+  );
+  return rows.map((row) => {
+    if (!isAdminPermission(row.requester_permission) ||
+        !isAdminPermission(row.approver_permission)) {
+      throw new Error('inventory_approval_rule_permission_invalid');
+    }
+    return {
+      id: row.id,
+      businessId: row.business_id,
+      shopId: row.shop_id,
+      actionType: row.action_type,
+      requesterPermission: row.requester_permission as AdminPermission,
+      approverPermission: row.approver_permission as AdminPermission,
+      requiresSecondPerson: row.requires_second_person,
+      requiresRequesterRepin: row.requires_requester_repin,
+      thresholdContext:
+        typeof row.threshold_context === 'object' &&
+        row.threshold_context !== null &&
+        !Array.isArray(row.threshold_context)
+          ? row.threshold_context as Readonly<Record<string, unknown>>
+          : {},
+      active: row.active,
+    };
+  });
+}
+
 function commandFailureStatus(result: AdminInventoryCommandResult): number {
   if (result.ok) return 200;
   if (
@@ -762,6 +827,7 @@ async function executeCommand(
   client: AdminSupabaseClient,
   context: AdminSessionContext,
   command: AdminInventoryCommand,
+  request: AdminRequest,
 ): Promise<AdminInventoryCommandResult> {
   switch (command.type) {
     case 'item.create':
@@ -787,16 +853,78 @@ async function executeCommand(
       if (command.emergencyNegativeOverride) {
         requirePermission(context.principal, 'inventory.override_negative', command.shopId);
       }
-      return client.rpc<AdminInventoryCommandResult>('post_inventory_adjustment_v1', {
-        p_employee_id: context.principal.employeeId,
+      const executeDirect = () =>
+        client.rpc<AdminInventoryCommandResult>('post_inventory_adjustment_v1', {
+          p_employee_id: context.principal.employeeId,
+          p_shop_id: command.shopId,
+          p_inventory_item_id: command.inventoryItemId,
+          p_quantity_delta_micros: command.quantityDeltaMicros,
+          p_reason_code_id: command.reasonCodeId,
+          p_note: command.note,
+          p_command_id: command.commandId,
+          p_emergency_negative_override: command.emergencyNegativeOverride,
+        });
+      const actor: AdminApprovalActor = {
+        employeeId: context.principal.employeeId,
+        businessId: context.principal.businessId,
+        role: context.principal.role,
+        permissions: context.principal.permissions,
+        shopIds: context.principal.shopIds,
+        sessionId: context.session.id,
+      };
+      const rules = await loadInventoryApprovalRules(client, actor.businessId);
+      const routing = evaluateInventoryAdjustmentRouting(
+        { shopId: command.shopId, quantityDeltaMicros: command.quantityDeltaMicros },
+        actor,
+        rules,
+      );
+      if (routing.kind === 'INVALID') return { ok: false, code: routing.code };
+      if (routing.kind === 'DIRECT') return executeDirect();
+
+      const fence = await client.rpc<
+        | { ok: true; expectedDefinitionVersion: number; expectedMovementCount: number }
+        | { ok: false; code: string }
+      >('read_admin_inventory_adjustment_fence_v1', {
+        p_employee_id: actor.employeeId,
         p_shop_id: command.shopId,
         p_inventory_item_id: command.inventoryItemId,
-        p_quantity_delta_micros: command.quantityDeltaMicros,
-        p_reason_code_id: command.reasonCodeId,
-        p_note: command.note,
-        p_command_id: command.commandId,
-        p_emergency_negative_override: command.emergencyNegativeOverride,
       });
+      if (!fence.ok) return { ok: false, code: fence.code };
+      const payload: InventoryAdjustmentApprovalPayload = {
+        shopId: command.shopId,
+        inventoryItemId: command.inventoryItemId,
+        quantityDeltaMicros: command.quantityDeltaMicros,
+        reasonCodeId: command.reasonCodeId,
+        note: command.note,
+        originalCommandId: command.commandId,
+        emergencyNegativeOverride: command.emergencyNegativeOverride,
+        expectedDefinitionVersion: fence.expectedDefinitionVersion,
+        expectedMovementCount: fence.expectedMovementCount,
+      };
+      const base = createSupabaseApprovalServiceDependencies(client);
+      const limiter = createAdminPinRateLimitRpc(client);
+      return executeOrRequestInventoryAdjustment(
+        payload,
+        actor,
+        rules,
+        {
+          ...base,
+          verifyEmployeePin(employeeId, pin) {
+            return verifyApprovalPinWithRateLimit(
+              {
+                employeeId,
+                sessionId: context.session.id,
+                pin,
+                fingerprint: clientFingerprint(request),
+                rateLimitSecret: getAdminServerEnv().rateLimitSecret,
+              },
+              { verifyEmployeePin: base.verifyEmployeePin, limiter },
+            );
+          },
+        },
+        command.requesterPin,
+        executeDirect,
+      );
     }
     case 'waste': {
       requirePermission(context.principal, 'inventory.adjust', command.shopId);
@@ -957,7 +1085,7 @@ export default async function handler(
     if (!requireSameOrigin(request, response)) return;
     const command = commandSchema.parse(await readJsonObject(request)) as AdminInventoryCommand;
     const context = await loadContext(request, client, true);
-    const result = await executeCommand(client, context, command);
+    const result = await executeCommand(client, context, command, request);
     sendJson(response, commandFailureStatus(result), result);
   } catch (error) {
     handleFailure(response, error, request);
