@@ -90,29 +90,30 @@ export async function executeOrRequestStaffApproval(
   executeDirect: () => Promise<StaffCommandResult>,
 ): Promise<StaffCommandResult> {
   const rules = await loadRules(client, actor.businessId, input.actionType);
-  // A configured monetary threshold must never be bypassed when a caller
-  // omits its trusted amount. Reject the command rather than executing directly.
+  // Match the evaluator's shop-over-business precedence before checking
+  // whether the governing rule requires a trusted numeric context.
+  const applicableRules = rules.filter(
+    (rule) =>
+      rule.active &&
+      rule.businessId === actor.businessId &&
+      rule.actionType === input.actionType &&
+      (rule.shopId === null || rule.shopId === input.shopId),
+  );
+  const governingRule =
+    applicableRules.find((rule) => rule.shopId === input.shopId) ??
+    applicableRules.find((rule) => rule.shopId === null);
+
+  // Never execute directly when the governing monetary threshold cannot
+  // be evaluated from a trusted amount.
   if (
-    rules.some(
-      (rule) =>
-        rule.active &&
-        (rule.shopId === null || rule.shopId === input.shopId) &&
-        typeof rule.thresholdContext['minimumMinor'] === 'number',
-    ) &&
+    typeof governingRule?.thresholdContext['minimumMinor'] === 'number' &&
     (input.amountMinor === undefined ||
       !Number.isSafeInteger(input.amountMinor) ||
       input.amountMinor < 0)
   ) {
     return { ok: false, code: 'approval_amount_context_required' };
   }
-  if (
-    rules.some(
-      (rule) =>
-        rule.active &&
-        (rule.shopId === null || rule.shopId === input.shopId) &&
-        typeof rule.thresholdContext['minimumQuantityImpact'] === 'number',
-    )
-  ) {
+  if (typeof governingRule?.thresholdContext['minimumQuantityImpact'] === 'number') {
     return { ok: false, code: 'approval_quantity_context_required' };
   }
   const requirement = evaluateApprovalRequirement(
