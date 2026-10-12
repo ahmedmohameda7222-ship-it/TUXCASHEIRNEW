@@ -146,6 +146,38 @@ const total=sql(`select count(*) from public.inventory_movements where shop_id='
 if(total!=='3')throw new Error('Approved adjustment posted duplicate stock movement: '+total);
 const audit=sql(`select count(*) from public.admin_audit_events where action_type='INVENTORY_ADJUSTMENT_APPROVED_POSTED' and shop_id='${S}'`);
 if(audit!=='1')throw new Error('Approved inventory audit not exactly once');
+
+const staleCommand='stale-inventory-approval-11';
+const stalePayload={...payload,originalCommandId:staleCommand,expectedMovementCount:3};
+const staleCreated=rpc(`public.create_admin_approval_request_v1(
+  '${B}'::uuid,'${S}'::uuid,'${E}'::uuid,null,'${LOCAL}'::uuid,
+  'INVENTORY_ADJUST','77777777-7777-4777-8777-777777777778'::uuid,
+  '${JSON.stringify(stalePayload)}'::jsonb,'Review'
+)`,'create stale-fence approval');
+if(!staleCreated.ok || !staleCreated.requestId)
+  throw new Error('Second approved inventory request failed '+JSON.stringify(staleCreated));
+const staleDecision=rpc(`public.decide_admin_approval_request_v1(
+  '${staleCreated.requestId}'::uuid,'${A}'::uuid,null,'APPROVE','Approve stock'
+)`,'approve before intervening movement');
+if(!staleDecision.ok)throw new Error('Stale-fence approval decision failed');
+const staleClaims=JSON.parse(sql(
+  "select coalesce(jsonb_agg(to_jsonb(claim)), '[]'::jsonb)::text " +
+  "from public.claim_admin_approval_execution_v1('inventory-test',now(),10,300) claim",
+  'claim stale-fence approval',
+));
+if(!staleClaims.some(x=>x.approval_request_id===staleCreated.requestId))
+  throw new Error('Stale-fence claim not issued');
+const intervening=post(1000000,'intervening-adjustment');
+if(!intervening.ok)throw new Error('Intervening ledger change failed');
+const staleResult=rpc(`public.execute_approved_admin_inventory_adjustment_v1(
+  '${staleCreated.requestId}'::uuid,'${B}'::uuid,'${S}'::uuid,'${E}'::uuid,
+  '${A}'::uuid,'${I}'::uuid,11000000::bigint,'${R}'::uuid,
+  'Review','${staleCommand}',false,1,3
+)`,'execute stale inventory approval');
+deny(staleResult,'stale_inventory_version');
+if(sql(`select count(*) from public.inventory_movements
+  where shop_id='${S}' and movement_type='ADMIN_ADJUSTMENT'`)!=='4')
+  throw new Error('Stale approval incorrectly posted stock');
 for(const role of ['anon','authenticated']){
   for(const fn of ['public.read_admin_inventory_adjustment_fence_v1(uuid,uuid,uuid)','public.execute_approved_admin_inventory_adjustment_v1(uuid,uuid,uuid,uuid,uuid,uuid,bigint,uuid,text,text,boolean,bigint,bigint)']){
     if(sql(`select has_function_privilege('${role}','${fn}','EXECUTE')`)!=='f')
