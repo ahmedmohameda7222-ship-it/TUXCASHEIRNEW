@@ -56,8 +56,8 @@ insert into public.business_employees(id,business_id,display_name,role,active) v
 insert into public.employee_shop_assignments(business_id,employee_id,shop_id)
 values ('${B}','${E}','${S}'),('${B}','${A}','${S}');
 insert into public.inventory_items(id,shop_id,name,unit_label,tracking_mode,active)
-  values ('${I}','Test Item','g','RECIPE_TRACKED',true);
-`.replace("'Test Item','g'","'${S}','Test Item','g'"),'inventory fixture');
+  values ('${I}','${S}','Test Item','g','RECIPE_TRACKED',true);
+`,'inventory fixture');
 sql(`insert into public.admin_reason_codes(business_id,shop_id,id,reason_key,family,label,updated_by_employee_id)
 values ('${B}',null,'${R}','COUNT_CORRECTION','STOCK_ADJUSTMENT','Count correction','${E}');
 insert into public.admin_approval_rules(id,business_id,shop_id,action_type,
