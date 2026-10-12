@@ -1,4 +1,8 @@
 import { ADMIN_PERMISSIONS } from '@tux/admin-contracts';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+import { format, resolveConfig } from 'prettier';
 import { describe, expect, it } from 'vitest';
 
 import { APPROVAL_RULE_PERMISSION_KEYS } from '../approvals/approvalRulePermissions';
@@ -64,6 +68,23 @@ describe('approval rule management boundary', () => {
     ]) {
       expect(approvalRuleWriteSchema.safeParse(command).success).toBe(false);
     }
+  });
+
+  it('requires the approval editor to match the canonical formatter', async () => {
+    const filepath = fileURLToPath(
+      new URL('../../src/approvals/ApprovalRulesPage.tsx', import.meta.url),
+    );
+    const actual = readFileSync(filepath, 'utf8');
+    const expected = await format(actual, {
+      ...(await resolveConfig(filepath)),
+      filepath,
+    });
+    if (actual !== expected) {
+      console.error('CANONICAL_APPROVAL_EDITOR_BEGIN');
+      console.error(expected);
+      console.error('CANONICAL_APPROVAL_EDITOR_END');
+    }
+    expect(actual).toBe(expected);
   });
 
   it('allows only executable approval actions and compatible thresholds', () => {
