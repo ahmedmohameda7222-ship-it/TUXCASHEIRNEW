@@ -90,6 +90,29 @@ export async function executeOrRequestStaffApproval(
   executeDirect: () => Promise<StaffCommandResult>,
 ): Promise<StaffCommandResult> {
   const rules = await loadRules(client, actor.businessId, input.actionType);
+  // A configured monetary threshold must never be bypassed when a caller
+  // omits its trusted amount. Reject the command rather than executing directly.
+  if (
+    rules.some(
+      (rule) =>
+        rule.active &&
+        (rule.shopId === null || rule.shopId === input.shopId) &&
+        typeof rule.thresholdContext['minimumMinor'] === 'number',
+    ) &&
+    (input.amountMinor === undefined || !Number.isSafeInteger(input.amountMinor) || input.amountMinor < 0)
+  ) {
+    return { ok: false, code: 'approval_amount_context_required' };
+  }
+  if (
+    rules.some(
+      (rule) =>
+        rule.active &&
+        (rule.shopId === null || rule.shopId === input.shopId) &&
+        typeof rule.thresholdContext['minimumQuantityImpact'] === 'number',
+    )
+  ) {
+    return { ok: false, code: 'approval_quantity_context_required' };
+  }
   const requirement = evaluateApprovalRequirement(
     {
       businessId: actor.businessId,
