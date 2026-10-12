@@ -123,6 +123,17 @@ function ruleThresholdMatches(
   rule: AdminApprovalRule,
   context: ApprovalRequirementContext,
 ): boolean {
+  const keys = Object.keys(rule.thresholdContext);
+  if (
+    keys.length > 1 ||
+    keys.some((key) => key !== 'minimumMinor' && key !== 'minimumQuantityImpact') ||
+    keys.some((key) => {
+      const value = rule.thresholdContext[key];
+      return typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0;
+    })
+  ) {
+    throw new Error('approval_threshold_context_invalid');
+  }
   const minimumMinor = rule.thresholdContext['minimumMinor'];
   if (typeof minimumMinor === 'number' && Number.isFinite(minimumMinor)) {
     return (
