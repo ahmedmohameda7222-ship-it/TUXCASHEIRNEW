@@ -84,6 +84,12 @@ business_id,shop_id,publish_version,operations_configuration_version,source_kind
 ) values
 ('${B}','${S}',1,1,'BASELINE',${quoteJson(sourceBundle)}),
 ('${B}','${T}',1,1,'BASELINE',${quoteJson(targetBundle)})`,'publish fixtures');
+// Canonical publish increments from Operations configuration snapshots. This
+// fixture must have the same initial version as the BASELINE catalog publish.
+sql(`insert into public.operations_configuration_snapshots(shop_id,version,bundle_json)
+values ('${S}',1,${quoteJson(sourceBundle)}),
+       ('${T}',1,${quoteJson(targetBundle)})
+on conflict (shop_id,version) do nothing`, 'seed baseline Operations projections');
 const draft=rpc(`public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,1,'Copy target')`,'draft create');
 if(!draft.ok || !draft.draftId)throw new Error('Could not create canonical draft: '+JSON.stringify(draft));
 const params=(from=S,to=T,revision=1,sourceVersion=1,domains="array['productPrices','productAvailability']::text[]")=>
