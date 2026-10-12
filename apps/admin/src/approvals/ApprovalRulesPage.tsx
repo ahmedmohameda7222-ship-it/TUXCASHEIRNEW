@@ -315,7 +315,7 @@ export function ApprovalRulesPage() {
             Requester permission: {selectedAction?.requesterPermission ?? 'Select an action'}
           </p>
           <p className="admin-field__help">
-            The selected action determines required requester authority.
+            The selected action determines the required requester permission, not the rule editor.
           </p>
           <p className="admin-field__help">Approver permission: approvals.review (fixed).</p>
           <label className="admin-field">
