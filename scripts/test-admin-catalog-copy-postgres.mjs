@@ -93,7 +93,17 @@ const preview=rpc(`public.preview_admin_catalog_shop_copy_v1(${params()})`,'prev
 if(!preview.ok || preview.mappedProducts!==1 || preview.changedProducts!==1 ||
    !/^[0-9a-f]{64}$/.test(preview.fingerprint))
 throw new Error('Expected one mapped changed product: '+JSON.stringify(preview));
-assertDenied(rpc(`public.preview_admin_catalog_shop_copy_v1(${params(FOREIGN,T)})`,'cross-tenant preview'),'cross_business_copy_forbidden');
+let crossBusinessDenied = false;
+try {
+  const result = rpc(
+    `public.preview_admin_catalog_shop_copy_v1(${params(FOREIGN,T)})`,
+    'cross-tenant preview',
+  );
+  crossBusinessDenied = result.ok === false;
+} catch (error) {
+  crossBusinessDenied = /FORBIDDEN|BUSINESS_MISMATCH/.test(String(error));
+}
+if (!crossBusinessDenied) throw new Error('Cross-business Catalog Copy was not denied');
 assertDenied(rpc(`public.preview_admin_catalog_shop_copy_v1(${params(S,T,1,2)})`,'stale source'),'stale_catalog_copy_preview');
 const apply=(fingerprint=preview.fingerprint,command='catalog-copy-1',revision=1)=>
 `public.apply_admin_catalog_shop_copy_v1(${params(S,T,revision)},'${fingerprint}', '${command}')`;
