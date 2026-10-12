@@ -266,8 +266,8 @@ export function PromotionEditor({
         <fieldset className="admin-choice-list">
           <legend>Target customer segments</legend>
           <p className="admin-field-help">
-            Select no segments to make the promotion available to all eligible customers.
-            Restricted offers require a recognized customer during checkout.
+            Select no segments to make the promotion available to all eligible customers. Restricted
+            offers require a recognized customer during checkout.
           </p>
           {AUTOMATIC_CUSTOMER_SEGMENTS.map((segment) => (
             <label key={segment}>
@@ -275,8 +275,9 @@ export function PromotionEditor({
                 type="checkbox"
                 checked={targetSegments.includes(segment)}
                 onChange={(event) =>
-                  setTargetSegments((current) =>
-                    toggle(current, segment, event.target.checked) as AdminCustomerSegment[],
+                  setTargetSegments(
+                    (current) =>
+                      toggle(current, segment, event.target.checked) as AdminCustomerSegment[],
                   )
                 }
               />
