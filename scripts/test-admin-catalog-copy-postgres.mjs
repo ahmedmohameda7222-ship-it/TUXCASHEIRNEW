@@ -107,6 +107,27 @@ if (!crossBusinessDenied) throw new Error('Cross-business Catalog Copy was not d
 assertDenied(rpc(`public.preview_admin_catalog_shop_copy_v1(${params(S,T,1,2)})`,'stale source'),'stale_catalog_copy_preview');
 const apply=(fingerprint=preview.fingerprint,command='catalog-copy-1',revision=1)=>
 `public.apply_admin_catalog_shop_copy_v1(${params(S,T,revision)},'${fingerprint}', '${command}')`;
+// Source/shop versions, missing master mappings and inactive shops must fail
+// before any draft change or audit can be recorded.
+assertDenied(
+  rpc(`public.preview_admin_catalog_shop_copy_v1('${OWNER}'::uuid,'${S}'::uuid,
+    '${T}'::uuid,'${draft.draftId}'::uuid,1,2,1,
+    array['productAvailability']::text[])`,'stale target publish'),
+  'stale_catalog_copy_preview',
+);
+sql(`delete from public.catalog_product_shop_overrides where shop_id='${T}' and master_product_id='${MP}'`,
+  'remove target business-master mapping in isolated fixture');
+assertDenied(rpc(`public.preview_admin_catalog_shop_copy_v1(${params()})`,'missing target mapping'),
+  'catalog_copy_missing_target_dependencies');
+sql(`insert into public.catalog_product_shop_overrides(
+business_id,master_product_id,shop_id,canonical_product_id,price_minor,visible,manual_sold_out
+) values ('${B}','${MP}','${T}','${P2}',22000,true,false)`, 'restore mapping');
+sql(`update public.shops set active=false,lifecycle_state='ARCHIVED' where id='${T}'`,
+  'archive target in isolated fixture');
+assertDenied(rpc(`public.preview_admin_catalog_shop_copy_v1(${params()})`,'archived target'),
+  'catalog_copy_shop_inactive');
+sql(`update public.shops set active=true,lifecycle_state='ACTIVE' where id='${T}'`,
+  'reactivate isolated target fixture');
 const applied=rpc(apply(),'stage copy');
 if(!applied.ok||applied.draftRevision!==2||applied.publishRequired!==true)
 throw new Error('Catalog copy staging failed: '+JSON.stringify(applied));
@@ -132,4 +153,19 @@ for(const role of ['anon','authenticated'])for(const fn of [
  'private.build_admin_catalog_copy_existing_products_v1(uuid,uuid,uuid,uuid,bigint,bigint,bigint,text[])'
 ])if(sql(`select has_function_privilege('${role}','${fn}','EXECUTE')`)!=='f')
 throw new Error('Unsafe catalog copy role grant '+role+' '+fn);
-console.log('Catalog Copy isolated PostgreSQL: master identity, preview, CAS, draft-only apply, idempotency, audit, ACL and no live/source mutation passed.');
+const published=rpc(
+  `public.publish_catalog_draft_v1('${OWNER}'::uuid,'${draft.draftId}'::uuid,2,1)`,
+  'publish staged draft through canonical authority',
+);
+if(!published.ok || published.publishVersion!==2)
+  throw new Error('Canonical publication rejected staged Catalog Copy: '+JSON.stringify(published));
+const targetLive=sql(`select price_minor||','||sold_out from public.products where id='${P2}'`);
+if(targetLive!=='12000,true')
+  throw new Error('Published Catalog Copy failed to project into Operations target catalog: '+targetLive);
+const sourceAfterPublish=sql(`select price_minor||','||sold_out from public.products where id='${P1}'`);
+if(sourceAfterPublish!=='12000,true')
+  throw new Error('Target publication unexpectedly changed source shop catalog');
+const recorded=sql(`select count(*) from public.catalog_publish_versions
+where shop_id='${T}' and publish_version=2 and source_kind='DRAFT'`);
+if(recorded!=='1') throw new Error('Catalog publication version not recorded');
+console.log('Catalog Copy isolated PostgreSQL: preview, master mapping, inactive/missing dependency, draft-only apply, once-only audit, ACL and canonical target publication passed.');
