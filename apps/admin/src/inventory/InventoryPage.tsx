@@ -63,6 +63,7 @@ export function InventoryPage() {
   const inventory = useInventory(shopId, selectedItemId);
   const [mode, setMode] = useState<WorkspaceMode>('detail');
   const [itemAction, setItemAction] = useState<ItemAction>(null);
+  const [adjustmentApprovalPending, setAdjustmentApprovalPending] = useState(false);
   const [definitionItemId, setDefinitionItemId] = useState<string | null>(null);
   const [definitionOpen, setDefinitionOpen] = useState(false);
   const [stocktakeSnapshot, setStocktakeSnapshot] = useState<AdminStocktakeSnapshot | null>(null);
@@ -253,6 +254,12 @@ export function InventoryPage() {
         </div>
       }
     >
+      {adjustmentApprovalPending ? (
+        <p className="admin-inventory-note" role="status">
+          Stock adjustment submitted for approval. No inventory movement is posted until approval
+          and trusted execution complete.
+        </p>
+      ) : null}
       {mutationErrorText ? (
         <p className="admin-inventory-note" role="alert">
           {mutationErrorText}
@@ -480,7 +487,12 @@ export function InventoryPage() {
                     onSubmit={(input) =>
                       inventory.adjustStock.mutate(
                         { inventoryItemId: selectedItem.id, ...input },
-                        { onSuccess: () => setItemAction(null) },
+                        {
+                          onSuccess: (result) => {
+                            setAdjustmentApprovalPending(result.state === 'PENDING_APPROVAL');
+                            setItemAction(null);
+                          },
+                        },
                       )
                     }
                   />
