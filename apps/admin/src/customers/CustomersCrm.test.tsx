@@ -80,6 +80,7 @@ const promotion: AdminPromotion = {
   totalUsageLimit: 100,
   perCustomerUsageLimit: 2,
   stackingPolicy: 'ONE_ORDER_LEVEL',
+  targetSegments: [],
   version: 2,
   updatedAt: '2026-09-20T12:00:00.000Z',
 };
