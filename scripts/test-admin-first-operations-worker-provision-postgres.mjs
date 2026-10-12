@@ -122,6 +122,12 @@ const identity = sql(
 if (identity !== '1,true') throw new Error('Created worker/link credentials drifted: ' + identity);
 sql("update public.shops set lifecycle_state='SUSPENDED' where id='" + S + "'", 'suspended shop fixture');
 deny(call(O, U, S, 'shop-suspended'), 'shop_not_active');
+const auditCount = sql(
+  "select count(*) from public.admin_audit_events where action_type='OPERATIONS_WORKER_PROVISIONED'" +
+    " and business_id='" + B + "' and shop_id='" + S + "'",
+  'immutable worker provisioning audit',
+);
+if (auditCount !== '1') throw new Error('Provisioning audit was not written exactly once');
 for (const role of ['anon', 'authenticated']) {
   if (sql("select has_function_privilege('" + role +
     "','public.provision_employee_operations_worker_v1(uuid,uuid,uuid,text)','EXECUTE')",
