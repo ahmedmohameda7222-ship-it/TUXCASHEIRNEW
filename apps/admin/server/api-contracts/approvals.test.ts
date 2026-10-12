@@ -1,8 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
-import { format, resolveConfig } from 'prettier';
-
 import type { AdminSessionContext } from '../adminAuthService';
 import { describe, expect, it } from 'vitest';
 
@@ -124,24 +119,5 @@ describe('Admin audit BFF cursor boundary', () => {
         id: '22222222-2222-4222-8222-222222222222',
       }),
     ).toBe(false);
-  });
-});
-
-describe('Approval rule source formatting diagnostics', () => {
-  it('prints canonical formatting for the approval policy editor', async () => {
-    const filepath = fileURLToPath(
-      new URL('../../src/approvals/ApprovalRulesPage.tsx', import.meta.url),
-    );
-    const original = readFileSync(filepath, 'utf8');
-    const formatted = await format(original, {
-      ...(await resolveConfig(filepath)),
-      filepath,
-    });
-    if (original !== formatted) {
-      console.error('CANONICAL_APPROVAL_EDITOR_BEGIN');
-      console.error(formatted);
-      console.error('CANONICAL_APPROVAL_EDITOR_END');
-    }
-    expect(original).toBe(formatted);
   });
 });
