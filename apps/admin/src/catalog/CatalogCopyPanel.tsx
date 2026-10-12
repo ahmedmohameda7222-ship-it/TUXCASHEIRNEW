@@ -15,6 +15,16 @@ type CopyPreview = {
   expectedTargetPublishVersion: number;
   expectedTargetDraftRevision: number;
   selectedDomains: Domain[];
+  differences: Array<{
+    targetProductId: string;
+    productName: string;
+    priceBeforeMinor: number;
+    priceAfterMinor: number;
+    activeBefore: boolean;
+    activeAfter: boolean;
+    soldOutBefore: boolean;
+    soldOutAfter: boolean;
+  }>;
 };
 
 export function CatalogCopyPanel({
@@ -205,6 +215,26 @@ export function CatalogCopyPanel({
             Read-only preview: {preview.mappedProducts} existing master-mapped products,
             {preview.changedProducts} target products would change.
           </p>
+          {preview.differences.length > 0 ? (
+            <ul>
+              {preview.differences.map((item) => (
+                <li key={item.targetProductId}>
+                  <strong>{item.productName}</strong>
+                  {domains.includes('productPrices') ? (
+                    <span>
+                      {' '}Price: {item.priceBeforeMinor} → {item.priceAfterMinor} minor units.
+                    </span>
+                  ) : null}
+                  {domains.includes('productAvailability') ? (
+                    <span>
+                      {' '}Active: {String(item.activeBefore)} → {String(item.activeAfter)},
+                      sold out: {String(item.soldOutBefore)} → {String(item.soldOutAfter)}.
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <p>
             Source publication {preview.expectedSourcePublishVersion}, target publication{' '}
             {preview.expectedTargetPublishVersion}, draft revision{' '}
