@@ -99,7 +99,11 @@ export async function executeOrRequestStaffApproval(
         (rule.shopId === null || rule.shopId === input.shopId) &&
         typeof rule.thresholdContext['minimumMinor'] === 'number',
     ) &&
-    (input.amountMinor === undefined || !Number.isSafeInteger(input.amountMinor) || input.amountMinor < 0)
+    (
+      input.amountMinor === undefined ||
+      !Number.isSafeInteger(input.amountMinor) ||
+      input.amountMinor < 0
+    )
   ) {
     return { ok: false, code: 'approval_amount_context_required' };
   }
