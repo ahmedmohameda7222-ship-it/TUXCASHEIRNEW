@@ -236,8 +236,7 @@ export function ApprovalRulesPage() {
                 <strong>{rule.actionType}</strong>
                 <span>
                   {rule.shopId === null ? 'Business-wide' : `Shop: ${rule.shopId}`} ·{' '}
-                  {rule.active ? 'Enabled' : 'Disabled'} · {ruleLabel} · Revision{' '}
-                  {rule.editVersion}
+                  {rule.active ? 'Enabled' : 'Disabled'} · {ruleLabel} · Revision {rule.editVersion}
                 </span>
               </div>
               <button
