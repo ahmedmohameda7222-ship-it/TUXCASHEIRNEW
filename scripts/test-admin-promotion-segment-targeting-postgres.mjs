@@ -79,10 +79,15 @@ const setup = [
     C2 + "','" + B + "','+201000000022','Unmatched Customer');",
   "insert into public.customer_contacts(id,shop_id,normalized_phone,display_phone,name,canonical_customer_id) values ('" +
     CONTACT + "','" + S + "','+201000000011','+201000000011','Returning Customer','" + C + "');",
-  "insert into public.customer_shop_links(business_id,shop_id,canonical_customer_id,legacy_customer_contact_id) values ('" +
-    B + "','" + S + "','" + C + "','" + CONTACT + "');",
 ];
 sql(setup.join('\n'), 'isolated promotion customer fixtures');
+const canonicalLink = sql(
+  "select count(*) from public.customer_shop_links where business_id='" + B +
+    "' and shop_id='" + S + "' and canonical_customer_id='" + C +
+    "' and legacy_customer_contact_id='" + CONTACT + "'",
+  'automatic customer-shop canonical linkage',
+);
+if (canonicalLink !== '1') throw new Error('Customer contact did not create exactly one canonical link');
 
 function promotion(id, segments) {
   const array = 'ARRAY[' + segments.map((v) => "'" + v + "'").join(',') + ']::text[]';
