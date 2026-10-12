@@ -133,7 +133,11 @@ describe('approvalService', () => {
     const globalRule = { ...approvalRule, id: 'business-rule', shopId: null };
     const shopRule = { ...approvalRule, id: 'shop-rule', shopId: 'shop-1' };
     const rules = [globalRule, shopRule];
-    const context = { businessId: 'business-1', shopId: 'shop-1', actionType: approvalRule.actionType };
+    const context = {
+      businessId: 'business-1',
+      shopId: 'shop-1',
+      actionType: approvalRule.actionType,
+    };
     expect(evaluateApprovalRequirement(context, rules)).toMatchObject({
       required: true,
       ruleId: 'shop-rule',
