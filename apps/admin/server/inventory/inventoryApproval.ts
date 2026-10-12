@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type {
   AdminApprovalActor,
   AdminApprovalRule,
@@ -11,7 +12,10 @@ import {
 } from '../approvals/approvalExecutionService.js';
 import {
   evaluateApprovalRequirement,
+  createApprovalCommandRegistry,
+  requestApproval,
   type ApprovalCommandRegistryEntry,
+  type ApprovalServiceDependencies,
 } from '../approvals/approvalService.js';
 
 export const INVENTORY_ADJUST_APPROVAL_ACTION = 'INVENTORY_ADJUST';
@@ -86,6 +90,25 @@ export function createInventoryAdjustmentApprovalExecutionEntries(deps: {
   ];
 }
 
+
+function stableInventoryApprovalCommandId(
+  actor: Pick<AdminApprovalActor, 'businessId' | 'employeeId'>,
+  payload: InventoryAdjustmentApprovalPayload,
+): string {
+  const digest = createHash('sha256')
+    .update(
+      JSON.stringify([
+        INVENTORY_ADJUST_APPROVAL_ACTION,
+        actor.businessId,
+        actor.employeeId,
+        payload.shopId,
+        payload.originalCommandId,
+      ]),
+    )
+    .digest('hex');
+  return `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-8${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
+}
+
 export type InventoryApprovalRoutingDecision =
   | { kind: 'DIRECT' }
   | { kind: 'APPROVAL_REQUIRED'; ruleId: string }
@@ -137,4 +160,76 @@ export function evaluateInventoryAdjustmentRouting(
   return requirement.required
     ? { kind: 'APPROVAL_REQUIRED', ruleId: requirement.ruleId }
     : { kind: 'DIRECT' };
+}
+
+export async function executeOrRequestInventoryAdjustment(
+  payload: InventoryAdjustmentApprovalPayload,
+  actor: AdminApprovalActor,
+  rules: readonly AdminApprovalRule[],
+  dependencies: ApprovalServiceDependencies,
+  requesterPin: string | undefined,
+  executeDirect: () => Promise<AdminInventoryCommandResult>,
+): Promise<AdminInventoryCommandResult> {
+  const decision = evaluateInventoryAdjustmentRouting(payload, actor, rules);
+  if (decision.kind === 'INVALID') return { ok: false, code: decision.code };
+  if (decision.kind === 'DIRECT') return executeDirect();
+
+  const rule = rules.find((entry) => entry.id === decision.ruleId);
+  if (!rule) return { ok: false, code: 'approval_rule_resolution_failed' };
+  if (actor.role !== 'OWNER' && !actor.permissions.includes(rule.requesterPermission)) {
+    return { ok: false, code: 'approval_requester_not_authorized' };
+  }
+
+  // Approval command IDs are UUIDs; inventory command IDs are arbitrary
+  // 160-character strings. Derive a stable UUID using a collision-resistant
+  // domain-separated digest, preserving exact command replay identity.
+  const commandId = stableInventoryApprovalCommandId(actor, payload);
+  const request = await requestApproval(
+    {
+      businessId: actor.businessId,
+      shopId: payload.shopId,
+      ruleId: decision.ruleId,
+      actionType: INVENTORY_ADJUST_APPROVAL_ACTION,
+      commandId,
+      commandInput: payload,
+      reason: payload.note,
+      ...(requesterPin === undefined ? {} : { requesterPin }),
+    },
+    actor,
+    dependencies,
+    createApprovalCommandRegistry(createInventoryAdjustmentApprovalCommandEntries()),
+  );
+
+  if (request['ok'] !== true) {
+    return {
+      ok: false,
+      code:
+        typeof request['code'] === 'string'
+          ? request['code']
+          : 'inventory_approval_request_failed',
+    };
+  }
+  if (typeof request['requestId'] !== 'string') {
+    return { ok: false, code: 'inventory_approval_response_invalid' };
+  }
+  if (request['status'] === 'REJECTED' || request['status'] === 'FAILED') {
+    return { ok: false, code: 'inventory_approval_terminal' };
+  }
+  if (request['status'] === 'EXECUTED') {
+    return { ok: true, idempotentReplay: true };
+  }
+  if (
+    request['status'] !== 'PENDING' &&
+    request['status'] !== 'APPROVED' &&
+    request['status'] !== 'EXECUTING'
+  ) {
+    return { ok: false, code: 'inventory_approval_response_invalid' };
+  }
+
+  return {
+    ok: true,
+    state: 'PENDING_APPROVAL',
+    approvalRequestId: request['requestId'],
+    idempotentReplay: request['idempotentReplay'] === true,
+  };
 }
