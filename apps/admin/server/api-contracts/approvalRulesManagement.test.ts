@@ -14,8 +14,8 @@ const ruleInput = {
   type: 'rule.upsert',
   ruleId: null,
   shopId,
-  actionType: 'inventory.adjust',
-  requesterPermission: 'inventory.adjust',
+  actionType: 'ORDER_RETURN',
+  requesterPermission: 'orders.refund',
   approverPermission: 'approvals.review',
   requiresSecondPerson: true,
   requiresRequesterRepin: false,
@@ -45,6 +45,7 @@ describe('approval rule management boundary', () => {
         ...ruleInput,
         ruleId: '3a7bd7ed-f722-4f91-bc32-4549a4897937',
         expectedVersion: 4,
+        actionType: 'ORDER_REFUND',
         threshold: { kind: 'minimumMinor', value: 25_000 },
       }).success,
     ).toBe(true);
@@ -62,6 +63,27 @@ describe('approval rule management boundary', () => {
       { ...ruleInput, extraPolicy: 'unsafe' },
     ]) {
       expect(approvalRuleWriteSchema.safeParse(command).success).toBe(false);
+    }
+  });
+
+  it('accepts only implemented high-risk action identities with matching requester authority and threshold context', () => {
+    for (const invalid of [
+      { ...ruleInput, actionType: 'inventory.adjust' },
+      { ...ruleInput, actionType: 'invented.high_risk_action' },
+      { ...ruleInput, actionType: 'EMPLOYEE_ROLE_CHANGE', threshold: { kind: 'none' } },
+      { ...ruleInput, actionType: 'ORDER_REFUND', threshold: { kind: 'minimumQuantityImpact', value: 3 } },
+      { ...ruleInput, actionType: 'ORDER_RETURN', threshold: { kind: 'minimumMinor', value: 1000 } },
+      { ...ruleInput, actionType: 'STAFF_PAYMENT', threshold: { kind: 'minimumQuantityImpact', value: 2 } },
+    ]) {
+      expect(approvalRuleWriteSchema.safeParse(invalid).success).toBe(false);
+    }
+    for (const valid of [
+      { ...ruleInput },
+      { ...ruleInput, actionType: 'ORDER_REFUND', threshold: { kind: 'minimumMinor', value: 1000 } },
+      { ...ruleInput, actionType: 'STAFF_PAYMENT', requesterPermission: 'staff.payments', threshold: { kind: 'minimumMinor', value: 1000 } },
+      { ...ruleInput, actionType: 'EMPLOYEE_ROLE_CHANGE', requesterPermission: 'staff.manage', threshold: { kind: 'none' } },
+    ]) {
+      expect(approvalRuleWriteSchema.safeParse(valid).success).toBe(true);
     }
   });
 
