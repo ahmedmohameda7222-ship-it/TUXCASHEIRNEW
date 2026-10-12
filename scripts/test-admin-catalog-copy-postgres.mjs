@@ -62,12 +62,14 @@ insert into public.business_employees(id,business_id,display_name,role,active) v
 ('${OTHER}','${B2}','Other owner','OWNER',true);
 insert into public.menu_categories(id,shop_id,slug,name,sort_order,active) values
 ('${C1}','${S}','burgers','Burgers',0,true),
-('${C2}','${T}','burgers','Burgers',0,true);
+('${C2}','${T}','burgers','Burgers',20,true);
 insert into public.products(id,shop_id,category_id,slug,name,price_minor,active,sold_out,is_combo,sort_order)
 values ('${P1}','${S}','${C1}','burger','Burger',12000,true,true,false,0),
 ('${P2}','${T}','${C2}','burger','Burger',22000,true,false,false,0);
 insert into public.catalog_master_categories(id,business_id,canonical_name)
 values ('${MC}','${B}','Burgers');
+insert into public.catalog_category_shop_bindings(business_id,master_category_id,shop_id,canonical_category_id)
+values ('${B}','${MC}','${S}','${C1}'),('${B}','${MC}','${T}','${C2}');
 insert into public.catalog_master_products(id,business_id,master_category_id,canonical_name)
 values ('${MP}','${B}','${MC}','Burger');
 insert into public.catalog_product_shop_overrides(
@@ -216,4 +218,33 @@ if(sourceAfterPublish!=='12000,true')
 const recorded=sql(`select count(*) from public.catalog_publish_versions
 where shop_id='${T}' and publish_version=2 and source_kind='DRAFT'`);
 if(recorded!=='1') throw new Error('Catalog publication version not recorded');
+// Category ordering uses distinct local category IDs connected only by a reviewed
+// business-level master mapping. It must never copy source IDs or touch live
+// categories before the explicit target draft publish.
+const categoryDraft=rpc(`public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,2,'Copy mapped category ordering')`, 'category draft');
+if(!categoryDraft.ok||!categoryDraft.draftId)throw new Error('Category draft failed: '+JSON.stringify(categoryDraft));
+const categoryArgs=`'${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,'${categoryDraft.draftId}'::uuid,
+1::bigint,2::bigint,1::bigint,array['categoryOrder']::text[]`;
+const categoryPreview=rpc(`public.preview_admin_catalog_shop_copy_v1(${categoryArgs})`,'category preview');
+if(!categoryPreview.ok||categoryPreview.mappedCategories!==1||
+  categoryPreview.changedCategories!==1||categoryPreview.changedProducts!==0||
+  categoryPreview.categoryDifferences?.[0]?.targetCategoryId!==C2)
+  throw new Error('Category copy did not retain target mapping: '+JSON.stringify(categoryPreview));
+const categoryApply=rpc(`public.apply_admin_catalog_shop_copy_v1(${categoryArgs},
+'${categoryPreview.fingerprint}','catalog-copy-category-1')`, 'stage categories');
+if(!categoryApply.ok||categoryApply.draftRevision!==2||categoryApply.changedCategories!==1)
+  throw new Error('Category draft staging failed: '+JSON.stringify(categoryApply));
+const priorCategory=sql(`select sort_order from public.menu_categories where id='${C2}'`);
+if(priorCategory!=='20')throw new Error('Category copy changed live target before publish');
+const categoryPublished=rpc(
+  `public.publish_catalog_draft_v1('${OWNER}'::uuid,'${categoryDraft.draftId}'::uuid,2,2)`,
+  'publish copied category through canonical authority'
+);
+if(!categoryPublished.ok||categoryPublished.publishVersion!==3)
+  throw new Error('Category publish rejected: '+JSON.stringify(categoryPublished));
+const publishedOrder=sql(`select sort_order from public.menu_categories where id='${C2}'`);
+const sourceOrder=sql(`select sort_order from public.menu_categories where id='${C1}'`);
+if(publishedOrder!=='0'||sourceOrder!=='0')throw new Error('Category published ordering or source scope invalid');
+const targetIdentity=sql(`select id from public.menu_categories where shop_id='${T}'`);
+if(targetIdentity!==C2)throw new Error('Category copy duplicated or replaced target category ID');
 console.log('Catalog Copy isolated PostgreSQL: preview, master mapping, inactive/missing dependency, draft-only apply, once-only audit, ACL and canonical target publication passed.');
