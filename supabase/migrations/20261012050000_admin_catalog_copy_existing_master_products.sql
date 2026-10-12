@@ -247,7 +247,8 @@ declare
 begin
   if nullif(btrim(p_command_id),'') is null or length(p_command_id)>160 or
      p_preview_fingerprint is null or
-     p_preview_fingerprint !~ '^[0-9a-f]{64}
+     length(p_preview_fingerprint) <> 64 or
+     p_preview_fingerprint ~ '[^0-9a-f]'
   then return jsonb_build_object('ok',false,'code','invalid_catalog_copy_apply'); end if;
   if p_source_shop_id=p_target_shop_id or p_domains is null then
     return jsonb_build_object('ok',false,'code','invalid_catalog_copy_apply');
