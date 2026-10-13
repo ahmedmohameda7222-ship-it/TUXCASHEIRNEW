@@ -429,6 +429,85 @@ test('inventory can receive a sent inter-shop transfer without using purchasing 
   });
 });
 
+
+test('authorized owner explicitly creates an audited recipe inventory master binding', async ({
+  page,
+}) => {
+  await mockInventory(page);
+  await page.route('**/api/admin/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...ownerSession,
+        principal: {
+          ...ownerSession.principal,
+          permissions: [...ownerSession.principal.permissions, 'catalog.edit'],
+        },
+      }),
+    });
+  });
+  const recorded: Record<string, unknown>[] = [];
+  const masterId = '88888888-8888-4888-8888-888888888888';
+  await page.route('**/api/admin/inventory-master**', async (route) => {
+    const req = route.request();
+    if (req.method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          shopId,
+          masters: recorded.length
+            ? [
+                {
+                  id: masterId,
+                  canonicalName: 'Business-wide beef',
+                  baseUnitLabel: 'kg',
+                  trackingMode: 'RECIPE_TRACKED',
+                  inventoryItemId: itemId,
+                  inventoryItemName: 'Beef',
+                },
+              ]
+            : [],
+        }),
+      });
+      return;
+    }
+    expect(req.headers()['x-tux-admin-csrf']).toBe(csrfToken);
+    recorded.push(req.postDataJSON() as Record<string, unknown>);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        masterInventoryItemId: masterId,
+        inventoryItemId: itemId,
+        shopId,
+        createdMaster: true,
+      }),
+    });
+  });
+  await page.goto('/inventory');
+  await page.getByText('More actions', { exact: true }).click();
+  await page.getByRole('button', { name: 'Manage recipe master bindings' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Recipe inventory master bindings' }),
+  ).toBeVisible();
+  await page.getByLabel('Master name').fill('Business-wide beef');
+  await page.getByRole('button', { name: 'Save explicit mapping' }).click();
+  await expect(page.getByText(/Already bound to Business-wide beef/)).toBeVisible();
+  expect(recorded).toHaveLength(1);
+  expect(recorded[0]).toMatchObject({
+    type: 'master.bind',
+    shopId,
+    inventoryItemId: itemId,
+    masterInventoryItemId: null,
+    canonicalName: 'Business-wide beef',
+  });
+  expect(recorded[0]?.commandId).toMatch(/^[0-9a-f-]{36}$/);
+});
+
 for (const viewport of ADMIN_CORE_VIEWPORTS) {
   test(`inventory master-detail remains usable at ${viewport.name} width`, async ({ page }) => {
     await page.setViewportSize(viewport);
