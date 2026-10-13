@@ -10,6 +10,7 @@ import { useShopScope } from '../shops/ShopScopeProvider';
 import { AdjustStockSheet } from './AdjustStockSheet';
 import { InventoryItemPage } from './InventoryItemPage';
 import { InventoryDefinitionEditor } from './InventoryDefinitionEditor';
+import { InventoryMasterBindingPanel } from './InventoryMasterBindingPanel';
 import { RecordWasteSheet } from './RecordWasteSheet';
 import { ReorderSuggestionsPage } from './ReorderSuggestionsPage';
 import { StocktakePage } from './StocktakePage';
@@ -52,7 +53,7 @@ function mutationErrorMessage(error: unknown): string | null {
 }
 
 type WorkspaceMode =
-  'detail' | 'stocktake-select' | 'stocktake' | 'transfer' | 'reorder' | 'variance';
+  'detail' | 'stocktake-select' | 'stocktake' | 'transfer' | 'reorder' | 'variance' | 'master-bindings';
 type ItemAction = 'adjust' | 'waste' | null;
 
 export function InventoryPage() {
@@ -130,6 +131,11 @@ export function InventoryPage() {
   const canTransfer = principal.permissions.includes('inventory.transfer');
   const canManageReplenishment = principal.permissions.includes('purchasing.manage');
   const canManageDefinitions = principal.permissions.includes('purchasing.manage');
+  const canManageMasterBindings =
+    (principal.role === 'OWNER' || principal.role === 'ADMIN') &&
+    principal.permissions.includes('inventory.view') &&
+    principal.permissions.includes('inventory.adjust') &&
+    principal.permissions.includes('catalog.edit');
   const canOverrideNegative =
     principal.role === 'OWNER' && principal.permissions.includes('inventory.override_negative');
 
@@ -240,6 +246,15 @@ export function InventoryPage() {
               >
                 Variance &amp; margins
               </button>
+              {canManageMasterBindings ? (
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  onClick={() => openWorkflow('master-bindings')}
+                >
+                  Manage recipe master bindings
+                </button>
+              ) : null}
               {canStocktake && canTransfer ? (
                 <button
                   className="admin-secondary-button"
@@ -327,6 +342,12 @@ export function InventoryPage() {
             })}
           </div>
         </section>
+      ) : mode === 'master-bindings' && canManageMasterBindings ? (
+        <InventoryMasterBindingPanel
+          shopId={shopId}
+          items={items}
+          onBack={() => setMode('detail')}
+        />
       ) : mode === 'reorder' ? (
         <ReorderSuggestionsPage
           suggestions={workspace.intelligence.reorderSuggestions}
