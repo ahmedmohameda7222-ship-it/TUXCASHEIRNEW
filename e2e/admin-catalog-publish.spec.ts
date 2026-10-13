@@ -19,7 +19,11 @@ const ownerSession = {
 
 type Command = Record<string, unknown> & { type?: string };
 
-async function mockPublishing(page: Page, withCopy = false) {
+async function mockPublishing(
+  page: Page,
+  withCopy = false,
+  copyPreviewOverrides: Record<string, unknown> = {},
+) {
   let currentPublishVersion = 48;
   let pendingSchedule = true;
   const commands: Command[] = [];
@@ -173,6 +177,10 @@ async function mockPublishing(page: Page, withCopy = false) {
         contentType: 'application/json',
         body: JSON.stringify({
           ok: true,
+          sourceShopId: copySourceShopId,
+          targetShopId: shopId,
+          targetDraftId: draftId,
+          ...copyPreviewOverrides,
           mappedProducts: 1,
           changedProducts: 1,
           mappedCategories: 0,
@@ -555,6 +563,21 @@ test('mobile Catalog Copy stages only selected product order through version-che
     expectedTargetDraftRevision: 2,
   });
   expect(typeof apply?.commandId).toBe('string');
+});
+
+test('Catalog Copy rejects a preview for another source shop before staging', async ({ page }) => {
+  await mockPublishing(page, true, {
+    sourceShopId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+  });
+  await page.goto('/catalog/products/publishing');
+  await page.getByRole('checkbox', { name: 'Product availability' }).uncheck();
+  await page
+    .getByRole('checkbox', { name: 'Product display order (mapped products only)' })
+    .check();
+  await page.getByRole('button', { name: 'Preview catalog copy' }).click();
+
+  await expect(page.getByRole('alert')).toContainText('Catalog preview could not be verified.');
+  await expect(page.getByRole('button', { name: 'Apply to target draft' })).toHaveCount(0);
 });
 
 for (const viewport of ADMIN_WIDE_TABLET_VIEWPORTS) {
