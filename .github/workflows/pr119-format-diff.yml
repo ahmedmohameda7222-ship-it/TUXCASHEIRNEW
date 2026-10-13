@@ -1,0 +1,22 @@
+name: PR119 Formatter Diff (temporary)
+on:
+  push:
+    branches:
+      - fix/admin-plans1-7-functional-completeness
+permissions:
+  contents: read
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Preview deterministic Prettier patch
+        shell: bash
+        run: |
+          npx prettier --write apps/admin/api/admin/inventory.ts apps/admin/src/inventory/InventoryMasterBindingPanel.tsx apps/admin/src/inventory/InventoryPage.tsx e2e/admin-inventory.spec.ts
+          git diff -- apps/admin/api/admin/inventory.ts apps/admin/src/inventory/InventoryMasterBindingPanel.tsx apps/admin/src/inventory/InventoryPage.tsx e2e/admin-inventory.spec.ts
