@@ -33,7 +33,7 @@ end $do$;
 grant usage on schema public to anon,authenticated,service_role;
 create table auth.users(id uuid primary key);
 create function auth.uid() returns uuid language sql stable as $do$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $do$;`,'reset');
-const migration='20261012060614_admin_catalog_copy_existing_master_categories.sql';
+const migration='20261013001000_admin_catalog_copy_existing_master_product_order.sql';
 const files=readdirSync(resolve('supabase/migrations')).filter(f=>/^\d+_.+\.sql$/.test(f)).sort();
 const index=files.indexOf(migration);if(index<0)throw new Error('Catalog Copy migration missing');
 for(const name of files.slice(0,index+1))file(name);
@@ -64,8 +64,8 @@ insert into public.menu_categories(id,shop_id,slug,name,sort_order,active) value
 ('${C1}','${S}','burgers','Burgers',0,true),
 ('${C2}','${T}','burgers','Burgers',20,true);
 insert into public.products(id,shop_id,category_id,slug,name,price_minor,active,sold_out,is_combo,sort_order)
-values ('${P1}','${S}','${C1}','burger','Burger',12000,true,true,false,0),
-('${P2}','${T}','${C2}','burger','Burger',22000,true,false,false,0);
+values ('${P1}','${S}','${C1}','burger','Burger',12000,true,true,false,5),
+('${P2}','${T}','${C2}','burger','Burger',22000,true,false,false,40);
 insert into public.catalog_master_categories(id,business_id,canonical_name)
 values ('${MC}','${B}','Burgers');
 insert into public.catalog_category_shop_bindings(business_id,master_category_id,shop_id,canonical_category_id)
@@ -247,4 +247,42 @@ const sourceOrder=sql(`select sort_order from public.menu_categories where id='$
 if(publishedOrder!=='0'||sourceOrder!=='0')throw new Error('Category published ordering or source scope invalid');
 const targetIdentity=sql(`select id from public.menu_categories where shop_id='${T}'`);
 if(targetIdentity!==C2)throw new Error('Category copy duplicated or replaced target category ID');
+// Product sorting is an explicit domain. A different canonical product ID in
+// the same business must retain its identity and all unselected fields.
+const orderDraft=rpc(
+  `public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,3,'Copy mapped product ordering')`,
+  'product-order draft',
+);
+if(!orderDraft.ok||!orderDraft.draftId)
+  throw new Error('Product-order draft failed: '+JSON.stringify(orderDraft));
+const orderArgs=`'${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,'${orderDraft.draftId}'::uuid,
+1::bigint,3::bigint,1::bigint,array['productOrder']::text[]`;
+const orderPreview=rpc(`public.preview_admin_catalog_shop_copy_v1(${orderArgs})`,'product-order preview');
+if(!orderPreview.ok||orderPreview.mappedProducts!==1||
+   orderPreview.changedProducts!==1||orderPreview.changedCategories!==0||
+   orderPreview.differences?.[0]?.targetProductId!==P2||
+   Number(orderPreview.differences?.[0]?.sortOrderBefore)!==40||
+   Number(orderPreview.differences?.[0]?.sortOrderAfter)!==5)
+  throw new Error('Product-order preview failed mapped ID and diff: '+JSON.stringify(orderPreview));
+const stagedOrder=rpc(`public.apply_admin_catalog_shop_copy_v1(${orderArgs},
+  '${orderPreview.fingerprint}','catalog-copy-product-order-1')`, 'stage mapped product ordering');
+if(!stagedOrder.ok||stagedOrder.draftRevision!==2||stagedOrder.changedProducts!==1)
+  throw new Error('Product-order staging failed: '+JSON.stringify(stagedOrder));
+const stagedSort=sql(`select working_bundle_json->'snapshot'->'products'->0->>'sortOrder'
+from public.catalog_drafts where id='${orderDraft.draftId}'`);
+if(stagedSort!=='5')throw new Error('Target draft product sort order was not copied');
+const beforeOrderPublish=sql(`select sort_order from public.products where id='${P2}'`);
+if(beforeOrderPublish!=='40')throw new Error('Product ordering mutated live rows before publish');
+const publishedProductOrder=rpc(
+  `public.publish_catalog_draft_v1('${OWNER}'::uuid,'${orderDraft.draftId}'::uuid,2,3)`,
+  'publish product ordering through canonical authority',
+);
+if(!publishedProductOrder.ok||publishedProductOrder.publishVersion!==4)
+  throw new Error('Product-order publication failed: '+JSON.stringify(publishedProductOrder));
+const afterOrder=sql(`select id||','||sort_order||','||price_minor from public.products where id='${P2}'`);
+if(afterOrder!==P2+',5,12000')
+  throw new Error('Product ordering replaced target identity or price: '+afterOrder);
+const sourceSort=sql(`select sort_order from public.products where id='${P1}'`);
+if(sourceSort!=='5')throw new Error('Product ordering mutated source shop');
+
 console.log('Catalog Copy isolated PostgreSQL: preview, master mapping, inactive/missing dependency, draft-only apply, once-only audit, ACL and canonical target publication passed.');

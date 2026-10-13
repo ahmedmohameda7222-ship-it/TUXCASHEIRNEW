@@ -4,7 +4,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
 
-type Domain = 'productPrices' | 'productAvailability' | 'categoryOrder' | 'categoryAvailability';
+type Domain =
+  | 'productPrices'
+  | 'productAvailability'
+  | 'productOrder'
+  | 'categoryOrder'
+  | 'categoryAvailability';
 
 type CopyPreview = {
   ok: true;
@@ -28,6 +33,8 @@ type CopyPreview = {
   differences: Array<{
     targetProductId: string;
     productName: string;
+    sortOrderBefore: number;
+    sortOrderAfter: number;
     priceBeforeMinor: number;
     priceAfterMinor: number;
     activeBefore: boolean;
@@ -161,7 +168,7 @@ export function CatalogCopyPanel({
     <section className="admin-publish-card" aria-labelledby="catalog-copy-title">
       <h2 id="catalog-copy-title">Selective catalog copy</h2>
       <p className="admin-publish-card__copy">
-        Copy product prices and availability from the published source catalog into this shop's
+        Copy selected product ordering, prices and availability from the published source catalog into this shop's
         unpublished draft. Products and categories must already share canonical business master
         mappings in both shops. Only explicitly selected fields transfer; missing entities,
         modifiers, recipes and historical data are not copied.
@@ -209,6 +216,15 @@ export function CatalogCopyPanel({
           <label className="admin-field">
             <input
               type="checkbox"
+              checked={domains.includes('productOrder')}
+              disabled={pending}
+              onChange={(event) => toggle('productOrder', event.currentTarget.checked)}
+            />
+            Product display order (mapped products only)
+          </label>
+          <label className="admin-field">
+            <input
+              type="checkbox"
               checked={domains.includes('categoryOrder')}
               disabled={pending}
               onChange={(event) => toggle('categoryOrder', event.currentTarget.checked)}
@@ -249,6 +265,12 @@ export function CatalogCopyPanel({
               {preview.differences.map((item) => (
                 <li key={item.targetProductId}>
                   <strong>{item.productName}</strong>
+                  {domains.includes('productOrder') ? (
+                    <span>
+                      {' '}
+                      Order: {item.sortOrderBefore} → {item.sortOrderAfter}.
+                    </span>
+                  ) : null}
                   {domains.includes('productPrices') ? (
                     <span>
                       {' '}
