@@ -65,7 +65,7 @@ const catalogCopyBaseSchema = z.object({
     .refine((domains) => new Set(domains).size === domains.length),
 });
 
-const catalogCopySchema = z.discriminatedUnion('type', [
+export const catalogCopySchema = z.discriminatedUnion('type', [
   catalogCopyBaseSchema.extend({ type: z.literal('catalog-copy.preview') }).strict(),
   catalogCopyBaseSchema
     .extend({

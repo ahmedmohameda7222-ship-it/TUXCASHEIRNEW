@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { catalogCommandSchema } from '../../api/admin/catalog';
+import { catalogCopySchema } from '../../api/admin/catalog';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../supabase/migrations');
 const id = '11111111-1111-4111-8111-111111111111';
@@ -23,9 +23,9 @@ const command = {
 
 describe('selective master-mapped product ordering', () => {
   it('accepts a selected product ordering domain and rejects duplicate selections', () => {
-    expect(catalogCommandSchema.safeParse(command).success).toBe(true);
+    expect(catalogCopySchema.safeParse(command).success).toBe(true);
     expect(
-      catalogCommandSchema.safeParse({
+      catalogCopySchema.safeParse({
         ...command,
         selectedDomains: ['productOrder', 'productOrder'],
       }).success,
