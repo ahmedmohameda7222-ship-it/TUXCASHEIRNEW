@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
+import { catalogCopyPreviewMatchesSelection } from './catalogCopyPreviewGuard';
 
 type Domain =
   | 'productPrices'
@@ -13,6 +14,9 @@ type Domain =
 
 type CopyPreview = {
   ok: true;
+  sourceShopId: string;
+  targetShopId: string;
+  targetDraftId: string;
   mappedProducts: number;
   changedProducts: number;
   mappedCategories: number;
@@ -60,12 +64,25 @@ export function CatalogCopyPanel({
   const session = useAdminSession();
   const queryClient = useQueryClient();
   const [sourceShopId, setSourceShopId] = useState(sourceShopIds[0] ?? '');
+  const activeSourceShopId = sourceShopIds.includes(sourceShopId)
+    ? sourceShopId
+    : (sourceShopIds[0] ?? '');
   const [domains, setDomains] = useState<Domain[]>(['productAvailability']);
   const [preview, setPreview] = useState<CopyPreview | null>(null);
   const [commandId, setCommandId] = useState('');
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const currentPreview = catalogCopyPreviewMatchesSelection(preview, {
+    sourceShopId: activeSourceShopId,
+    targetShopId,
+    targetDraftId: draft?.draftId ?? null,
+    targetPublishVersion,
+    targetDraftRevision: draft?.draftRevision ?? null,
+    selectedDomains: domains,
+  })
+    ? preview
+    : null;
 
   function reset() {
     setPreview(null);
@@ -82,14 +99,14 @@ export function CatalogCopyPanel({
 
   async function makePreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!draft || !sourceShopId || pending || domains.length === 0) return;
+    if (!draft || !activeSourceShopId || pending || domains.length === 0) return;
     if (session.state.status !== 'authenticated') return;
     setPending(true);
     setError('');
     reset();
     try {
       const source = await adminFetch<{ currentPublishVersion: number }>(
-        `/api/admin/catalog?shopId=${encodeURIComponent(sourceShopId)}&view=publishing`,
+        `/api/admin/catalog?shopId=${encodeURIComponent(activeSourceShopId)}&view=publishing`,
       );
       if (source.currentPublishVersion < 1) {
         throw new Error('Source shop has no published catalog.');
@@ -100,7 +117,7 @@ export function CatalogCopyPanel({
           method: 'POST',
           body: JSON.stringify({
             type: 'catalog-copy.preview',
-            sourceShopId,
+            sourceShopId: activeSourceShopId,
             targetShopId,
             targetDraftId: draft.draftId,
             expectedSourcePublishVersion: source.currentPublishVersion,
@@ -112,7 +129,12 @@ export function CatalogCopyPanel({
         session.state.session.csrfToken,
       );
       if (!result.ok) throw new Error('Catalog preview could not be verified.');
-      setPreview(result);
+      setPreview({
+        ...result,
+        sourceShopId: activeSourceShopId,
+        targetShopId,
+        targetDraftId: draft.draftId,
+      });
       setCommandId(crypto.randomUUID());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Catalog preview failed.');
@@ -122,7 +144,7 @@ export function CatalogCopyPanel({
   }
 
   async function stageCopy() {
-    if (!draft || !preview || !commandId || pending) return;
+    if (!draft || !currentPreview || !commandId || pending) return;
     if (session.state.status !== 'authenticated') return;
     setPending(true);
     setError('');
@@ -133,14 +155,14 @@ export function CatalogCopyPanel({
           method: 'POST',
           body: JSON.stringify({
             type: 'catalog-copy.apply',
-            sourceShopId,
+            sourceShopId: activeSourceShopId,
             targetShopId,
             targetDraftId: draft.draftId,
-            expectedSourcePublishVersion: preview.expectedSourcePublishVersion,
-            expectedTargetPublishVersion: preview.expectedTargetPublishVersion,
-            expectedTargetDraftRevision: preview.expectedTargetDraftRevision,
-            selectedDomains: preview.selectedDomains,
-            previewFingerprint: preview.fingerprint,
+            expectedSourcePublishVersion: currentPreview.expectedSourcePublishVersion,
+            expectedTargetPublishVersion: currentPreview.expectedTargetPublishVersion,
+            expectedTargetDraftRevision: currentPreview.expectedTargetDraftRevision,
+            selectedDomains: currentPreview.selectedDomains,
+            previewFingerprint: currentPreview.fingerprint,
             commandId,
           }),
         },
@@ -178,7 +200,7 @@ export function CatalogCopyPanel({
           <label className="admin-field">
             <span>Source shop</span>
             <select
-              value={sourceShopId}
+              value={activeSourceShopId}
               disabled={pending}
               onChange={(event) => {
                 setSourceShopId(event.currentTarget.value);
@@ -253,16 +275,16 @@ export function CatalogCopyPanel({
       )}
       {error ? <p role="alert">{error}</p> : null}
       {message ? <p role="status">{message}</p> : null}
-      {preview ? (
+      {currentPreview ? (
         <div role="status">
           <p>
-            Read-only preview: {preview.mappedProducts} existing master-mapped products,
-            {preview.changedProducts} target products would change; {preview.mappedCategories}{' '}
-            mapped categories, {preview.changedCategories} target categories would change.
+            Read-only preview: {currentPreview.mappedProducts} existing master-mapped products,
+            {currentPreview.changedProducts} target products would change; {currentPreview.mappedCategories}{' '}
+            mapped categories, {currentPreview.changedCategories} target categories would change.
           </p>
-          {preview.differences.length > 0 ? (
+          {currentPreview.differences.length > 0 ? (
             <ul>
-              {preview.differences.map((item) => (
+              {currentPreview.differences.map((item) => (
                 <li key={item.targetProductId}>
                   <strong>{item.productName}</strong>
                   {domains.includes('productOrder') ? (
@@ -288,9 +310,9 @@ export function CatalogCopyPanel({
               ))}
             </ul>
           ) : null}
-          {preview.categoryDifferences.length > 0 ? (
+          {currentPreview.categoryDifferences.length > 0 ? (
             <ul>
-              {preview.categoryDifferences.map((item) => (
+              {currentPreview.categoryDifferences.map((item) => (
                 <li key={item.targetCategoryId}>
                   <strong>{item.categoryName}</strong>
                   {domains.includes('categoryOrder') ? (
@@ -310,14 +332,14 @@ export function CatalogCopyPanel({
             </ul>
           ) : null}
           <p>
-            Source publication {preview.expectedSourcePublishVersion}, target publication{' '}
-            {preview.expectedTargetPublishVersion}, draft revision{' '}
-            {preview.expectedTargetDraftRevision}. Both are revalidated transactionally.
+            Source publication {currentPreview.expectedSourcePublishVersion}, target publication{' '}
+            {currentPreview.expectedTargetPublishVersion}, draft revision{' '}
+            {currentPreview.expectedTargetDraftRevision}. Both are revalidated transactionally.
           </p>
           <button
             type="button"
             className="admin-primary-button"
-            disabled={pending || (preview.changedProducts === 0 && preview.changedCategories === 0)}
+            disabled={pending || (currentPreview.changedProducts === 0 && currentPreview.changedCategories === 0)}
             onClick={() => void stageCopy()}
           >
             {pending ? 'Applying…' : 'Apply to target draft'}
