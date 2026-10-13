@@ -485,7 +485,7 @@ const comboBeforeLive=sql(`select count(*) from public.combo_beverage_options
 where shop_id='${T}' and combo_product_id='${TCP}'`);
 if(comboBeforeLive!=='0')throw new Error('Combo copy mutated target live options before publish');
 const comboDraftOption=sql(`select
-opt.value->>'comboProductId'||','||opt.value->>'beverageProductId'
+(opt.value->>'comboProductId')||','||(opt.value->>'beverageProductId')
 from public.catalog_drafts d
 cross join lateral jsonb_array_elements(d.working_bundle_json->'snapshot'->'comboBeverageOptions') opt(value)
 where d.id='${comboCopyDraft.draftId}' and opt.value->>'comboProductId'='${TCP}'`);
