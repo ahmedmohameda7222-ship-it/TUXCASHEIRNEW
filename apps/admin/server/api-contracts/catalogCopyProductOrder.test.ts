@@ -77,7 +77,7 @@ describe('selective master-mapped product ordering', () => {
       }).success,
     ).toBe(true);
     const sql = readFileSync(
-      join(root, '20261013070000_admin_catalog_copy_product_modifier_links.sql'),
+      join(root, '20261013034802_admin_catalog_copy_product_modifier_links.sql'),
       'utf8',
     );
     expect(sql).toContain('v_source_to_target_product_map');
