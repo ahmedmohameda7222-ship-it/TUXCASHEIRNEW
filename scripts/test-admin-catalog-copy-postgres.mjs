@@ -827,4 +827,72 @@ const originalRecipe=sql(`select inventory_item_id||','||quantity_micros
 if(originalRecipe!==SI+',2500000')
  throw new Error('Source recipe changed during target copy: '+originalRecipe);
 
+// Inventory-master binding is an explicit authorized operator decision,
+// not a guessed same-name match. It is command-idempotent and tenant scoped.
+const SAUCE_SOURCE='90000000-0000-4000-8000-000000000004';
+sql(`insert into public.inventory_items(id,shop_id,name,unit_label,tracking_mode,active)
+values ('${SAUCE_SOURCE}','${S}','Sauce (source)','ml','RECIPE_TRACKED',true)`,
+'second-shop recipe item fixture');
+const createMasterArgs=`'${OWNER}'::uuid,'${T}'::uuid,'${TIL}'::uuid,
+null::uuid,'Sauce master'::text,'bind-sauce-1'::text`;
+const masterCreated=rpc(
+`public.bind_admin_inventory_master_v1(${createMasterArgs})`,
+'create business master for target sauce');
+if(!masterCreated.ok||!masterCreated.masterInventoryItemId)
+throw new Error('Inventory master creation failed: '+JSON.stringify(masterCreated));
+const masterId=masterCreated.masterInventoryItemId;
+const createReplay=rpc(
+`public.bind_admin_inventory_master_v1(${createMasterArgs})`,
+'idempotent master creation');
+if(!createReplay.ok||!createReplay.replayed||
+   createReplay.masterInventoryItemId!==masterId)
+throw new Error('Master create replay duplicated or changed binding: '+JSON.stringify(createReplay));
+assertDenied(rpc(`public.bind_admin_inventory_master_v1(
+'${OWNER}'::uuid,'${T}'::uuid,'${TI}'::uuid,null::uuid,
+'Sauce master'::text,'bind-sauce-1'::text)`,
+'command ID reused for different inventory item'),'command_id_conflict');
+const listed=rpc(
+`public.list_admin_inventory_masters_v1('${OWNER}'::uuid,'${T}'::uuid)`,
+'authorized master listing');
+if(!listed.ok||!listed.masters?.some(row=>row.id===masterId &&
+    row.inventoryItemId===TIL && row.baseUnitLabel==='ml'))
+throw new Error('Master list missing canonical binding: '+JSON.stringify(listed));
+assertDenied(rpc(`public.bind_admin_inventory_master_v1(
+'${OWNER}'::uuid,'${S}'::uuid,'${SI}'::uuid,
+'${masterId}'::uuid,null::text,'bind-wrong-unit'::text)`,
+'deny grams-to-milliliters mapping'),'catalog_inventory_master_unit_conflict');
+const attached=rpc(`public.bind_admin_inventory_master_v1(
+'${OWNER}'::uuid,'${S}'::uuid,'${SAUCE_SOURCE}'::uuid,
+'${masterId}'::uuid,null::text,'bind-sauce-source-1'::text)`,
+'attach source shop local sauce to existing master');
+if(!attached.ok||attached.masterInventoryItemId!==masterId)
+throw new Error('Cross-shop inventory binding failed: '+JSON.stringify(attached));
+const sameMasterCount=sql(`select count(*)
+from public.catalog_inventory_item_shop_bindings
+where master_inventory_item_id='${masterId}'`);
+if(sameMasterCount!=='2')throw new Error('Inventory master did not link two shops');
+const suspiciousBindings=sql(`select count(*)
+from public.catalog_inventory_item_shop_bindings
+where inventory_item_id in ('${SI}','${TI}')
+and master_inventory_item_id='${masterId}'`);
+if(suspiciousBindings!=='0')throw new Error('Inventory master silently reassigned existing items');
+sql(`insert into public.admin_employee_permissions(business_id,employee_id,permission_key,effect)
+values ('${B}','${EDITOR}','inventory.adjust','ALLOW'),
+('${B}','${EDITOR}','catalog.edit','ALLOW') on conflict do nothing`,
+'non-owner manager permissions fixture');
+let managerDenied=false;
+try {rpc(`public.bind_admin_inventory_master_v1(
+'${EDITOR}'::uuid,'${S}'::uuid,'${SI}'::uuid,
+'${MI}'::uuid,null::text,'bind-manager-1'::text)`,
+'manager cannot mutate master identity');}
+catch(error){managerDenied=/TUX_ADMIN_CATALOG_FORBIDDEN|inventory_master_owner_required/.test(String(error));}
+if(!managerDenied)throw new Error('Non-owner mutated business-wide inventory identity');
+const mismatchedRowCount=sql(`select count(*)
+from public.catalog_inventory_item_shop_bindings
+where master_inventory_item_id='${masterId}'`);
+if(mismatchedRowCount!=='2')throw new Error('Rejected command mutated the inventory bindings');
+const masterAudit=sql(`select count(*) from public.admin_audit_events
+where action_type='INVENTORY_MASTER_BOUND' and entity_id='${masterId}'`);
+if(masterAudit!=='2')throw new Error('Canonical inventory-master audit must be once per mutation');
+
 console.log('Catalog Copy isolated PostgreSQL: preview, master mapping, inactive/missing dependency, draft-only apply, once-only audit, ACL and canonical target publication passed.');
