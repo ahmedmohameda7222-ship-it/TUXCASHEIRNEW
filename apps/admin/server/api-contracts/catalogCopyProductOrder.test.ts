@@ -52,6 +52,23 @@ describe('selective master-mapped product ordering', () => {
     expect(sql).toContain('private.validate_admin_catalog_bundle_v1');
   });
 
+  it('allows explicitly selected combo beverage copy with full target-product mapping', () => {
+    expect(
+      catalogCopySchema.safeParse({
+        ...command,
+        selectedDomains: ['comboBeverageOptions'],
+      }).success,
+    ).toBe(true);
+    const sql = readFileSync(
+      join(root, '20261013040000_admin_catalog_copy_combo_beverage_options.sql'),
+      'utf8',
+    );
+    expect(sql).toContain('v_source_to_target_product_map');
+    expect(sql).toContain('changedComboBeverageOptions');
+    expect(sql).toContain('catalog_copy_missing_target_dependencies');
+    expect(sql).toContain('private.validate_admin_catalog_bundle_v1');
+  });
+
   it('copies only target sortOrder through the fingerprinted draft and preserves identity', () => {
     const names = readdirSync(root).filter((name) =>
       name.endsWith('_admin_catalog_copy_existing_master_product_order.sql'),

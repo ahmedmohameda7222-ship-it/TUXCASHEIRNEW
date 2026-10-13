@@ -59,10 +59,11 @@ const catalogCopyBaseSchema = z.object({
         'categoryAvailability',
         'productOrder',
         'productCategoryAssignments',
+        'comboBeverageOptions',
       ]),
     )
     .min(1)
-    .max(6)
+    .max(7)
     .refine((domains) => new Set(domains).size === domains.length),
 });
 

@@ -11,7 +11,8 @@ type Domain =
   | 'productOrder'
   | 'categoryOrder'
   | 'categoryAvailability'
-  | 'productCategoryAssignments';
+  | 'productCategoryAssignments'
+  | 'comboBeverageOptions';
 
 type CopyPreview = {
   ok: true;
@@ -22,6 +23,14 @@ type CopyPreview = {
   changedProducts: number;
   mappedCategories: number;
   changedCategories: number;
+  mappedComboBeverageOptions: number;
+  changedComboBeverageOptions: number;
+  comboDifferences: Array<{
+    targetComboProductId: string;
+    targetBeverageProductId: string;
+    sortOrderBefore: number | null;
+    sortOrderAfter: number | null;
+  }>;
   categoryDifferences: Array<{
     targetCategoryId: string;
     categoryName: string;
@@ -230,10 +239,11 @@ export function CatalogCopyPanel({
     <section className="admin-publish-card" aria-labelledby="catalog-copy-title">
       <h2 id="catalog-copy-title">Selective catalog copy</h2>
       <p className="admin-publish-card__copy">
-        Copy selected product category assignments, ordering, prices and availability from the
-        published source catalog into this shop's unpublished draft. Products and categories must
-        already share canonical business master mappings in both shops. Only explicitly selected
-        fields transfer; missing entities, modifiers, recipes and historical data are not copied.
+        Copy selected product category assignments, combo beverage options, ordering, prices and
+        availability from the published source catalog into this shop's unpublished draft. Products
+        and categories must already share canonical business master mappings in both shops. Only
+        explicitly selected fields transfer; missing entities, modifiers, recipes and historical
+        data are not copied.
       </p>
       {draft ? (
         <form onSubmit={(event) => void makePreview(event)}>
@@ -285,6 +295,15 @@ export function CatalogCopyPanel({
               }
             />
             Product category assignments (mapped products and categories)
+          </label>
+          <label className="admin-field">
+            <input
+              type="checkbox"
+              checked={domains.includes('comboBeverageOptions')}
+              disabled={pending}
+              onChange={(event) => toggle('comboBeverageOptions', event.currentTarget.checked)}
+            />
+            Combo beverage options (mapped products only)
           </label>
           <label className="admin-field">
             <input
@@ -342,7 +361,8 @@ export function CatalogCopyPanel({
             Read-only preview: {currentPreview.mappedProducts} existing master-mapped products,
             {currentPreview.changedProducts} target products would change;{' '}
             {currentPreview.mappedCategories} mapped categories, {currentPreview.changedCategories}{' '}
-            target categories would change.
+            target categories would change; {currentPreview.mappedComboBeverageOptions} combo
+            beverage options mapped, {currentPreview.changedComboBeverageOptions} option changes.
           </p>
           {currentPreview.differences.length > 0 ? (
             <ul>
@@ -399,6 +419,17 @@ export function CatalogCopyPanel({
               ))}
             </ul>
           ) : null}
+          {currentPreview.comboDifferences.length > 0 ? (
+            <ul>
+              {currentPreview.comboDifferences.map((item) => (
+                <li key={`${item.targetComboProductId}:${item.targetBeverageProductId}`}>
+                  <strong>Combo {item.targetComboProductId}</strong> — beverage{' '}
+                  {item.targetBeverageProductId}; order {item.sortOrderBefore ?? 'none'} →{' '}
+                  {item.sortOrderAfter ?? 'removed'}.
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <p>
             Source publication {currentPreview.expectedSourcePublishVersion}, target publication{' '}
             {currentPreview.expectedTargetPublishVersion}, draft revision{' '}
@@ -409,7 +440,9 @@ export function CatalogCopyPanel({
             className="admin-primary-button"
             disabled={
               pending ||
-              (currentPreview.changedProducts === 0 && currentPreview.changedCategories === 0)
+              (currentPreview.changedProducts === 0 &&
+                currentPreview.changedCategories === 0 &&
+                currentPreview.changedComboBeverageOptions === 0)
             }
             onClick={() => void stageCopy()}
           >
