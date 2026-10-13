@@ -592,7 +592,7 @@ test('Catalog Copy can create an authorized target draft before previewing', asy
   });
 });
 
-test('Catalog Copy previews and stages master-mapped product category assignments', async ({ page }) => {
+test('Catalog Copy remaps product categories before staging', async ({ page }) => {
   const { commands } = await mockPublishing(page, true, {
     selectedDomains: ['productCategoryAssignments'],
     differences: [
