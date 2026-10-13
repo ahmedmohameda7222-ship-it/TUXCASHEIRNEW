@@ -250,10 +250,10 @@ export function CatalogCopyPanel({
     <section className="admin-publish-card" aria-labelledby="catalog-copy-title">
       <h2 id="catalog-copy-title">Selective catalog copy</h2>
       <p className="admin-publish-card__copy">
-        Copy selected catalog configuration into this shop's unpublished draft. Product and category
-        identities must have canonical business master mappings. Product modifier links use mapped
-        standalone products. Missing entities, modifier definitions, recipes and historical data are
-        not copied.
+        {'Copy selected fields into the target catalog draft. '}
+        {'Products and categories require canonical business master mappings. '}
+        {'Product modifier links require mapped standalone products. '}
+        {'Missing entities, modifier definitions, recipes, and history are not copied.'}
       </p>
       {draft ? (
         <form onSubmit={(event) => void makePreview(event)}>
@@ -457,9 +457,12 @@ export function CatalogCopyPanel({
             <ul>
               {currentPreview.productModifierLinkDifferences.map((item) => (
                 <li key={`${item.targetProductId}:${item.targetModifierId}`}>
-                  <strong>Product {item.targetProductId}</strong> — modifier{' '}
-                  {item.targetModifierId}; max quantity {item.maxQuantityBefore ?? 'none'} →{' '}
-                  {item.maxQuantityAfter ?? 'removed'}, order{' '}
+                  <strong>Product {item.targetProductId}</strong>
+                  {' — modifier '}
+                  {item.targetModifierId}
+                  {'; max quantity '}
+                  {item.maxQuantityBefore ?? 'none'} → {item.maxQuantityAfter ?? 'removed'}
+                  {'; order '}
                   {item.sortOrderBefore ?? 'none'} → {item.sortOrderAfter ?? 'removed'}.
                 </li>
               ))}
