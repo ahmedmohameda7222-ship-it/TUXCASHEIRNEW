@@ -95,10 +95,9 @@ async function mockPublishing(
               publishedAt: '2026-09-10T12:00:00.000Z',
             },
           ],
-          draftPreviews: hasCopyDraft
-            ? [
-                {
-                  draftId,
+          draftPreviews: [
+            {
+              draftId,
               shopId,
               basePublishVersion: 48,
               currentPublishVersion,
@@ -111,9 +110,8 @@ async function mockPublishing(
                 comboBeverageOptions: 0,
                 recipeLines: 0,
               },
-                },
-              ]
-            : [],
+            },
+          ].filter(() => hasCopyDraft),
           schedules: pendingSchedule
             ? [
                 {
