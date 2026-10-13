@@ -70,10 +70,7 @@ export const inventoryMasterBindSchema = z
       (input.masterInventoryItemId !== null && input.canonicalName === null),
   );
 
-function requireInventoryMasterAuthority(
-  context: AdminSessionContext,
-  shopId: string,
-): void {
+function requireInventoryMasterAuthority(context: AdminSessionContext, shopId: string): void {
   for (const permission of ['inventory.view', 'inventory.adjust', 'catalog.edit'] as const) {
     requireBusinessWidePermission(context.principal, permission, shopId);
   }
@@ -1100,7 +1097,7 @@ export default async function handler(
         const result = await client.rpc<Readonly<Record<string, unknown>>>(
           'list_admin_inventory_masters_v1',
           {
-          p_employee_id: context.principal.employeeId,
+            p_employee_id: context.principal.employeeId,
             p_shop_id: shopId,
           },
         );

@@ -5,10 +5,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
 
-type LocalItem = Pick<
-  AdminInventoryItem,
-  'id' | 'name' | 'unitLabel' | 'trackingMode' | 'active'
->;
+type LocalItem = Pick<AdminInventoryItem, 'id' | 'name' | 'unitLabel' | 'trackingMode' | 'active'>;
 
 type Master = {
   id: string;
@@ -111,9 +108,7 @@ export function InventoryMasterBindingPanel({
       setSuccess('Inventory master binding saved. Other shops require explicit binding.');
       await queryClient.invalidateQueries({ queryKey: ['admin', 'inventory-master', shopId] });
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Could not save inventory master binding.',
-      );
+      setError(cause instanceof Error ? cause.message : 'Could not save inventory master binding.');
     } finally {
       setPending(false);
     }
@@ -131,8 +126,8 @@ export function InventoryMasterBindingPanel({
         </button>
       </div>
       <p>
-        Match items only after verifying their physical base units. Each shop uses its own
-        inventory item ID. No stock balances, costs or purchase conversions are transferred.
+        Match items only after verifying their physical base units. Each shop uses its own inventory
+        item ID. No stock balances, costs or purchase conversions are transferred.
       </p>
       {mastersQuery.isLoading ? <p role="status">Loading inventory masters…</p> : null}
       {mastersQuery.isError ? (

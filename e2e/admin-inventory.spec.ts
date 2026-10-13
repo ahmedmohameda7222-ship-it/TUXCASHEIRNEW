@@ -429,7 +429,6 @@ test('inventory can receive a sent inter-shop transfer without using purchasing 
   });
 });
 
-
 test('authorized owner explicitly creates an audited recipe inventory master binding', async ({
   page,
 }) => {

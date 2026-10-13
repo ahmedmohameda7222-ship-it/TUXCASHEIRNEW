@@ -53,7 +53,13 @@ function mutationErrorMessage(error: unknown): string | null {
 }
 
 type WorkspaceMode =
-  'detail' | 'stocktake-select' | 'stocktake' | 'transfer' | 'reorder' | 'variance' | 'master-bindings';
+  | 'detail'
+  | 'stocktake-select'
+  | 'stocktake'
+  | 'transfer'
+  | 'reorder'
+  | 'variance'
+  | 'master-bindings';
 type ItemAction = 'adjust' | 'waste' | null;
 
 export function InventoryPage() {
