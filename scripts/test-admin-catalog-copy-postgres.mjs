@@ -724,4 +724,107 @@ where id='${SMI}'`);
 if(sourceDefinition!=='Source drink modifier,500')
   throw new Error('Modifier source configuration was mutated: '+sourceDefinition);
 
+// Recipe copy requires an explicit SAME-BUSINESS inventory master identity.
+// It must NOT infer inventory correspondence from shop-local IDs or names,
+// copy costing/ledger/movement balances, or mutate live rows before publish.
+const SI='90000000-0000-4000-8000-000000000001';
+const TI='90000000-0000-4000-8000-000000000002';
+const TIL='90000000-0000-4000-8000-000000000003';
+const MI='91000000-0000-4000-8000-000000000001';
+sql(`insert into public.inventory_items(
+ id,shop_id,name,unit_label,tracking_mode,active)
+ values ('${SI}','${S}','Burger flour','g','RECIPE_TRACKED',true),
+        ('${TI}','${T}','Flour local','g','RECIPE_TRACKED',true),
+        ('${TIL}','${T}','Sauce local','ml','RECIPE_TRACKED',true);
+ insert into public.recipe_lines(shop_id,product_id,inventory_item_id,quantity_micros)
+ values ('${S}','${P1}','${SI}',2500000),
+        ('${T}','${TCLOCAL}','${TIL}',500000);`,
+  'source and target recipe items with different shop-local IDs');
+const recipeSourceBundle=sql(`select private.build_admin_catalog_bundle_v1('${S}'::uuid,5,now())::text`);
+const recipeTargetBundle=sql(`select private.build_admin_catalog_bundle_v1('${T}'::uuid,12,now())::text`);
+sql(`insert into public.catalog_publish_versions(
+ business_id,shop_id,publish_version,operations_configuration_version,source_kind,bundle_json)
+ values ('${B}','${S}',5,5,'BASELINE',${quoteJson(recipeSourceBundle)}),
+        ('${B}','${T}',12,12,'BASELINE',${quoteJson(recipeTargetBundle)});
+ insert into public.operations_configuration_snapshots(shop_id,version,bundle_json)
+ values ('${S}',5,${quoteJson(recipeSourceBundle)}),
+        ('${T}',12,${quoteJson(recipeTargetBundle)})
+ on conflict (shop_id,version) do nothing;`,
+  'isolated canonical recipe publication baselines');
+const recipeDraft=rpc(
+ `public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,12,'Master-mapped recipe copy')`,
+ 'create target recipe draft');
+if(!recipeDraft.ok||!recipeDraft.draftId)
+ throw new Error('Could not create recipe target draft: '+JSON.stringify(recipeDraft));
+const recipeParams=`'${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,
+'${recipeDraft.draftId}'::uuid,5::bigint,12::bigint,1::bigint,
+array['recipeLines']::text[]`;
+assertDenied(rpc(`public.preview_admin_catalog_shop_copy_v1(${recipeParams})`,
+ 'recipe missing approved master mapping'),'catalog_copy_missing_target_dependencies');
+sql(`insert into public.catalog_master_inventory_items
+ (id,business_id,canonical_name,base_unit_label,tracking_mode)
+ values ('${MI}','${B}','Flour','g','RECIPE_TRACKED');
+ insert into public.catalog_inventory_item_shop_bindings
+ (business_id,master_inventory_item_id,shop_id,inventory_item_id)
+ values ('${B}','${MI}','${S}','${SI}'),
+        ('${B}','${MI}','${T}','${TI}');`,
+  'explicit same-business inventory item master bindings');
+const acl=sql(`select has_table_privilege('anon','public.catalog_inventory_item_shop_bindings','SELECT')
+ ||','||has_table_privilege('authenticated','public.catalog_inventory_item_shop_bindings','SELECT')
+ ||','||has_table_privilege('service_role','public.catalog_inventory_item_shop_bindings','SELECT')`);
+if(acl!=='f,f,t')throw new Error('Inventory mapping grants breached: '+acl);
+sql(`update public.inventory_items set unit_label='kg' where id='${TI}'`,
+  'simulate target inventory unit drift after target publish');
+assertDenied(rpc(`public.preview_admin_catalog_shop_copy_v1(${recipeParams})`,
+ 'recipe incompatible target unit'),'catalog_copy_incompatible_inventory_units');
+sql(`update public.inventory_items set unit_label='g' where id='${TI}'`,
+  'restore target base unit');
+const recipePreview=rpc(`public.preview_admin_catalog_shop_copy_v1(${recipeParams})`,
+  'preview mapped recipe lines');
+if(!recipePreview.ok||recipePreview.mappedRecipeLines!==1||
+   recipePreview.changedRecipeLines!==1||
+   recipePreview.recipeDifferences?.[0]?.targetProductId!==P2||
+   recipePreview.recipeDifferences?.[0]?.targetInventoryItemId!==TI||
+   recipePreview.recipeDifferences?.[0]?.quantityAfterMicros!==2500000)
+ throw new Error('Recipe source→target unit-safe remap preview failed: '+
+   JSON.stringify(recipePreview));
+const recipeStaged=rpc(`public.apply_admin_catalog_shop_copy_v1(
+  ${recipeParams},'${recipePreview.fingerprint}','recipe-copy-1')`,
+  'stage mapped recipe');
+if(!recipeStaged.ok||recipeStaged.draftRevision!==2||
+   recipeStaged.changedRecipeLines!==1)
+ throw new Error('Recipe copy draft CAS apply failed: '+JSON.stringify(recipeStaged));
+const recipeLiveBefore=sql(`select count(*) from public.recipe_lines
+ where shop_id='${T}' and product_id='${P2}'`);
+if(recipeLiveBefore!=='0')throw new Error('Recipe copy mutated live recipe before publish');
+const stagedRecipe=sql(`select
+ (r.value->>'productId')||','||(r.value->>'inventoryItemId')||','||(r.value->>'quantityMicros')
+ from public.catalog_drafts d
+ cross join lateral jsonb_array_elements(d.working_bundle_json->'snapshot'->'recipeLines') r(value)
+ where d.id='${recipeDraft.draftId}' and r.value->>'productId'='${P2}'`);
+if(stagedRecipe!==P2+','+TI+',2500000')
+ throw new Error('Source inventory ID leaked into target draft recipe: '+stagedRecipe);
+const stagedLocalRecipe=sql(`select count(*) from public.catalog_drafts d
+ cross join lateral jsonb_array_elements(d.working_bundle_json->'snapshot'->'recipeLines') r(value)
+ where d.id='${recipeDraft.draftId}' and r.value->>'productId'='${TCLOCAL}'
+ and r.value->>'inventoryItemId'='${TIL}' and r.value->>'quantityMicros'='500000'`);
+if(stagedLocalRecipe!=='1')throw new Error('Target-only recipe lost from staged draft');
+const recipePublish=rpc(`public.publish_catalog_draft_v1(
+ '${OWNER}'::uuid,'${recipeDraft.draftId}'::uuid,2,12)`,
+ 'publish target recipe through catalog authority');
+if(!recipePublish.ok||recipePublish.publishVersion!==13)
+ throw new Error('Target recipe publication failed: '+JSON.stringify(recipePublish));
+const actualRecipe=sql(`select inventory_item_id||','||quantity_micros
+ from public.recipe_lines where shop_id='${T}' and product_id='${P2}'`);
+if(actualRecipe!==TI+',2500000')
+ throw new Error('Published recipe uses wrong target item/quantity: '+actualRecipe);
+const localRecipe=sql(`select inventory_item_id||','||quantity_micros
+ from public.recipe_lines where shop_id='${T}' and product_id='${TCLOCAL}'`);
+if(localRecipe!==TIL+',500000')
+ throw new Error('Target-only recipe was overwritten: '+localRecipe);
+const originalRecipe=sql(`select inventory_item_id||','||quantity_micros
+ from public.recipe_lines where shop_id='${S}' and product_id='${P1}'`);
+if(originalRecipe!==SI+',2500000')
+ throw new Error('Source recipe changed during target copy: '+originalRecipe);
+
 console.log('Catalog Copy isolated PostgreSQL: preview, master mapping, inactive/missing dependency, draft-only apply, once-only audit, ACL and canonical target publication passed.');
