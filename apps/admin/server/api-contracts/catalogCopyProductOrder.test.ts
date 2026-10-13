@@ -60,7 +60,7 @@ describe('selective master-mapped product ordering', () => {
       }).success,
     ).toBe(true);
     const sql = readFileSync(
-      join(root, '20261013040000_admin_catalog_copy_combo_beverage_options.sql'),
+      join(root, '20261013031700_admin_catalog_copy_combo_beverage_options.sql'),
       'utf8',
     );
     expect(sql).toContain('v_source_to_target_product_map');
