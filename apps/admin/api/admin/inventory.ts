@@ -15,7 +15,11 @@ import {
   requireSessionCsrf,
   type AdminSessionContext,
 } from '../../server/adminAuthService.js';
-import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
+import {
+  AdminAuthorizationError,
+  requireBusinessWidePermission,
+  requirePermission,
+} from '../../server/authorization.js';
 import type { AdminApprovalActor, AdminApprovalRule, AdminPermission } from '@tux/admin-contracts';
 import { isAdminPermission } from '../../server/adminContractRuntime.js';
 import { createSupabaseApprovalServiceDependencies } from '../../server/approvals/approvalService.js';
@@ -49,6 +53,31 @@ const microsSchema = z.number().int().safe();
 const positiveMicrosSchema = microsSchema.positive();
 const commandIdSchema = z.string().trim().min(1).max(160);
 const noteSchema = z.string().trim().max(500).nullable();
+
+export const inventoryMasterBindSchema = z
+  .object({
+    type: z.literal('master.bind'),
+    shopId: uuidSchema,
+    inventoryItemId: uuidSchema,
+    masterInventoryItemId: uuidSchema.nullable(),
+    canonicalName: z.string().trim().min(1).max(160).nullable(),
+    commandId: commandIdSchema,
+  })
+  .strict()
+  .refine(
+    (input) =>
+      (input.masterInventoryItemId === null && input.canonicalName !== null) ||
+      (input.masterInventoryItemId !== null && input.canonicalName === null),
+  );
+
+function requireInventoryMasterAuthority(
+  context: AdminSessionContext,
+  shopId: string,
+): void {
+  for (const permission of ['inventory.view', 'inventory.adjust', 'catalog.edit'] as const) {
+    requireBusinessWidePermission(context.principal, permission, shopId);
+  }
+}
 
 const commandSchema = z.discriminatedUnion('type', [
   z
@@ -1025,7 +1054,9 @@ function handleFailure(response: AdminResponse, error: unknown, request: AdminRe
   if (error instanceof AdminSupabaseError) {
     if (
       error.responseBody.includes('TUX_ADMIN_INVENTORY_PERMISSION_REQUIRED') ||
-      error.responseBody.includes('TUX_ADMIN_INVENTORY_REASON_INVALID')
+      error.responseBody.includes('TUX_ADMIN_INVENTORY_REASON_INVALID') ||
+      error.responseBody.includes('TUX_ADMIN_CATALOG_FORBIDDEN') ||
+      error.responseBody.includes('inventory_master_owner_required')
     ) {
       sendJson(response, 403, { error: 'permission_forbidden' });
       return;
@@ -1063,6 +1094,20 @@ export default async function handler(
       const shopId = uuidSchema.parse(url.searchParams.get('shopId'));
       const inventoryItemId = url.searchParams.get('inventoryItemId');
       const context = await loadContext(request, client, false);
+      const view = url.searchParams.get('view');
+      if (view === 'master-bindings') {
+        requireInventoryMasterAuthority(context, shopId);
+        const result = await client.rpc('list_admin_inventory_masters_v1', {
+          p_employee_id: context.principal.employeeId,
+          p_shop_id: shopId,
+        });
+        sendJson(response, 200, result);
+        return;
+      }
+      if (view !== null) {
+        sendJson(response, 400, { error: 'invalid_inventory_request' });
+        return;
+      }
       if (inventoryItemId !== null) {
         const parsedInventoryItemId = uuidSchema.parse(inventoryItemId);
         requirePermission(context.principal, 'inventory.view', shopId);
@@ -1084,7 +1129,34 @@ export default async function handler(
     }
 
     if (!requireSameOrigin(request, response)) return;
-    const command = commandSchema.parse(await readJsonObject(request)) as AdminInventoryCommand;
+    const body = await readJsonObject(request);
+    if (body.type === 'master.bind') {
+      const input = inventoryMasterBindSchema.parse(body);
+      const context = await loadContext(request, client, true);
+      requireInventoryMasterAuthority(context, input.shopId);
+      const result = await client.rpc<{ ok: boolean; code?: string }>(
+        'bind_admin_inventory_master_v1',
+        {
+          p_employee_id: context.principal.employeeId,
+          p_shop_id: input.shopId,
+          p_inventory_item_id: input.inventoryItemId,
+          p_master_inventory_item_id: input.masterInventoryItemId,
+          p_canonical_name: input.canonicalName,
+          p_command_id: input.commandId,
+        },
+      );
+      const code = result.code ?? '';
+      const status = result.ok
+        ? 200
+        : code.includes('conflict') || code.includes('bound')
+          ? 409
+          : code.includes('not_found')
+            ? 404
+            : 400;
+      sendJson(response, status, result);
+      return;
+    }
+    const command = commandSchema.parse(body) as AdminInventoryCommand;
     const context = await loadContext(request, client, true);
     const result = await executeCommand(client, context, command, request);
     sendJson(response, commandFailureStatus(result), result);

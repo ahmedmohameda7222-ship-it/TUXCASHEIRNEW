@@ -56,7 +56,7 @@ export function InventoryMasterBindingPanel({
     queryKey: ['admin', 'inventory-master', shopId],
     queryFn: () =>
       adminFetch<MasterResponse>(
-        `/api/admin/inventory-master?shopId=${encodeURIComponent(shopId)}`,
+        `/api/admin/inventory?view=master-bindings&shopId=${encodeURIComponent(shopId)}`,
       ),
   });
   const masters = mastersQuery.data?.masters ?? [];
@@ -92,7 +92,7 @@ export function InventoryMasterBindingPanel({
     if (!retainedCommandId.current) retainedCommandId.current = crypto.randomUUID();
     try {
       const result = await adminFetch<BindResult>(
-        '/api/admin/inventory-master',
+        '/api/admin/inventory',
         {
           method: 'POST',
           body: JSON.stringify({

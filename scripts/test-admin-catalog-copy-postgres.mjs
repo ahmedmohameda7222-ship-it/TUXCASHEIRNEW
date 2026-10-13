@@ -857,10 +857,14 @@ const listed=rpc(
 if(!listed.ok||!listed.masters?.some(row=>row.id===masterId &&
     row.inventoryItemId===TIL && row.baseUnitLabel==='ml'))
 throw new Error('Master list missing canonical binding: '+JSON.stringify(listed));
+sql(`update public.inventory_items set unit_label='g'
+where id='${SAUCE_SOURCE}'`, 'simulate a non-matching unbound base unit');
 assertDenied(rpc(`public.bind_admin_inventory_master_v1(
-'${OWNER}'::uuid,'${S}'::uuid,'${SI}'::uuid,
+'${OWNER}'::uuid,'${S}'::uuid,'${SAUCE_SOURCE}'::uuid,
 '${masterId}'::uuid,null::text,'bind-wrong-unit'::text)`,
 'deny grams-to-milliliters mapping'),'catalog_inventory_master_unit_conflict');
+sql(`update public.inventory_items set unit_label='ml'
+where id='${SAUCE_SOURCE}'`, 'restore original inventory item unit');
 const attached=rpc(`public.bind_admin_inventory_master_v1(
 '${OWNER}'::uuid,'${S}'::uuid,'${SAUCE_SOURCE}'::uuid,
 '${masterId}'::uuid,null::text,'bind-sauce-source-1'::text)`,

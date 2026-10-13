@@ -449,9 +449,10 @@ test('authorized owner explicitly creates an audited recipe inventory master bin
   });
   const recorded: Record<string, unknown>[] = [];
   const masterId = '88888888-8888-4888-8888-888888888888';
-  await page.route('**/api/admin/inventory-master**', async (route) => {
+  await page.route('**/api/admin/inventory**', async (route) => {
     const req = route.request();
-    if (req.method() === 'GET') {
+    const url = new URL(req.url());
+    if (req.method() === 'GET' && url.searchParams.get('view') === 'master-bindings') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -472,6 +473,10 @@ test('authorized owner explicitly creates an audited recipe inventory master bin
             : [],
         }),
       });
+      return;
+    }
+    if (req.method() !== 'POST' || req.postDataJSON().type !== 'master.bind') {
+      await route.fallback();
       return;
     }
     expect(req.headers()['x-tux-admin-csrf']).toBe(csrfToken);
