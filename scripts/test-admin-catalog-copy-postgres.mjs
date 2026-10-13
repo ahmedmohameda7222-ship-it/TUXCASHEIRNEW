@@ -101,6 +101,50 @@ const preview=rpc(`public.preview_admin_catalog_shop_copy_v1(${params()})`,'prev
 if(!preview.ok || preview.mappedProducts!==1 || preview.changedProducts!==1 ||
    !/^[0-9a-f]{64}$/.test(preview.fingerprint))
 throw new Error('Expected one mapped changed product: '+JSON.stringify(preview));
+// Exercise the trusted database boundary using a real scoped, non-owner employee.
+// The source grants catalog.view, the target grants catalog.edit, but pricing is
+// explicitly denied; publication/staging versions remain read-only during preview.
+const EDITOR='30000000-0000-4000-8000-000000000003';
+sql(`insert into public.business_employees(id,business_id,display_name,role,active)
+values ('${EDITOR}','${B}','Catalog manager','MANAGER',true);
+insert into public.employee_shop_assignments(business_id,employee_id,shop_id)
+values ('${B}','${EDITOR}','${S}'),('${B}','${EDITOR}','${T}');
+insert into public.admin_employee_permissions(business_id,employee_id,permission_key,effect)
+values ('${B}','${EDITOR}','catalog.view','ALLOW'),
+       ('${B}','${EDITOR}','catalog.edit','ALLOW'),
+       ('${B}','${EDITOR}','catalog.pricing','DENY');`, 'scoped catalog manager');
+const scopedArgs=(domains)=>params(S,T,1,1,domains).replace(
+  `'${OWNER}'::uuid`,`'${EDITOR}'::uuid`
+);
+const scopedPreview=rpc(
+  `public.preview_admin_catalog_shop_copy_v1(${scopedArgs("array['productOrder']::text[]")})`,
+  'non-pricing manager product-order preview'
+);
+if(!scopedPreview.ok || scopedPreview.changedProducts!==1)
+  throw new Error('Scoped non-pricing catalog preview was denied: '+JSON.stringify(scopedPreview));
+let scopedPricingDenied=false;
+try {
+  rpc(`public.preview_admin_catalog_shop_copy_v1(${scopedArgs("array['productPrices']::text[]")})`,
+    'non-pricing manager forbidden prices');
+} catch(error) {
+  scopedPricingDenied=/TUX_ADMIN_CATALOG_FORBIDDEN/.test(String(error));
+}
+if(!scopedPricingDenied)
+  throw new Error('A non-pricing catalog manager could preview restricted product prices');
+sql(`delete from public.employee_shop_assignments
+where business_id='${B}' and employee_id='${EDITOR}' and shop_id='${T}'`,
+  'revoke target-shop assignment');
+let unassignedTargetDenied=false;
+try {
+  rpc(`public.preview_admin_catalog_shop_copy_v1(${scopedArgs("array['productOrder']::text[]")})`,
+    'manager unassigned target');
+} catch(error) {
+  unassignedTargetDenied=/TUX_ADMIN_CATALOG_FORBIDDEN/.test(String(error));
+}
+if(!unassignedTargetDenied)
+  throw new Error('Unassigned manager could preview the target shop catalog');
+sql(`insert into public.employee_shop_assignments(business_id,employee_id,shop_id)
+values ('${B}','${EDITOR}','${T}')`, 'restore isolated manager shop scope');
 let crossBusinessDenied = false;
 try {
   const result = rpc(
