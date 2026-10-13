@@ -87,6 +87,21 @@ describe('selective master-mapped product ordering', () => {
     expect(sql).toContain('changedProductModifierLinks');
   });
 
+  it('requires pricing authority and canonical modifier identity for selected definitions', () => {
+    expect(catalogCopySchema.safeParse({
+      ...command,
+      selectedDomains: ['modifierDefinitions'],
+    }).success).toBe(true);
+    const sql = readFileSync(
+      join(root, '20261013050000_admin_catalog_copy_modifier_definitions.sql'),
+      'utf8',
+    );
+    expect(sql).toContain("or 'modifierDefinitions'=any(p_domains)");
+    expect(sql).toContain('catalog_copy_target_name_conflict');
+    expect(sql).toContain('v_modifier_definition_map');
+    expect(sql).toContain('private.validate_admin_catalog_bundle_v1');
+  });
+
   it('copies only target sortOrder through the fingerprinted draft and preserves identity', () => {
     const names = readdirSync(root).filter((name) =>
       name.endsWith('_admin_catalog_copy_existing_master_product_order.sql'),

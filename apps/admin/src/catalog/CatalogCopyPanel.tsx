@@ -13,7 +13,8 @@ type Domain =
   | 'categoryAvailability'
   | 'productCategoryAssignments'
   | 'comboBeverageOptions'
-  | 'productModifierLinks';
+  | 'productModifierLinks'
+  | 'modifierDefinitions';
 
 type CopyPreview = {
   ok: true;
@@ -28,6 +29,19 @@ type CopyPreview = {
   changedComboBeverageOptions: number;
   mappedProductModifierLinks: number;
   changedProductModifierLinks: number;
+  mappedModifierDefinitions: number;
+  changedModifierDefinitions: number;
+  modifierDefinitionDifferences: Array<{
+    targetModifierId: string;
+    nameBefore: string;
+    nameAfter: string;
+    priceBeforeMinor: number;
+    priceAfterMinor: number;
+    activeBefore: boolean;
+    activeAfter: boolean;
+    sortOrderBefore: number;
+    sortOrderAfter: number;
+  }>;
   productModifierLinkDifferences: Array<{
     targetProductId: string;
     targetModifierId: string;
@@ -315,6 +329,17 @@ export function CatalogCopyPanel({
             />
             Combo beverage options (mapped products only)
           </label>
+          {canPrice ? (
+            <label className="admin-field">
+              <input
+                type="checkbox"
+                checked={domains.includes('modifierDefinitions')}
+                disabled={pending}
+                onChange={(event) => toggle('modifierDefinitions', event.currentTarget.checked)}
+              />
+              Modifier definitions (mapped names, prices, active status and order)
+            </label>
+          ) : null}
           <label className="admin-field">
             <input
               type="checkbox"
@@ -386,6 +411,10 @@ export function CatalogCopyPanel({
           <p>
             {currentPreview.mappedProductModifierLinks} mapped modifier links,{' '}
             {currentPreview.changedProductModifierLinks} link changes.
+          </p>
+          <p>
+            {currentPreview.mappedModifierDefinitions} mapped modifier definitions,{' '}
+            {currentPreview.changedModifierDefinitions} definition changes.
           </p>
           {currentPreview.differences.length > 0 ? (
             <ul>
@@ -468,6 +497,23 @@ export function CatalogCopyPanel({
               ))}
             </ul>
           ) : null}
+          {currentPreview.modifierDefinitionDifferences.length > 0 ? (
+            <ul>
+              {currentPreview.modifierDefinitionDifferences.map((item) => (
+                <li key={item.targetModifierId}>
+                  <strong>Modifier {item.targetModifierId}</strong>
+                  {' — name: '}
+                  {item.nameBefore} → {item.nameAfter}
+                  {'; price: '}
+                  {item.priceBeforeMinor} → {item.priceAfterMinor}
+                  {'; active: '}
+                  {String(item.activeBefore)} → {String(item.activeAfter)}
+                  {'; order: '}
+                  {item.sortOrderBefore} → {item.sortOrderAfter}.
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <p>
             Source publication {currentPreview.expectedSourcePublishVersion}, target publication{' '}
             {currentPreview.expectedTargetPublishVersion}, draft revision{' '}
@@ -481,7 +527,8 @@ export function CatalogCopyPanel({
               (currentPreview.changedProducts === 0 &&
                 currentPreview.changedCategories === 0 &&
                 currentPreview.changedComboBeverageOptions === 0 &&
-                currentPreview.changedProductModifierLinks === 0)
+                currentPreview.changedProductModifierLinks === 0 &&
+                currentPreview.changedModifierDefinitions === 0)
             }
             onClick={() => void stageCopy()}
           >

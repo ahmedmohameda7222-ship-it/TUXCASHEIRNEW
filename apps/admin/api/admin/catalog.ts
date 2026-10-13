@@ -61,10 +61,11 @@ const catalogCopyBaseSchema = z.object({
         'productCategoryAssignments',
         'comboBeverageOptions',
         'productModifierLinks',
+        'modifierDefinitions',
       ]),
     )
     .min(1)
-    .max(8)
+    .max(9)
     .refine((domains) => new Set(domains).size === domains.length),
 });
 
@@ -272,7 +273,9 @@ export default async function handler(
       const principal = await loadPrincipal(request, client, true);
       requirePermission(principal, 'catalog.view', copy.data.sourceShopId);
       requirePermission(principal, 'catalog.edit', copy.data.targetShopId);
-      if (copy.data.selectedDomains.includes('productPrices')) {
+      if (copy.data.selectedDomains.some((domain) =>
+        domain === 'productPrices' || domain === 'modifierDefinitions'
+      )) {
         requirePermission(principal, 'catalog.pricing', copy.data.targetShopId);
       }
       const result = await client.rpc<Readonly<Record<string, unknown>>>(
