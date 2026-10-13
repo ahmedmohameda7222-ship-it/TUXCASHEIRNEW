@@ -546,10 +546,8 @@ export function CatalogCopyPanel({
             <ul>
               {currentPreview.recipeDifferences.map((item) => (
                 <li key={`${item.targetProductId}:${item.targetInventoryItemId}`}>
-                  <strong>Recipe product {item.targetProductId}</strong>
-                  {' — inventory item '}
-                  {item.targetInventoryItemId}
-                  {'; quantity (base micros): '}
+                  <strong>Recipe {item.targetProductId}</strong> — inventory item{' '}
+                  {item.targetInventoryItemId}; quantity (base micros):{' '}
                   {item.quantityBeforeMicros ?? 'none'} →{' '}
                   {item.quantityAfterMicros ?? 'removed'}.
                 </li>
