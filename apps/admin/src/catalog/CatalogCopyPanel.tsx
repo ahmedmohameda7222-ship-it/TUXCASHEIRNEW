@@ -279,8 +279,9 @@ export function CatalogCopyPanel({
         <div role="status">
           <p>
             Read-only preview: {currentPreview.mappedProducts} existing master-mapped products,
-            {currentPreview.changedProducts} target products would change; {currentPreview.mappedCategories}{' '}
-            mapped categories, {currentPreview.changedCategories} target categories would change.
+            {currentPreview.changedProducts} target products would change;{' '}
+            {currentPreview.mappedCategories} mapped categories, {currentPreview.changedCategories}{' '}
+            target categories would change.
           </p>
           {currentPreview.differences.length > 0 ? (
             <ul>
@@ -339,7 +340,10 @@ export function CatalogCopyPanel({
           <button
             type="button"
             className="admin-primary-button"
-            disabled={pending || (currentPreview.changedProducts === 0 && currentPreview.changedCategories === 0)}
+            disabled={
+              pending ||
+              (currentPreview.changedProducts === 0 && currentPreview.changedCategories === 0)
+            }
             onClick={() => void stageCopy()}
           >
             {pending ? 'Applying…' : 'Apply to target draft'}
