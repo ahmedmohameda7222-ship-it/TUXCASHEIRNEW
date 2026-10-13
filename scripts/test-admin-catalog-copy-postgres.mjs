@@ -186,6 +186,25 @@ throw new Error('Catalog copy staging failed: '+JSON.stringify(applied));
 const replay=rpc(apply(),'replay copy');
 if(!replay.ok||replay.replayed!==true||replay.draftRevision!==2)
 throw new Error('Catalog Copy idempotency failed: '+JSON.stringify(replay));
+// An immutable command receipt is scoped to the exact actor and canonical
+// request. A reused command ID with altered domains or versions must conflict,
+// even if the caller retains a previously valid preview fingerprint.
+assertDenied(
+  rpc(`public.apply_admin_catalog_shop_copy_v1(${params(S,T,1,1,"array['productAvailability']::text[]")},
+    '${preview.fingerprint}','catalog-copy-1')`,'changed-domain command ID'),
+  'command_id_conflict',
+);
+assertDenied(
+  rpc(`public.apply_admin_catalog_shop_copy_v1(${params().replace(
+    `'${OWNER}'::uuid`,`'${EDITOR}'::uuid`
+  )},'${preview.fingerprint}','catalog-copy-1')`,'foreign-actor command ID'),
+  'command_id_conflict',
+);
+assertDenied(
+  rpc(`public.apply_admin_catalog_shop_copy_v1(${params(S,T,1,2)},
+    '${preview.fingerprint}','catalog-copy-1')`,'changed-source-version command ID'),
+  'command_id_conflict',
+);
 assertDenied(rpc(apply('0'.repeat(64)),'collision'),'command_id_conflict');
 const state=sql(`select (working_bundle_json->'snapshot'->'products'->0->>'priceMinor') || ',' ||
 (working_bundle_json->'snapshot'->'products'->0->>'soldOut')
