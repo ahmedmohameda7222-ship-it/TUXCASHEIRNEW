@@ -580,7 +580,9 @@ test('Catalog Copy can create an authorized target draft before previewing', asy
   const { commands } = await mockPublishing(page, true, {}, true);
   await page.goto('/catalog/products/publishing');
 
-  await expect(page.getByText('Create an authorized catalog draft for this shop before copying.')).toBeVisible();
+  await expect(
+    page.getByText('Create an authorized catalog draft for this shop before copying.'),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Create target draft for copy' }).click();
   await expect(page.getByRole('button', { name: 'Preview catalog copy' })).toBeVisible();
   expect(commands.find((command) => command.type === 'draft.create')).toMatchObject({
