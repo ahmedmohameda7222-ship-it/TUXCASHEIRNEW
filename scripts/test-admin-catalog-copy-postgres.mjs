@@ -372,29 +372,29 @@ const preparedCategory=rpc(`public.apply_catalog_draft_change_v1(
   'prepare alternative target category via canonical draft');
 if(!preparedCategory.ok || preparedCategory.draftRevision!==2)
   throw new Error('Could not prepare valid alternative target category: '+JSON.stringify(preparedCategory));
-const categoryArgs=`'${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,
+const assignmentArgs=`'${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,
   '${assignmentDraft.draftId}'::uuid,1::bigint,4::bigint,2::bigint,
   array['productCategoryAssignments']::text[]`;
 sql(`delete from public.catalog_category_shop_bindings
 where shop_id='${T}' and master_category_id='${MC}'`,
   'remove target category binding in isolated copy fixture');
-assertDenied(rpc(`public.preview_admin_catalog_shop_copy_v1(${categoryArgs})`,
+assertDenied(rpc(`public.preview_admin_catalog_shop_copy_v1(${assignmentArgs})`,
   'missing master-mapped category assignment'),'catalog_copy_missing_target_dependencies');
 sql(`insert into public.catalog_category_shop_bindings(
   business_id,master_category_id,shop_id,canonical_category_id)
 values ('${B}','${MC}','${T}','${C2}')`,
   'restore target master-category binding');
-const categoryPreview=rpc(
-  `public.preview_admin_catalog_shop_copy_v1(${categoryArgs})`,
+const assignmentPreview=rpc(
+  `public.preview_admin_catalog_shop_copy_v1(${assignmentArgs})`,
   'preview canonical shop-local category reassignment');
-if(!categoryPreview.ok || categoryPreview.changedProducts!==1 ||
-   categoryPreview.differences?.[0]?.categoryIdBefore!==C3 ||
-   categoryPreview.differences?.[0]?.categoryIdAfter!==C2 ||
-   categoryPreview.differences?.[0]?.targetProductId!==P2)
+if(!assignmentPreview.ok || assignmentPreview.changedProducts!==1 ||
+   assignmentPreview.differences?.[0]?.categoryIdBefore!==C3 ||
+   assignmentPreview.differences?.[0]?.categoryIdAfter!==C2 ||
+   assignmentPreview.differences?.[0]?.targetProductId!==P2)
   throw new Error('Category reassignment must map target-local IDs with preview diff: '+
-    JSON.stringify(categoryPreview));
+    JSON.stringify(assignmentPreview));
 const stagedCategory=rpc(`public.apply_admin_catalog_shop_copy_v1(
-  ${categoryArgs},'${categoryPreview.fingerprint}','copy-category-assignment-1')`,
+  ${assignmentArgs},'${assignmentPreview.fingerprint}','copy-category-assignment-1')`,
   'stage canonical category reassignment');
 if(!stagedCategory.ok || stagedCategory.draftRevision!==3)
   throw new Error('Could not stage mapped target category assignment: '+JSON.stringify(stagedCategory));
