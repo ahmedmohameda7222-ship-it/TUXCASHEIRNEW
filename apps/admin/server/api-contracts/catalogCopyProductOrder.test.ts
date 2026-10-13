@@ -88,10 +88,12 @@ describe('selective master-mapped product ordering', () => {
   });
 
   it('requires pricing authority and canonical modifier identity for selected definitions', () => {
-    expect(catalogCopySchema.safeParse({
-      ...command,
-      selectedDomains: ['modifierDefinitions'],
-    }).success).toBe(true);
+    expect(
+      catalogCopySchema.safeParse({
+        ...command,
+        selectedDomains: ['modifierDefinitions'],
+      }).success,
+    ).toBe(true);
     const sql = readFileSync(
       join(root, '20261013050000_admin_catalog_copy_modifier_definitions.sql'),
       'utf8',

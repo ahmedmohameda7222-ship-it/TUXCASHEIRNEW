@@ -608,23 +608,27 @@ test('Catalog Copy previews and stages mapped modifier definitions', async ({ pa
     differences: [],
     mappedModifierDefinitions: 1,
     changedModifierDefinitions: 1,
-    modifierDefinitionDifferences: [{
-      targetModifierId: '11111111-1111-4111-8111-111111111113',
-      nameBefore: 'Target modifier',
-      nameAfter: 'Source modifier',
-      priceBeforeMinor: 600,
-      priceAfterMinor: 500,
-      activeBefore: true,
-      activeAfter: true,
-      sortOrderBefore: 8,
-      sortOrderAfter: 3,
-    }],
+    modifierDefinitionDifferences: [
+      {
+        targetModifierId: '11111111-1111-4111-8111-111111111113',
+        nameBefore: 'Target modifier',
+        nameAfter: 'Source modifier',
+        priceBeforeMinor: 600,
+        priceAfterMinor: 500,
+        activeBefore: true,
+        activeAfter: true,
+        sortOrderBefore: 8,
+        sortOrderAfter: 3,
+      },
+    ],
   });
   await page.goto('/catalog/products/publishing');
   await page.getByRole('checkbox', { name: 'Product availability' }).uncheck();
-  await page.getByRole('checkbox', {
-    name: 'Modifier definitions (mapped names, prices, active status and order)',
-  }).check();
+  await page
+    .getByRole('checkbox', {
+      name: 'Modifier definitions (mapped names, prices, active status and order)',
+    })
+    .check();
   await page.getByRole('button', { name: 'Preview catalog copy' }).click();
   await expect(page.getByText(/1 mapped modifier definitions/)).toBeVisible();
   await expect(page.getByText(/Target modifier/)).toBeVisible();

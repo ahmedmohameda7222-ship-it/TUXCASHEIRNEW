@@ -273,9 +273,10 @@ export default async function handler(
       const principal = await loadPrincipal(request, client, true);
       requirePermission(principal, 'catalog.view', copy.data.sourceShopId);
       requirePermission(principal, 'catalog.edit', copy.data.targetShopId);
-      if (copy.data.selectedDomains.some((domain) =>
-        domain === 'productPrices' || domain === 'modifierDefinitions'
-      )) {
+      if (
+        copy.data.selectedDomains.includes('productPrices') ||
+        copy.data.selectedDomains.includes('modifierDefinitions')
+      ) {
         requirePermission(principal, 'catalog.pricing', copy.data.targetShopId);
       }
       const result = await client.rpc<Readonly<Record<string, unknown>>>(
