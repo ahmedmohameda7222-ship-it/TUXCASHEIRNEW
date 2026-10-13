@@ -32,6 +32,15 @@ describe('selective master-mapped product ordering', () => {
     ).toBe(false);
   });
 
+  it('accepts product-category reassignment as a separate selected catalog copy domain', () => {
+    expect(
+      catalogCopySchema.safeParse({
+        ...command,
+        selectedDomains: ['productCategoryAssignments'],
+      }).success,
+    ).toBe(true);
+  });
+
   it('copies only target sortOrder through the fingerprinted draft and preserves identity', () => {
     const names = readdirSync(root).filter((name) =>
       name.endsWith('_admin_catalog_copy_existing_master_product_order.sql'),
