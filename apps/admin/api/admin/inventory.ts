@@ -1097,10 +1097,13 @@ export default async function handler(
       const view = url.searchParams.get('view');
       if (view === 'master-bindings') {
         requireInventoryMasterAuthority(context, shopId);
-        const result = await client.rpc('list_admin_inventory_masters_v1', {
+        const result = await client.rpc<Readonly<Record<string, unknown>>>(
+          'list_admin_inventory_masters_v1',
+          {
           p_employee_id: context.principal.employeeId,
-          p_shop_id: shopId,
-        });
+            p_shop_id: shopId,
+          },
+        );
         sendJson(response, 200, result);
         return;
       }
