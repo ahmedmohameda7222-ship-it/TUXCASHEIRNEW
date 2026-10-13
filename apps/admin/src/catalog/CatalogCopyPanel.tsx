@@ -97,6 +97,35 @@ export function CatalogCopyPanel({
     reset();
   }
 
+  async function createTargetDraft() {
+    if (draft || pending || session.state.status !== 'authenticated') return;
+    setPending(true);
+    setError('');
+    reset();
+    try {
+      const result = await adminFetch<{ ok: boolean; code?: string }>(
+        '/api/admin/catalog',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'draft.create',
+            shopId: targetShopId,
+            expectedVersion: targetPublishVersion,
+            title: 'Selective catalog copy',
+          }),
+        },
+        session.state.session.csrfToken,
+      );
+      if (!result.ok) throw new Error(result.code ?? 'catalog_draft_create_failed');
+      setMessage('Target draft created. Preview selected configuration before applying.');
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'catalog', targetShopId] });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to create target draft.');
+    } finally {
+      setPending(false);
+    }
+  }
+
   async function makePreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft || !activeSourceShopId || pending || domains.length === 0) return;
@@ -279,7 +308,17 @@ export function CatalogCopyPanel({
           </button>
         </form>
       ) : (
-        <p>Create an authorized catalog draft for this shop before copying.</p>
+        <div>
+          <p>Create an authorized catalog draft for this shop before copying.</p>
+          <button
+            type="button"
+            className="admin-secondary-button"
+            disabled={pending}
+            onClick={() => void createTargetDraft()}
+          >
+            {pending ? 'Creating draft…' : 'Create target draft for copy'}
+          </button>
+        </div>
       )}
       {error ? <p role="alert">{error}</p> : null}
       {message ? <p role="status">{message}</p> : null}
