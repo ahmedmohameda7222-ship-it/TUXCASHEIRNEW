@@ -11,7 +11,14 @@ const ownerSession = {
     employeeId: '33333333-3333-4333-8333-333333333333',
     businessId: '44444444-4444-4444-8444-444444444444',
     role: 'OWNER',
-    permissions: ['catalog.view', 'catalog.edit', 'catalog.pricing', 'catalog.publish'],
+    permissions: [
+      'catalog.view',
+      'catalog.edit',
+      'catalog.pricing',
+      'catalog.publish',
+      'inventory.view',
+      'inventory.adjust',
+    ],
     shopIds: [shopId],
   },
   csrfToken: 'a'.repeat(64),
@@ -622,9 +629,11 @@ test('Catalog Copy previews and stages unit-safe master-mapped recipe lines', as
   });
   await page.goto('/catalog/products/publishing');
   await page.getByRole('checkbox', { name: 'Product availability' }).uncheck();
-  await page.getByRole('checkbox', {
-    name: 'Recipe quantities (explicit inventory masters and matching base units)',
-  }).check();
+  await page
+    .getByRole('checkbox', {
+      name: 'Recipe quantities (explicit inventory masters and matching base units)',
+    })
+    .check();
   await page.getByRole('button', { name: 'Preview catalog copy' }).click();
   await expect(page.getByText(/1 mapped recipe lines/)).toBeVisible();
   await expect(page.getByText(/2500000/)).toBeVisible();

@@ -109,6 +109,10 @@ export function CatalogCopyPanel({
 }) {
   const session = useAdminSession();
   const queryClient = useQueryClient();
+  const canCopyRecipe =
+    session.state.status === 'authenticated' &&
+    session.state.session.principal.permissions.includes('inventory.view') &&
+    session.state.session.principal.permissions.includes('inventory.adjust');
   const [sourceShopId, setSourceShopId] = useState(sourceShopIds[0] ?? '');
   const activeSourceShopId = sourceShopIds.includes(sourceShopId)
     ? sourceShopId
@@ -329,9 +333,7 @@ export function CatalogCopyPanel({
             />
             Product category assignments (mapped products and categories)
           </label>
-          {session.state.status === 'authenticated' &&
-          session.state.session.principal.permissions.includes('inventory.view') &&
-          session.state.session.principal.permissions.includes('inventory.adjust') ? (
+          {canCopyRecipe ? (
             <label className="admin-field">
               <input
                 type="checkbox"
