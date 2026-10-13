@@ -419,12 +419,14 @@ const SCP='70000000-0000-4000-8000-000000000003';
 const TCP='70000000-0000-4000-8000-000000000004';
 const SBP='70000000-0000-4000-8000-000000000005';
 const TBP='70000000-0000-4000-8000-000000000006';
+const TCLOCAL='70000000-0000-4000-8000-000000000007';
 sql(`
 insert into public.products(id,shop_id,category_id,slug,name,price_minor,active,sold_out,is_combo,sort_order)
 values ('${SCP}','${S}','${C1}','meal','Meal',26000,true,false,true,7),
        ('${TCP}','${T}','${C2}','meal','Meal',28000,true,false,true,10),
        ('${SBP}','${S}','${C1}','drink','Drink',5000,true,false,false,8),
-       ('${TBP}','${T}','${C2}','drink','Drink',6000,true,false,false,11);
+       ('${TBP}','${T}','${C2}','drink','Drink',6000,true,false,false,11),
+       ('${TCLOCAL}','${T}','${C2}','local-combo','Local combo',38000,true,false,true,12);
 insert into public.catalog_master_products(id,business_id,master_category_id,canonical_name)
 values ('${CMP}','${B}','${MC}','Meal'),('${BMP}','${B}','${MC}','Drink');
 insert into public.catalog_product_shop_overrides(
@@ -434,7 +436,8 @@ values ('${B}','${CMP}','${S}','${SCP}',26000,true,false),
        ('${B}','${BMP}','${S}','${SBP}',5000,true,false),
        ('${B}','${BMP}','${T}','${TBP}',6000,true,false);
 insert into public.combo_beverage_options(shop_id,combo_product_id,beverage_product_id,sort_order)
-values ('${S}','${SCP}','${SBP}',11);
+values ('${S}','${SCP}','${SBP}',11),
+       ('${T}','${TCLOCAL}','${TBP}',91);
 `, 'isolated cross-shop combo and beverage master fixtures');
 const comboSourceBundle=sql(`select private.build_admin_catalog_bundle_v1('${S}'::uuid,2,now())::text`);
 const comboTargetBundle=sql(`select private.build_admin_catalog_bundle_v1('${T}'::uuid,6,now())::text`);
@@ -478,23 +481,39 @@ const comboCopyStaged=rpc(
   'stage mapped beverage options');
 if(!comboCopyStaged.ok||comboCopyStaged.draftRevision!==2)
   throw new Error('Combo beverage copy staging failed: '+JSON.stringify(comboCopyStaged));
-const comboBeforeLive=sql(`select count(*) from public.combo_beverage_options where shop_id='${T}'`);
+const comboBeforeLive=sql(`select count(*) from public.combo_beverage_options
+where shop_id='${T}' and combo_product_id='${TCP}'`);
 if(comboBeforeLive!=='0')throw new Error('Combo copy mutated target live options before publish');
 const comboDraftOption=sql(`select
-(working_bundle_json->'snapshot'->'comboBeverageOptions'->0->>'comboProductId')
-||','||(working_bundle_json->'snapshot'->'comboBeverageOptions'->0->>'beverageProductId')
-from public.catalog_drafts where id='${comboCopyDraft.draftId}'`);
+opt.value->>'comboProductId'||','||opt.value->>'beverageProductId'
+from public.catalog_drafts d
+cross join lateral jsonb_array_elements(d.working_bundle_json->'snapshot'->'comboBeverageOptions') opt(value)
+where d.id='${comboCopyDraft.draftId}' and opt.value->>'comboProductId'='${TCP}'`);
 if(comboDraftOption!==TCP+','+TBP)
   throw new Error('Source-local combo/beverage IDs leaked into target draft: '+comboDraftOption);
+const comboLocalDraft=sql(`select count(*)
+from public.catalog_drafts d
+cross join lateral jsonb_array_elements(d.working_bundle_json->'snapshot'->'comboBeverageOptions') opt(value)
+where d.id='${comboCopyDraft.draftId}'
+and opt.value->>'comboProductId'='${TCLOCAL}'
+and opt.value->>'beverageProductId'='${TBP}'
+and opt.value->>'sortOrder'='91'`);
+if(comboLocalDraft!=='1')
+  throw new Error('Copy removed target-only combo options from the draft');
 const comboCopyPublished=rpc(
   `public.publish_catalog_draft_v1('${OWNER}'::uuid,'${comboCopyDraft.draftId}'::uuid,2,6)`,
   'publish target combo options');
 if(!comboCopyPublished.ok||comboCopyPublished.publishVersion!==7)
   throw new Error('Target combo publish failed: '+JSON.stringify(comboCopyPublished));
 const comboLive=sql(`select combo_product_id||','||beverage_product_id||','||sort_order
-from public.combo_beverage_options where shop_id='${T}'`);
+from public.combo_beverage_options where shop_id='${T}' and combo_product_id='${TCP}'`);
 if(comboLive!==TCP+','+TBP+',11')
   throw new Error('Target combo beverage projection is not master-mapped: '+comboLive);
+const comboLocalLive=sql(`select combo_product_id||','||beverage_product_id||','||sort_order
+from public.combo_beverage_options
+where shop_id='${T}' and combo_product_id='${TCLOCAL}'`);
+if(comboLocalLive!==TCLOCAL+','+TBP+',91')
+  throw new Error('Target-only combo options were lost on publication: '+comboLocalLive);
 const comboSourceUnchanged=sql(`select combo_product_id||','||beverage_product_id
 from public.combo_beverage_options where shop_id='${S}'`);
 if(comboSourceUnchanged!==SCP+','+SBP)
