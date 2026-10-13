@@ -526,7 +526,9 @@ test('mobile Catalog Copy stages only selected product order through version-che
 
   await expect(page.getByRole('heading', { name: 'Selective catalog copy' })).toBeVisible();
   await page.getByRole('checkbox', { name: 'Product availability' }).uncheck();
-  await page.getByRole('checkbox', { name: 'Product display order (mapped products only)' }).check();
+  await page
+    .getByRole('checkbox', { name: 'Product display order (mapped products only)' })
+    .check();
   await page.getByRole('button', { name: 'Preview catalog copy' }).click();
 
   await expect(page.getByText('Order: 40 → 5.')).toBeVisible();
