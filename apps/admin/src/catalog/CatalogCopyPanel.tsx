@@ -10,7 +10,8 @@ type Domain =
   | 'productAvailability'
   | 'productOrder'
   | 'categoryOrder'
-  | 'categoryAvailability';
+  | 'categoryAvailability'
+  | 'productCategoryAssignments';
 
 type CopyPreview = {
   ok: true;
@@ -39,6 +40,8 @@ type CopyPreview = {
     productName: string;
     sortOrderBefore: number;
     sortOrderAfter: number;
+    categoryIdBefore: string;
+    categoryIdAfter: string;
     priceBeforeMinor: number;
     priceAfterMinor: number;
     activeBefore: boolean;
@@ -227,7 +230,7 @@ export function CatalogCopyPanel({
     <section className="admin-publish-card" aria-labelledby="catalog-copy-title">
       <h2 id="catalog-copy-title">Selective catalog copy</h2>
       <p className="admin-publish-card__copy">
-        Copy selected product ordering, prices and availability from the published source catalog
+        Copy selected product category assignments, ordering, prices and availability from the published source catalog
         into this shop's unpublished draft. Products and categories must already share canonical
         business master mappings in both shops. Only explicitly selected fields transfer; missing
         entities, modifiers, recipes and historical data are not copied.
@@ -272,6 +275,17 @@ export function CatalogCopyPanel({
               Product prices
             </label>
           ) : null}
+          <label className="admin-field">
+            <input
+              type="checkbox"
+              checked={domains.includes('productCategoryAssignments')}
+              disabled={pending}
+              onChange={(event) =>
+                toggle('productCategoryAssignments', event.currentTarget.checked)
+              }
+            />
+            Product category assignments (mapped products and categories)
+          </label>
           <label className="admin-field">
             <input
               type="checkbox"
@@ -339,6 +353,12 @@ export function CatalogCopyPanel({
                     <span>
                       {' '}
                       Order: {item.sortOrderBefore} → {item.sortOrderAfter}.
+                    </span>
+                  ) : null}
+                  {domains.includes('productCategoryAssignments') ? (
+                    <span>
+                      {' '}
+                      Category: {item.categoryIdBefore} → {item.categoryIdAfter}.
                     </span>
                   ) : null}
                   {domains.includes('productPrices') ? (
