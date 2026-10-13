@@ -481,8 +481,8 @@ if(!comboCopyStaged.ok||comboCopyStaged.draftRevision!==2)
 const comboBeforeLive=sql(`select count(*) from public.combo_beverage_options where shop_id='${T}'`);
 if(comboBeforeLive!=='0')throw new Error('Combo copy mutated target live options before publish');
 const comboDraftOption=sql(`select
-working_bundle_json->'snapshot'->'comboBeverageOptions'->0->>'comboProductId'
-||','||working_bundle_json->'snapshot'->'comboBeverageOptions'->0->>'beverageProductId'
+(working_bundle_json->'snapshot'->'comboBeverageOptions'->0->>'comboProductId')
+||','||(working_bundle_json->'snapshot'->'comboBeverageOptions'->0->>'beverageProductId')
 from public.catalog_drafts where id='${comboCopyDraft.draftId}'`);
 if(comboDraftOption!==TCP+','+TBP)
   throw new Error('Source-local combo/beverage IDs leaked into target draft: '+comboDraftOption);
