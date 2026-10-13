@@ -206,8 +206,8 @@ export function ShopCopyPreviewPanel({
       {currentPreview ? (
         <div role="status">
           <p>
-            Read-only preview: source settings version {currentPreview.sourceSettingsVersion}, target
-            settings version {currentPreview.targetSettingsVersion}.
+            Read-only preview: source settings version {currentPreview.sourceSettingsVersion},
+            target settings version {currentPreview.targetSettingsVersion}.
           </p>
           {currentPreview.changes.filter((row) => row.wouldChange).length === 0 ? (
             <p>No configuration differences in the selected domains.</p>
