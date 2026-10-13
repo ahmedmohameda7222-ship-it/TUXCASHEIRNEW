@@ -33,7 +33,7 @@ end $do$;
 grant usage on schema public to anon,authenticated,service_role;
 create table auth.users(id uuid primary key);
 create function auth.uid() returns uuid language sql stable as $do$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $do$;`,'reset');
-const migration='20261013050000_admin_catalog_copy_modifier_definitions.sql';
+const migration='20261013043133_admin_catalog_copy_modifier_definitions.sql';
 const files=readdirSync(resolve('supabase/migrations')).filter(f=>/^\d+_.+\.sql$/.test(f)).sort();
 const index=files.indexOf(migration);if(index<0)throw new Error('Catalog Copy migration missing');
 for(const name of files.slice(0,index+1))file(name);
@@ -651,6 +651,20 @@ sql(`insert into public.catalog_product_shop_overrides(
 business_id,master_product_id,shop_id,canonical_product_id,price_minor,visible,manual_sold_out)
 values ('${B}','${BMP}','${T}','${TBP}',6000,true,false)`,
   'restore target standalone product master mapping');
+// Pricing authority is mandatory for both preview and apply, including for
+// an otherwise authorized catalog editor with a target-shop assignment.
+const nonPricingModifierArgs=modifierDefinitionArgs.replace(
+  `'${OWNER}'::uuid`,`'${EDITOR}'::uuid`
+);
+let modifierPricingDenied=false;
+try {
+  rpc(`public.preview_admin_catalog_shop_copy_v1(${nonPricingModifierArgs})`,
+      'non-pricing catalog editor modifier definitions');
+} catch(error) {
+  modifierPricingDenied=/TUX_ADMIN_CATALOG_FORBIDDEN/.test(String(error));
+}
+if(!modifierPricingDenied)
+  throw new Error('Modifier definitions preview allowed a non-pricing editor');
 const modifierDefinitionPreview=rpc(
   `public.preview_admin_catalog_shop_copy_v1(${modifierDefinitionArgs})`,
   'preview master-mapped modifier definitions');

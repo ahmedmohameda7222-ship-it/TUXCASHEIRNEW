@@ -95,7 +95,7 @@ describe('selective master-mapped product ordering', () => {
       }).success,
     ).toBe(true);
     const sql = readFileSync(
-      join(root, '20261013050000_admin_catalog_copy_modifier_definitions.sql'),
+      join(root, '20261013043133_admin_catalog_copy_modifier_definitions.sql'),
       'utf8',
     );
     expect(sql).toContain("or 'modifierDefinitions'=any(p_domains)");
