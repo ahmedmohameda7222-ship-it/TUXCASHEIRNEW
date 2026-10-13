@@ -411,4 +411,93 @@ const liveCategoryId=sql(`select category_id from public.products where id='${P2
 if(liveCategoryId!==C2)
   throw new Error('Published target product category did not preserve target identity: '+liveCategoryId);
 
+// Copy a combo's beverage relationships only after resolving BOTH the combo
+// and beverage IDs through source/target business-master product mappings.
+const CMP='50000000-0000-4000-8000-000000000002';
+const BMP='50000000-0000-4000-8000-000000000003';
+const SCP='70000000-0000-4000-8000-000000000003';
+const TCP='70000000-0000-4000-8000-000000000004';
+const SBP='70000000-0000-4000-8000-000000000005';
+const TBP='70000000-0000-4000-8000-000000000006';
+sql(`
+insert into public.products(id,shop_id,category_id,slug,name,price_minor,active,sold_out,is_combo,sort_order)
+values ('${SCP}','${S}','${C1}','meal','Meal',26000,true,false,true,7),
+       ('${TCP}','${T}','${C2}','meal','Meal',28000,true,false,true,10),
+       ('${SBP}','${S}','${C1}','drink','Drink',5000,true,false,false,8),
+       ('${TBP}','${T}','${C2}','drink','Drink',6000,true,false,false,11);
+insert into public.catalog_master_products(id,business_id,master_category_id,canonical_name)
+values ('${CMP}','${B}','${MC}','Meal'),('${BMP}','${B}','${MC}','Drink');
+insert into public.catalog_product_shop_overrides(
+business_id,master_product_id,shop_id,canonical_product_id,price_minor,visible,manual_sold_out)
+values ('${B}','${CMP}','${S}','${SCP}',26000,true,false),
+       ('${B}','${CMP}','${T}','${TCP}',28000,true,false),
+       ('${B}','${BMP}','${S}','${SBP}',5000,true,false),
+       ('${B}','${BMP}','${T}','${TBP}',6000,true,false);
+insert into public.combo_beverage_options(shop_id,combo_product_id,beverage_product_id,sort_order)
+values ('${S}','${SCP}','${SBP}',11);
+`, 'isolated cross-shop combo and beverage master fixtures');
+const comboSourceBundle=sql(`select private.build_admin_catalog_bundle_v1('${S}'::uuid,2,now())::text`);
+const comboTargetBundle=sql(`select private.build_admin_catalog_bundle_v1('${T}'::uuid,6,now())::text`);
+sql(`insert into public.catalog_publish_versions(
+business_id,shop_id,publish_version,operations_configuration_version,source_kind,bundle_json)
+values ('${B}','${S}',2,2,'BASELINE',${quoteJson(comboSourceBundle)}),
+       ('${B}','${T}',6,6,'BASELINE',${quoteJson(comboTargetBundle)});
+insert into public.operations_configuration_snapshots(shop_id,version,bundle_json)
+values ('${S}',2,${quoteJson(comboSourceBundle)}),
+       ('${T}',6,${quoteJson(comboTargetBundle)})
+on conflict (shop_id,version) do nothing;`, 'isolated source/target combo published baselines');
+const comboCopyDraft=rpc(
+  `public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,6,'Master-mapped combo options')`,
+  'create target combo draft');
+if(!comboCopyDraft.ok||!comboCopyDraft.draftId)
+  throw new Error('Cannot create combo target draft: '+JSON.stringify(comboCopyDraft));
+const comboCopyArgs=`'${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,
+'${comboCopyDraft.draftId}'::uuid,2::bigint,6::bigint,1::bigint,
+array['comboBeverageOptions']::text[]`;
+sql(`delete from public.catalog_product_shop_overrides
+where master_product_id='${BMP}' and shop_id='${T}'`,
+  'remove target beverage master binding');
+assertDenied(rpc(`public.preview_admin_catalog_shop_copy_v1(${comboCopyArgs})`,
+  'missing mapped target beverage'),'catalog_copy_missing_target_dependencies');
+sql(`insert into public.catalog_product_shop_overrides(
+business_id,master_product_id,shop_id,canonical_product_id,price_minor,visible,manual_sold_out)
+values ('${B}','${BMP}','${T}','${TBP}',6000,true,false)`,
+  'restore target beverage business-master mapping');
+const comboCopyPreview=rpc(
+  `public.preview_admin_catalog_shop_copy_v1(${comboCopyArgs})`,
+  'preview master-mapped combo beverage options');
+if(!comboCopyPreview.ok||comboCopyPreview.mappedComboBeverageOptions!==1||
+   comboCopyPreview.changedComboBeverageOptions!==1||
+   comboCopyPreview.comboDifferences?.[0]?.targetComboProductId!==TCP||
+   comboCopyPreview.comboDifferences?.[0]?.targetBeverageProductId!==TBP)
+  throw new Error('Combo beverage copy preview was not target-local: '+
+    JSON.stringify(comboCopyPreview));
+const comboCopyStaged=rpc(
+  `public.apply_admin_catalog_shop_copy_v1(${comboCopyArgs},
+  '${comboCopyPreview.fingerprint}','combo-beverage-copy-1')`,
+  'stage mapped beverage options');
+if(!comboCopyStaged.ok||comboCopyStaged.draftRevision!==2)
+  throw new Error('Combo beverage copy staging failed: '+JSON.stringify(comboCopyStaged));
+const comboBeforeLive=sql(`select count(*) from public.combo_beverage_options where shop_id='${T}'`);
+if(comboBeforeLive!=='0')throw new Error('Combo copy mutated target live options before publish');
+const comboDraftOption=sql(`select
+working_bundle_json->'snapshot'->'comboBeverageOptions'->0->>'comboProductId'
+||','||working_bundle_json->'snapshot'->'comboBeverageOptions'->0->>'beverageProductId'
+from public.catalog_drafts where id='${comboCopyDraft.draftId}'`);
+if(comboDraftOption!==TCP+','+TBP)
+  throw new Error('Source-local combo/beverage IDs leaked into target draft: '+comboDraftOption);
+const comboCopyPublished=rpc(
+  `public.publish_catalog_draft_v1('${OWNER}'::uuid,'${comboCopyDraft.draftId}'::uuid,2,6)`,
+  'publish target combo options');
+if(!comboCopyPublished.ok||comboCopyPublished.publishVersion!==7)
+  throw new Error('Target combo publish failed: '+JSON.stringify(comboCopyPublished));
+const comboLive=sql(`select combo_product_id||','||beverage_product_id||','||sort_order
+from public.combo_beverage_options where shop_id='${T}'`);
+if(comboLive!==TCP+','+TBP+',11')
+  throw new Error('Target combo beverage projection is not master-mapped: '+comboLive);
+const comboSourceUnchanged=sql(`select combo_product_id||','||beverage_product_id
+from public.combo_beverage_options where shop_id='${S}'`);
+if(comboSourceUnchanged!==SCP+','+SBP)
+  throw new Error('Combo beverage copy mutated source configuration');
+
 console.log('Catalog Copy isolated PostgreSQL: preview, master mapping, inactive/missing dependency, draft-only apply, once-only audit, ACL and canonical target publication passed.');
