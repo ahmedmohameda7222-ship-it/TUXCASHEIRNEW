@@ -216,7 +216,10 @@ if(sourceUntouched!=='12000,true'||targetUntouched!=='22000,false')
 throw new Error('Catalog copy mutated live product rows before publication');
 const receiptCount=sql(`select count(*) from public.admin_catalog_copy_receipts where command_id='catalog-copy-1'`);
 if(receiptCount!=='1')throw new Error('Catalog Copy receipt not idempotent');
-const receiptBinding=sql(`select request_fingerprint ~ '^[0-9a-f]{64}
+const receiptBinding=sql(`select request_fingerprint ~ '^[0-9a-f]{64}$'
+from public.admin_catalog_copy_receipts where command_id='catalog-copy-1'`);
+if(receiptBinding!=='t')
+  throw new Error('Catalog Copy receipt lacks canonical request binding');
 const auditCount=sql(`select count(*) from public.admin_audit_events where action_type='CATALOG_COPY_STAGED'`);
 if(auditCount!=='1')throw new Error('Catalog copy audit not append-only or once-only');
 // A second, different command must observe a stale draft revision rather than
