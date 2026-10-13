@@ -352,4 +352,63 @@ if(afterOrder!==P2+',5,12000')
 const sourceSort=sql(`select sort_order from public.products where id='${P1}'`);
 if(sourceSort!=='5')throw new Error('Product ordering mutated source shop');
 
+// Product/category relationships use shop-local IDs. Reassignments must use
+// master-category bindings, never a source shop's category UUID.
+const C3='60000000-0000-4000-8000-000000000003';
+const categoryDraft=rpc(
+  `public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,4,'Category-assignment copy')`,
+  'create category-assignment target draft',
+);
+if(!categoryDraft.ok)throw new Error('Category assignment target draft failed');
+const catDraftJson=JSON.parse(sql(`select working_bundle_json::text from public.catalog_drafts
+where id='${categoryDraft.draftId}'`));
+const otherCategory={...catDraftJson.snapshot.categories[0],id:C3,shopId:T,
+  name:'Target-only grouping',slug:'target-only',sortOrder:61,active:true};
+catDraftJson.snapshot.categories.push(otherCategory);
+catDraftJson.snapshot.products[0].categoryId=C3;
+const preparedCategory=rpc(`public.apply_catalog_draft_change_v1(
+  '${OWNER}'::uuid,'${categoryDraft.draftId}'::uuid,1,
+  jsonb_build_object('bundleJson',${quoteJson(JSON.stringify(catDraftJson))}))`,
+  'prepare alternative target category via canonical draft');
+if(!preparedCategory.ok || preparedCategory.draftRevision!==2)
+  throw new Error('Could not prepare valid alternative target category: '+JSON.stringify(preparedCategory));
+const categoryArgs=`'${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,
+  '${categoryDraft.draftId}'::uuid,1::bigint,4::bigint,2::bigint,
+  array['productCategoryAssignments']::text[]`;
+sql(`delete from public.catalog_category_shop_bindings
+where shop_id='${T}' and master_category_id='${MC}'`,
+  'remove target category binding in isolated copy fixture');
+assertDenied(rpc(`public.preview_admin_catalog_shop_copy_v1(${categoryArgs})`,
+  'missing master-mapped category assignment'),'catalog_copy_missing_target_dependencies');
+sql(`insert into public.catalog_category_shop_bindings(
+  business_id,master_category_id,shop_id,canonical_category_id)
+values ('${B}','${MC}','${T}','${C2}')`,
+  'restore target master-category binding');
+const categoryPreview=rpc(
+  `public.preview_admin_catalog_shop_copy_v1(${categoryArgs})`,
+  'preview canonical shop-local category reassignment');
+if(!categoryPreview.ok || categoryPreview.changedProducts!==1 ||
+   categoryPreview.differences?.[0]?.categoryIdBefore!==C3 ||
+   categoryPreview.differences?.[0]?.categoryIdAfter!==C2 ||
+   categoryPreview.differences?.[0]?.targetProductId!==P2)
+  throw new Error('Category reassignment must map target-local IDs with preview diff: '+
+    JSON.stringify(categoryPreview));
+const stagedCategory=rpc(`public.apply_admin_catalog_shop_copy_v1(
+  ${categoryArgs},'${categoryPreview.fingerprint}','copy-category-assignment-1')`,
+  'stage canonical category reassignment');
+if(!stagedCategory.ok || stagedCategory.draftRevision!==3)
+  throw new Error('Could not stage mapped target category assignment: '+JSON.stringify(stagedCategory));
+const stagedCategoryId=sql(`select working_bundle_json->'snapshot'->'products'->0->>'categoryId'
+from public.catalog_drafts where id='${categoryDraft.draftId}'`);
+if(stagedCategoryId!==C2 || stagedCategoryId===C1)
+  throw new Error('Source category UUID leaked into target draft: '+stagedCategoryId);
+const publishedCategory=rpc(
+  `public.publish_catalog_draft_v1('${OWNER}'::uuid,'${categoryDraft.draftId}'::uuid,3,4)`,
+  'publish category reassignment through canonical authority');
+if(!publishedCategory.ok || publishedCategory.publishVersion!==5)
+  throw new Error('Mapped category assignment failed to publish: '+JSON.stringify(publishedCategory));
+const liveCategoryId=sql(`select category_id from public.products where id='${P2}'`);
+if(liveCategoryId!==C2)
+  throw new Error('Published target product category did not preserve target identity: '+liveCategoryId);
+
 console.log('Catalog Copy isolated PostgreSQL: preview, master mapping, inactive/missing dependency, draft-only apply, once-only audit, ACL and canonical target publication passed.');
