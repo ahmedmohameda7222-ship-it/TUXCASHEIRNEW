@@ -43,7 +43,7 @@ describe('selective master-mapped product ordering', () => {
 
   it('preserves source/target identity mapping when copying product-category relationships', () => {
     const sql = readFileSync(
-      join(root, '20261013022500_admin_catalog_copy_product_category_assignments.sql'),
+      join(root, '20261013022832_admin_catalog_copy_product_category_assignments.sql'),
       'utf8',
     );
     expect(sql).toContain("'productCategoryAssignments'");
