@@ -614,4 +614,100 @@ from public.product_modifiers where shop_id='${S}' and product_id='${P1}'`);
 if(modifierSourceLive!==P1+','+SMI)
   throw new Error('Source product modifiers mutated during cross-shop copy');
 
+// Modifier definitions may be copied only when anchored to the same business
+// master standalone product. Preserve the target modifier and product UUIDs,
+// target-only modifiers, source configuration, and canonical publish boundary.
+const TLOCAL_MOD='80000000-0000-4000-8000-000000000003';
+sql(`insert into public.modifiers(id,shop_id,name,price_minor,standalone_product_id,active,sort_order)
+values ('${TLOCAL_MOD}','${T}','Local-only modifier',700,'${TCLOCAL}',true,13)`,
+  'target-only modifier definition fixture');
+const modifierSourceBundle=sql(`select private.build_admin_catalog_bundle_v1('${S}'::uuid,4,now())::text`);
+const modifierTargetBundle=sql(`select private.build_admin_catalog_bundle_v1('${T}'::uuid,10,now())::text`);
+sql(`insert into public.catalog_publish_versions(
+business_id,shop_id,publish_version,operations_configuration_version,source_kind,bundle_json)
+values ('${B}','${S}',4,4,'BASELINE',${quoteJson(modifierSourceBundle)}),
+       ('${B}','${T}',10,10,'BASELINE',${quoteJson(modifierTargetBundle)});
+insert into public.operations_configuration_snapshots(shop_id,version,bundle_json)
+values ('${S}',4,${quoteJson(modifierSourceBundle)}),
+       ('${T}',10,${quoteJson(modifierTargetBundle)})
+on conflict (shop_id,version) do nothing;`,'modifier-definitions publication fixtures');
+const modifierDefinitionDraft=rpc(
+  `public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,10,'Mapped modifier definitions')`,
+  'create target modifier definitions draft');
+if(!modifierDefinitionDraft.ok||!modifierDefinitionDraft.draftId)
+  throw new Error('Could not create modifier definitions draft: '+JSON.stringify(modifierDefinitionDraft));
+const modifierDefinitionArgs=`'${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,
+'${modifierDefinitionDraft.draftId}'::uuid,4::bigint,10::bigint,1::bigint,
+array['modifierDefinitions']::text[]`;
+sql(`delete from public.catalog_product_shop_overrides
+where shop_id='${T}' and master_product_id='${BMP}'`,
+  'deny missing standalone target master mapping');
+assertDenied(
+  rpc(`public.preview_admin_catalog_shop_copy_v1(${modifierDefinitionArgs})`,
+    'missing target modifier definition identity'),
+  'catalog_copy_missing_target_dependencies',
+);
+sql(`insert into public.catalog_product_shop_overrides(
+business_id,master_product_id,shop_id,canonical_product_id,price_minor,visible,manual_sold_out)
+values ('${B}','${BMP}','${T}','${TBP}',6000,true,false)`,
+  'restore target standalone product master mapping');
+const modifierDefinitionPreview=rpc(
+  `public.preview_admin_catalog_shop_copy_v1(${modifierDefinitionArgs})`,
+  'preview master-mapped modifier definitions');
+if(!modifierDefinitionPreview.ok||modifierDefinitionPreview.mappedModifierDefinitions!==1||
+   modifierDefinitionPreview.changedModifierDefinitions!==1||
+   modifierDefinitionPreview.modifierDefinitionDifferences?.[0]?.targetModifierId!==TMI||
+   modifierDefinitionPreview.modifierDefinitionDifferences?.[0]?.nameAfter!=='Source drink modifier'||
+   modifierDefinitionPreview.modifierDefinitionDifferences?.[0]?.priceAfterMinor!==500)
+  throw new Error('Modifier definition preview failed target identity mapping: '+
+    JSON.stringify(modifierDefinitionPreview));
+const defsBefore=sql(`select name||','||price_minor||','||sort_order from public.modifiers
+where id='${TMI}'`);
+if(defsBefore!=='Target drink modifier,600,8')
+  throw new Error('Modifier preview mutated live target configuration: '+defsBefore);
+const modifierDefinitionStaged=rpc(
+  `public.apply_admin_catalog_shop_copy_v1(${modifierDefinitionArgs},
+    '${modifierDefinitionPreview.fingerprint}','modifier-definition-copy-1')`,
+  'stage selected modifier definitions');
+if(!modifierDefinitionStaged.ok||modifierDefinitionStaged.draftRevision!==2||
+   modifierDefinitionStaged.changedModifierDefinitions!==1)
+  throw new Error('Modifier definitions staging failed: '+JSON.stringify(modifierDefinitionStaged));
+const stagedDefinition=sql(`select
+(mod.value->>'id')||','||(mod.value->>'standaloneProductId')||','||
+(mod.value->>'name')||','||(mod.value->>'priceMinor')||','||(mod.value->>'sortOrder')
+from public.catalog_drafts d
+cross join lateral jsonb_array_elements(d.working_bundle_json->'snapshot'->'modifiers') mod(value)
+where d.id='${modifierDefinitionDraft.draftId}' and mod.value->>'id'='${TMI}'`);
+if(stagedDefinition!==TMI+','+TBP+',Source drink modifier,500,3')
+  throw new Error('Modifier definition draft lost target-local identity: '+stagedDefinition);
+const targetOnlyDefinition=sql(`select count(*) from public.catalog_drafts d
+cross join lateral jsonb_array_elements(d.working_bundle_json->'snapshot'->'modifiers') mod(value)
+where d.id='${modifierDefinitionDraft.draftId}'
+and mod.value->>'id'='${TLOCAL_MOD}'
+and mod.value->>'name'='Local-only modifier'
+and mod.value->>'priceMinor'='700'`);
+if(targetOnlyDefinition!=='1')
+  throw new Error('Modifier copy replaced target-only modifier definition');
+const modifierDefinitionPublished=rpc(
+  `public.publish_catalog_draft_v1('${OWNER}'::uuid,
+    '${modifierDefinitionDraft.draftId}'::uuid,2,10)`,
+  'canonical target modifier definitions publish');
+if(!modifierDefinitionPublished.ok||modifierDefinitionPublished.publishVersion!==11)
+  throw new Error('Modifier definitions failed canonical publication: '+
+    JSON.stringify(modifierDefinitionPublished));
+const liveDefinition=sql(`select
+name||','||price_minor||','||active||','||sort_order||','||standalone_product_id
+from public.modifiers where id='${TMI}'`);
+if(liveDefinition!=='Source drink modifier,500,true,3,'+TBP &&
+   liveDefinition!=='Source drink modifier,500,t,3,'+TBP)
+  throw new Error('Published modifier definition violated identity: '+liveDefinition);
+const targetOnlyLive=sql(`select name||','||price_minor from public.modifiers
+where id='${TLOCAL_MOD}'`);
+if(targetOnlyLive!=='Local-only modifier,700')
+  throw new Error('Target-only modifier definition was changed: '+targetOnlyLive);
+const sourceDefinition=sql(`select name||','||price_minor from public.modifiers
+where id='${SMI}'`);
+if(sourceDefinition!=='Source drink modifier,500')
+  throw new Error('Modifier source configuration was mutated: '+sourceDefinition);
+
 console.log('Catalog Copy isolated PostgreSQL: preview, master mapping, inactive/missing dependency, draft-only apply, once-only audit, ACL and canonical target publication passed.');
