@@ -519,4 +519,99 @@ from public.combo_beverage_options where shop_id='${S}'`);
 if(comboSourceUnchanged!==SCP+','+SBP)
   throw new Error('Combo beverage copy mutated source configuration');
 
+// Product modifier links are shop-local: a canonical standalone product
+// supplies an independently master-mapped identity for a modifier option.
+// Both product and modifier IDs must be remapped; preserve target-only links.
+const SMI='80000000-0000-4000-8000-000000000001';
+const TMI='80000000-0000-4000-8000-000000000002';
+sql(`insert into public.modifiers(id,shop_id,name,price_minor,standalone_product_id,active,sort_order)
+values ('${SMI}','${S}','Source drink modifier',500,'${SBP}',true,3),
+       ('${TMI}','${T}','Target drink modifier',600,'${TCLOCAL}',true,8);
+insert into public.product_modifiers(shop_id,product_id,modifier_id,max_quantity,sort_order)
+values ('${S}','${P1}','${SMI}',2,6),
+       ('${T}','${TCLOCAL}','${TMI}',1,99);`,
+  'source and target modifiers with distinct shop IDs and target-only link');
+const linkedSourceBundle=sql(`select private.build_admin_catalog_bundle_v1('${S}'::uuid,3,now())::text`);
+const linkedTargetBundle=sql(`select private.build_admin_catalog_bundle_v1('${T}'::uuid,8,now())::text`);
+sql(`insert into public.catalog_publish_versions(
+business_id,shop_id,publish_version,operations_configuration_version,source_kind,bundle_json)
+values ('${B}','${S}',3,3,'BASELINE',${quoteJson(linkedSourceBundle)}),
+       ('${B}','${T}',8,8,'BASELINE',${quoteJson(linkedTargetBundle)});
+insert into public.operations_configuration_snapshots(shop_id,version,bundle_json)
+values ('${S}',3,${quoteJson(linkedSourceBundle)}),
+       ('${T}',8,${quoteJson(linkedTargetBundle)})
+on conflict (shop_id,version) do nothing;`,
+  'isolated modifier-link publication fixture');
+const modifierLinkDraft=rpc(
+  `public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,8,'Mapped modifier links')`,
+  'new target modifier-link draft');
+if(!modifierLinkDraft.ok||!modifierLinkDraft.draftId)
+  throw new Error('Cannot create canonical target modifier draft: '+JSON.stringify(modifierLinkDraft));
+const modifierLinkArgs=(rev)=>`'${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,
+'${modifierLinkDraft.draftId}'::uuid,3::bigint,8::bigint,${rev}::bigint,
+array['productModifierLinks']::text[]`;
+assertDenied(
+  rpc(`public.preview_admin_catalog_shop_copy_v1(${modifierLinkArgs(1)})`,
+      'modifier standalone target identity not matched'),
+  'catalog_copy_missing_target_dependencies',
+);
+const modifierTargetDraft=JSON.parse(sql(`select working_bundle_json::text from public.catalog_drafts
+where id='${modifierLinkDraft.draftId}'`));
+modifierTargetDraft.snapshot.modifiers.find(m=>m.id===TMI).standaloneProductId=TBP;
+const modifierCorrected=rpc(`public.apply_catalog_draft_change_v1(
+'${OWNER}'::uuid,'${modifierLinkDraft.draftId}'::uuid,1,
+jsonb_build_object('bundleJson',${quoteJson(JSON.stringify(modifierTargetDraft))}))`,
+  'canonical correction of target modifier standalone product');
+if(!modifierCorrected.ok||modifierCorrected.draftRevision!==2)
+  throw new Error('Could not resolve target modifier mapping in draft: '+JSON.stringify(modifierCorrected));
+const modifierLinkPreview=rpc(
+  `public.preview_admin_catalog_shop_copy_v1(${modifierLinkArgs(2)})`,
+  'preview product modifier links via master standalone products');
+if(!modifierLinkPreview.ok||modifierLinkPreview.changedProductModifierLinks!==1||
+   modifierLinkPreview.mappedProductModifierLinks!==1||
+   modifierLinkPreview.productModifierLinkDifferences?.[0]?.targetProductId!==P2||
+   modifierLinkPreview.productModifierLinkDifferences?.[0]?.targetModifierId!==TMI)
+  throw new Error('Modifier link preview did not map target-local IDs: '+
+    JSON.stringify(modifierLinkPreview));
+const modifierLinkApplied=rpc(`public.apply_admin_catalog_shop_copy_v1(
+${modifierLinkArgs(2)},'${modifierLinkPreview.fingerprint}','product-modifier-links-1')`,
+  'stage source modifier links into target draft');
+if(!modifierLinkApplied.ok||modifierLinkApplied.draftRevision!==3||
+   modifierLinkApplied.changedProductModifierLinks!==1)
+  throw new Error('Modifier link draft apply failed: '+JSON.stringify(modifierLinkApplied));
+const modifierLiveBefore=sql(`select count(*) from public.product_modifiers
+where shop_id='${T}' and product_id='${P2}'`);
+if(modifierLiveBefore!=='0')
+  throw new Error('Modifier link copy wrote live target before canonical publication');
+const modifierMappedDraft=sql(`select count(*) from public.catalog_drafts d
+cross join lateral jsonb_array_elements(d.working_bundle_json->'snapshot'->'productModifierLinks') entry(value)
+where d.id='${modifierLinkDraft.draftId}'
+and entry.value->>'productId'='${P2}'
+and entry.value->>'modifierId'='${TMI}'
+and entry.value->>'maxQuantity'='2'
+and entry.value->>'sortOrder'='6'`);
+if(modifierMappedDraft!=='1')throw new Error('Mapped modifier link absent from target draft');
+const modifierLocalDraft=sql(`select count(*) from public.catalog_drafts d
+cross join lateral jsonb_array_elements(d.working_bundle_json->'snapshot'->'productModifierLinks') entry(value)
+where d.id='${modifierLinkDraft.draftId}' and entry.value->>'productId'='${TCLOCAL}'
+and entry.value->>'modifierId'='${TMI}'`);
+if(modifierLocalDraft!=='1')throw new Error('Target-only modifier link was lost on draft apply');
+const modifierLinksPublished=rpc(`public.publish_catalog_draft_v1(
+'${OWNER}'::uuid,'${modifierLinkDraft.draftId}'::uuid,3,8)`,
+  'publish master-mapped modifier link options');
+if(!modifierLinksPublished.ok||modifierLinksPublished.publishVersion!==9)
+  throw new Error('Canonical modifier publication failed: '+JSON.stringify(modifierLinksPublished));
+const modifierLive=sql(`select product_id||','||modifier_id||','||max_quantity||','||sort_order
+from public.product_modifiers where shop_id='${T}' and product_id='${P2}'`);
+if(modifierLive!==P2+','+TMI+',2,6')
+  throw new Error('Published modifier link reused source IDs or corrupted quantities: '+modifierLive);
+const modifierLocalLive=sql(`select product_id||','||modifier_id
+from public.product_modifiers where shop_id='${T}' and product_id='${TCLOCAL}'`);
+if(modifierLocalLive!==TCLOCAL+','+TMI)
+  throw new Error('Target-only product modifier link did not survive publication');
+const modifierSourceLive=sql(`select product_id||','||modifier_id
+from public.product_modifiers where shop_id='${S}' and product_id='${P1}'`);
+if(modifierSourceLive!==P1+','+SMI)
+  throw new Error('Source product modifiers mutated during cross-shop copy');
+
 console.log('Catalog Copy isolated PostgreSQL: preview, master mapping, inactive/missing dependency, draft-only apply, once-only audit, ACL and canonical target publication passed.');
