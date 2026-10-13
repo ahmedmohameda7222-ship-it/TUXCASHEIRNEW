@@ -250,11 +250,10 @@ export function CatalogCopyPanel({
     <section className="admin-publish-card" aria-labelledby="catalog-copy-title">
       <h2 id="catalog-copy-title">Selective catalog copy</h2>
       <p className="admin-publish-card__copy">
-        Copy selected product category assignments, combo beverage options, product modifier links,
-        ordering, prices and availability from the published source catalog into this shop's
-        unpublished draft. Products and categories must have canonical business master mappings.
-        Modifier link identity uses mapped standalone products; missing entities, modifier definitions,
-        recipes and historical data are not copied.
+        Copy selected catalog configuration into this shop's unpublished draft. Product and category
+        identities must have canonical business master mappings. Product modifier links use mapped
+        standalone products. Missing entities, modifier definitions, recipes and historical data are
+        not copied.
       </p>
       {draft ? (
         <form onSubmit={(event) => void makePreview(event)}>
@@ -382,7 +381,9 @@ export function CatalogCopyPanel({
             {currentPreview.changedProducts} target products would change;{' '}
             {currentPreview.mappedCategories} mapped categories, {currentPreview.changedCategories}{' '}
             target categories would change; {currentPreview.mappedComboBeverageOptions} combo
-            beverage options mapped, {currentPreview.changedComboBeverageOptions} option changes;{' '}
+            beverage options mapped, {currentPreview.changedComboBeverageOptions} option changes.
+          </p>
+          <p>
             {currentPreview.mappedProductModifierLinks} mapped modifier links,{' '}
             {currentPreview.changedProductModifierLinks} link changes.
           </p>
@@ -456,10 +457,10 @@ export function CatalogCopyPanel({
             <ul>
               {currentPreview.productModifierLinkDifferences.map((item) => (
                 <li key={`${item.targetProductId}:${item.targetModifierId}`}>
-                  <strong>Product {item.targetProductId}</strong> — modifier {item.targetModifierId};
-                  max quantity {item.maxQuantityBefore ?? 'none'} →{' '}
-                  {item.maxQuantityAfter ?? 'removed'}, order {item.sortOrderBefore ?? 'none'} →{' '}
-                  {item.sortOrderAfter ?? 'removed'}.
+                  <strong>Product {item.targetProductId}</strong> — modifier{' '}
+                  {item.targetModifierId}; max quantity {item.maxQuantityBefore ?? 'none'} →{' '}
+                  {item.maxQuantityAfter ?? 'removed'}, order{' '}
+                  {item.sortOrderBefore ?? 'none'} → {item.sortOrderAfter ?? 'removed'}.
                 </li>
               ))}
             </ul>
