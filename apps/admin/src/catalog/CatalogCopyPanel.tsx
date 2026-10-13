@@ -128,13 +128,21 @@ export function CatalogCopyPanel({
         },
         session.state.session.csrfToken,
       );
-      if (!result.ok) throw new Error('Catalog preview could not be verified.');
-      setPreview({
-        ...result,
-        sourceShopId: activeSourceShopId,
-        targetShopId,
-        targetDraftId: draft.draftId,
-      });
+      if (
+        !result.ok ||
+        result.expectedSourcePublishVersion !== source.currentPublishVersion ||
+        !catalogCopyPreviewMatchesSelection(result, {
+          sourceShopId: activeSourceShopId,
+          targetShopId,
+          targetDraftId: draft.draftId,
+          targetPublishVersion,
+          targetDraftRevision: draft.draftRevision,
+          selectedDomains: domains,
+        })
+      ) {
+        throw new Error('Catalog preview could not be verified.');
+      }
+      setPreview(result);
       setCommandId(crypto.randomUUID());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Catalog preview failed.');
