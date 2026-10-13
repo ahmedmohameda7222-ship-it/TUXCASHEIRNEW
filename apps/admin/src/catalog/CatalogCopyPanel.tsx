@@ -341,7 +341,7 @@ export function CatalogCopyPanel({
                 disabled={pending}
                 onChange={(event) => toggle('recipeLines', event.currentTarget.checked)}
               />
-              Recipe quantities (explicit inventory masters and matching base units)
+              {'Recipe quantities (explicit inventory masters and matching base units)'}
             </label>
           ) : null}
           <label className="admin-field">
@@ -546,10 +546,12 @@ export function CatalogCopyPanel({
             <ul>
               {currentPreview.recipeDifferences.map((item) => (
                 <li key={`${item.targetProductId}:${item.targetInventoryItemId}`}>
-                  <strong>Recipe {item.targetProductId}</strong> — inventory item{' '}
-                  {item.targetInventoryItemId}; quantity (base micros):{' '}
-                  {item.quantityBeforeMicros ?? 'none'} →{' '}
-                  {item.quantityAfterMicros ?? 'removed'}.
+                  <strong>{item.targetProductId}</strong>
+                  <span>{item.targetInventoryItemId}</span>
+                  <span>{item.quantityBeforeMicros ?? 'none'}</span>
+                  <span>→</span>
+                  <span>{item.quantityAfterMicros ?? 'removed'}</span>
+                  <span>base micros</span>
                 </li>
               ))}
             </ul>
