@@ -112,7 +112,7 @@ describe('selective master-mapped product ordering', () => {
       }).success,
     ).toBe(true);
     const sql = readFileSync(
-      join(root, '20261013052100_admin_catalog_copy_mapped_recipe_lines.sql'),
+      join(root, '20261013052717_admin_catalog_copy_mapped_recipe_lines.sql'),
       'utf8',
     );
     expect(sql).toContain('catalog_inventory_item_shop_bindings');
