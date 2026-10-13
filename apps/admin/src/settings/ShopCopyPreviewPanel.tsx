@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
+import { shopCopyPreviewMatchesSelection } from './shopCopyPreviewGuard';
 
 type CopyDomain = 'checkout' | 'receipts';
 type CopyChange = {
@@ -39,15 +40,30 @@ export function ShopCopyPreviewPanel({
   const session = useAdminSession();
   const queryClient = useQueryClient();
   const [sourceShopId, setSourceShopId] = useState(sourceShopIds[0] ?? '');
+  const activeSourceShopId = sourceShopIds.includes(sourceShopId)
+    ? sourceShopId
+    : (sourceShopIds[0] ?? '');
   const [domains, setDomains] = useState<CopyDomain[]>(['checkout']);
   const [preview, setPreview] = useState<CopyPreview | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copiedKeys, setCopiedKeys] = useState<number | null>(null);
+  const [copiedKeys, setCopiedKeys] = useState<{ count: number; targetShopId: string } | null>(
+    null,
+  );
+  const currentPreview =
+    preview?.ok &&
+    shopCopyPreviewMatchesSelection(preview, {
+      sourceShopId: activeSourceShopId,
+      targetShopId,
+      targetSettingsVersion: expectedTargetSettingsVersion,
+      selectedDomains: domains,
+    })
+      ? preview
+      : null;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending || !sourceShopId || domains.length === 0) return;
+    if (pending || !activeSourceShopId || domains.length === 0) return;
     setPending(true);
     setError(null);
     setPreview(null);
@@ -59,7 +75,7 @@ export function ShopCopyPreviewPanel({
         {
           method: 'POST',
           body: JSON.stringify({
-            sourceShopId,
+            sourceShopId: activeSourceShopId,
             targetShopId,
             selectedDomains: domains,
             expectedTargetSettingsVersion,
@@ -77,8 +93,8 @@ export function ShopCopyPreviewPanel({
   }
 
   async function applySelected() {
-    if (pending || !preview?.ok || !preview.changes.some((change) => change.wouldChange)) return;
-    const confirmedPreview = preview;
+    if (pending || !currentPreview?.changes.some((change) => change.wouldChange)) return;
+    const confirmedPreview = currentPreview;
     setPending(true);
     setError(null);
     setCopiedKeys(null);
@@ -103,7 +119,7 @@ export function ShopCopyPreviewPanel({
         session.state.session.csrfToken,
       );
       if (!result.ok) throw new Error(result.code);
-      setCopiedKeys(result.updatedKeys.length);
+      setCopiedKeys({ count: result.updatedKeys.length, targetShopId });
       setPreview(null);
       await queryClient.invalidateQueries({ queryKey: ['admin', 'settings', targetShopId] });
     } catch (cause) {
@@ -138,7 +154,7 @@ export function ShopCopyPreviewPanel({
         <label className="admin-field">
           <span>Source shop</span>
           <select
-            value={sourceShopId}
+            value={activeSourceShopId}
             disabled={pending}
             onChange={(event) => {
               setSourceShopId(event.currentTarget.value);
@@ -181,23 +197,23 @@ export function ShopCopyPreviewPanel({
         </button>
       </form>
       {error ? <p role="alert">{error}</p> : null}
-      {copiedKeys !== null ? (
+      {copiedKeys?.targetShopId === targetShopId ? (
         <p role="status">
-          {copiedKeys} settings copied as draft overrides. Publish the target shop settings to
+          {copiedKeys.count} settings copied as draft overrides. Publish the target shop settings to
           activate changes for future orders.
         </p>
       ) : null}
-      {preview?.ok ? (
+      {currentPreview ? (
         <div role="status">
           <p>
-            Read-only preview: source settings version {preview.sourceSettingsVersion}, target
-            settings version {preview.targetSettingsVersion}.
+            Read-only preview: source settings version {currentPreview.sourceSettingsVersion}, target
+            settings version {currentPreview.targetSettingsVersion}.
           </p>
-          {preview.changes.filter((row) => row.wouldChange).length === 0 ? (
+          {currentPreview.changes.filter((row) => row.wouldChange).length === 0 ? (
             <p>No configuration differences in the selected domains.</p>
           ) : (
             <ul>
-              {preview.changes
+              {currentPreview.changes
                 .filter((row) => row.wouldChange)
                 .map((row) => (
                   <li key={row.settingKey}>
@@ -216,7 +232,7 @@ export function ShopCopyPreviewPanel({
           <button
             className="admin-primary-button"
             type="button"
-            disabled={pending || !preview.changes.some((change) => change.wouldChange)}
+            disabled={pending || !currentPreview.changes.some((change) => change.wouldChange)}
             onClick={() => void applySelected()}
           >
             {pending ? 'Applying…' : 'Apply selected settings'}
