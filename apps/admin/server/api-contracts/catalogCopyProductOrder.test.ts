@@ -25,8 +25,10 @@ describe('selective master-mapped product ordering', () => {
   it('accepts a selected product ordering domain and rejects duplicate selections', () => {
     expect(catalogCommandSchema.safeParse(command).success).toBe(true);
     expect(
-      catalogCommandSchema.safeParse({ ...command, selectedDomains: ['productOrder', 'productOrder'] })
-        .success,
+      catalogCommandSchema.safeParse({
+        ...command,
+        selectedDomains: ['productOrder', 'productOrder'],
+      }).success,
     ).toBe(false);
   });
 

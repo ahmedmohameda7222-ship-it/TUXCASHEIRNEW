@@ -168,10 +168,10 @@ export function CatalogCopyPanel({
     <section className="admin-publish-card" aria-labelledby="catalog-copy-title">
       <h2 id="catalog-copy-title">Selective catalog copy</h2>
       <p className="admin-publish-card__copy">
-        Copy selected product ordering, prices and availability from the published source catalog into this shop's
-        unpublished draft. Products and categories must already share canonical business master
-        mappings in both shops. Only explicitly selected fields transfer; missing entities,
-        modifiers, recipes and historical data are not copied.
+        Copy selected product ordering, prices and availability from the published source catalog
+        into this shop's unpublished draft. Products and categories must already share canonical
+        business master mappings in both shops. Only explicitly selected fields transfer; missing
+        entities, modifiers, recipes and historical data are not copied.
       </p>
       {draft ? (
         <form onSubmit={(event) => void makePreview(event)}>
