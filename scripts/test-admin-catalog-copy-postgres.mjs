@@ -33,7 +33,7 @@ end $do$;
 grant usage on schema public to anon,authenticated,service_role;
 create table auth.users(id uuid primary key);
 create function auth.uid() returns uuid language sql stable as $do$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $do$;`,'reset');
-const migration='20261013031700_admin_catalog_copy_combo_beverage_options.sql';
+const migration='20261013070000_admin_catalog_copy_product_modifier_links.sql';
 const files=readdirSync(resolve('supabase/migrations')).filter(f=>/^\d+_.+\.sql$/.test(f)).sort();
 const index=files.indexOf(migration);if(index<0)throw new Error('Catalog Copy migration missing');
 for(const name of files.slice(0,index+1))file(name);

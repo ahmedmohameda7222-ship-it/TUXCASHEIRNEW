@@ -69,6 +69,24 @@ describe('selective master-mapped product ordering', () => {
     expect(sql).toContain('private.validate_admin_catalog_bundle_v1');
   });
 
+  it('allows mapped product modifier links with missing/ambiguous identity refusal', () => {
+    expect(
+      catalogCopySchema.safeParse({
+        ...command,
+        selectedDomains: ['productModifierLinks'],
+      }).success,
+    ).toBe(true);
+    const sql = readFileSync(
+      join(root, '20261013070000_admin_catalog_copy_product_modifier_links.sql'),
+      'utf8',
+    );
+    expect(sql).toContain('v_source_to_target_product_map');
+    expect(sql).toContain('v_modifier_distinct_count');
+    expect(sql).toContain('catalog_copy_missing_target_dependencies');
+    expect(sql).toContain('private.validate_admin_catalog_bundle_v1');
+    expect(sql).toContain('changedProductModifierLinks');
+  });
+
   it('copies only target sortOrder through the fingerprinted draft and preserves identity', () => {
     const names = readdirSync(root).filter((name) =>
       name.endsWith('_admin_catalog_copy_existing_master_product_order.sql'),

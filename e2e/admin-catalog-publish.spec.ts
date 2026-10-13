@@ -198,6 +198,9 @@ async function mockPublishing(
           mappedComboBeverageOptions: 0,
           changedComboBeverageOptions: 0,
           comboDifferences: [],
+          mappedProductModifierLinks: 0,
+          changedProductModifierLinks: 0,
+          productModifierLinkDifferences: [],
           categoryDifferences: [],
           fingerprint: 'e'.repeat(64),
           expectedSourcePublishVersion: 17,
@@ -592,6 +595,44 @@ test('Catalog Copy can create an authorized target draft before previewing', asy
     type: 'draft.create',
     shopId,
     expectedVersion: 48,
+  });
+});
+
+test('Catalog Copy previews and stages mapped product modifier links', async ({ page }) => {
+  const { commands } = await mockPublishing(page, true, {
+    selectedDomains: ['productModifierLinks'],
+    mappedProducts: 3,
+    changedProducts: 0,
+    differences: [],
+    mappedProductModifierLinks: 1,
+    changedProductModifierLinks: 1,
+    productModifierLinkDifferences: [
+      {
+        targetProductId: '11111111-1111-4111-8111-111111111112',
+        targetModifierId: '11111111-1111-4111-8111-111111111113',
+        maxQuantityBefore: null,
+        maxQuantityAfter: 2,
+        sortOrderBefore: null,
+        sortOrderAfter: 6,
+      },
+    ],
+  });
+  await page.goto('/catalog/products/publishing');
+  await page.getByRole('checkbox', { name: 'Product availability' }).uncheck();
+  await page
+    .getByRole('checkbox', {
+      name: 'Product modifier links (mapped standalone products only)',
+    })
+    .check();
+  await page.getByRole('button', { name: 'Preview catalog copy' }).click();
+  await expect(page.getByText(/1 mapped modifier links/)).toBeVisible();
+  await expect(page.getByText(/1 link changes/)).toBeVisible();
+  await page.getByRole('button', { name: 'Apply to target draft' }).click();
+  expect(commands.find((command) => command.type === 'catalog-copy.preview')).toMatchObject({
+    selectedDomains: ['productModifierLinks'],
+  });
+  expect(commands.find((command) => command.type === 'catalog-copy.apply')).toMatchObject({
+    selectedDomains: ['productModifierLinks'],
   });
 });
 

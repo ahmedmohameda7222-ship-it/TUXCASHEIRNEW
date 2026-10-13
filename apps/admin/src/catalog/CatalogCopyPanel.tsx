@@ -12,7 +12,8 @@ type Domain =
   | 'categoryOrder'
   | 'categoryAvailability'
   | 'productCategoryAssignments'
-  | 'comboBeverageOptions';
+  | 'comboBeverageOptions'
+  | 'productModifierLinks';
 
 type CopyPreview = {
   ok: true;
@@ -25,6 +26,16 @@ type CopyPreview = {
   changedCategories: number;
   mappedComboBeverageOptions: number;
   changedComboBeverageOptions: number;
+  mappedProductModifierLinks: number;
+  changedProductModifierLinks: number;
+  productModifierLinkDifferences: Array<{
+    targetProductId: string;
+    targetModifierId: string;
+    maxQuantityBefore: number | null;
+    maxQuantityAfter: number | null;
+    sortOrderBefore: number | null;
+    sortOrderAfter: number | null;
+  }>;
   comboDifferences: Array<{
     targetComboProductId: string;
     targetBeverageProductId: string;
@@ -239,11 +250,11 @@ export function CatalogCopyPanel({
     <section className="admin-publish-card" aria-labelledby="catalog-copy-title">
       <h2 id="catalog-copy-title">Selective catalog copy</h2>
       <p className="admin-publish-card__copy">
-        Copy selected product category assignments, combo beverage options, ordering, prices and
-        availability from the published source catalog into this shop's unpublished draft. Products
-        and categories must already share canonical business master mappings in both shops. Only
-        explicitly selected fields transfer; missing entities, modifiers, recipes and historical
-        data are not copied.
+        Copy selected product category assignments, combo beverage options, product modifier links,
+        ordering, prices and availability from the published source catalog into this shop's
+        unpublished draft. Products and categories must have canonical business master mappings.
+        Modifier link identity uses mapped standalone products; missing entities, modifier definitions,
+        recipes and historical data are not copied.
       </p>
       {draft ? (
         <form onSubmit={(event) => void makePreview(event)}>
@@ -308,6 +319,15 @@ export function CatalogCopyPanel({
           <label className="admin-field">
             <input
               type="checkbox"
+              checked={domains.includes('productModifierLinks')}
+              disabled={pending}
+              onChange={(event) => toggle('productModifierLinks', event.currentTarget.checked)}
+            />
+            Product modifier links (mapped standalone products only)
+          </label>
+          <label className="admin-field">
+            <input
+              type="checkbox"
               checked={domains.includes('productOrder')}
               disabled={pending}
               onChange={(event) => toggle('productOrder', event.currentTarget.checked)}
@@ -362,7 +382,9 @@ export function CatalogCopyPanel({
             {currentPreview.changedProducts} target products would change;{' '}
             {currentPreview.mappedCategories} mapped categories, {currentPreview.changedCategories}{' '}
             target categories would change; {currentPreview.mappedComboBeverageOptions} combo
-            beverage options mapped, {currentPreview.changedComboBeverageOptions} option changes.
+            beverage options mapped, {currentPreview.changedComboBeverageOptions} option changes;{' '}
+            {currentPreview.mappedProductModifierLinks} mapped modifier links,{' '}
+            {currentPreview.changedProductModifierLinks} link changes.
           </p>
           {currentPreview.differences.length > 0 ? (
             <ul>
@@ -430,6 +452,18 @@ export function CatalogCopyPanel({
               ))}
             </ul>
           ) : null}
+          {currentPreview.productModifierLinkDifferences.length > 0 ? (
+            <ul>
+              {currentPreview.productModifierLinkDifferences.map((item) => (
+                <li key={`${item.targetProductId}:${item.targetModifierId}`}>
+                  <strong>Product {item.targetProductId}</strong> — modifier {item.targetModifierId};
+                  max quantity {item.maxQuantityBefore ?? 'none'} →{' '}
+                  {item.maxQuantityAfter ?? 'removed'}, order {item.sortOrderBefore ?? 'none'} →{' '}
+                  {item.sortOrderAfter ?? 'removed'}.
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <p>
             Source publication {currentPreview.expectedSourcePublishVersion}, target publication{' '}
             {currentPreview.expectedTargetPublishVersion}, draft revision{' '}
@@ -442,7 +476,8 @@ export function CatalogCopyPanel({
               pending ||
               (currentPreview.changedProducts === 0 &&
                 currentPreview.changedCategories === 0 &&
-                currentPreview.changedComboBeverageOptions === 0)
+                currentPreview.changedComboBeverageOptions === 0 &&
+                currentPreview.changedProductModifierLinks === 0)
             }
             onClick={() => void stageCopy()}
           >
