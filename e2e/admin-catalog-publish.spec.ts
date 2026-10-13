@@ -23,9 +23,11 @@ async function mockPublishing(
   page: Page,
   withCopy = false,
   copyPreviewOverrides: Record<string, unknown> = {},
+  startWithoutDraft = false,
 ) {
   let currentPublishVersion = 48;
   let pendingSchedule = true;
+  let hasCopyDraft = !startWithoutDraft;
   const commands: Command[] = [];
 
   await page.route('**/api/admin/session', async (route) => {
@@ -93,9 +95,10 @@ async function mockPublishing(
               publishedAt: '2026-09-10T12:00:00.000Z',
             },
           ],
-          draftPreviews: [
-            {
-              draftId,
+          draftPreviews: hasCopyDraft
+            ? [
+                {
+                  draftId,
               shopId,
               basePublishVersion: 48,
               currentPublishVersion,
@@ -108,8 +111,9 @@ async function mockPublishing(
                 comboBeverageOptions: 0,
                 recipeLines: 0,
               },
-            },
-          ],
+                },
+              ]
+            : [],
           schedules: pendingSchedule
             ? [
                 {
@@ -171,6 +175,15 @@ async function mockPublishing(
     const body = request.postDataJSON() as Command;
     commands.push(body);
 
+    if (withCopy && body.type === 'draft.create') {
+      hasCopyDraft = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, draftId, draftRevision: 2, basePublishVersion: 48 }),
+      });
+      return;
+    }
     if (withCopy && body.type === 'catalog-copy.preview') {
       await route.fulfill({
         status: 200,
@@ -563,6 +576,20 @@ test('mobile Catalog Copy stages only selected product order through version-che
     expectedTargetDraftRevision: 2,
   });
   expect(typeof apply?.commandId).toBe('string');
+});
+
+test('Catalog Copy can create an authorized target draft before previewing', async ({ page }) => {
+  const { commands } = await mockPublishing(page, true, {}, true);
+  await page.goto('/catalog/products/publishing');
+
+  await expect(page.getByText('Create an authorized catalog draft for this shop before copying.')).toBeVisible();
+  await page.getByRole('button', { name: 'Create target draft for copy' }).click();
+  await expect(page.getByRole('button', { name: 'Preview catalog copy' })).toBeVisible();
+  expect(commands.find((command) => command.type === 'draft.create')).toMatchObject({
+    type: 'draft.create',
+    shopId,
+    expectedVersion: 48,
+  });
 });
 
 test('Catalog Copy rejects a preview for another source shop before staging', async ({ page }) => {
