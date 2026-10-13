@@ -62,10 +62,11 @@ const catalogCopyBaseSchema = z.object({
         'comboBeverageOptions',
         'productModifierLinks',
         'modifierDefinitions',
+        'recipeLines',
       ]),
     )
     .min(1)
-    .max(9)
+    .max(10)
     .refine((domains) => new Set(domains).size === domains.length),
 });
 
@@ -273,6 +274,10 @@ export default async function handler(
       const principal = await loadPrincipal(request, client, true);
       requirePermission(principal, 'catalog.view', copy.data.sourceShopId);
       requirePermission(principal, 'catalog.edit', copy.data.targetShopId);
+      if (copy.data.selectedDomains.includes('recipeLines')) {
+        requirePermission(principal, 'inventory.view', copy.data.sourceShopId);
+        requirePermission(principal, 'inventory.adjust', copy.data.targetShopId);
+      }
       if (
         copy.data.selectedDomains.includes('productPrices') ||
         copy.data.selectedDomains.includes('modifierDefinitions')

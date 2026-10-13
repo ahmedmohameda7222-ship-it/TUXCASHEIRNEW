@@ -104,6 +104,24 @@ describe('selective master-mapped product ordering', () => {
     expect(sql).toContain('private.validate_admin_catalog_bundle_v1');
   });
 
+  it('gates recipe copy on explicit inventory masters and compatible base units', () => {
+    expect(
+      catalogCopySchema.safeParse({
+        ...command,
+        selectedDomains: ['recipeLines'],
+      }).success,
+    ).toBe(true);
+    const sql = readFileSync(
+      join(root, '20261013052100_admin_catalog_copy_mapped_recipe_lines.sql'),
+      'utf8',
+    );
+    expect(sql).toContain('catalog_inventory_item_shop_bindings');
+    expect(sql).toContain('catalog_copy_incompatible_inventory_units');
+    expect(sql).toContain('v_inventory_item_map');
+    expect(sql).toContain("'inventory.adjust'");
+    expect(sql).toContain('private.validate_admin_catalog_bundle_v1');
+  });
+
   it('copies only target sortOrder through the fingerprinted draft and preserves identity', () => {
     const names = readdirSync(root).filter((name) =>
       name.endsWith('_admin_catalog_copy_existing_master_product_order.sql'),

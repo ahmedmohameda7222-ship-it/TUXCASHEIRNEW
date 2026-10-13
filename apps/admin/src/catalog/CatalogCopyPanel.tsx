@@ -14,7 +14,8 @@ type Domain =
   | 'productCategoryAssignments'
   | 'comboBeverageOptions'
   | 'productModifierLinks'
-  | 'modifierDefinitions';
+  | 'modifierDefinitions'
+  | 'recipeLines';
 
 type CopyPreview = {
   ok: true;
@@ -31,6 +32,14 @@ type CopyPreview = {
   changedProductModifierLinks: number;
   mappedModifierDefinitions: number;
   changedModifierDefinitions: number;
+  mappedRecipeLines: number;
+  changedRecipeLines: number;
+  recipeDifferences: Array<{
+    targetProductId: string;
+    targetInventoryItemId: string;
+    quantityBeforeMicros: number | null;
+    quantityAfterMicros: number | null;
+  }>;
   modifierDefinitionDifferences: Array<{
     targetModifierId: string;
     nameBefore: string;
@@ -320,6 +329,19 @@ export function CatalogCopyPanel({
             />
             Product category assignments (mapped products and categories)
           </label>
+          {session.state.status === 'authenticated' &&
+          session.state.session.principal.permissions.includes('inventory.view') &&
+          session.state.session.principal.permissions.includes('inventory.adjust') ? (
+            <label className="admin-field">
+              <input
+                type="checkbox"
+                checked={domains.includes('recipeLines')}
+                disabled={pending}
+                onChange={(event) => toggle('recipeLines', event.currentTarget.checked)}
+              />
+              Recipe quantities (explicit inventory masters and matching base units)
+            </label>
+          ) : null}
           <label className="admin-field">
             <input
               type="checkbox"
@@ -415,6 +437,10 @@ export function CatalogCopyPanel({
           <p>
             {currentPreview.mappedModifierDefinitions} mapped modifier definitions,{' '}
             {currentPreview.changedModifierDefinitions} definition changes.
+          </p>
+          <p>
+            {currentPreview.mappedRecipeLines} mapped recipe lines,{' '}
+            {currentPreview.changedRecipeLines} recipe changes.
           </p>
           {currentPreview.differences.length > 0 ? (
             <ul>
@@ -514,6 +540,20 @@ export function CatalogCopyPanel({
               ))}
             </ul>
           ) : null}
+          {currentPreview.recipeDifferences.length > 0 ? (
+            <ul>
+              {currentPreview.recipeDifferences.map((item) => (
+                <li key={`${item.targetProductId}:${item.targetInventoryItemId}`}>
+                  <strong>Recipe product {item.targetProductId}</strong>
+                  {' — inventory item '}
+                  {item.targetInventoryItemId}
+                  {'; quantity (base micros): '}
+                  {item.quantityBeforeMicros ?? 'none'} →{' '}
+                  {item.quantityAfterMicros ?? 'removed'}.
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <p>
             Source publication {currentPreview.expectedSourcePublishVersion}, target publication{' '}
             {currentPreview.expectedTargetPublishVersion}, draft revision{' '}
@@ -528,7 +568,8 @@ export function CatalogCopyPanel({
                 currentPreview.changedCategories === 0 &&
                 currentPreview.changedComboBeverageOptions === 0 &&
                 currentPreview.changedProductModifierLinks === 0 &&
-                currentPreview.changedModifierDefinitions === 0)
+                currentPreview.changedModifierDefinitions === 0 &&
+                currentPreview.changedRecipeLines === 0)
             }
             onClick={() => void stageCopy()}
           >

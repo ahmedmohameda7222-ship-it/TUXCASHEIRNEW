@@ -204,6 +204,9 @@ async function mockPublishing(
           mappedModifierDefinitions: 0,
           changedModifierDefinitions: 0,
           modifierDefinitionDifferences: [],
+          mappedRecipeLines: 0,
+          changedRecipeLines: 0,
+          recipeDifferences: [],
           categoryDifferences: [],
           fingerprint: 'e'.repeat(64),
           expectedSourcePublishVersion: 17,
@@ -598,6 +601,39 @@ test('Catalog Copy can create an authorized target draft before previewing', asy
     type: 'draft.create',
     shopId,
     expectedVersion: 48,
+  });
+});
+
+test('Catalog Copy previews and stages unit-safe master-mapped recipe lines', async ({ page }) => {
+  const { commands } = await mockPublishing(page, true, {
+    selectedDomains: ['recipeLines'],
+    changedProducts: 0,
+    differences: [],
+    mappedRecipeLines: 1,
+    changedRecipeLines: 1,
+    recipeDifferences: [
+      {
+        targetProductId: '11111111-1111-4111-8111-111111111112',
+        targetInventoryItemId: '11111111-1111-4111-8111-111111111114',
+        quantityBeforeMicros: null,
+        quantityAfterMicros: 2500000,
+      },
+    ],
+  });
+  await page.goto('/catalog/products/publishing');
+  await page.getByRole('checkbox', { name: 'Product availability' }).uncheck();
+  await page.getByRole('checkbox', {
+    name: 'Recipe quantities (explicit inventory masters and matching base units)',
+  }).check();
+  await page.getByRole('button', { name: 'Preview catalog copy' }).click();
+  await expect(page.getByText(/1 mapped recipe lines/)).toBeVisible();
+  await expect(page.getByText(/2500000/)).toBeVisible();
+  await page.getByRole('button', { name: 'Apply to target draft' }).click();
+  expect(commands.find((command) => command.type === 'catalog-copy.preview')).toMatchObject({
+    selectedDomains: ['recipeLines'],
+  });
+  expect(commands.find((command) => command.type === 'catalog-copy.apply')).toMatchObject({
+    selectedDomains: ['recipeLines'],
   });
 });
 
