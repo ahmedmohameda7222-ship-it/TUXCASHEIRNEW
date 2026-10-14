@@ -283,7 +283,10 @@ describe('Admin inventory route', () => {
 
   it('maps locked recipe units to an actionable conflict', async () => {
     const apiSource = await readFile(resolve('apps/admin/api/admin/inventory.ts'), 'utf8');
-    const pageSource = await readFile(resolve('apps/admin/src/inventory/InventoryPage.tsx'), 'utf8');
+    const pageSource = await readFile(
+      resolve('apps/admin/src/inventory/InventoryPage.tsx'),
+      'utf8',
+    );
 
     expect(apiSource).toContain(
       "error.responseBody.includes('catalog_inventory_master_unit_locked')",
