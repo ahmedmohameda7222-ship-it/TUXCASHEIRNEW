@@ -926,4 +926,44 @@ const otherTenantCount=sql(`select count(*) from public.catalog_master_inventory
 where business_id='${B2}' and lower(btrim(canonical_name))='sauce master'`);
 if(otherTenantCount!=='1')throw new Error('Unique master name scope crossed business boundary');
 
+// The canonical business-master product and category mappings must point
+// to a row IN THE DECLARED SHOP. A standalone FK to products(id) or
+// menu_categories(id) is insufficient: those UUIDs may belong to another shop.
+const WRONG_CATEGORY='97000000-0000-4000-8000-000000000001';
+const WRONG_CATEGORY_MASTER='97000000-0000-4000-8000-000000000002';
+const WRONG_PRODUCT='97000000-0000-4000-8000-000000000003';
+const WRONG_PRODUCT_MASTER='97000000-0000-4000-8000-000000000004';
+sql(`insert into public.menu_categories(id,shop_id,name,sort_order,active)
+ values ('${WRONG_CATEGORY}','${T}','Target-only canonical category',140,true);
+ insert into public.products(id,shop_id,category_id,name,price_minor,active,sold_out,is_combo,sort_order)
+ values ('${WRONG_PRODUCT}','${T}','${WRONG_CATEGORY}','Target-only canonical product',
+ 1200,true,false,false,150);
+ insert into public.catalog_master_categories(id,business_id,canonical_name)
+ values ('${WRONG_CATEGORY_MASTER}','${B}','Canonical category for identity test');
+ insert into public.catalog_master_products(id,business_id,master_category_id,canonical_name)
+ values ('${WRONG_PRODUCT_MASTER}','${B}','${WRONG_CATEGORY_MASTER}','Canonical product for identity test');`,
+ 'unbound target-only category and product identity fixtures');
+sql(`do $reject_category$ begin
+ begin
+  insert into public.catalog_category_shop_bindings(
+   business_id,master_category_id,shop_id,canonical_category_id)
+  values ('${B}','${WRONG_CATEGORY_MASTER}','${S}','${WRONG_CATEGORY}');
+  raise exception 'cross_shop_category_binding_accepted';
+ exception when foreign_key_violation then null;
+ end;
+end $reject_category$;`,
+ 'reject business-correct but wrong-shop category binding');
+sql(`do $reject_product$ begin
+ begin
+  insert into public.catalog_product_shop_overrides(
+   business_id,master_product_id,shop_id,canonical_product_id,
+   price_minor,visible,manual_sold_out)
+  values ('${B}','${WRONG_PRODUCT_MASTER}','${S}',
+   '${WRONG_PRODUCT}',1200,true,false);
+  raise exception 'cross_shop_product_binding_accepted';
+ exception when foreign_key_violation then null;
+ end;
+end $reject_product$;`,
+ 'reject business-correct but wrong-shop product binding');
+
 console.log('Catalog Copy isolated PostgreSQL: preview, master mapping, inactive/missing dependency, draft-only apply, once-only audit, ACL and canonical target publication passed.');
