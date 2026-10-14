@@ -773,12 +773,14 @@ const acl=sql(`select has_table_privilege('anon','public.catalog_inventory_item_
  ||','||has_table_privilege('authenticated','public.catalog_inventory_item_shop_bindings','SELECT')
  ||','||has_table_privilege('service_role','public.catalog_inventory_item_shop_bindings','SELECT')`);
 if(acl!=='false,false,true')throw new Error('Inventory mapping grants breached: '+acl);
-sql(`update public.inventory_items set unit_label='kg' where id='${TI}'`,
-  'simulate target inventory unit drift after target publish');
-assertDenied(rpc(`public.preview_admin_catalog_shop_copy_v1(${recipeParams})`,
- 'recipe incompatible target unit'),'catalog_copy_incompatible_inventory_units');
-sql(`update public.inventory_items set unit_label='g' where id='${TI}'`,
-  'restore target base unit');
+sql(`do $reject_drift_before_preview$ begin
+  begin
+    update public.inventory_items set unit_label='kg' where id='${TI}';
+    raise exception 'recipe_target_unit_drift_accepted';
+  exception when check_violation then null;
+  end;
+end $reject_drift_before_preview$;`,
+  'reject recipe target unit drift before preview');
 const recipePreview=rpc(`public.preview_admin_catalog_shop_copy_v1(${recipeParams})`,
   'preview mapped recipe lines');
 if(!recipePreview.ok||recipePreview.mappedRecipeLines!==1||
