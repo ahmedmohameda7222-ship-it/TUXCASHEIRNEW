@@ -966,4 +966,45 @@ sql(`do $reject_product$ begin
 end $reject_product$;`,
  'reject business-correct but wrong-shop product binding');
 
+// Business-wide recipe identities must remain correct AFTER creation, not
+// just on the initial bind RPC. Direct privileged maintenance writes must
+// never silently change the base unit of a bound item or its master.
+sql(`do $reject_bound_item_unit$ begin
+  begin
+    update public.inventory_items set unit_label='kg' where id='${TI}';
+    raise exception 'bound_inventory_unit_drift_accepted';
+  exception when check_violation then null;
+  end;
+end $reject_bound_item_unit$;`, 'bound inventory unit must be immutable');
+sql(`do $reject_bound_master_unit$ begin
+  begin
+    update public.catalog_master_inventory_items set base_unit_label='kg'
+      where id='${MI}';
+    raise exception 'bound_master_unit_drift_accepted';
+  exception when check_violation then null;
+  end;
+end $reject_bound_master_unit$;`, 'bound master base unit must be immutable');
+const INVALID_ITEM='98000000-0000-4000-8000-000000000001';
+const INVALID_MASTER='98000000-0000-4000-8000-000000000002';
+sql(`insert into public.inventory_items(id,shop_id,name,unit_label,tracking_mode,active)
+values ('${INVALID_ITEM}','${S}','Unmatched inventory','kg','RECIPE_TRACKED',true);
+insert into public.catalog_master_inventory_items(
+ id,business_id,canonical_name,base_unit_label,tracking_mode)
+values ('${INVALID_MASTER}','${B}','Incompatible recipe master','g','RECIPE_TRACKED');`,
+  'unbound item and master with incompatible physical units');
+sql(`do $reject_direct_binding$ begin
+  begin
+    insert into public.catalog_inventory_item_shop_bindings(
+      business_id,master_inventory_item_id,shop_id,inventory_item_id)
+    values ('${B}','${INVALID_MASTER}','${S}','${INVALID_ITEM}');
+    raise exception 'direct_mismatched_inventory_binding_accepted';
+  exception when check_violation then null;
+  end;
+end $reject_direct_binding$;`, 'direct service writer cannot create mismatched inventory bindings');
+const UNIT_STABLE=sql(`select unit_label from public.inventory_items where id='${TI}'`);
+const MASTER_STABLE=sql(`select base_unit_label from public.catalog_master_inventory_items
+where id='${MI}'`);
+if(UNIT_STABLE!=='g'||MASTER_STABLE!=='g')
+  throw new Error('Rejected unit changes altered canonical inventory definitions');
+
 console.log('Catalog Copy isolated PostgreSQL: preview, master mapping, inactive/missing dependency, draft-only apply, once-only audit, ACL and canonical target publication passed.');
