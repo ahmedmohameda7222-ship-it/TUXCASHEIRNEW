@@ -1,6 +1,27 @@
 -- Correction A: an approved recipe-inventory master link is a continuing
 -- unit and tracking identity invariant, not only a one-time RPC validation.
 -- Do not mutate balances, purchases, COGS, recipes or binding rows.
+-- Fail closed if historical privileged writes already broke a physical
+-- identity. This migration must not silently normalize or overwrite them.
+do $assert_existing_master_units$
+begin
+  if exists (
+    select 1
+    from public.catalog_inventory_item_shop_bindings b
+    left join public.catalog_master_inventory_items master
+      on master.business_id=b.business_id and master.id=b.master_inventory_item_id
+    left join public.inventory_items item
+      on item.shop_id=b.shop_id and item.id=b.inventory_item_id
+    where master.id is null or item.id is null
+      or master.tracking_mode is distinct from 'RECIPE_TRACKED'
+      or item.tracking_mode is distinct from master.tracking_mode
+      or item.unit_label is distinct from master.base_unit_label
+  ) then
+    raise exception 'catalog_inventory_master_existing_unit_conflict';
+  end if;
+end;
+$assert_existing_master_units$;
+
 create or replace function private.guard_admin_inventory_master_binding_v1()
 returns trigger language plpgsql security definer
 set search_path=pg_catalog,public,private

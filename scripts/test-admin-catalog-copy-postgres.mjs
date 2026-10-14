@@ -1001,6 +1001,22 @@ sql(`do $reject_direct_binding$ begin
   exception when check_violation then null;
   end;
 end $reject_direct_binding$;`, 'direct service writer cannot create mismatched inventory bindings');
+const REBIND_ITEM='98000000-0000-4000-8000-000000000003';
+sql(`insert into public.inventory_items(id,shop_id,name,unit_label,tracking_mode,active)
+values ('${REBIND_ITEM}','${S}','Valid but different inventory item','g','RECIPE_TRACKED',true)`,
+  'same-unit item cannot steal an existing canonical identity');
+sql(`do $reject_direct_rebind$ begin
+  begin
+    update public.catalog_inventory_item_shop_bindings
+    set inventory_item_id='${REBIND_ITEM}'
+    where shop_id='${S}' and master_inventory_item_id='${MI}';
+    raise exception 'inventory_identity_rebind_accepted';
+  exception when check_violation then null;
+  end;
+end $reject_direct_rebind$;`, 'service writer cannot rebind a master identity');
+sql(`update public.inventory_items set name='Flour alias only' where id='${TI}'`,
+  'changing only a bound inventory display name remains valid');
+
 const UNIT_STABLE=sql(`select unit_label from public.inventory_items where id='${TI}'`);
 const MASTER_STABLE=sql(`select base_unit_label from public.catalog_master_inventory_items
 where id='${MI}'`);
