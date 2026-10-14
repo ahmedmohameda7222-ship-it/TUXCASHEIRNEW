@@ -899,4 +899,22 @@ const masterAudit=sql(`select count(*) from public.admin_audit_events
 where action_type='INVENTORY_MASTER_BOUND' and entity_id='${masterId}'`);
 if(masterAudit!=='2')throw new Error('Canonical inventory-master audit must be once per mutation');
 
+// Database uniqueness must enforce the same case/whitespace-insensitive
+// invariant as the trusted bind RPC even under concurrent independent commands.
+sql(`do $master_unique$ begin
+  begin
+    insert into public.catalog_master_inventory_items
+      (business_id,canonical_name,base_unit_label,tracking_mode)
+    values ('${B}','  SAUCE MASTER  ','ml','RECIPE_TRACKED');
+    raise exception 'normalized_duplicate_inventory_master_accepted';
+  exception when unique_violation then
+    null;
+  end;
+end $master_unique$;`,'database-level master-name uniqueness');
+
+const normalizedMasterCount=sql(`select count(*) from public.catalog_master_inventory_items
+where business_id='${B}' and lower(btrim(canonical_name))='sauce master'`);
+if(normalizedMasterCount!=='1')
+  throw new Error('Inventory master logical identity split by case or spaces');
+
 console.log('Catalog Copy isolated PostgreSQL: preview, master mapping, inactive/missing dependency, draft-only apply, once-only audit, ACL and canonical target publication passed.');
