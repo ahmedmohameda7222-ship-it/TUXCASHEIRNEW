@@ -281,6 +281,16 @@ describe('Admin inventory route', () => {
     expect(source).toContain('shops: shopRows');
   });
 
+  it('reports locked recipe master units as an actionable conflict, not a backend outage', async () => {
+    const apiSource = await readFile(resolve('apps/admin/api/admin/inventory.ts'), 'utf8');
+    const pageSource = await readFile(resolve('apps/admin/src/inventory/InventoryPage.tsx'), 'utf8');
+
+    expect(apiSource).toContain("error.responseBody.includes('catalog_inventory_master_unit_locked')");
+    expect(apiSource).toContain("sendJson(response, 409, { error: 'inventory_master_unit_locked' })");
+    expect(pageSource).toContain("code.includes('inventory_master_unit_locked')");
+    expect(pageSource).toContain('business-wide recipe master binding');
+  });
+
   it('retains one command ID for retries of the same inventory or purchasing intent', async () => {
     const inventorySource = await readFile(
       resolve('apps/admin/src/inventory/useInventory.ts'),

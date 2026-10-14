@@ -43,6 +43,8 @@ function latestMutationError(
 function mutationErrorMessage(error: unknown): string | null {
   if (error === null || error === undefined) return null;
   const code = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  if (code.includes('inventory_master_unit_locked'))
+    return 'This ingredient has a business-wide recipe master binding. Its base unit and tracking mode cannot change.';
   if (code.includes('insufficient_stock'))
     return 'There is not enough available stock for this action.';
   if (code.includes('conflict'))

@@ -1058,6 +1058,10 @@ function handleFailure(response: AdminResponse, error: unknown, request: AdminRe
       sendJson(response, 403, { error: 'permission_forbidden' });
       return;
     }
+    if (error.responseBody.includes('catalog_inventory_master_unit_locked')) {
+      sendJson(response, 409, { error: 'inventory_master_unit_locked' });
+      return;
+    }
     console.error('Admin inventory database request failed', {
       resource: 'inventory',
       operation: adminRequestOperation(request),
