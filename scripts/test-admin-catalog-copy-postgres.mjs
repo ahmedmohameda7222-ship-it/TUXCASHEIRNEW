@@ -33,7 +33,7 @@ end $do$;
 grant usage on schema public to anon,authenticated,service_role;
 create table auth.users(id uuid primary key);
 create function auth.uid() returns uuid language sql stable as $do$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $do$;`,'reset');
-const migration='20261013062014_admin_inventory_master_binding_workflow.sql';
+const migration='20261014010000_admin_inventory_master_casefold_unique.sql';
 const files=readdirSync(resolve('supabase/migrations')).filter(f=>/^\d+_.+\.sql$/.test(f)).sort();
 const index=files.indexOf(migration);if(index<0)throw new Error('Catalog Copy migration missing');
 for(const name of files.slice(0,index+1))file(name);
@@ -916,5 +916,14 @@ const normalizedMasterCount=sql(`select count(*) from public.catalog_master_inve
 where business_id='${B}' and lower(btrim(canonical_name))='sauce master'`);
 if(normalizedMasterCount!=='1')
   throw new Error('Inventory master logical identity split by case or spaces');
+
+// A logical ingredient name remains reusable by a different business tenant.
+sql(`insert into public.catalog_master_inventory_items
+  (business_id,canonical_name,base_unit_label,tracking_mode)
+values ('${B2}',' sauce master ','ml','RECIPE_TRACKED')`,
+  'independent tenant may use the same logical master name');
+const otherTenantCount=sql(`select count(*) from public.catalog_master_inventory_items
+where business_id='${B2}' and lower(btrim(canonical_name))='sauce master'`);
+if(otherTenantCount!=='1')throw new Error('Unique master name scope crossed business boundary');
 
 console.log('Catalog Copy isolated PostgreSQL: preview, master mapping, inactive/missing dependency, draft-only apply, once-only audit, ACL and canonical target publication passed.');
