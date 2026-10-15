@@ -1,0 +1,23 @@
+name: PR119 Temporary Archive Prettier Preview
+on:
+  push:
+    branches:
+      - fix/admin-plans1-7-functional-completeness
+    paths:
+      - '.github/workflows/pr119-temp-archive-prettier-preview.yml'
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Preview canonical Prettier only
+        run: |
+          echo "PR119_ARCHIVE_FORMAT_BEGIN"
+          npx prettier apps/admin/src/settings/ShopsPage.tsx | base64 -w0
+          echo
+          echo "PR119_ARCHIVE_FORMAT_END"
