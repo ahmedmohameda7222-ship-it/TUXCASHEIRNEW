@@ -312,7 +312,9 @@ export function useSettings(shopId: string | undefined, includeSchedules = false
   });
 
   const updateShopLifecycle = useMutation({
-    mutationFn: async (draft: ShopLifecycleUpdateDraft): Promise<void> => {
+    mutationFn: async (
+      draft: ShopLifecycleUpdateDraft,
+    ): Promise<ShopManagementWriteResult> => {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
       const workspace = latestWorkspace();
       if (
@@ -320,7 +322,16 @@ export function useSettings(shopId: string | undefined, includeSchedules = false
         workspace.shop.lifecycleRevision !== draft.expectedLifecycleRevision
       )
         throw new SettingsUiError('stale_shop_lifecycle');
-      await postShopManagement({ type: 'shop.lifecycle.update', shopId, ...draft });
+      const result = await adminFetch<ShopManagementWriteResult>(
+        '/api/admin/settings',
+        {
+          method: 'POST',
+          body: JSON.stringify({ type: 'shop.lifecycle.update', shopId, ...draft }),
+        },
+        csrfTokenForMutation(session),
+      );
+      requireShopManagementSuccess(result);
+      return result;
     },
     onSuccess: invalidateWorkspace,
   });
