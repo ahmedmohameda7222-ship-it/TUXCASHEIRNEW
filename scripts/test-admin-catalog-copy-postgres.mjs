@@ -103,10 +103,10 @@ if(!preview.ok || preview.mappedProducts!==1 || preview.changedProducts!==1 ||
 throw new Error('Expected one mapped changed product: '+JSON.stringify(preview));
 // Missing-entity Preview is read-only, with explicit business-master identity.
 const missingEntityArgs=(from=S,to=T)=>
-  `'\u0024{OWNER}'::uuid,'\u0024{from}'::uuid,'\u0024{to}'::uuid,
-  '\u0024{draft.draftId}'::uuid,1::bigint,1::bigint,1::bigint`;
+  `'${OWNER}'::uuid,'${from}'::uuid,'${to}'::uuid,
+  '${draft.draftId}'::uuid,1::bigint,1::bigint,1::bigint`;
 const mappedEntityReport=rpc(
-  `public.preview_admin_catalog_missing_entities_v1(\u0024{missingEntityArgs()})`,
+  `public.preview_admin_catalog_missing_entities_v1(${missingEntityArgs()})`,
   'read-only mapped entity preview');
 if(!mappedEntityReport.ok || mappedEntityReport.missingCategories!==0 ||
    mappedEntityReport.missingProducts!==0 || mappedEntityReport.conflicts!==0 ||
@@ -119,11 +119,11 @@ if(!mappedEntityReport.ok || mappedEntityReport.missingCategories!==0 ||
     JSON.stringify(mappedEntityReport));
 assertDenied(rpc(
   `public.preview_admin_catalog_missing_entities_v1(
-  '\u0024{OWNER}'::uuid,'\u0024{S}'::uuid,'\u0024{T}'::uuid,'\u0024{draft.draftId}'::uuid,
+  '${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,'${draft.draftId}'::uuid,
   2::bigint,1::bigint,1::bigint)`,
   'diagnostic stale source publication'),'stale_catalog_copy_preview');
 if(sql(`select count(*) from public.catalog_product_shop_overrides
-  where shop_id='\u0024{T}' and master_product_id='\u0024{MP}'`)!=='1')
+  where shop_id='${T}' and master_product_id='${MP}'`)!=='1')
   throw new Error('Read-only diagnostic changed target binding');
 
 // Exercise the trusted database boundary using a real scoped, non-owner employee.
@@ -197,7 +197,7 @@ sql(`delete from public.catalog_product_shop_overrides where shop_id='${T}' and 
 assertDenied(rpc(`public.preview_admin_catalog_shop_copy_v1(${params()})`,'missing target mapping'),
   'catalog_copy_missing_target_dependencies');
 const missingNameConflict=rpc(
-  `public.preview_admin_catalog_missing_entities_v1(\u0024{missingEntityArgs()})`,
+  `public.preview_admin_catalog_missing_entities_v1(${missingEntityArgs()})`,
   'missing target product name collision');
 if(!missingNameConflict.ok ||
    missingNameConflict.products[0]?.status!=='CONFLICT_NAME' ||
@@ -205,19 +205,19 @@ if(!missingNameConflict.ok ||
   throw new Error('Name collision was silently used as master identity: '+
     JSON.stringify(missingNameConflict));
 const savedDraftBundle=sql(`select working_bundle_json::text from public.catalog_drafts
-  where id='\u0024{draft.draftId}'`);
+  where id='${draft.draftId}'`);
 sql(`update public.catalog_drafts set working_bundle_json=jsonb_set(
   working_bundle_json,'{snapshot,products}','[]'::jsonb
-) where id='\u0024{draft.draftId}'`, 'missing product fixture without name collision');
+) where id='${draft.draftId}'`, 'missing product fixture without name collision');
 const missingProductReport=rpc(
-  `public.preview_admin_catalog_missing_entities_v1(\u0024{missingEntityArgs()})`,
+  `public.preview_admin_catalog_missing_entities_v1(${missingEntityArgs()})`,
   'explicit target product creation required');
 if(!missingProductReport.ok || missingProductReport.missingProducts!==1 ||
    missingProductReport.products[0]?.status!=='CREATE_REQUIRED')
   throw new Error('Missing target product not classified for creation: '+
     JSON.stringify(missingProductReport));
-sql(`update public.catalog_drafts set working_bundle_json=\u0024{quoteJson(savedDraftBundle)}
-  where id='\u0024{draft.draftId}'`, 'restore target draft after diagnostic');
+sql(`update public.catalog_drafts set working_bundle_json=${quoteJson(savedDraftBundle)}
+  where id='${draft.draftId}'`, 'restore target draft after diagnostic');
 
 sql(`insert into public.catalog_product_shop_overrides(
 business_id,master_product_id,shop_id,canonical_product_id,price_minor,visible,manual_sold_out
