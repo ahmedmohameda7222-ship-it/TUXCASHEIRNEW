@@ -40,7 +40,7 @@ create function auth.uid() returns uuid language sql stable as $do$
 const migrations = readdirSync(resolve('supabase/migrations'))
   .filter((x) => /^\d+_.+\.sql$/.test(x))
   .sort();
-const target = '20261015143000_admin_shop_lifecycle_open_request_lock.sql';
+const target = '20261015085527_admin_shop_lifecycle_open_request_lock.sql';
 const index = migrations.indexOf(target);
 if (index < 0) throw new Error('Missing expected shop lifecycle approval SQL migration');
 for (const name of migrations.slice(0, index + 1)) {
