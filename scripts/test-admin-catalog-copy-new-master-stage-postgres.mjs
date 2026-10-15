@@ -133,6 +133,34 @@ const stage = (commandId = 'create-cat-prod-1', fingerprint = preview.creationFi
   `public.stage_admin_catalog_copy_created_entities_v1(
     ${args},array['${SC}'::uuid],array['${SP}'::uuid],
     '${fingerprint}','${commandId}')`;
+// Force an immutable audit write to fail after the canonical Draft CAS and
+// private intent inserts. The entire command must roll back transactionally.
+sql(`create function public.reject_test_catalog_creation_audit() returns trigger
+language plpgsql as $forced$ begin
+ if new.action_type='CATALOG_COPY_STAGED' then
+   raise exception 'TUX_CREATION_AUDIT_FORCED_ROLLBACK';
+ end if;
+ return new;
+end; $forced$;
+create trigger reject_test_catalog_creation_audit
+ before insert on public.admin_audit_events for each row
+ execute function public.reject_test_catalog_creation_audit();`, 'isolated audit rollback injection');
+let auditRollback = false;
+try {
+  rpc(stage('creation-rollback'), 'failure after staged Draft write');
+} catch (error) {
+  auditRollback = String(error).includes('TUX_CREATION_AUDIT_FORCED_ROLLBACK');
+}
+sql(`drop trigger reject_test_catalog_creation_audit on public.admin_audit_events;
+drop function public.reject_test_catalog_creation_audit();`, 'remove isolated audit trigger');
+if (!auditRollback) throw new Error('Audit failure did not abort Catalog entity Stage');
+if (sql(`select draft_revision from public.catalog_drafts where id='${draft.draftId}'`) !== '1' ||
+    sql(`select count(*) from private.admin_catalog_copy_creation_intents
+          where target_draft_id='${draft.draftId}'`) !== '0' ||
+    sql(`select count(*) from public.admin_catalog_copy_receipts
+          where command_id='creation-rollback'`) !== '0') {
+  throw new Error('Failed Stage left partial Draft change, mapping intent or receipt');
+}
 const staged = rpc(stage(), 'stage missing category and product');
 if (!staged.ok || staged.draftRevision !== 2 || staged.createdCategories !== 1 ||
     staged.createdProducts !== 1 || staged.publishRequired !== true) {
@@ -182,6 +210,34 @@ try {
 }
 if (!foreignDenied) throw new Error('Foreign tenant could stage another business Catalog');
 
+// A source publication changed between Stage and Publish must fail closed.
+// This creates/removes test-only versions in this loopback PostgreSQL fixture.
+sql(`insert into public.catalog_publish_versions(
+ business_id,shop_id,publish_version,operations_configuration_version,source_kind,bundle_json)
+ values ('${B}','${S}',2,2,'BASELINE',${quote(sourceBundle)});
+insert into public.operations_configuration_snapshots(shop_id,version,bundle_json)
+ values ('${S}',2,${quote(sourceBundle)})`, 'isolated newer source publication');
+let stalePublishRejected=false;
+try {
+  rpc(`public.publish_catalog_draft_v1(
+    '${OWNER}'::uuid,'${draft.draftId}'::uuid,2,1)`,
+    'stale source publication at target Publish');
+} catch(error) {
+  stalePublishRejected=String(error).includes('TUX_CATALOG_COPY_SOURCE_PUBLICATION_STALE');
+}
+if(!stalePublishRejected) throw new Error('Target publisher ignored newer source version');
+if(sql(`select count(*) from public.products where shop_id='${T}'`)!=='0' ||
+   sql(`select count(*) from public.catalog_product_shop_overrides
+       where shop_id='${T}'`)!=='0' ||
+   sql(`select status||','||draft_revision::text from public.catalog_drafts
+        where id='${draft.draftId}'`)!=='DRAFT,2') {
+  throw new Error('Stale source publish partially changed target Catalog');
+}
+// Restore ONLY the isolated version fixture to exercise successful publication.
+sql(`delete from public.catalog_publish_versions
+ where shop_id='${S}' and publish_version=2;
+delete from public.operations_configuration_snapshots
+ where shop_id='${S}' and version=2;`, 'restore isolated source version fixture');
 const published = rpc(
   `public.publish_catalog_draft_v1('${OWNER}'::uuid,'${draft.draftId}'::uuid,2,1)`,
   'publish missing Category/Product through canonical Catalog authority',
