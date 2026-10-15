@@ -36,7 +36,7 @@ create table auth.users(id uuid primary key);
 create function auth.uid() returns uuid language sql stable as $auth$
 select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $auth$;`,
 'isolated reset');
-const target='20261015095659_admin_finance_snapshot_second_person_approval.sql';
+const target='20261015113000_admin_finance_snapshot_pending_command_lock.sql';
 const migrations=readdirSync(resolve('supabase/migrations'))
   .filter(x=>/^\d+_.+\.sql$/.test(x)).sort();
 const index=migrations.indexOf(target);
