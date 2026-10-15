@@ -618,6 +618,15 @@ begin
  end if;
  if v_request.status<>'EXECUTING' then
    return jsonb_build_object('ok',false,'code','approval_owner_withdrawal_not_claimed');end if;
+ -- An approval cannot retroactively legitimize a movement posted before the
+ -- request was claimed. The approved receipt is the ONLY replay authority.
+ if exists(
+   select 1 from private.finance_management_commands prior
+   where prior.business_id=p_business_id
+     and prior.command_id=p_original_command_id
+ ) then
+   return jsonb_build_object('ok',false,'code','approval_owner_withdrawal_already_posted');
+ end if;
  perform set_config('tux.approved_owner_withdrawal_request_id',
    p_approval_request_id::text,true);
  v_result:=public.execute_finance_management_v1(
