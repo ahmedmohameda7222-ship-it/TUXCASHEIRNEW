@@ -611,6 +611,29 @@ const comboCandidate=comboPreview.products.find(x=>x.sourceProductId===SP4);
 if(!comboPreview.ok||comboCandidate?.status!=='CREATE_REQUIRED')
  throw new Error('Missing source Combo master not presented for creation');
 const comboLocal=comboCandidate.proposedTargetProductId;
+// Even an identical beverage name is insufficient: without the target
+// business-master binding, the new Combo must fail closed.
+sql(`delete from public.catalog_product_shop_overrides
+ where business_id='${B}' and shop_id='${T}' and master_product_id='${MP}'`,
+ 'remove mapped target beverage master');
+const unboundComboPreview=rpc(
+ `public.preview_admin_catalog_missing_entities_v1(${comboArgs})`,
+ 'recompute fingerprint after missing target beverage');
+const unboundComboStage=rpc(
+ `public.stage_admin_catalog_copy_created_entities_v1(
+ ${comboArgs},array[]::uuid[],array['${SP4}'::uuid],
+ '${unboundComboPreview.creationFingerprint}','combo-beverage-unbound')`,
+ 'refuse new Combo without exact beverage master');
+if(unboundComboStage.ok!==false ||
+ unboundComboStage.code!=='catalog_copy_missing_target_dependencies')
+ throw new Error('Unmapped beverage was silently linked by name: '+
+  JSON.stringify(unboundComboStage));
+sql(`
+ insert into public.catalog_product_shop_overrides(
+ business_id,master_product_id,shop_id,canonical_product_id,price_minor,
+ visible,manual_sold_out)
+ values ('${B}','${MP}','${T}','${localProductId}',12000,true,false)
+ `, 'restore target beverage master binding');
 const comboStage=rpc(
  `public.stage_admin_catalog_copy_created_entities_v1(
  ${comboArgs},array[]::uuid[],array['${SP4}'::uuid],
@@ -716,6 +739,29 @@ const modifierCandidate=modifierPreview.products.find(x=>x.sourceProductId===SP5
 if(!modifierPreview.ok||modifierCandidate?.status!=='CREATE_REQUIRED')
  throw new Error('New modifier-linked source Product not in creation preview');
 const modifierLocal=modifierCandidate.proposedTargetProductId;
+// A target Modifier with a matching name cannot substitute for the
+// existing standalone Product business-master binding.
+sql(`delete from public.catalog_product_shop_overrides
+ where business_id='${B}' and shop_id='${T}' and master_product_id='${MP}'`,
+ 'remove target standalone Product master binding');
+const unboundModifierPreview=rpc(
+ `public.preview_admin_catalog_missing_entities_v1(${modifierArgs})`,
+ 'recompute missing standalone Product fingerprint');
+const unboundModifierStage=rpc(
+ `public.stage_admin_catalog_copy_created_entities_v1(
+ ${modifierArgs},array[]::uuid[],array['${SP5}'::uuid],
+ '${unboundModifierPreview.creationFingerprint}','modifier-standalone-unbound')`,
+ 'refuse new Product Modifier link without standalone master');
+if(unboundModifierStage.ok!==false ||
+ unboundModifierStage.code!=='catalog_copy_missing_target_dependencies')
+ throw new Error('Unmapped standalone Product silently resolved Modifier identity: '+
+  JSON.stringify(unboundModifierStage));
+sql(`
+ insert into public.catalog_product_shop_overrides(
+ business_id,master_product_id,shop_id,canonical_product_id,price_minor,
+ visible,manual_sold_out)
+ values ('${B}','${MP}','${T}','${localProductId}',12000,true,false)
+ `, 'restore target standalone Product master binding');
 const modifierStage=rpc(
  `public.stage_admin_catalog_copy_created_entities_v1(
  ${modifierArgs},array[]::uuid[],array['${SP5}'::uuid],
