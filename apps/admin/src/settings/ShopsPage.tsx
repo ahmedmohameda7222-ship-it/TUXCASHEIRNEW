@@ -684,7 +684,8 @@ export function ShopsPage({
             pending={lifecycleUpdating}
             onOpenChange={setArchiveConfirmOpen}
             onConfirm={async () => {
-              if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined) return;
+              if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined)
+                return;
               const requesterPin = lifecyclePin.trim();
               setLifecyclePin('');
               await onUpdateLifecycle({
