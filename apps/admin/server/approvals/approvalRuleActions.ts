@@ -65,6 +65,12 @@ export const APPROVAL_RULE_ACTIONS: readonly ConfigurableApprovalAction[] = [
     thresholdKind: null,
   },
   {
+    actionType: 'FINANCE_SNAPSHOT_ADJUST',
+    label: 'Financial Z correction',
+    requesterPermission: 'finance.adjust',
+    thresholdKind: 'minimumMinor',
+  },
+  {
     actionType: 'STAFF_PAYMENT',
     label: 'Staff payment',
     requesterPermission: 'staff.payments',
