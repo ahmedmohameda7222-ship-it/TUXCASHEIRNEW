@@ -17,7 +17,7 @@ type FinanceSnapshotCommand = {
   amountMinor: number;
   reason: string;
   commandId: string;
-  requesterPin?: string;
+  requesterPin?: string | undefined;
 };
 
 type TrustedFinancePreview =
