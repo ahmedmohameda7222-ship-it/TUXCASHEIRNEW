@@ -89,6 +89,18 @@ const created = rpc(`public.create_admin_approval_request_v1(
 if (!created.ok || !created.requestId) {
   throw new Error('Lifecycle request was not persisted: ' + JSON.stringify(created));
 }
+// Disabling an approval Rule cannot unlock an already-open exact lifecycle
+// command. The request must be executed or terminally resolved first.
+sql(`update public.admin_approval_rules set active=false where id='${RULE}'`,
+ 'turn off policy after pending request exists');
+deny(rpc(direct(),'pending command bypass with disabled rule'),
+ 'shop_lifecycle_approval_required');
+if (sql(`select lifecycle_state||','||lifecycle_revision from public.shops
+ where id='${S}'`) !== 'ACTIVE,1') {
+  throw new Error('Pending lifecycle action was bypassed after policy disable');
+}
+sql(`update public.admin_approval_rules set active=true where id='${RULE}'`,
+ 'restore policy before decision');
 const approved = rpc(`public.decide_admin_approval_request_v1(
   '${created.requestId}'::uuid,'${A}'::uuid,null,'APPROVE','Operational pause')`,
   'second person approves lifecycle');
@@ -150,14 +162,16 @@ const claim2 = JSON.parse(sql(`select coalesce(jsonb_agg(to_jsonb(c)),'[]'::json
 if (!claim2.some((x) => x.approval_request_id === created2.requestId)) {
   throw new Error('Stale lifecycle request could not be claimed');
 }
-sql(`update public.admin_approval_rules set active=false where id='${RULE}'`,
- 'disable rule temporarily to simulate interleaving administrative change');
-const intervening = rpc(direct(2,'SUSPENDED','ACTIVE'), 'unprotected intervening CAS');
-if (!intervening.ok || intervening.lifecycleRevision !== 3) {
-  throw new Error('Intervening state fixture failed');
+// Simulate a legitimately concurrent change in the isolated fixture (not
+// through the protected public RPC) to prove the approved command has a
+// strict expected-revision fence even after an earlier approval decision.
+sql(`update public.shops set lifecycle_state='ACTIVE',lifecycle_revision=3,
+ active=true,temporary_closed=true,online_orders_paused=true
+ where id='${S}' and lifecycle_state='SUSPENDED' and lifecycle_revision=2`,
+ 'interleaving revision conflict fixture');
+if (sql(`select lifecycle_revision::text from public.shops where id='${S}'`) !== '3') {
+  throw new Error('Interleaving change did not establish stale revision');
 }
-sql(`update public.admin_approval_rules set active=true where id='${RULE}'`,
- 'restore approval policy');
 const stale = rpc(`public.execute_approved_admin_shop_lifecycle_v1(
  '${created2.requestId}'::uuid,'${B}'::uuid,'${S}'::uuid,'${E}'::uuid,
  '${A}'::uuid,2,'SUSPENDED','ACTIVE','${CMD2}'::uuid)`, 'reject stale approval');
