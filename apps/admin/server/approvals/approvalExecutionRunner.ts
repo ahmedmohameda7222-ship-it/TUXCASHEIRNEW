@@ -17,6 +17,11 @@ import {
 } from '../staff/staffApproval.js';
 import { AdminSupabaseClient } from '../supabaseAdmin.js';
 import {
+  createCashierReconciliationApprovalExecutionEntries,
+  type ApprovedCashierReconciliationInput,
+  type CashierReconciliationMutationResult,
+} from './financeCashierReconciliationApproval.js';
+import {
   createOwnerWithdrawalApprovalExecutionEntries,
   type ApprovedOwnerWithdrawalInput,
   type OwnerWithdrawalMutationResult,
@@ -155,6 +160,27 @@ export async function runProductionApprovalExecutionRunner(): Promise<ApprovalEx
     ...createStaffApprovalExecutionEntries(
       createSupabaseStaffApprovalExecutionDependencies(client),
     ),
+    ...createCashierReconciliationApprovalExecutionEntries({
+      executeReconciliation(input: ApprovedCashierReconciliationInput) {
+        return client.rpc<CashierReconciliationMutationResult>(
+          'execute_approved_admin_cashier_reconciliation_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_business_day_id: input.businessDayId,
+            p_cashier_worker_id: input.cashierWorkerId,
+            p_actual_minor: input.actualMinor,
+            p_expected_minor: input.expectedMinor,
+            p_reason: input.reason,
+            p_original_command_id: input.commandId,
+            p_approval_command_id: input.approvalCommandId,
+          },
+        );
+      },
+    }),
     ...createOwnerWithdrawalApprovalExecutionEntries({
       executeWithdrawal(input: ApprovedOwnerWithdrawalInput) {
         return client.rpc<OwnerWithdrawalMutationResult>(
