@@ -87,7 +87,10 @@ export const approvalRuleWriteSchema = z
       context.addIssue({
         code: 'custom',
         path: ['requiresSecondPerson'],
-        message: 'shop_lifecycle_second_person_required',
+        message:
+          value.actionType === 'SHOP_LIFECYCLE_CHANGE'
+            ? 'shop_lifecycle_second_person_required'
+            : 'finance_snapshot_second_person_required',
       });
     }
     if (value.requesterPermission !== action.requesterPermission) {
