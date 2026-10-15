@@ -13,7 +13,7 @@ export function catalogCopyErrorMessage(cause: unknown): string {
     case 'catalog_copy_creation_conflict':
       return 'Creation blocked: at least one selected source entity cannot be assigned a new target-local identity. Review explicit creation decisions and any existing master mapping.';
     case 'catalog_copy_unresolved_entity_dependencies':
-      return 'Creation blocked: a selected Product has modifier, combo or recipe dependencies that cannot be safely created or remapped. Resolve or map those dependencies first; nothing was staged.';
+      return 'Creation blocked: a selected Product has modifier or combo dependencies that cannot be safely created or remapped. Resolve or map those dependencies first; nothing was staged.';
     case 'catalog_copy_target_draft_invalid':
       return 'Creation blocked: the target draft is unavailable or no longer editable. Reload the target shop.';
     case 'invalid_catalog_copy_selection':
