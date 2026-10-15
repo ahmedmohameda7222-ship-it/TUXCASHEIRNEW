@@ -61,6 +61,7 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - run: node scripts/test-admin-workforce-postgres.mjs
       - run: node scripts/test-admin-workforce-review-hardening-postgres.mjs
+      - run: node scripts/test-admin-workforce-security-parity-postgres.mjs
       - run: node scripts/test-admin-workforce-reactivation-postgres.mjs
       - run: node scripts/test-admin-production-parity-postgres.mjs
       - run: node scripts/test-admin-workforce-tenant-isolation-postgres.mjs
