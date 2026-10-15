@@ -1005,7 +1005,9 @@ export function ShopsPage({
         <div className="admin-settings-danger-zone">
           <div>
             <strong>Delete unused shop</strong>
-            <span>Used shops must be archived through the approval-aware lifecycle control above.</span>
+            <span>
+              Used shops must be archived through the approval-aware lifecycle control above.
+            </span>
           </div>
           <button
             className="admin-secondary-button"
