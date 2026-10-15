@@ -71,6 +71,10 @@ const catalogCopyBaseSchema = z.object({
 });
 
 export const catalogCopySchema = z.discriminatedUnion('type', [
+  catalogCopyBaseSchema
+    .omit({ selectedDomains: true })
+    .extend({ type: z.literal('catalog-copy.missing-preview') })
+    .strict(),
   catalogCopyBaseSchema.extend({ type: z.literal('catalog-copy.preview') }).strict(),
   catalogCopyBaseSchema
     .extend({
@@ -264,7 +268,9 @@ export default async function handler(
       typeof rawCommand === 'object' &&
       rawCommand !== null &&
       'type' in rawCommand &&
-      (rawCommand.type === 'catalog-copy.preview' || rawCommand.type === 'catalog-copy.apply')
+      (rawCommand.type === 'catalog-copy.preview' ||
+        rawCommand.type === 'catalog-copy.apply' ||
+        rawCommand.type === 'catalog-copy.missing-preview')
     ) {
       const copy = catalogCopySchema.safeParse(rawCommand);
       if (!copy.success || copy.data.sourceShopId === copy.data.targetShopId) {
@@ -274,6 +280,26 @@ export default async function handler(
       const principal = await loadPrincipal(request, client, true);
       requirePermission(principal, 'catalog.view', copy.data.sourceShopId);
       requirePermission(principal, 'catalog.edit', copy.data.targetShopId);
+      if (copy.data.type === 'catalog-copy.missing-preview') {
+        const result = await client.rpc<Readonly<Record<string, unknown>>>(
+          'preview_admin_catalog_missing_entities_v1',
+          {
+            p_employee_id: principal.employeeId,
+            p_source_shop_id: copy.data.sourceShopId,
+            p_target_shop_id: copy.data.targetShopId,
+            p_target_draft_id: copy.data.targetDraftId,
+            p_source_publish_version: copy.data.expectedSourcePublishVersion,
+            p_target_publish_version: copy.data.expectedTargetPublishVersion,
+            p_target_draft_revision: copy.data.expectedTargetDraftRevision,
+          },
+        );
+        if (result['ok'] !== true && result['ok'] !== false) {
+          sendJson(response, 502, { error: 'backend_contract_invalid' });
+          return;
+        }
+        sendJson(response, result['ok'] === true ? 200 : 409, result);
+        return;
+      }
       if (copy.data.selectedDomains.includes('recipeLines')) {
         requirePermission(principal, 'inventory.view', copy.data.sourceShopId);
         requirePermission(principal, 'inventory.adjust', copy.data.targetShopId);
