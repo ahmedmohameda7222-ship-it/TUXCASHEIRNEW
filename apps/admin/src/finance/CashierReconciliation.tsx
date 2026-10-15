@@ -40,7 +40,7 @@ export function CashierReconciliation({
       if (actualMinor < 0) throw new Error('Actual cash cannot be negative.');
       finance.command.mutate(
         {
-          reauthPin: requesterPin.trim() || undefined,
+          ...(requesterPin.trim() ? { reauthPin: requesterPin.trim() } : {}),
           draft: {
             type: 'finance.cashier.reconcile',
             shopId,
