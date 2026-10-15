@@ -88,6 +88,13 @@ const direct = (minor,cmd) => `public.finance_adjust_snapshot_v1(
  'Audited correction','${cmd}')`;
 const smaller=rpc(direct(499,'below-approval-threshold'),'below threshold direct');
 if(!smaller.ok)throw new Error('Below-threshold adjustment must remain allowed');
+const trustedPreview=rpc(`public.preview_admin_finance_snapshot_adjustment_v1(
+ '${E}'::uuid,'${S}'::uuid,'${SNAP}'::uuid,500,
+ 'Audited correction','at-threshold-needs-approval')`,
+ 'trusted preview resolves threshold and snapshot revision');
+if(!trustedPreview.ok||!trustedPreview.approvalRequired||
+ trustedPreview.ruleId!==RULE||trustedPreview.expectedAdjustmentCount!==1)
+ throw new Error('Trusted Finance Snapshot approval preview did not match rule and revision');
 deny(rpc(direct(500,'at-threshold-needs-approval'),'guard mandatory threshold'),
  'finance_snapshot_approval_required');
 if(sql(`select count(*) from public.financial_adjustments where amount_minor=500`) !== '0')
@@ -131,9 +138,58 @@ deny(rpc(executor(A,2), 'worker may not tamper with count'),
 const result=rpc(executor(), 'trusted finance snapshot approved execution');
 if(!result.ok||!result.adjustmentId||result.replayed)
  throw new Error('Approved finance correction failed: '+JSON.stringify(result));
+const financeClaim=claims.find(x=>x.approval_request_id===pending.requestId);
+if(!financeClaim?.claim_token)throw new Error('Claim receipt token missing');
 const replay=rpc(executor(), 'replay after ambiguous worker completion');
 if(!replay.ok||replay.adjustmentId!==result.adjustmentId||
  replay.idempotentReplay!==true)throw new Error('Finance correction duplicated on replay');
+const completed=rpc(`public.complete_admin_approval_execution_v1(
+ '${pending.requestId}'::uuid,'${financeClaim.claim_token}','EXECUTED',
+ null,'{"idempotentReplay":false}'::jsonb,now())`,
+ 'persist finance approval worker completion');
+if(!completed.ok)throw new Error('Finance worker completion was not durable');
+const completedReplay=rpc(executor(), 'replay after durable worker completion');
+if(!completedReplay.ok||completedReplay.adjustmentId!==result.adjustmentId||
+ completedReplay.idempotentReplay!==true)
+ throw new Error('Completed Finance approval replay posted a duplicate correction');
+
+// Approval is bound to the observed immutable-snapshot adjustment count.
+// A below-threshold correction can still advance that count; stale approved
+// amounts must not execute against a newer ledger state.
+const CMD2='88888888-8888-4888-8888-888888888889';
+const countBefore=Number(sql(`select count(*) from public.financial_adjustments
+ where snapshot_id='${SNAP}'`));
+const stalePayload={
+ shopId:S,snapshotId:SNAP,amountMinor:700,reason:'Stale adjustment',
+ commandId:'stale-finance-correction',expectedAdjustmentCount:countBefore
+};
+const requested2=rpc(`public.create_admin_approval_request_v1(
+ '${B}'::uuid,'${S}'::uuid,'${E}'::uuid,null,'${RULE}'::uuid,
+ 'FINANCE_SNAPSHOT_ADJUST','${CMD2}'::uuid,
+ '${JSON.stringify(stalePayload)}'::jsonb,'Stale correction')`,
+ 'create revision-bound approved correction');
+if(!requested2.ok||!requested2.requestId)throw new Error('Cannot create stale correction');
+const decided2=rpc(`public.decide_admin_approval_request_v1(
+ '${requested2.requestId}'::uuid,'${A}'::uuid,null,'APPROVE','Reviewed')`,
+ 'second person approves stale correction');
+if(!decided2.ok)throw new Error('Second finance approval rejected');
+const claims2=JSON.parse(sql(`select coalesce(jsonb_agg(to_jsonb(c)),'[]'::jsonb)::text
+ from public.claim_admin_approval_execution_v1('finance-review',now(),10,300) c`));
+if(!claims2.some(x=>x.approval_request_id===requested2.requestId))
+ throw new Error('Second adjustment not claimed');
+const intervening=rpc(direct(100,'unrelated-below-threshold'),
+ 'allow an unrelated below-threshold adjustment');
+if(!intervening.ok)throw new Error('Legitimate below-threshold correction blocked');
+const staleResult=rpc(`public.execute_approved_admin_finance_snapshot_adjustment_v1(
+ '${requested2.requestId}'::uuid,'${B}'::uuid,'${S}'::uuid,
+ '${E}'::uuid,'${A}'::uuid,'${SNAP}'::uuid,
+ 700,'Stale adjustment','stale-finance-correction',${countBefore},
+ '${CMD2}'::uuid)`, 'reject stale finance snapshot adjustment');
+deny(staleResult,'stale_finance_snapshot_adjustment');
+if(sql(`select count(*) from public.financial_adjustments
+ where snapshot_id='${SNAP}' and amount_minor=700`) !== '0')
+ throw new Error('Stale approved correction mutated the ledger');
+
 if(sql(`select count(*) from public.financial_adjustments
  where snapshot_id='${SNAP}' and amount_minor=500`) !== '1')
  throw new Error('Approved adjustment not exactly once');
