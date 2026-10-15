@@ -67,15 +67,14 @@ describe('Finance Snapshot second-person approval', () => {
       kind: 'APPROVAL_REQUIRED',
       ruleId: globalRule.id,
     });
+    expect(evaluateFinanceSnapshotApprovalRouting(payload, actor, [globalRule, localRule])).toEqual(
+      { kind: 'DIRECT' },
+    );
     expect(
-      evaluateFinanceSnapshotApprovalRouting(payload, actor, [globalRule, localRule]),
-    ).toEqual({ kind: 'DIRECT' });
-    expect(
-      evaluateFinanceSnapshotApprovalRouting(
-        { ...payload, amountMinor: -1_000 },
-        actor,
-        [globalRule, localRule],
-      ),
+      evaluateFinanceSnapshotApprovalRouting({ ...payload, amountMinor: -1_000 }, actor, [
+        globalRule,
+        localRule,
+      ]),
     ).toEqual({ kind: 'APPROVAL_REQUIRED', ruleId: localRule.id });
   });
 

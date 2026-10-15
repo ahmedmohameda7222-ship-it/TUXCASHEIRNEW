@@ -20,7 +20,11 @@ const payloadSchema = z
   .object({
     shopId: z.string().uuid(),
     snapshotId: z.string().uuid(),
-    amountMinor: z.number().int().safe().refine((amount) => amount !== 0),
+    amountMinor: z
+      .number()
+      .int()
+      .safe()
+      .refine((amount) => amount !== 0),
     reason: z.string().trim().min(1).max(500),
     commandId: z.string().uuid(),
     expectedAdjustmentCount: z.number().int().safe().nonnegative(),
