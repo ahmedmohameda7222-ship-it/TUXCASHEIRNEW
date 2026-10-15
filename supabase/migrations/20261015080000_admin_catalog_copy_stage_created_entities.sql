@@ -305,6 +305,22 @@ begin
   (v_draft.working_bundle_json->'snapshot'->'categories')||v_new_categories),
   '{snapshot,products}',
   (v_draft.working_bundle_json->'snapshot'->'products')||v_new_products);
+ -- Existing target data is preserved. A selected new entity may never
+ -- collide by normalized name with ANY other target-local entity, including
+ -- another newly selected source master with a different UUID.
+ if exists (
+   select 1 from jsonb_array_elements(v_new_categories) created(value)
+   join jsonb_array_elements(v_bundle->'snapshot'->'categories') other(value)
+     on created.value->>'id' is distinct from other.value->>'id'
+    and lower(btrim(created.value->>'name'))=lower(btrim(other.value->>'name'))
+ ) or exists (
+   select 1 from jsonb_array_elements(v_new_products) created(value)
+   join jsonb_array_elements(v_bundle->'snapshot'->'products') other(value)
+     on created.value->>'id' is distinct from other.value->>'id'
+    and lower(btrim(created.value->>'name'))=lower(btrim(other.value->>'name'))
+ ) then
+   return jsonb_build_object('ok',false,'code','catalog_copy_target_name_conflict');
+ end if;
  perform private.validate_admin_catalog_bundle_v1(p_target_shop_id,v_bundle);
  v_saved:=public.apply_catalog_draft_change_v1(
    p_employee_id,p_target_draft_id,p_target_draft_revision,
