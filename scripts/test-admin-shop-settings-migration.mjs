@@ -284,15 +284,17 @@ begin
     raise exception 'reason family constraint accepted an unreviewed family';
   end if;
 
+  -- Used shops may only be archived via the version-fenced lifecycle
+  -- approval runner. The legacy settings delete RPC must fail closed.
   v_archive := public.delete_or_archive_shop_v1('${employeeId}', '${shopId}');
-  if v_archive ->> 'action' <> 'ARCHIVED' then
-    raise exception 'used shop was not archived: %', v_archive;
+  if v_archive ->> 'code' <> 'shop_archive_use_lifecycle_command' then
+    raise exception 'used shop bypassed approved archive lifecycle: %', v_archive;
   end if;
   if not exists (
     select 1 from public.shops s
-    where s.id = '${shopId}' and s.lifecycle_state = 'ARCHIVED' and s.active = false
+    where s.id = '${shopId}' and s.lifecycle_state = 'ACTIVE' and s.active = true
   ) then
-    raise exception 'archived shop canonical row was not retained';
+    raise exception 'used shop changed state despite denied legacy archive';
   end if;
 
   v_delete := public.delete_or_archive_shop_v1('${employeeId}', '${unusedShopId}');
