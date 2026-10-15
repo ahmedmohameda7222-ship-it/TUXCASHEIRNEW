@@ -80,6 +80,13 @@ export const approvalRuleWriteSchema = z
       });
       return;
     }
+    if (value.actionType === 'SHOP_LIFECYCLE_CHANGE' && !value.requiresSecondPerson) {
+      context.addIssue({
+        code: 'custom',
+        path: ['requiresSecondPerson'],
+        message: 'shop_lifecycle_second_person_required',
+      });
+    }
     if (value.requesterPermission !== action.requesterPermission) {
       context.addIssue({
         code: 'custom',
