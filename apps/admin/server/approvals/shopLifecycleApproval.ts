@@ -45,6 +45,10 @@ export type ShopLifecycleApprovalResult =
     }
   | { ok: false; code: string; currentVersion?: number };
 
+export type ApprovedShopLifecycleMutationResult =
+  | { ok: true; lifecycleRevision: number; idempotentReplay?: boolean }
+  | { ok: false; code: string; currentVersion?: number };
+
 function parsePayload(input: unknown): ShopLifecycleApprovalPayload {
   const parsed = payloadSchema.safeParse(input);
   if (!parsed.success) {
@@ -66,7 +70,7 @@ export function createShopLifecycleApprovalCommandEntries(): readonly ApprovalCo
 }
 
 export function createShopLifecycleApprovalExecutionEntries(deps: {
-  executeLifecycle(input: ApprovedShopLifecycleInput): Promise<ShopLifecycleApprovalResult>;
+  executeLifecycle(input: ApprovedShopLifecycleInput): Promise<ApprovedShopLifecycleMutationResult>;
 }): readonly ApprovalExecutionRegistryEntry[] {
   return [
     {
@@ -85,6 +89,9 @@ export function createShopLifecycleApprovalExecutionEntries(deps: {
           originalCommandId: claim.commandId,
         });
         if (!result.ok) throw new ApprovalTerminalCommandError(result.code);
+        if (!Number.isSafeInteger(result.lifecycleRevision) || result.lifecycleRevision < 1) {
+          throw new Error('approval_shop_lifecycle_result_invalid');
+        }
         return { result, idempotentReplay: result.idempotentReplay === true };
       },
     },
