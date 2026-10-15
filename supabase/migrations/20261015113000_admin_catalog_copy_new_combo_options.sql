@@ -3,7 +3,8 @@
 -- Product master bindings. No name matching, product/stock cloning, or live
 -- mutation before canonical Draft Publish.
 -- Products serving as beverages for already-existing Combo owners remain
--- fail-closed, as do unresolved modifier dependencies.
+-- fail-closed. Outgoing modifier links are resolved only by existing
+-- target-local modifiers whose standalone Product has the same business master.
 create or replace function public.stage_admin_catalog_copy_created_entities_v1(
  p_employee_id uuid,p_source_shop_id uuid,p_target_shop_id uuid,
  p_target_draft_id uuid,p_source_publish_version bigint,
@@ -37,6 +38,13 @@ declare
  v_recipe record;
  v_new_recipe_lines jsonb:='[]'::jsonb;
  v_new_combo_options jsonb:='[]'::jsonb;
+ v_new_modifier_links jsonb:='[]'::jsonb;
+ v_modifier_link record;
+ v_source_modifier jsonb;
+ v_source_standalone_id uuid;
+ v_target_standalone_id uuid;
+ v_target_modifier_id uuid;
+ v_modifier_match_count bigint;
  v_combo record;
  v_target_beverage_id uuid;
  v_target_inventory_id uuid;
@@ -174,9 +182,6 @@ begin
    -- Scope guard: modifiers, combo links and recipes require additional
    -- explicit mapping; never silently discard source product dependencies.
    if exists(select 1 from jsonb_array_elements(
-      v_source_bundle->'snapshot'->'productModifierLinks') x(value)
-      where x.value->>'productId'=v_src_id::text)
-      or exists(select 1 from jsonb_array_elements(
       v_source_bundle->'snapshot'->'comboBeverageOptions') x(value)
       where x.value->>'beverageProductId'=v_src_id::text)
       or exists(select 1 from jsonb_array_elements(
@@ -189,6 +194,58 @@ begin
      v_src,'{id}',to_jsonb(v_local::text)),
      '{shopId}',to_jsonb(p_target_shop_id::text)),
      '{categoryId}',to_jsonb(v_target_category::text));
+   -- Product→Modifier links use existing target modifiers anchored by
+   -- the master identity of their standalone Product. Modifier names and
+   -- source shop UUIDs are never treated as identity, and target prices win.
+   for v_modifier_link in select link.value from jsonb_array_elements(
+     v_source_bundle->'snapshot'->'productModifierLinks') link(value)
+     where link.value->>'productId'=v_src_id::text
+   loop
+     select modifier.value into v_source_modifier from jsonb_array_elements(
+       v_source_bundle->'snapshot'->'modifiers') modifier(value)
+       where modifier.value->>'id'=v_modifier_link.value->>'modifierId';
+     if v_source_modifier is null or
+        nullif(v_source_modifier->>'standaloneProductId','') is null
+     then return jsonb_build_object('ok',false,
+       'code','catalog_copy_missing_target_dependencies'); end if;
+     v_source_standalone_id:=(v_source_modifier->>'standaloneProductId')::uuid;
+     v_target_standalone_id:=null;
+     select target_binding.canonical_product_id into v_target_standalone_id
+     from public.catalog_product_shop_overrides source_binding
+     join public.catalog_master_products master
+       on master.business_id=source_binding.business_id
+      and master.id=source_binding.master_product_id
+      and master.archived_at is null
+     join public.catalog_product_shop_overrides target_binding
+       on target_binding.business_id=source_binding.business_id
+      and target_binding.shop_id=p_target_shop_id
+      and target_binding.master_product_id=source_binding.master_product_id
+     join jsonb_array_elements(
+       v_draft.working_bundle_json->'snapshot'->'products') target_product(value)
+       on target_product.value->>'id'=target_binding.canonical_product_id::text
+     where source_binding.business_id=v_business
+       and source_binding.shop_id=p_source_shop_id
+       and source_binding.canonical_product_id=v_source_standalone_id;
+     if v_target_standalone_id is null then
+       return jsonb_build_object('ok',false,
+         'code','catalog_copy_missing_target_dependencies'); end if;
+     select count(*), (array_agg((dst.value->>'id')::uuid))[1]
+       into v_modifier_match_count,v_target_modifier_id
+     from jsonb_array_elements(
+       v_draft.working_bundle_json->'snapshot'->'modifiers') dst(value)
+     where dst.value->>'standaloneProductId'=v_target_standalone_id::text;
+     if v_modifier_match_count<>1 then
+       return jsonb_build_object('ok',false,
+         'code','catalog_copy_missing_target_dependencies'); end if;
+     v_new_modifier_links:=v_new_modifier_links||jsonb_build_array(
+       jsonb_build_object(
+         'shopId',p_target_shop_id,
+         'productId',v_local,
+         'modifierId',v_target_modifier_id,
+         'maxQuantity',v_modifier_link.value->'maxQuantity',
+         'sortOrder',v_modifier_link.value->'sortOrder'
+       ));
+   end loop;
    -- Only outgoing options of a newly created Combo are copied. A new
    -- Beverage referenced by an unrelated existing Combo remains fail closed
    -- until the operator explicitly resolves the target owner mapping.
@@ -320,6 +377,9 @@ begin
  v_bundle:=jsonb_set(v_bundle,'{snapshot,comboBeverageOptions}',
    (v_draft.working_bundle_json->'snapshot'->'comboBeverageOptions')||
       v_new_combo_options);
+ v_bundle:=jsonb_set(v_bundle,'{snapshot,productModifierLinks}',
+   (v_draft.working_bundle_json->'snapshot'->'productModifierLinks')||
+      v_new_modifier_links);
  -- Existing target data is preserved. A selected new entity may never
  -- collide by normalized name with ANY other target-local entity, including
  -- another newly selected source master with a different UUID.
@@ -360,6 +420,7 @@ begin
     'createdProducts',jsonb_array_length(v_new_products),
     'createdRecipeLines',jsonb_array_length(v_new_recipe_lines),
     'createdComboOptions',jsonb_array_length(v_new_combo_options),
+    'createdModifierLinks',jsonb_array_length(v_new_modifier_links),
     'createdCategoryIds',(select coalesce(jsonb_agg(
        (c.value->>'id')::uuid order by c.ordinality),'[]'::jsonb)
        from jsonb_array_elements(v_new_categories) with ordinality c(value,ordinality)),
