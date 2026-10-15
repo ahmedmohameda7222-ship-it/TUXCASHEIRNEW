@@ -101,9 +101,7 @@ export async function executeCashierReconciliationCommand(
   }
   const base = createSupabaseApprovalServiceDependencies(client);
   const rule =
-    preview.approvalRequired && preview.ruleId
-      ? await base.loadRule(preview.ruleId)
-      : null;
+    preview.approvalRequired && preview.ruleId ? await base.loadRule(preview.ruleId) : null;
   if (preview.approvalRequired && !rule) {
     return { ok: false, code: 'finance_cashier_rule_invalid' };
   }

@@ -41,9 +41,7 @@ const rule = {
 
 describe('cashier reconciliation trusted approval boundary', () => {
   it('uses trusted absolute drawer variance and prefers shop rules to business defaults', () => {
-    expect(CASHIER_RECONCILIATION_APPROVAL_ACTION).toBe(
-      'FINANCE_CASHIER_RECONCILIATION',
-    );
+    expect(CASHIER_RECONCILIATION_APPROVAL_ACTION).toBe('FINANCE_CASHIER_RECONCILIATION');
     const defaultRule = { ...rule, id: 'business-rule', shopId: null };
     expect(evaluateCashierReconciliationRouting(command, 501, actor, [defaultRule])).toEqual({
       kind: 'APPROVAL_REQUIRED',
@@ -83,7 +81,13 @@ describe('cashier reconciliation trusted approval boundary', () => {
     };
     const direct = vi.fn(async () => ({ ok: true as const, reconciliationId: 'direct' }));
     const outcome = await executeOrRequestCashierReconciliation(
-      command, 500, actor, [rule], deps, undefined, direct,
+      command,
+      500,
+      actor,
+      [rule],
+      deps,
+      undefined,
+      direct,
     );
     expect(outcome).toMatchObject({ ok: true, state: 'PENDING_APPROVAL' });
     expect(createRequest).toHaveBeenCalledTimes(1);
@@ -112,8 +116,9 @@ describe('cashier reconciliation trusted approval boundary', () => {
       attemptCount: 1,
       leaseExpiresAt: '2026-10-15T13:00:00Z',
     };
-    await expect(entry.execute({ claim, payload: command, commandId: claim.commandId }))
-      .resolves.toMatchObject({ result: { ok: true }, idempotentReplay: false });
+    await expect(
+      entry.execute({ claim, payload: command, commandId: claim.commandId }),
+    ).resolves.toMatchObject({ result: { ok: true }, idempotentReplay: false });
     expect(executeReconciliation).toHaveBeenCalledWith(
       expect.objectContaining({
         ...command,

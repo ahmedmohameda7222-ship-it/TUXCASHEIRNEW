@@ -199,7 +199,7 @@ export function useFinanceOperations(
               commandId,
               ...((draft.type === 'finance.snapshot.adjust' ||
                 draft.type === 'finance.owner-withdrawal' ||
-                 draft.type === 'finance.cashier.reconcile') &&
+                draft.type === 'finance.cashier.reconcile') &&
               reauthPin !== undefined
                 ? { requesterPin: reauthPin }
                 : {}),

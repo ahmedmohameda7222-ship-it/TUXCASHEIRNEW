@@ -68,7 +68,11 @@ const workspace = {
 async function mockFinance(
   page: Page,
   dayStatus: 'OPEN' | 'CLOSED' = 'OPEN',
-  options: { pendingSnapshot?: boolean; pendingWithdrawal?: boolean; pendingCashier?: boolean } = {},
+  options: {
+    pendingSnapshot?: boolean;
+    pendingWithdrawal?: boolean;
+    pendingCashier?: boolean;
+  } = {},
 ) {
   const postedCommands: Array<Record<string, unknown>> = [];
   await page.route('**/api/admin/session', async (route) => {
@@ -169,14 +173,16 @@ async function mockFinance(
       data = options.pendingCashier
         ? {
             workers: [{ id: cashierWorkerId, display_name: 'Cashier #1' }],
-            cashiers: [{
-              cashierWorkerId,
-              displayName: 'Cashier #1',
-              expectedMinor: 2000,
-              cashSalesExpectationMinor: 2000,
-              recordedCashMovementMinor: 0,
-              openingFloatRecorded: true,
-            }],
+            cashiers: [
+              {
+                cashierWorkerId,
+                displayName: 'Cashier #1',
+                expectedMinor: 2000,
+                cashSalesExpectationMinor: 2000,
+                recordedCashMovementMinor: 0,
+                openingFloatRecorded: true,
+              },
+            ],
             reconciliations: [],
           }
         : { workers: [], cashiers: [], reconciliations: [] };
@@ -237,12 +243,13 @@ test('cashier variance approval remains pending without falsely posting a count'
   await dialog.getByLabel('Variance reason, if different').fill('Verified drawer difference');
   await dialog.getByLabel('Requester PIN (if approval requires reauthentication)').fill('1234');
   await dialog.getByRole('button', { name: 'Record count' }).click();
-  await expect(dialog.getByRole('status')).toContainText(
-    'pending second-person approval',
-  );
-  await expect(dialog.getByRole('button', { name: 'Pending second-person approval' })).toBeDisabled();
-  await expect(page.getByText('No cashier reconciliation has been posted for this day.'))
-    .toBeVisible();
+  await expect(dialog.getByRole('status')).toContainText('pending second-person approval');
+  await expect(
+    dialog.getByRole('button', { name: 'Pending second-person approval' }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText('No cashier reconciliation has been posted for this day.'),
+  ).toBeVisible();
   expect(commands).toHaveLength(1);
   expect(commands[0]).toMatchObject({
     type: 'finance.cashier.reconcile',
