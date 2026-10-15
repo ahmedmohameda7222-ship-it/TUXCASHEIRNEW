@@ -71,6 +71,17 @@ insert into public.admin_approval_rules(
  requires_second_person,threshold_context,active)
  values ('${RULE}','${B}',null,'SHOP_LIFECYCLE_CHANGE',
  'shops.manage','approvals.review',true,'{}'::jsonb,true);`, 'business rule and two real approvers');
+// Confirm the public Settings approval-rule mutator accepts this executable
+// action and performs the rule CAS as the real BFF does.
+const configuredRule = rpc(`public.upsert_admin_approval_rule_v1(
+ '${E}'::uuid,'${S}'::uuid,'${RULE}'::uuid,null,
+ 'SHOP_LIFECYCLE_CHANGE','shops.manage','approvals.review',true,false,
+ 3600,'{}'::jsonb,true,1)`, 'trusted lifecycle approval Rule upsert');
+if (!configuredRule.ok || configuredRule.ruleId !== RULE ||
+ configuredRule.editVersion !== 2) {
+ throw new Error('Shop lifecycle action not configurable through trusted settings: ' +
+   JSON.stringify(configuredRule));
+}
 const direct = (revision = 1, expected = 'ACTIVE', target = 'SUSPENDED') =>
   `public.update_admin_shop_lifecycle_v1(
     '${E}'::uuid,'${S}'::uuid,${revision},'${expected}','${target}')`;
