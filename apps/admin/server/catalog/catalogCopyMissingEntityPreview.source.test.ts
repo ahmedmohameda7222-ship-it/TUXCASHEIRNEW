@@ -30,7 +30,9 @@ describe('Catalog Copy missing-entity diagnostic preview', () => {
   });
 
   it('keeps the read-only diagnostic RPC service-role-only', () => {
-    expect(sql).toContain('revoke all on function public.preview_admin_catalog_missing_entities_v1');
+    expect(sql).toContain(
+      'revoke all on function public.preview_admin_catalog_missing_entities_v1',
+    );
     expect(sql).toContain('to service_role');
     expect(sql).not.toContain('insert into public.menu_categories');
     expect(sql).not.toContain('insert into public.products');
