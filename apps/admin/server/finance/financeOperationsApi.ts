@@ -16,6 +16,7 @@ import { AdminSupabaseClient, AdminSupabaseError } from '../supabaseAdmin.js';
 import { adminRequestOperation } from '../observability.js';
 import { maskOwnerSummaryForPrincipal } from './ownerSummaryAuthorization.js';
 import { executeFinanceSnapshotCommand } from './financeSnapshotApprovalRoute.js';
+import { executeOwnerWithdrawalCommand } from './financeOwnerWithdrawalApprovalRoute.js';
 
 const uuid = z.string().uuid();
 const commandId = uuid;
@@ -69,6 +70,7 @@ const operationSchema = z.discriminatedUnion('type', [
       amountMinor: minor,
       reason,
       commandId,
+      requesterPin: z.string().min(1).max(64).optional(),
     })
     .strict(),
   z
@@ -523,6 +525,8 @@ export async function handleAdvancedFinance(
         p_reason: command.reason,
         p_command_id: command.commandId,
       });
+    } else if (command.type === 'finance.owner-withdrawal') {
+      result = await executeOwnerWithdrawalCommand(client, context, command, request);
     } else if (command.type === 'finance.cashier.reconcile') {
       result = await client.rpc('finance_reconcile_cashier_v1', {
         p_actor_employee_id: principal.employeeId,
