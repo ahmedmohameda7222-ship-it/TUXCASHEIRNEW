@@ -97,7 +97,7 @@ async function mockFinance(
         contentType: 'application/json',
         body: JSON.stringify(
           (options.pendingSnapshot && command.type === 'finance.snapshot.adjust') ||
-          (options.pendingWithdrawal && command.type === 'finance.owner-withdrawal')
+            (options.pendingWithdrawal && command.type === 'finance.owner-withdrawal')
             ? {
                 ok: true,
                 state: 'PENDING_APPROVAL',
@@ -209,9 +209,7 @@ test('Bank & Cash keeps tracked money distinct from profit and posts a transfer 
   );
 });
 
-test('owner withdrawal requests second-person approval without posting funds', async ({
-  page,
-}) => {
+test('owner withdrawal requests second-person approval without posting funds', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const commands = await mockFinance(page, 'OPEN', { pendingWithdrawal: true });
   await page.goto('/finance');

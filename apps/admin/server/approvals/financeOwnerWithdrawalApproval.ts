@@ -56,28 +56,30 @@ function readPayload(input: unknown): OwnerWithdrawalApprovalPayload {
 export function createOwnerWithdrawalApprovalExecutionEntries(deps: {
   executeWithdrawal(input: ApprovedOwnerWithdrawalInput): Promise<OwnerWithdrawalMutationResult>;
 }): readonly ApprovalExecutionRegistryEntry[] {
-  return [{
-    actionType: OWNER_WITHDRAWAL_APPROVAL_ACTION,
-    async execute({ payload, claim }) {
-      const input = readPayload(payload);
-      if (claim.shopId !== input.shopId) {
-        throw new ApprovalTerminalCommandError('approval_owner_withdrawal_scope_invalid');
-      }
-      const result = await deps.executeWithdrawal({
-        ...input,
-        businessId: claim.businessId,
-        approvalRequestId: claim.approvalRequestId,
-        requesterEmployeeId: claim.requesterEmployeeId,
-        approverEmployeeId: claim.approverEmployeeId,
-        approvalCommandId: claim.commandId,
-      });
-      if (!result.ok) throw new ApprovalTerminalCommandError(result.code);
-      if (result.commandId !== input.commandId) {
-        throw new Error('approval_owner_withdrawal_result_invalid');
-      }
-      return { result, idempotentReplay: result.idempotentReplay === true };
+  return [
+    {
+      actionType: OWNER_WITHDRAWAL_APPROVAL_ACTION,
+      async execute({ payload, claim }) {
+        const input = readPayload(payload);
+        if (claim.shopId !== input.shopId) {
+          throw new ApprovalTerminalCommandError('approval_owner_withdrawal_scope_invalid');
+        }
+        const result = await deps.executeWithdrawal({
+          ...input,
+          businessId: claim.businessId,
+          approvalRequestId: claim.approvalRequestId,
+          requesterEmployeeId: claim.requesterEmployeeId,
+          approverEmployeeId: claim.approverEmployeeId,
+          approvalCommandId: claim.commandId,
+        });
+        if (!result.ok) throw new ApprovalTerminalCommandError(result.code);
+        if (result.commandId !== input.commandId) {
+          throw new Error('approval_owner_withdrawal_result_invalid');
+        }
+        return { result, idempotentReplay: result.idempotentReplay === true };
+      },
     },
-  }];
+  ];
 }
 
 export type OwnerWithdrawalRouting =
@@ -93,11 +95,12 @@ export function evaluateOwnerWithdrawalRouting(
   if (!schema.safeParse(payload).success) {
     return { kind: 'INVALID', code: 'finance_owner_withdrawal_invalid' };
   }
-  const matching = rules.filter((rule) =>
-    rule.active &&
-    rule.businessId === actor.businessId &&
-    rule.actionType === OWNER_WITHDRAWAL_APPROVAL_ACTION &&
-    (rule.shopId === null || rule.shopId === payload.shopId),
+  const matching = rules.filter(
+    (rule) =>
+      rule.active &&
+      rule.businessId === actor.businessId &&
+      rule.actionType === OWNER_WITHDRAWAL_APPROVAL_ACTION &&
+      (rule.shopId === null || rule.shopId === payload.shopId),
   );
   const selected =
     matching.find((rule) => rule.shopId === payload.shopId) ??
@@ -110,8 +113,7 @@ export function evaluateOwnerWithdrawalRouting(
     !selected.requiresSecondPerson ||
     Object.keys(selected.thresholdContext).some((key) => key !== 'minimumMinor') ||
     (threshold !== undefined &&
-      (typeof threshold !== 'number' ||
-        !Number.isSafeInteger(threshold) || threshold <= 0))
+      (typeof threshold !== 'number' || !Number.isSafeInteger(threshold) || threshold <= 0))
   ) {
     return { kind: 'INVALID', code: 'finance_owner_withdrawal_rule_invalid' };
   }
@@ -125,12 +127,18 @@ function stableApprovalId(
   payload: OwnerWithdrawalApprovalPayload,
 ): string {
   const hash = createHash('sha256')
-    .update(JSON.stringify([
-      OWNER_WITHDRAWAL_APPROVAL_ACTION,
-      actor.businessId, actor.employeeId,
-      payload.shopId, payload.accountId, payload.amountMinor,
-      payload.reason, payload.commandId,
-    ]))
+    .update(
+      JSON.stringify([
+        OWNER_WITHDRAWAL_APPROVAL_ACTION,
+        actor.businessId,
+        actor.employeeId,
+        payload.shopId,
+        payload.accountId,
+        payload.amountMinor,
+        payload.reason,
+        payload.commandId,
+      ]),
+    )
     .digest('hex');
   return [
     hash.slice(0, 8),
@@ -141,11 +149,15 @@ function stableApprovalId(
   ].join('-');
 }
 
-const commands: readonly ApprovalCommandRegistryEntry[] = [{
-  actionType: OWNER_WITHDRAWAL_APPROVAL_ACTION,
-  containsSecretInput: false,
-  serialize(input) { return readPayload(input); },
-}];
+const commands: readonly ApprovalCommandRegistryEntry[] = [
+  {
+    actionType: OWNER_WITHDRAWAL_APPROVAL_ACTION,
+    containsSecretInput: false,
+    serialize(input) {
+      return readPayload(input);
+    },
+  },
+];
 
 export async function executeOrRequestOwnerWithdrawal(
   payload: OwnerWithdrawalApprovalPayload,
@@ -181,8 +193,7 @@ export async function executeOrRequestOwnerWithdrawal(
   if (result['ok'] !== true) {
     return {
       ok: false,
-      code: typeof result['code'] === 'string'
-        ? result['code'] : 'approval_request_failed',
+      code: typeof result['code'] === 'string' ? result['code'] : 'approval_request_failed',
     };
   }
   if (typeof result['requestId'] !== 'string') {
@@ -191,9 +202,7 @@ export async function executeOrRequestOwnerWithdrawal(
   if (result['status'] === 'EXECUTED') {
     return { ok: true, idempotentReplay: true };
   }
-  if (
-    !['PENDING', 'APPROVED', 'EXECUTING'].includes(String(result['status']))
-  ) {
+  if (!['PENDING', 'APPROVED', 'EXECUTING'].includes(String(result['status']))) {
     return { ok: false, code: 'approval_request_terminal' };
   }
   return {

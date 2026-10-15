@@ -54,18 +54,22 @@ describe('Owner withdrawal approval', () => {
     const business = { ...rule, id: 'business', shopId: null };
     const local = { ...rule, thresholdContext: { minimumMinor: 800 } };
     expect(evaluateOwnerWithdrawalRouting(payload, actor, [business])).toEqual({
-      kind: 'APPROVAL_REQUIRED', ruleId: 'business',
+      kind: 'APPROVAL_REQUIRED',
+      ruleId: 'business',
     });
     expect(evaluateOwnerWithdrawalRouting(payload, actor, [business, local])).toEqual({
       kind: 'DIRECT',
     });
-    expect(evaluateOwnerWithdrawalRouting({ ...payload, amountMinor: 800 }, actor, [local]))
-      .toEqual({ kind: 'APPROVAL_REQUIRED', ruleId: rule.id });
-    expect(evaluateOwnerWithdrawalRouting(payload, actor, [
-      { ...rule, requiresSecondPerson: false },
-    ])).toEqual({ kind: 'INVALID', code: 'finance_owner_withdrawal_rule_invalid' });
-    expect(evaluateOwnerWithdrawalRouting({ ...payload, amountMinor: 0 }, actor, [rule]))
-      .toEqual({ kind: 'INVALID', code: 'finance_owner_withdrawal_invalid' });
+    expect(
+      evaluateOwnerWithdrawalRouting({ ...payload, amountMinor: 800 }, actor, [local]),
+    ).toEqual({ kind: 'APPROVAL_REQUIRED', ruleId: rule.id });
+    expect(
+      evaluateOwnerWithdrawalRouting(payload, actor, [{ ...rule, requiresSecondPerson: false }]),
+    ).toEqual({ kind: 'INVALID', code: 'finance_owner_withdrawal_rule_invalid' });
+    expect(evaluateOwnerWithdrawalRouting({ ...payload, amountMinor: 0 }, actor, [rule])).toEqual({
+      kind: 'INVALID',
+      code: 'finance_owner_withdrawal_invalid',
+    });
   });
   it('makes durable requests without posting and retains command identity', async () => {
     const seen: CreateRequestInput[] = [];
@@ -77,7 +81,8 @@ describe('Owner withdrawal approval', () => {
       createRequest: vi.fn(async (input: CreateRequestInput) => {
         seen.push(input);
         return {
-          ok: true, requestId: 'a8888888-8888-4888-8888-888888888888',
+          ok: true,
+          requestId: 'a8888888-8888-4888-8888-888888888888',
           status: 'PENDING' as const,
         };
       }),
@@ -85,7 +90,12 @@ describe('Owner withdrawal approval', () => {
     };
     const direct = vi.fn(async () => ({ ok: true as const, commandId: payload.commandId }));
     const first = await executeOrRequestOwnerWithdrawal(
-      payload, actor, [rule], deps, '123456', direct,
+      payload,
+      actor,
+      [rule],
+      deps,
+      '123456',
+      direct,
     );
     await executeOrRequestOwnerWithdrawal(payload, actor, [rule], deps, '123456', direct);
     expect(first).toMatchObject({ ok: true, state: 'PENDING_APPROVAL' });
@@ -114,11 +124,16 @@ describe('Owner withdrawal approval', () => {
       attemptCount: 1,
       leaseExpiresAt: '2026-10-15T09:00:00Z',
     };
-    await expect(entry.execute({ payload, claim, commandId: claim.commandId }))
-      .resolves.toMatchObject({ idempotentReplay: false });
-    await expect(entry.execute({
-      payload, claim: { ...claim, shopId: actor.businessId }, commandId: claim.commandId,
-    })).rejects.toBeInstanceOf(ApprovalTerminalCommandError);
+    await expect(
+      entry.execute({ payload, claim, commandId: claim.commandId }),
+    ).resolves.toMatchObject({ idempotentReplay: false });
+    await expect(
+      entry.execute({
+        payload,
+        claim: { ...claim, shopId: actor.businessId },
+        commandId: claim.commandId,
+      }),
+    ).rejects.toBeInstanceOf(ApprovalTerminalCommandError);
     expect(exec).toHaveBeenCalledTimes(1);
   });
 });

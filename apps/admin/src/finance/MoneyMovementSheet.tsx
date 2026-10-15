@@ -209,8 +209,8 @@ export function MoneyMovementSheet({
         ) : null}
         {approvalPending ? (
           <p role="status" className="admin-field__help">
-            Owner withdrawal pending second-person approval. No funds have moved.
-            Review the request in Approvals.
+            Owner withdrawal pending second-person approval. No funds have moved. Review the request
+            in Approvals.
           </p>
         ) : null}
         {error ? <InlineError>{error}</InlineError> : null}

@@ -20,14 +20,16 @@ type Command = {
   requesterPin?: string | undefined;
 };
 
-type Preview = {
-  ok: true;
-  businessId: string;
-  shopId: string;
-  accountId: string;
-  approvalRequired: boolean;
-  ruleId: string | null;
-} | { ok: false; code: string };
+type Preview =
+  | {
+      ok: true;
+      businessId: string;
+      shopId: string;
+      accountId: string;
+      approvalRequired: boolean;
+      ruleId: string | null;
+    }
+  | { ok: false; code: string };
 
 function parsePreview(input: unknown): Preview | null {
   if (input === null || typeof input !== 'object' || Array.isArray(input)) return null;
@@ -42,7 +44,8 @@ function parsePreview(input: unknown): Preview | null {
     typeof value['accountId'] !== 'string' ||
     typeof value['approvalRequired'] !== 'boolean' ||
     !(typeof value['ruleId'] === 'string' || value['ruleId'] === null)
-  ) return null;
+  )
+    return null;
   return {
     ok: true,
     businessId: value['businessId'],
@@ -79,8 +82,8 @@ export async function executeOwnerWithdrawalCommand(
     return { ok: false, code: 'finance_owner_withdrawal_scope_invalid' };
   }
   const base = createSupabaseApprovalServiceDependencies(client);
-  const rule = preview.ruleId && preview.approvalRequired
-    ? await base.loadRule(preview.ruleId) : null;
+  const rule =
+    preview.ruleId && preview.approvalRequired ? await base.loadRule(preview.ruleId) : null;
   if (preview.approvalRequired && !rule) {
     return { ok: false, code: 'finance_owner_withdrawal_rule_invalid' };
   }
@@ -112,16 +115,17 @@ export async function executeOwnerWithdrawalCommand(
       },
     },
     command.requesterPin,
-    () => client.rpc<OwnerWithdrawalResult>('execute_finance_management_v1', {
-      p_actor_employee_id: context.principal.employeeId,
-      p_shop_id: command.shopId,
-      p_action: 'OWNER_WITHDRAWAL',
-      p_payload: {
-        fromAccountId: command.accountId,
-        amountMinor: command.amountMinor,
-        reason: command.reason,
-      },
-      p_command_id: command.commandId,
-    }),
+    () =>
+      client.rpc<OwnerWithdrawalResult>('execute_finance_management_v1', {
+        p_actor_employee_id: context.principal.employeeId,
+        p_shop_id: command.shopId,
+        p_action: 'OWNER_WITHDRAWAL',
+        p_payload: {
+          fromAccountId: command.accountId,
+          amountMinor: command.amountMinor,
+          reason: command.reason,
+        },
+        p_command_id: command.commandId,
+      }),
   );
 }
