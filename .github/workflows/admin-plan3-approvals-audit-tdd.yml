@@ -8,6 +8,7 @@ on:
     paths:
       - 'supabase/migrations/**'
       - 'scripts/test-admin-approvals-audit-migration.mjs'
+      - 'scripts/test-admin-shop-lifecycle-approvals-postgres.mjs'
       - 'scripts/test-admin-approvals-audit-review-hardening*.mjs'
       - 'apps/admin/server/approvals/**'
       - 'apps/admin/server/audit/**'
@@ -28,6 +29,7 @@ on:
     paths:
       - 'supabase/migrations/**'
       - 'scripts/test-admin-approvals-audit-migration.mjs'
+      - 'scripts/test-admin-shop-lifecycle-approvals-postgres.mjs'
       - 'scripts/test-admin-approvals-audit-review-hardening*.mjs'
       - 'apps/admin/server/approvals/**'
       - 'apps/admin/server/audit/**'
@@ -80,6 +82,7 @@ jobs:
         run: >-
           npx vitest run
           apps/admin/server/approvals/approvalService.test.ts
+          apps/admin/server/approvals/shopLifecycleApproval.test.ts
           apps/admin/server/approvals/approvalReadService.test.ts
           apps/admin/server/approvals/approvalPinRateLimit.test.ts
           apps/admin/server/approvals/approvalExecutionService.test.ts
@@ -183,3 +186,5 @@ jobs:
         run: node scripts/test-admin-approvals-audit-review-hardening-round10.mjs
       - name: Plan 3 review round-13 PostgreSQL behavior
         run: node scripts/test-admin-approvals-audit-review-hardening-round13.mjs
+      - name: Shop lifecycle approved execution PostgreSQL behavior
+        run: node scripts/test-admin-shop-lifecycle-approvals-postgres.mjs
