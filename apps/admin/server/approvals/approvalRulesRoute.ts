@@ -81,7 +81,11 @@ export const approvalRuleWriteSchema = z
       return;
     }
     if (
-      ['SHOP_LIFECYCLE_CHANGE', 'FINANCE_SNAPSHOT_ADJUST'].includes(value.actionType) &&
+      [
+        'SHOP_LIFECYCLE_CHANGE',
+        'FINANCE_SNAPSHOT_ADJUST',
+        'FINANCE_OWNER_WITHDRAWAL',
+      ].includes(value.actionType) &&
       !value.requiresSecondPerson
     ) {
       context.addIssue({
@@ -90,7 +94,9 @@ export const approvalRuleWriteSchema = z
         message:
           value.actionType === 'SHOP_LIFECYCLE_CHANGE'
             ? 'shop_lifecycle_second_person_required'
-            : 'finance_snapshot_second_person_required',
+            : value.actionType === 'FINANCE_SNAPSHOT_ADJUST'
+              ? 'finance_snapshot_second_person_required'
+              : 'finance_owner_withdrawal_second_person_required',
       });
     }
     if (value.requesterPermission !== action.requesterPermission) {
