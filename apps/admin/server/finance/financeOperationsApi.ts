@@ -15,6 +15,7 @@ import { readAdminSessionToken } from '../session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../supabaseAdmin.js';
 import { adminRequestOperation } from '../observability.js';
 import { maskOwnerSummaryForPrincipal } from './ownerSummaryAuthorization.js';
+import { executeFinanceSnapshotCommand } from './financeSnapshotApprovalRoute.js';
 
 const uuid = z.string().uuid();
 const commandId = uuid;
@@ -167,6 +168,7 @@ const operationSchema = z.discriminatedUnion('type', [
       amountMinor: signedMinor,
       reason,
       commandId,
+      requesterPin: z.string().min(1).max(64).optional(),
     })
     .strict(),
 ]);
@@ -539,14 +541,7 @@ export async function handleAdvancedFinance(
         p_command_id: command.commandId,
       });
     } else if (command.type === 'finance.snapshot.adjust') {
-      result = await client.rpc('finance_adjust_snapshot_v1', {
-        p_actor_employee_id: principal.employeeId,
-        p_shop_id: shopId,
-        p_snapshot_id: command.snapshotId,
-        p_amount_minor: command.amountMinor,
-        p_reason: command.reason,
-        p_command_id: command.commandId,
-      });
+      result = await executeFinanceSnapshotCommand(client, context, command, request);
     } else {
       const actionMap = {
         'finance.transfer': 'TRANSFER',
