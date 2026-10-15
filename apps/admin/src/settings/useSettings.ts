@@ -312,9 +312,7 @@ export function useSettings(shopId: string | undefined, includeSchedules = false
   });
 
   const updateShopLifecycle = useMutation({
-    mutationFn: async (
-      draft: ShopLifecycleUpdateDraft,
-    ): Promise<ShopManagementWriteResult> => {
+    mutationFn: async (draft: ShopLifecycleUpdateDraft): Promise<ShopManagementWriteResult> => {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
       const workspace = latestWorkspace();
       if (
