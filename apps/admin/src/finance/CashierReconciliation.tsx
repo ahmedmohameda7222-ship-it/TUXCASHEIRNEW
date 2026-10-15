@@ -20,6 +20,8 @@ export function CashierReconciliation({
   const [workerId, setWorkerId] = useState('');
   const [actual, setActual] = useState('');
   const [reason, setReason] = useState('');
+  const [requesterPin, setRequesterPin] = useState('');
+  const [approvalPending, setApprovalPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const workers = finance.cashierQuery.data?.workers ?? [];
   const posted = finance.cashierQuery.data?.reconciliations ?? [];
@@ -38,6 +40,7 @@ export function CashierReconciliation({
       if (actualMinor < 0) throw new Error('Actual cash cannot be negative.');
       finance.command.mutate(
         {
+          reauthPin: requesterPin.trim() || undefined,
           draft: {
             type: 'finance.cashier.reconcile',
             shopId,
@@ -48,7 +51,14 @@ export function CashierReconciliation({
           },
         },
         {
-          onSuccess: () => {
+          onSuccess: (result) => {
+            setRequesterPin('');
+            if (result['state'] === 'PENDING_APPROVAL') {
+              setApprovalPending(true);
+              setError(null);
+              return;
+            }
+            setApprovalPending(false);
             onClose();
             setWorkerId('');
             setActual('');
@@ -78,10 +88,14 @@ export function CashierReconciliation({
           <button
             type="button"
             className="admin-primary-button"
-            disabled={finance.command.isPending || remaining.length === 0}
+            disabled={finance.command.isPending || remaining.length === 0 || approvalPending}
             onClick={submit}
           >
-            {finance.command.isPending ? 'Recording…' : 'Record count'}
+            {finance.command.isPending
+              ? 'Submitting…'
+              : approvalPending
+                ? 'Pending second-person approval'
+                : 'Record count'}
           </button>
         </>
       }
@@ -134,6 +148,21 @@ export function CashierReconciliation({
             onChange={(e) => setReason(e.target.value)}
           />
         </label>
+        <label>
+          Requester PIN (if approval requires reauthentication)
+          <input
+            type="password"
+            autoComplete="off"
+            maxLength={64}
+            value={requesterPin}
+            onChange={(event) => setRequesterPin(event.currentTarget.value)}
+          />
+        </label>
+        {approvalPending ? (
+          <p role="status">
+            Cashier reconciliation pending second-person approval. No cash count has been posted.
+          </p>
+        ) : null}
         {error ? <InlineError>{error}</InlineError> : null}
         {finance.command.error ? (
           <InlineError>
