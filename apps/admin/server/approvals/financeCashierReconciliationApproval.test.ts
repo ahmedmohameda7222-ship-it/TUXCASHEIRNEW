@@ -108,6 +108,9 @@ describe('cashier reconciliation trusted approval boundary', () => {
       commandId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
       actionType: CASHIER_RECONCILIATION_APPROVAL_ACTION,
       claimToken: 'durable-claim',
+      commandPayload: command,
+      attemptCount: 1,
+      leaseExpiresAt: '2026-10-15T13:00:00Z',
     };
     await expect(entry.execute({ claim, payload: command, commandId: claim.commandId }))
       .resolves.toMatchObject({ result: { ok: true }, idempotentReplay: false });
