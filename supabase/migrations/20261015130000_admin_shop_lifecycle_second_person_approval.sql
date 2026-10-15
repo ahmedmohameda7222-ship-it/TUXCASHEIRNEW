@@ -114,8 +114,7 @@ BEGIN
   );
   RETURN jsonb_build_object('ok', true, 'lifecycleRevision', v_next_revision);
 END;
-$function$
-
+$function$;
 
 create or replace function public.execute_approved_admin_shop_lifecycle_v1(
   p_approval_request_id uuid, p_business_id uuid, p_shop_id uuid,
