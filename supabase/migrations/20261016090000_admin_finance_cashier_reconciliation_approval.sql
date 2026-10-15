@@ -56,8 +56,8 @@ begin
   end if;
   v_drawer:=private.plan7_drawer_facts_v1(v_business_id,p_shop_id,p_business_day_id,p_cashier_worker_id);
   v_expected:=(v_drawer->>'recordedDrawerExpectationMinor')::bigint;
-  -- Pending command identity is irrevocable without its exact approved
-  -- execution context, even after a rules administrator disables the rule.
+  -- A pending approved command is fenced by its ORIGINAL business-wide
+  -- command ID even if a rule is disabled or inputs are changed.
   if exists (
     select 1 from public.admin_approval_requests ar
     where ar.business_id=v_business_id
@@ -66,8 +66,9 @@ begin
       and ar.status in ('PENDING','APPROVED','EXECUTING')
   ) and not exists (
     select 1 from public.admin_approval_requests ar
-    where ar.id=nullif(current_setting(
-       'tux.approved_cashier_reconciliation_request_id',true),'')::uuid
+    where ar.id=nullif(
+      current_setting('tux.approved_cashier_reconciliation_request_id',true),''
+    )::uuid
       and ar.business_id=v_business_id and ar.shop_id=p_shop_id
       and ar.requester_employee_id=p_actor_employee_id
       and ar.action_type='FINANCE_CASHIER_RECONCILIATION'
@@ -75,70 +76,53 @@ begin
         'shopId',p_shop_id,'businessDayId',p_business_day_id,
         'cashierWorkerId',p_cashier_worker_id,
         'actualMinor',p_actual_minor,'expectedMinor',v_expected,
-        'reason',nullif(btrim(p_reason),''),
-        'commandId',p_command_id)
+        'reason',nullif(btrim(p_reason),''),'commandId',p_command_id)
       and ar.approver_employee_id is not null
       and ar.approver_employee_id<>ar.requester_employee_id
       and ar.status='EXECUTING'
   ) then
-    return jsonb_build_object(
-      'ok',false,'code','finance_cashier_approval_required');
+    return jsonb_build_object('ok',false,'code','finance_cashier_approval_required');
   end if;
   declare
     v_rule public.admin_approval_rules%rowtype;
     v_minimum numeric;
   begin
-    select * into v_rule from public.admin_approval_rules ar
-    where ar.business_id=v_business_id and ar.active
-      and ar.action_type='FINANCE_CASHIER_RECONCILIATION'
-      and (ar.shop_id=p_shop_id or ar.shop_id is null)
-    order by (ar.shop_id is not null) desc limit 1;
+    select * into v_rule from public.admin_approval_rules r
+    where r.business_id=v_business_id and r.active
+      and r.action_type='FINANCE_CASHIER_RECONCILIATION'
+      and (r.shop_id=p_shop_id or r.shop_id is null)
+    order by (r.shop_id is not null) desc limit 1;
     if found then
       if v_rule.requester_permission<>'finance.reconcile'
          or v_rule.approver_permission<>'approvals.review'
          or not v_rule.requires_second_person
          or jsonb_typeof(v_rule.threshold_context)<>'object'
          or (select count(*) from jsonb_object_keys(v_rule.threshold_context))>1
-         or (v_rule.threshold_context ? 'minimumMinor' and
-           (jsonb_typeof(v_rule.threshold_context->'minimumMinor')<>'number'
-           or (v_rule.threshold_context->>'minimumMinor') !~ '^[1-9][0-9]*
-  if p_actual_minor<>v_expected and nullif(btrim(p_reason),'') is null then
-    return jsonb_build_object('ok',false,'code','finance_variance_reason_required');
-  end if;
-
-  insert into public.cashier_reconciliations(
-    business_id,shop_id,business_day_id,cashier_worker_id,
-    expected_minor,actual_minor,variance_reason,reviewed_by_employee_id,
-    command_id,request_fingerprint)
-  values(v_business_id,p_shop_id,p_business_day_id,p_cashier_worker_id,
-    v_expected,p_actual_minor,nullif(btrim(p_reason),''),
-    p_actor_employee_id,p_command_id,v_fingerprint)
-  returning id into v_id;
-  perform public.append_admin_audit_event_v1(v_business_id,p_shop_id,p_actor_employee_id,
-    'FINANCE_CASHIER_RECONCILED','BUSINESS_DAY',p_business_day_id::text,
-    null,jsonb_build_object('workerId',p_cashier_worker_id,'expected',v_expected,
-      'actual',p_actual_minor),'Cashier reconciliation',null,null,'{}'::jsonb);
-  return jsonb_build_object('ok',true,'replayed',false,
-    'reconciliationId',v_id,'expectedMinor',v_expected,
-    'actualMinor',p_actual_minor,'varianceMinor',p_actual_minor-v_expected,
-    'cashSalesExpectationMinor',v_drawer->'cashSalesExpectationMinor',
-    'recordedCashMovementMinor',v_drawer->'recordedCashMovementMinor',
-    'openingFloatRecorded',v_drawer->'openingFloatRecorded');
-end;
-$function$
-
-           or length(v_rule.threshold_context->>'minimumMinor')>16))
-      then return jsonb_build_object(
-        'ok',false,'code','finance_cashier_approval_rule_invalid');end if;
-      v_minimum:=nullif(v_rule.threshold_context->>'minimumMinor','')::numeric;
-      if (v_minimum is null or abs(p_actual_minor::numeric-v_expected::numeric)>=v_minimum)
-        and not exists (
+      then
+        return jsonb_build_object('ok',false,
+          'code','finance_cashier_approval_rule_invalid');
+      end if;
+      if v_rule.threshold_context ? 'minimumMinor' then
+        if jsonb_typeof(v_rule.threshold_context->'minimumMinor')<>'number' then
+          return jsonb_build_object('ok',false,
+            'code','finance_cashier_approval_rule_invalid');
+        end if;
+        v_minimum:=(v_rule.threshold_context->>'minimumMinor')::numeric;
+        if v_minimum<>trunc(v_minimum) or v_minimum<1 or
+          v_minimum>9007199254740991 then
+          return jsonb_build_object('ok',false,
+            'code','finance_cashier_approval_rule_invalid');
+        end if;
+      end if;
+      if (
+        v_minimum is null or
+        abs(p_actual_minor::numeric-v_expected::numeric)>=v_minimum
+      ) and not exists (
         select 1 from public.admin_approval_requests ar
-        where ar.id=nullif(current_setting(
-          'tux.approved_cashier_reconciliation_request_id',true),'')::uuid
-          and ar.business_id=v_business_id
-          and ar.shop_id=p_shop_id
-          and ar.requester_employee_id=p_actor_employee_id
+        where ar.id=nullif(
+          current_setting('tux.approved_cashier_reconciliation_request_id',true),''
+        )::uuid and ar.business_id=v_business_id
+          and ar.shop_id=p_shop_id and ar.requester_employee_id=p_actor_employee_id
           and ar.action_type='FINANCE_CASHIER_RECONCILIATION'
           and ar.approver_employee_id is not null
           and ar.approver_employee_id<>ar.requester_employee_id
@@ -148,11 +132,11 @@ $function$
             'cashierWorkerId',p_cashier_worker_id,'actualMinor',p_actual_minor,
             'expectedMinor',v_expected,'reason',nullif(btrim(p_reason),''),
             'commandId',p_command_id)
-      ) then return jsonb_build_object(
-        'ok',false,'code','finance_cashier_approval_required');end if;
+      ) then
+        return jsonb_build_object('ok',false,'code','finance_cashier_approval_required');
+      end if;
     end if;
   end;
-
   if p_actual_minor<>v_expected and nullif(btrim(p_reason),'') is null then
     return jsonb_build_object('ok',false,'code','finance_variance_reason_required');
   end if;
@@ -176,7 +160,7 @@ $function$
     'recordedCashMovementMinor',v_drawer->'recordedCashMovementMinor',
     'openingFloatRecorded',v_drawer->'openingFloatRecorded');
 end;
-$function$
+$function$;
 
 
 create or replace function public.preview_admin_finance_cashier_reconciliation_v1(
