@@ -605,8 +605,7 @@ export function CatalogCopyPanel({
               .filter((category) => category.status !== 'MAPPED')
               .map((category) => (
                 <li key={category.sourceCategoryId}>
-                  {category.status === 'CREATE_REQUIRED' &&
-                  category.proposedTargetCategoryId ? (
+                  {category.status === 'CREATE_REQUIRED' && category.proposedTargetCategoryId ? (
                     <label>
                       <input
                         type="checkbox"
@@ -623,7 +622,9 @@ export function CatalogCopyPanel({
                       Create Category: {category.sourceName}
                     </label>
                   ) : (
-                    <span>Category: {category.sourceName} — {category.status}</span>
+                    <span>
+                      Category: {category.sourceName} — {category.status}
+                    </span>
                   )}
                 </li>
               ))}
@@ -652,7 +653,9 @@ export function CatalogCopyPanel({
                         : ''}
                     </label>
                   ) : (
-                    <span>Product: {product.sourceName} — {product.status}</span>
+                    <span>
+                      Product: {product.sourceName} — {product.status}
+                    </span>
                   )}
                 </li>
               ))}
