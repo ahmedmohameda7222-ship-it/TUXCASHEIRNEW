@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
 import { InlineError } from '../components/feedback/AdminStates';
 import { AdminDialog } from '../components/overlay/AdminDialog';
@@ -17,6 +17,7 @@ export function CashierReconciliation({
   onClose(): void;
 }) {
   const finance = useFinanceOperations(shopId, businessDayId, ['cashiers']);
+  const cashierSelectId = useId();
   const [workerId, setWorkerId] = useState('');
   const [actual, setActual] = useState('');
   const [reason, setReason] = useState('');
@@ -101,17 +102,19 @@ export function CashierReconciliation({
       }
     >
       <div className="tux-finance-form">
-        <label>
-          Cashier
-          <select value={workerId} onChange={(e) => setWorkerId(e.target.value)}>
-            <option value="">Choose cashier</option>
-            {remaining.map((worker) => (
-              <option key={worker.id} value={worker.id}>
-                {worker.display_name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <label htmlFor={cashierSelectId}>Cashier</label>
+        <select
+          id={cashierSelectId}
+          value={workerId}
+          onChange={(e) => setWorkerId(e.target.value)}
+        >
+          <option value="">Choose cashier</option>
+          {remaining.map((worker) => (
+            <option key={worker.id} value={worker.id}>
+              {worker.display_name}
+            </option>
+          ))}
+        </select>
         {selectedCashier ? (
           <div className="tux-finance-attention" role="status">
             <p>
