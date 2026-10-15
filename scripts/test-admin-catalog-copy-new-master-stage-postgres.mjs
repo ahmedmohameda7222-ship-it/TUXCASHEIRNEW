@@ -133,6 +133,44 @@ const stage = (commandId = 'create-cat-prod-1', fingerprint = preview.creationFi
   `public.stage_admin_catalog_copy_created_entities_v1(
     ${args},array['${SC}'::uuid],array['${SP}'::uuid],
     '${fingerprint}','${commandId}')`;
+// Two source Categories may be distinct under existing case-sensitive
+// uniqueness but still collide after normalization. Never silently stage both.
+const SC2 = '60000000-0000-4000-8000-000000000012';
+const MC2 = '40000000-0000-4000-8000-000000000012';
+sql(`insert into public.menu_categories(id,shop_id,name,sort_order,active)
+ values ('${SC2}','${S}','specials',5,true);
+ insert into public.catalog_master_categories(id,business_id,canonical_name)
+ values ('${MC2}','${B}','specials');
+ insert into public.catalog_category_shop_bindings(
+ business_id,master_category_id,shop_id,canonical_category_id)
+ values ('${B}','${MC2}','${S}','${SC2}')`, 'casefold source category fixture');
+const duplicateNamesBundle = sql(
+  `select private.build_admin_catalog_bundle_v1('${S}'::uuid,1,now())::text`,
+  'duplicate source names under independent master IDs',
+);
+sql(`update public.catalog_publish_versions set bundle_json=${quote(duplicateNamesBundle)}
+ where shop_id='${S}' and publish_version=1;
+ update public.operations_configuration_snapshots set bundle_json=${quote(duplicateNamesBundle)}
+ where shop_id='${S}' and version=1;`, 'isolated casefold source snapshot');
+const ambiguousPreview = rpc(
+  `public.preview_admin_catalog_missing_entities_v1(${args})`,
+  'trusted ambiguous source category preview');
+if(!ambiguousPreview.ok || ambiguousPreview.categories.length!==2) {
+  throw new Error('Ambiguous source master identity fixture was not accepted');
+}
+const ambiguous = rpc(
+  `public.stage_admin_catalog_copy_created_entities_v1(
+    ${args},array['${SC}'::uuid,'${SC2}'::uuid],array['${SP}'::uuid],
+    '${ambiguousPreview.creationFingerprint}','casefold-conflict-1')`,
+  'reject casefold-colliding source entities');
+if(ambiguous.ok!==false || ambiguous.code!=='catalog_copy_target_name_conflict') {
+  throw new Error('Two casefold-colliding masters were staged: '+JSON.stringify(ambiguous));
+}
+sql(`update public.catalog_publish_versions set bundle_json=${quote(sourceBundle)}
+ where shop_id='${S}' and publish_version=1;
+ update public.operations_configuration_snapshots set bundle_json=${quote(sourceBundle)}
+ where shop_id='${S}' and version=1;`, 'restore isolated published source fixture');
+
 // Force an immutable audit write to fail after the canonical Draft CAS and
 // private intent inserts. The entire command must roll back transactionally.
 sql(`create function public.reject_test_catalog_creation_audit() returns trigger
