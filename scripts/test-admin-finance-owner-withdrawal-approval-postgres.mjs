@@ -30,7 +30,7 @@ grant usage on schema public to anon,authenticated,service_role;
 create table auth.users(id uuid primary key);
 create function auth.uid() returns uuid language sql stable as $u$
 select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $u$;`,'loopback reset');
-const target='20261015180000_admin_finance_owner_withdrawal_second_person_approval.sql';
+const target='20261015192234_admin_finance_owner_withdrawal_second_person_approval.sql';
 const migrations=readdirSync(resolve('supabase/migrations')).filter(x=>/^\d+_.+\.sql$/.test(x)).sort();
 const end=migrations.indexOf(target);if(end<0)throw new Error('Missing approved withdrawal migration');
 for(const name of migrations.slice(0,end+1)){
