@@ -240,6 +240,7 @@ describe('Settings workspace', () => {
         onUpdateOperationalState={noop}
         canManageLifecycle
         onUpdateLifecycle={noop}
+        onDeleteOrArchive={noop}
         busy={false}
       />,
     );
