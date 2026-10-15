@@ -22,6 +22,7 @@ const schema = z
     businessDayId: z.string().uuid(),
     cashierWorkerId: z.string().uuid(),
     actualMinor: z.number().int().safe().nonnegative(),
+    expectedMinor: z.number().int().safe(),
     reason: z.string().trim().max(500).nullable(),
     commandId: z.string().uuid(),
   })
@@ -43,6 +44,7 @@ export type CashierReconciliationMutationResult =
 
 export type CashierReconciliationResult =
   | CashierReconciliationMutationResult
+  | { ok: true; idempotentReplay: true }
   | { ok: true; state: 'PENDING_APPROVAL'; approvalRequestId: string };
 
 function parsePayload(input: unknown): CashierReconciliationPayload {
@@ -150,6 +152,7 @@ function approvalCommandId(actor: AdminApprovalActor, payload: CashierReconcilia
         payload.businessDayId,
         payload.cashierWorkerId,
         payload.actualMinor,
+        payload.expectedMinor,
         payload.reason,
         payload.commandId,
       ]),
@@ -208,7 +211,7 @@ export async function executeOrRequestCashierReconciliation(
     return { ok: false, code: 'approval_response_invalid' };
   }
   if (result['status'] === 'EXECUTED') {
-    return { ok: true, idempotentReplay: true, reconciliationId: '' };
+    return { ok: true, idempotentReplay: true };
   }
   if (!['PENDING', 'APPROVED', 'EXECUTING'].includes(String(result['status']))) {
     return { ok: false, code: 'approval_request_terminal' };
