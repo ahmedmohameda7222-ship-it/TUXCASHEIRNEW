@@ -115,6 +115,17 @@ sql(`update public.admin_approval_rules set active=false where id='${RULE}'`,
 deny(rpc(direct(500,'at-threshold-needs-approval'),
  'pending approval cannot be bypassed by disabling policy'),
  'finance_snapshot_approval_required');
+// A pending approval owns its ORIGINAL command identity. Disabling a rule
+// must not allow a changed amount to post with that pending command ID.
+deny(
+  rpc(direct(501,'at-threshold-needs-approval'),
+    'tampered amount cannot bypass existing pending approval after rule disable'),
+  'finance_snapshot_approval_required',
+);
+if (sql(`select count(*) from public.financial_adjustments
+ where command_id='at-threshold-needs-approval'`) !== '0') {
+  throw new Error('Tampered pending Finance command modified the ledger');
+}
 sql(`update public.admin_approval_rules set active=true where id='${RULE}'`,
  'restore finance approval threshold');
 const approved=rpc(`public.decide_admin_approval_request_v1(
