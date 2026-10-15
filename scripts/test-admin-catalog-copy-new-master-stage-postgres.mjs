@@ -644,4 +644,111 @@ const comboLive=sql(`
  where c.shop_id='${T}'`);
 if(comboLive!==[comboLocal,localProductId,'4','true',MP4].join(','))
  throw new Error('Published Combo Product lacks target-local master-mapped option: '+comboLive);
+// Prepare a target-only modifier through the SAME trusted Draft/Publish
+// pipeline used by Admin, not by silently cloning a source modifier row.
+const TM5='81000000-0000-4000-8000-000000000015';
+const targetModifierDraft=rpc(
+ `public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,4,
+ 'Publish target-local modifier definition')`,
+ 'create target modifier draft');
+if(!targetModifierDraft.ok||!targetModifierDraft.draftId)
+ throw new Error('Target modifier preparation draft missing');
+const targetModifierBundle=JSON.parse(sql(
+ `select working_bundle_json::text from public.catalog_drafts
+  where id='${targetModifierDraft.draftId}'`));
+targetModifierBundle.snapshot.modifiers.push({
+ shopId:T,id:TM5,name:'Target local condiment',
+ priceMinor:700,standaloneProductId:localProductId,active:true,sortOrder:8,
+});
+const savedTargetModifier=rpc(
+ `public.apply_catalog_draft_change_v1(
+ '${OWNER}'::uuid,'${targetModifierDraft.draftId}'::uuid,1,
+ jsonb_build_object('bundleJson',${quote(JSON.stringify(targetModifierBundle))}))`,
+ 'stage target local modifier through canonical draft');
+if(!savedTargetModifier.ok||savedTargetModifier.draftRevision!==2)
+ throw new Error('Target modifier cannot be prepared: '+JSON.stringify(savedTargetModifier));
+const publishedTargetModifier=rpc(
+ `public.publish_catalog_draft_v1(
+ '${OWNER}'::uuid,'${targetModifierDraft.draftId}'::uuid,2,4)`,
+ 'publish target local modifier');
+if(!publishedTargetModifier.ok||publishedTargetModifier.publishVersion!==5)
+ throw new Error('Target modifier failed canonical Publish');
+const SP5='70000000-0000-4000-8000-000000000016';
+const MP5='50000000-0000-4000-8000-000000000016';
+const SM5='81000000-0000-4000-8000-000000000016';
+sql(`
+ insert into public.products(
+ id,shop_id,category_id,slug,name,price_minor,active,sold_out,is_combo,sort_order)
+ values ('${SP5}','${S}','${SC}','coffee-spiced','Coffee spiced',17000,true,false,false,11);
+ insert into public.catalog_master_products(id,business_id,master_category_id,canonical_name)
+ values ('${MP5}','${B}','${MC}','Coffee spiced');
+ insert into public.catalog_product_shop_overrides(
+ business_id,master_product_id,shop_id,canonical_product_id,price_minor,visible,manual_sold_out)
+ values ('${B}','${MP5}','${S}','${SP5}',17000,true,false);
+ insert into public.modifiers(
+ id,shop_id,name,price_minor,standalone_product_id,active,sort_order)
+ values ('${SM5}','${S}','Source condiment',400,'${SP}',true,6);
+ insert into public.product_modifiers(shop_id,product_id,modifier_id,max_quantity,sort_order)
+ values ('${S}','${SP5}','${SM5}',2,7);
+ `, 'new source Product with master-anchored modifier dependency');
+const modifierSourceBundle=sql(
+ `select private.build_admin_catalog_bundle_v1('${S}'::uuid,4,now())::text`,
+ 'published source new Product with modifier');
+sql(`
+ insert into public.catalog_publish_versions(
+ business_id,shop_id,publish_version,operations_configuration_version,source_kind,bundle_json)
+ values ('${B}','${S}',4,4,'BASELINE',${quote(modifierSourceBundle)});
+ insert into public.operations_configuration_snapshots(shop_id,version,bundle_json)
+ values ('${S}',4,${quote(modifierSourceBundle)});
+ `, 'source immutable modifier publication');
+const modifierDraft=rpc(
+ `public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,5,
+  'Create new Product and map existing target modifier')`,
+ 'new modifier-linked Product target draft');
+if(!modifierDraft.ok||!modifierDraft.draftId)
+ throw new Error('New modifier-linked Product draft missing');
+const modifierArgs=`'${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,
+ '${modifierDraft.draftId}'::uuid,4::bigint,5::bigint,1::bigint`;
+const modifierPreview=rpc(
+ `public.preview_admin_catalog_missing_entities_v1(${modifierArgs})`,
+ 'source modifier-linked Product preview');
+const modifierCandidate=modifierPreview.products.find(x=>x.sourceProductId===SP5);
+if(!modifierPreview.ok||modifierCandidate?.status!=='CREATE_REQUIRED')
+ throw new Error('New modifier-linked source Product not in creation preview');
+const modifierLocal=modifierCandidate.proposedTargetProductId;
+const modifierStage=rpc(
+ `public.stage_admin_catalog_copy_created_entities_v1(
+ ${modifierArgs},array[]::uuid[],array['${SP5}'::uuid],
+ '${modifierPreview.creationFingerprint}','create-linked-product-1')`,
+ 'Stage new Product with existing master-mapped target Modifier');
+if(!modifierStage.ok||modifierStage.createdProducts!==1)
+ throw new Error('Mapped Modifier dependent Product Stage failed: '+
+   JSON.stringify(modifierStage));
+const modifierBundle=JSON.parse(sql(`
+ select working_bundle_json::text from public.catalog_drafts
+ where id='${modifierDraft.draftId}'`,'staged Modifier link target draft'));
+const mappedLinks=modifierBundle.snapshot.productModifierLinks;
+if(mappedLinks.length!==1||mappedLinks[0].productId!==modifierLocal||
+ mappedLinks[0].modifierId!==TM5||mappedLinks[0].shopId!==T||
+ mappedLinks[0].maxQuantity!==2||mappedLinks[0].sortOrder!==7)
+ throw new Error('Product Modifier mapped to source-local or ambiguous modifier identity');
+if(sql(`select count(*) from public.product_modifiers where shop_id='${T}'`)!=='0')
+ throw new Error('Modifier link Stage changed target live configuration');
+const modifierPublished=rpc(
+ `public.publish_catalog_draft_v1(
+ '${OWNER}'::uuid,'${modifierDraft.draftId}'::uuid,2,5)`,
+ 'Publish mapped Modifier linked new Product');
+if(!modifierPublished.ok||modifierPublished.publishVersion!==6)
+ throw new Error('Modifier linked new Product publication failed');
+const liveModifierLink=sql(`
+ select pm.product_id::text||','||pm.modifier_id::text||','||
+        pm.max_quantity::text||','||m.price_minor::text||','||bind.master_product_id::text
+ from public.product_modifiers pm
+ join public.modifiers m on m.shop_id=pm.shop_id and m.id=pm.modifier_id
+ join public.catalog_product_shop_overrides bind
+   on bind.shop_id=pm.shop_id and bind.canonical_product_id=pm.product_id
+ where pm.shop_id='${T}'`, 'published Modifier local identity');
+if(liveModifierLink!==[modifierLocal,TM5,'2','700',MP5].join(','))
+ throw new Error('Mapped Modifier Product changed target definition or master identity: '+
+  liveModifierLink);
 console.log('Missing Catalog Category/Product Stage/Publish master identity integration passed.');
