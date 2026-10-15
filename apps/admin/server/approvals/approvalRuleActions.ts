@@ -59,6 +59,12 @@ export const APPROVAL_RULE_ACTIONS: readonly ConfigurableApprovalAction[] = [
     thresholdKind: 'minimumQuantityImpact',
   },
   {
+    actionType: 'SHOP_LIFECYCLE_CHANGE',
+    label: 'Shop suspension / reactivation',
+    requesterPermission: 'shops.manage',
+    thresholdKind: null,
+  },
+  {
     actionType: 'STAFF_PAYMENT',
     label: 'Staff payment',
     requesterPermission: 'staff.payments',
