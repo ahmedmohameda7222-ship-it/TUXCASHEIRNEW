@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -199,7 +199,50 @@ if (sql(`select draft_revision from public.catalog_drafts where id='${draft.draf
           where command_id='creation-rollback'`) !== '0') {
   throw new Error('Failed Stage left partial Draft change, mapping intent or receipt');
 }
-const staged = rpc(stage(), 'stage missing category and product');
+// Issue two identical commands through independent PostgreSQL sessions.
+// Both requests carry the same immutable actor/payload identity: exactly one
+// may mutate the Draft and the other must receive its durable replay receipt.
+function concurrentStage(command) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      'psql',
+      [db, '-X', '-v', 'ON_ERROR_STOP=1', '-At', '-c', 'select (' + command + ')::text'],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    let output = '';
+    let error = '';
+    child.stdout.on('data', (chunk) => { output += chunk.toString(); });
+    child.stderr.on('data', (chunk) => { error += chunk.toString(); });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error('Concurrent Stage failed: ' + error));
+        return;
+      }
+      try {
+        resolve(JSON.parse(output.trim()));
+      } catch (cause) {
+        reject(new Error('Invalid concurrent Stage response: ' + String(cause)));
+      }
+    });
+  });
+}
+const concurrentResults = await Promise.all([
+  concurrentStage(stage()),
+  concurrentStage(stage()),
+]);
+const originalStages = concurrentResults.filter((result) =>
+  result.ok === true && result.replayed === false,
+);
+const replayStages = concurrentResults.filter((result) =>
+  result.ok === true && result.replayed === true,
+);
+if (originalStages.length !== 1 || replayStages.length !== 1 ||
+    originalStages[0].draftRevision !== replayStages[0].draftRevision) {
+  throw new Error('Two simultaneous commands generated duplicate or missing Stage effects: ' +
+    JSON.stringify(concurrentResults));
+}
+const staged = originalStages[0];
 if (!staged.ok || staged.draftRevision !== 2 || staged.createdCategories !== 1 ||
     staged.createdProducts !== 1 || staged.publishRequired !== true) {
   throw new Error('Missing Catalog entities not coherently staged: ' + JSON.stringify(staged));
