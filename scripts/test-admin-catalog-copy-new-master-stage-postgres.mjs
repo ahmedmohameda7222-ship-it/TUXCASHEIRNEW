@@ -45,7 +45,7 @@ grant usage on schema public to anon,authenticated,service_role;
 create table auth.users(id uuid primary key);
 create function auth.uid() returns uuid language sql stable as $auth$
  select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $auth$;`, 'isolated database reset');
-const migration = '20261015113000_admin_catalog_copy_new_combo_options.sql';
+const migration = '20261015064909_admin_catalog_copy_new_combo_options.sql';
 const files = readdirSync(resolve('supabase/migrations')).filter((name) =>
   /^\d+_.+\.sql$/.test(name),
 ).sort();
