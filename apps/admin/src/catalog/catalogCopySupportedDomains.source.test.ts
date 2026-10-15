@@ -9,7 +9,9 @@ describe('Catalog Copy supported-domain disclosure', () => {
     expect(panel).not.toContain(
       'Missing entities, modifier definitions, recipes, and history are not copied.',
     );
-    expect(panel).toContain('Mapped modifier definitions and compatible recipe lines can be copied.');
+    expect(panel).toContain(
+      'Mapped modifier definitions and compatible recipe lines can be copied.',
+    );
     expect(panel).toContain('Missing target categories or products are not yet copied.');
     expect(panel).toContain('Historical sales and inventory balances are never copied.');
   });
