@@ -12,7 +12,9 @@ const sql = readFileSync(
 
 describe('Trusted Catalog Copy Preview Category dependency', () => {
   it('reports missing target Category even when the Product identity is mapped', () => {
-    expect(sql).toContain("when target_category.master_category_id is null then 'missing_target_category'");
+    expect(sql).toContain(
+      "when target_category.master_category_id is null then 'missing_target_category'",
+    );
     expect(sql).toContain("when target_binding.master_product_id is not null then 'mapped'");
     expect(sql.indexOf("then 'missing_target_category'")).toBeLessThan(
       sql.indexOf("when target_binding.master_product_id is not null then 'mapped'"),
