@@ -220,7 +220,9 @@ test('owner withdrawal requests second-person approval without posting funds', a
   await page.getByLabel('Reason').fill('Owner distribution');
   await page.getByLabel('PIN re-authentication').fill('1234');
   await page.getByRole('button', { name: 'Record movement' }).click();
-  await expect(page.getByRole('status')).toContainText('pending second-person approval');
+  await expect(
+    page.getByRole('dialog', { name: 'Record money movement' }).getByRole('status'),
+  ).toContainText('pending second-person approval');
   await expect(page.getByText('Total tracked money')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Record movement' })).toBeDisabled();
   expect(commands).toHaveLength(1);
