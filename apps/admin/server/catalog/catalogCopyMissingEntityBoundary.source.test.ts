@@ -25,6 +25,8 @@ describe('Catalog Copy entity identity preview boundary', () => {
     expect(panel).toContain('result.expectedSourcePublishVersion !== source.currentPublishVersion');
     expect(panel).toContain('result.expectedTargetDraftRevision !== draft.draftRevision');
     expect(panel).toContain('Inspect target master mappings');
-    expect(panel).toContain('This report does not create or publish catalog records.');
+    expect(panel).toContain("type: 'catalog-copy.missing-preview'");
+    expect(panel).toContain('separate publication is required');
+    expect(panel).toContain('Stage selected new entities in target draft');
   });
 });
