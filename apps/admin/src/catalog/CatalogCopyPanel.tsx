@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
+import { catalogCopyErrorMessage } from './catalogCopyFeedback';
 import { catalogCopyPreviewMatchesSelection } from './catalogCopyPreviewGuard';
 
 type Domain =
@@ -224,7 +225,7 @@ export function CatalogCopyPanel({
       setPreview(result);
       setCommandId(crypto.randomUUID());
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Catalog preview failed.');
+      setError(catalogCopyErrorMessage(cause));
     } finally {
       setPending(false);
     }
@@ -261,11 +262,7 @@ export function CatalogCopyPanel({
       setCommandId('');
       await queryClient.invalidateQueries({ queryKey: ['admin', 'catalog', targetShopId] });
     } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? `Copy not applied: ${cause.message}. Refresh both shops and preview again.`
-          : 'Catalog copy failed.',
-      );
+      setError(`Copy not applied: ${catalogCopyErrorMessage(cause)}`);
       setPreview(null);
     } finally {
       setPending(false);
