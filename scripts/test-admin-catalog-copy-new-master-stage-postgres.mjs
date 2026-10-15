@@ -108,6 +108,17 @@ insert into public.operations_configuration_snapshots(shop_id,version,bundle_jso
 values ('${S}',1,${quote(sourceBundle)}),('${T}',1,${quote(targetBundle)});
 `, 'published source and empty target baselines');
 
+// This is the same public SQL projection consumed by the deployed Menu
+// catalog-public Edge Function, not a synthetic React/API mock.
+const publicMenuBefore = rpc(
+  `public.read_catalog_public_v1('${T}'::uuid)`,
+  'target Menu projection before Catalog Copy',
+);
+if (publicMenuBefore.shop?.id !== T ||
+    publicMenuBefore.categories.length !== 0 ||
+    publicMenuBefore.products.length !== 0) {
+  throw new Error('Unpublished Category/Product leaked to target Menu');
+}
 const draft = rpc(
   `public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,1,'Import missing entities')`,
   'target draft',
@@ -345,6 +356,36 @@ const publishedSnapshot = JSON.parse(sql(`
 if (publishedSnapshot.snapshot.categories[0]?.id !== localCategoryId ||
     publishedSnapshot.snapshot.products[0]?.id !== localProductId) {
   throw new Error('Operations published configuration omitted staged Catalog entities');
+}
+const targetPublicMenu = rpc(
+  `public.read_catalog_public_v1('${T}'::uuid)`,
+  'published Menu consumer target projection',
+);
+if (
+  targetPublicMenu.shop?.id !== T ||
+  targetPublicMenu.categories.length !== 1 ||
+  targetPublicMenu.categories[0]?.id !== localCategoryId ||
+  targetPublicMenu.products.length !== 1 ||
+  targetPublicMenu.products[0]?.id !== localProductId ||
+  targetPublicMenu.products[0]?.category_id !== localCategoryId ||
+  targetPublicMenu.products[0]?.price_minor !== 12000 ||
+  Object.hasOwn(targetPublicMenu.products[0], 'masterProductId')
+) {
+  throw new Error('Target published Menu projection did not use local bound identities');
+}
+const sourcePublicMenu = rpc(
+  `public.read_catalog_public_v1('${S}'::uuid)`,
+  'source Menu projection after target publication',
+);
+if (sourcePublicMenu.shop?.id !== S ||
+    sourcePublicMenu.categories[0]?.id !== SC ||
+    sourcePublicMenu.products[0]?.id !== SP) {
+  throw new Error('Target publication rewrote or leaked source Menu identities');
+}
+if (sql(`select has_function_privilege(
+  'anon','public.read_catalog_public_v1(uuid)','EXECUTE')::text`)
+  !== 'true') {
+  throw new Error('Published Menu reader no longer accessible by public role');
 }
 const original = sql(`select count(*)::text||','||sum(price_minor)::text
  from public.products where shop_id='${S}'`, 'source untouched');
