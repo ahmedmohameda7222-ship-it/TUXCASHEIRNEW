@@ -95,6 +95,34 @@ type CopyPreview = {
   }>;
 };
 
+type MissingEntityPreview = {
+  ok: true;
+  sourceShopId: string;
+  targetShopId: string;
+  targetDraftId: string;
+  expectedSourcePublishVersion: number;
+  expectedTargetPublishVersion: number;
+  expectedTargetDraftRevision: number;
+  missingCategories: number;
+  missingProducts: number;
+  conflicts: number;
+  allCategoriesAndProductsMapped: boolean;
+  categories: Array<{
+    sourceCategoryId: string;
+    sourceName: string;
+    targetCategoryId: string | null;
+    masterCategoryId: string | null;
+    status: string;
+  }>;
+  products: Array<{
+    sourceProductId: string;
+    sourceName: string;
+    targetProductId: string | null;
+    masterProductId: string | null;
+    status: string;
+  }>;
+};
+
 export function CatalogCopyPanel({
   targetShopId,
   targetPublishVersion,
@@ -120,6 +148,7 @@ export function CatalogCopyPanel({
     : (sourceShopIds[0] ?? '');
   const [domains, setDomains] = useState<Domain[]>(['productAvailability']);
   const [preview, setPreview] = useState<CopyPreview | null>(null);
+  const [missingPreview, setMissingPreview] = useState<MissingEntityPreview | null>(null);
   const [commandId, setCommandId] = useState('');
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
@@ -135,7 +164,17 @@ export function CatalogCopyPanel({
     ? preview
     : null;
 
+  const currentMissingPreview =
+    missingPreview?.sourceShopId === activeSourceShopId &&
+    missingPreview.targetShopId === targetShopId &&
+    missingPreview.targetDraftId === draft?.draftId &&
+    missingPreview.expectedTargetPublishVersion === targetPublishVersion &&
+    missingPreview.expectedTargetDraftRevision === draft?.draftRevision
+      ? missingPreview
+      : null;
+
   function reset() {
+    setMissingPreview(null);
     setPreview(null);
     setCommandId('');
     setMessage('');
@@ -172,6 +211,56 @@ export function CatalogCopyPanel({
       await queryClient.invalidateQueries({ queryKey: ['admin', 'catalog', targetShopId] });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to create target draft.');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function inspectMissingEntities() {
+    if (!draft || !activeSourceShopId || pending) return;
+    if (session.state.status !== 'authenticated') return;
+    setPending(true);
+    setError('');
+    reset();
+    try {
+      const source = await adminFetch<{ currentPublishVersion: number }>(
+        `/api/admin/catalog?shopId=${encodeURIComponent(activeSourceShopId)}&view=publishing`,
+      );
+      if (source.currentPublishVersion < 1) {
+        throw new Error('Source shop has no published catalog.');
+      }
+      const result = await adminFetch<MissingEntityPreview>(
+        '/api/admin/catalog',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'catalog-copy.missing-preview',
+            sourceShopId: activeSourceShopId,
+            targetShopId,
+            targetDraftId: draft.draftId,
+            expectedSourcePublishVersion: source.currentPublishVersion,
+            expectedTargetPublishVersion: targetPublishVersion,
+            expectedTargetDraftRevision: draft.draftRevision,
+          }),
+        },
+        session.state.session.csrfToken,
+      );
+      if (
+        result.ok !== true ||
+        result.sourceShopId !== activeSourceShopId ||
+        result.targetShopId !== targetShopId ||
+        result.targetDraftId !== draft.draftId ||
+        result.expectedSourcePublishVersion !== source.currentPublishVersion ||
+        result.expectedTargetPublishVersion !== targetPublishVersion ||
+        result.expectedTargetDraftRevision !== draft.draftRevision ||
+        !Array.isArray(result.categories) ||
+        !Array.isArray(result.products)
+      ) {
+        throw new Error('Catalog entity mapping report could not be verified.');
+      }
+      setMissingPreview(result);
+    } catch (cause) {
+      setError(catalogCopyErrorMessage(cause));
     } finally {
       setPending(false);
     }
@@ -400,6 +489,14 @@ export function CatalogCopyPanel({
             Category availability (mapped categories only)
           </label>
           <button
+            type="button"
+            className="admin-secondary-button"
+            disabled={pending}
+            onClick={() => void inspectMissingEntities()}
+          >
+            {pending ? 'Checking…' : 'Inspect target master mappings'}
+          </button>
+          <button
             type="submit"
             className="admin-secondary-button"
             disabled={pending || domains.length === 0}
@@ -420,6 +517,36 @@ export function CatalogCopyPanel({
           </button>
         </div>
       )}
+      {currentMissingPreview ? (
+        <section aria-label="Catalog master mapping report" role="status">
+          <p>
+            Read-only master identity report: {currentMissingPreview.missingCategories} missing
+            categories, {currentMissingPreview.missingProducts} missing products, and{' '}
+            {currentMissingPreview.conflicts} mapping conflicts.
+          </p>
+          <p>
+            {currentMissingPreview.allCategoriesAndProductsMapped
+              ? 'All source categories and products have mapped target-local identities.'
+              : 'Resolve missing master mappings or conflicting entities before staging. This report does not create or publish catalog records.'}
+          </p>
+          <ul>
+            {currentMissingPreview.categories
+              .filter((category) => category.status !== 'MAPPED')
+              .map((category) => (
+                <li key={category.sourceCategoryId}>
+                  Category: {category.sourceName} — {category.status}
+                </li>
+              ))}
+            {currentMissingPreview.products
+              .filter((product) => product.status !== 'MAPPED')
+              .map((product) => (
+                <li key={product.sourceProductId}>
+                  Product: {product.sourceName} — {product.status}
+                </li>
+              ))}
+          </ul>
+        </section>
+      ) : null}
       {error ? <p role="alert">{error}</p> : null}
       {message ? <p role="status">{message}</p> : null}
       {currentPreview ? (
