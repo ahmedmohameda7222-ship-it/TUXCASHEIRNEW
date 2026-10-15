@@ -198,7 +198,8 @@ export function useFinanceOperations(
               ...draft,
               commandId,
               ...((draft.type === 'finance.snapshot.adjust' ||
-                draft.type === 'finance.owner-withdrawal') &&
+                draft.type === 'finance.owner-withdrawal' ||
+                 draft.type === 'finance.cashier.reconcile') &&
               reauthPin !== undefined
                 ? { requesterPin: reauthPin }
                 : {}),
