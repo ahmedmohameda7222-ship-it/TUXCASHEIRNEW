@@ -17,6 +17,11 @@ import {
 } from '../staff/staffApproval.js';
 import { AdminSupabaseClient } from '../supabaseAdmin.js';
 import {
+  createFinanceSnapshotApprovalExecutionEntries,
+  type ApprovedFinanceSnapshotExecutionInput,
+  type ApprovedFinanceSnapshotMutationResult,
+} from './financeSnapshotApproval.js';
+import {
   createShopLifecycleApprovalExecutionEntries,
   type ApprovedShopLifecycleInput,
   type ApprovedShopLifecycleMutationResult,
@@ -145,6 +150,26 @@ export async function runProductionApprovalExecutionRunner(): Promise<ApprovalEx
     ...createStaffApprovalExecutionEntries(
       createSupabaseStaffApprovalExecutionDependencies(client),
     ),
+    ...createFinanceSnapshotApprovalExecutionEntries({
+      executeAdjustment(input: ApprovedFinanceSnapshotExecutionInput) {
+        return client.rpc<ApprovedFinanceSnapshotMutationResult>(
+          'execute_approved_admin_finance_snapshot_adjustment_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_snapshot_id: input.snapshotId,
+            p_amount_minor: input.amountMinor,
+            p_reason: input.reason,
+            p_original_command_id: input.commandId,
+            p_expected_adjustment_count: input.expectedAdjustmentCount,
+            p_command_id: input.approvalCommandId,
+          },
+        );
+      },
+    }),
     ...createShopLifecycleApprovalExecutionEntries({
       executeLifecycle(input: ApprovedShopLifecycleInput) {
         return client.rpc<ApprovedShopLifecycleMutationResult>(
