@@ -205,7 +205,9 @@ export function useFinanceOperations(
           },
           token,
         );
-        commands.complete(draft.type, draft);
+        if (result['state'] !== 'PENDING_APPROVAL') {
+          commands.complete(draft.type, draft);
+        }
         return result;
       } catch (error) {
         if (error instanceof AdminApiError && error.status < 500) {
