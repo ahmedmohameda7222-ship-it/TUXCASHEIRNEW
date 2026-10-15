@@ -21,7 +21,7 @@ const payloadSchema = z
     shopId: z.string().uuid(),
     expectedLifecycleRevision: z.number().int().safe().positive(),
     expectedState: z.enum(['ACTIVE', 'SUSPENDED']),
-    targetState: z.enum(['ACTIVE', 'SUSPENDED']),
+    targetState: z.enum(['ACTIVE', 'SUSPENDED', 'ARCHIVED']),
   })
   .strict()
   .refine((value) => value.expectedState !== value.targetState);
