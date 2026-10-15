@@ -493,6 +493,7 @@ export function ShopsPage({
   canManageLifecycle = false,
   onUpdateLifecycle,
   lifecycleUpdating = false,
+  lifecycleApprovalPending = false,
   busy = false,
 }: {
   workspace: AdminSettingsWorkspace;
@@ -505,9 +506,11 @@ export function ShopsPage({
   canManageLifecycle?: boolean;
   onUpdateLifecycle?: ((draft: ShopLifecycleUpdateDraft) => void | Promise<void>) | undefined;
   lifecycleUpdating?: boolean;
+  lifecycleApprovalPending?: boolean;
   busy?: boolean;
 }) {
   const shop = workspace.shop;
+  const [lifecyclePin, setLifecyclePin] = useState('');
   const [identity, setIdentity] = useState<IdentityForm>({
     name: shop.name,
     address: shop.address ?? '',
@@ -627,6 +630,22 @@ export function ShopsPage({
             Suspending stops new intake. Reactivation leaves online orders paused and the shop
             temporarily closed until separately reopened.
           </p>
+          {lifecycleApprovalPending ? (
+            <p role="status" className="admin-field__help">
+              Lifecycle change is pending second-person approval. The shop has not changed state.
+            </p>
+          ) : null}
+          <label className="admin-field">
+            <span>Requester PIN (only when the approval rule requires reauthentication)</span>
+            <input
+              type="password"
+              autoComplete="off"
+              maxLength={64}
+              value={lifecyclePin}
+              disabled={busy || lifecycleUpdating}
+              onChange={(event) => setLifecyclePin(event.currentTarget.value)}
+            />
+          </label>
           <button
             className="admin-secondary-button"
             type="button"
@@ -634,10 +653,13 @@ export function ShopsPage({
             onClick={() => {
               if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined)
                 return;
+              const requesterPin = lifecyclePin.trim();
+              setLifecyclePin('');
               void onUpdateLifecycle({
                 expectedState: shop.lifecycleState,
                 targetState: shop.lifecycleState === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE',
                 expectedLifecycleRevision: shop.lifecycleRevision,
+                ...(requesterPin === '' ? {} : { requesterPin }),
               });
             }}
           >
