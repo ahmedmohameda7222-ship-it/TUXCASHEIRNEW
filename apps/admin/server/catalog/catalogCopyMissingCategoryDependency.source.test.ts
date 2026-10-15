@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const sql = readFileSync(
   new URL(
-    '../../../../supabase/migrations/20261015020000_admin_catalog_copy_missing_category_dependency.sql',
+    '../../../../supabase/migrations/20261015025923_admin_catalog_copy_missing_category_dependency.sql',
     import.meta.url,
   ),
   'utf8',
