@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const api = readFileSync(new URL('../../api/admin/catalog.ts', import.meta.url), 'utf8');
-const panel = readFileSync(new URL('../../src/catalog/CatalogCopyPanel.tsx', import.meta.url), 'utf8');
+const panel = readFileSync(
+  new URL('../../src/catalog/CatalogCopyPanel.tsx', import.meta.url),
+  'utf8',
+);
 
 describe('Catalog Copy missing target-local Category/Product Stage boundary', () => {
   it('exposes only a strict CSRF and permission-protected explicit selection', () => {
