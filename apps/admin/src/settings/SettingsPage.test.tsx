@@ -230,7 +230,21 @@ describe('Settings workspace', () => {
     expect(shop).toContain('23:00');
     expect(shop).toContain('Temporarily close shop');
     expect(shop).toContain('Pause online orders');
-    expect(shop).toContain('Archive / delete unused shop');
+    expect(shop).toContain('Delete unused shop');
+    const lifecycleShop = renderToStaticMarkup(
+      <ShopsPage
+        workspace={{
+          ...workspace,
+          shop: { ...workspace.shop, lifecycleRevision: 4 },
+        }}
+        onUpdateOperationalState={noop}
+        canManageLifecycle
+        onUpdateLifecycle={noop}
+        busy={false}
+      />,
+    );
+    expect(lifecycleShop).toContain('Archive shop');
+    expect(lifecycleShop).toContain('Delete unused shop');
 
     const orderTypes = renderSection('order-types');
     expect(orderTypes).toContain('Take Away');
