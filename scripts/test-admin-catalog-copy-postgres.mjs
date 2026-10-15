@@ -33,7 +33,7 @@ end $do$;
 grant usage on schema public to anon,authenticated,service_role;
 create table auth.users(id uuid primary key);
 create function auth.uid() returns uuid language sql stable as $do$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $do$;`,'reset');
-const migration='20261015025923_admin_catalog_copy_missing_category_dependency.sql';
+const migration='20261015070000_admin_catalog_copy_creation_proposal.sql';
 const files=readdirSync(resolve('supabase/migrations')).filter(f=>/^\d+_.+\.sql$/.test(f)).sort();
 const index=files.indexOf(migration);if(index<0)throw new Error('Catalog Copy migration missing');
 for(const name of files.slice(0,index+1))file(name);
@@ -237,6 +237,22 @@ if(!missingProductReport.ok || missingProductReport.missingProducts!==1 ||
    missingProductReport.products[0]?.status!=='CREATE_REQUIRED')
   throw new Error('Missing target product not classified for creation: '+
     JSON.stringify(missingProductReport));
+// The proposed product identity belongs to the TARGET shop and SOURCE business
+// master. Repeated preview never allocates another ID or mutates live rows.
+const proposedProductId=missingProductReport.products[0]?.proposedTargetProductId;
+if(!/^[0-9a-f]{8}-[0-9a-f-]{27}$/.test(proposedProductId||'') ||
+    proposedProductId===P1 || proposedProductId===P2 ||
+    !/^[0-9a-f]{64}$/.test(missingProductReport.creationFingerprint||'')) {
+  throw new Error('Trusted product creation preview lacks stable identity/fingerprint');
+}
+const repeatedMissingProduct=rpc(
+  `public.preview_admin_catalog_missing_entities_v1(${missingEntityArgs()})`,
+  'idempotent read-only product creation proposal');
+if(repeatedMissingProduct.creationFingerprint!==missingProductReport.creationFingerprint ||
+   repeatedMissingProduct.products[0]?.proposedTargetProductId!==proposedProductId) {
+  throw new Error('Creation proposal changed without source/target/draft revision');
+}
+
 sql(`update public.catalog_drafts set working_bundle_json=${quoteJson(savedDraftBundle)}
   where id='${draft.draftId}'`, 'restore target draft after diagnostic');
 
@@ -272,6 +288,20 @@ if (!bothCategoryAndProductMissing.ok ||
  throw new Error('Category creation prerequisite not exposed: '+
   JSON.stringify(bothCategoryAndProductMissing));
 }
+// A missing Category and its dependent mapped Product must agree about the
+// proposed target-local Category ID. No source UUID may appear as the proposal.
+const proposedCategoryId=bothCategoryAndProductMissing.categories[0]?.proposedTargetCategoryId;
+if(!/^[0-9a-f]{8}-[0-9a-f-]{27}$/.test(proposedCategoryId||'') ||
+   proposedCategoryId===C1 || proposedCategoryId===C2 ||
+   bothCategoryAndProductMissing.products[0]?.proposedTargetCategoryId!==proposedCategoryId ||
+   bothCategoryAndProductMissing.products[0]?.proposedTargetProductId!==null) {
+ throw new Error('Category/Product proposal master dependency mapping is not coherent');
+}
+if(sql(`select count(*) from public.menu_categories where id='${proposedCategoryId}'`)!=='0' ||
+   sql(`select count(*) from public.products where id='${proposedProductId}'`)!=='0') {
+ throw new Error('Read-only proposal wrote canonical category/product rows');
+}
+
 sql(`update public.catalog_drafts set working_bundle_json=${quoteJson(savedCategoryDraft)}
  where id='${draft.draftId}'`, 'restore target category draft');
 sql(`insert into public.catalog_category_shop_bindings(
