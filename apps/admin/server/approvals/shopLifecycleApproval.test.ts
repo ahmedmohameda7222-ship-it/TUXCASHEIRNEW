@@ -12,6 +12,8 @@ import {
   SHOP_LIFECYCLE_APPROVAL_ACTION,
 } from './shopLifecycleApproval';
 
+type CreateRequestInput = Parameters<ApprovalServiceDependencies['createRequest']>[0];
+
 const actor: AdminApprovalActor = {
   employeeId: 'a0000000-0000-4000-8000-000000000001',
   businessId: 'b0000000-0000-4000-8000-000000000001',
@@ -75,7 +77,7 @@ describe('Shop lifecycle approval: supported executable action', () => {
   });
 
   it('persists exact CAS payload without mutating the shop', async () => {
-    const createRequest = vi.fn(async (input: Parameters<ApprovalServiceDependencies['createRequest']>[0]) => ({
+    const createRequest = vi.fn(async (input: CreateRequestInput) => ({
       ok: true,
       requestId: 'f0000000-0000-4000-8000-000000000001',
       status: 'PENDING' as const,
@@ -120,7 +122,7 @@ describe('Shop lifecycle approval: supported executable action', () => {
       loadRule: vi.fn(async () => rule),
       verifyEmployeePin: vi.fn(async () => true),
       decideRequest: vi.fn(async () => ({ ok: false as const, code: 'unused' })),
-      createRequest: vi.fn(async (input: Parameters<ApprovalServiceDependencies['createRequest']>[0]) => {
+      createRequest: vi.fn(async (input: CreateRequestInput) => {
         commands.push(input.commandId);
         return {
           ok: true,
