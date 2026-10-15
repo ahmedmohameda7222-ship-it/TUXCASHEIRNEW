@@ -173,7 +173,19 @@ export type CanonicalSettingsRowEditResult =
   | { ok: false; code: string };
 
 export type ShopManagementWriteResult =
-  | { ok: true; hoursId?: string; deactivated?: boolean }
+  | {
+      ok: true;
+      hoursId?: string;
+      deactivated?: boolean;
+      lifecycleRevision?: number;
+      idempotentReplay?: boolean;
+    }
+  | {
+      ok: true;
+      state: 'PENDING_APPROVAL';
+      approvalRequestId: string;
+      idempotentReplay?: boolean;
+    }
   | { ok: false; code: 'stale_shop_lifecycle'; currentVersion: number }
   | { ok: false; code: 'stale_settings_version'; currentVersion: number }
   | { ok: false; code: string };
@@ -196,6 +208,7 @@ export type ShopLifecycleUpdateInput = {
   expectedState: 'ACTIVE' | 'SUSPENDED';
   targetState: 'ACTIVE' | 'SUSPENDED';
   expectedLifecycleRevision: number;
+  requesterPin?: string;
 };
 
 export type ShopOperationalStateUpdateInput = {
