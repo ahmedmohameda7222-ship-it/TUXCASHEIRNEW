@@ -201,6 +201,7 @@ async function mockPublishing(
           expectedSourcePublishVersion: 17,
           expectedTargetPublishVersion: 48,
           expectedTargetDraftRevision: 2,
+          creationFingerprint: 'c'.repeat(64),
           missingCategories: 1,
           missingProducts: 0,
           conflicts: 1,
@@ -211,6 +212,7 @@ async function mockPublishing(
               sourceName: 'Weekend Sides',
               masterCategoryId: '11111111-1111-4111-8111-111111111121',
               targetCategoryId: null,
+              proposedTargetCategoryId: '11111111-1111-5111-8111-111111111124',
               status: 'CREATE_REQUIRED',
             },
           ],
@@ -220,9 +222,28 @@ async function mockPublishing(
               sourceName: 'Milkshake',
               masterProductId: '11111111-1111-4111-8111-111111111123',
               targetProductId: null,
+              proposedTargetProductId: null,
+              proposedTargetCategoryId: null,
               status: 'CONFLICT_NAME',
             },
           ],
+        }),
+      });
+      return;
+    }
+    if (withCopy && body.type === 'catalog-copy.stage-created-entities') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          targetDraftId: draftId,
+          draftRevision: 3,
+          createdCategories: 1,
+          createdProducts: 0,
+          createdCategoryIds: ['11111111-1111-5111-8111-111111111124'],
+          createdProductIds: [],
+          publishRequired: true,
         }),
       });
       return;
@@ -643,7 +664,7 @@ test('mobile Catalog Copy previews missing identities without staging or publish
   await page.getByRole('button', { name: 'Inspect target master mappings' }).click();
   await expect(page.getByText(/1 missing categories, 0 missing products/)).toBeVisible();
   await expect(page.getByText(/1 mapping conflicts/)).toBeVisible();
-  await expect(page.getByText('Category: Weekend Sides — CREATE_REQUIRED')).toBeVisible();
+  await expect(page.getByLabel('Create Category: Weekend Sides')).toBeVisible();
   await expect(page.getByText('Product: Milkshake — CONFLICT_NAME')).toBeVisible();
   expect(commands).toEqual([
     expect.objectContaining({
@@ -656,6 +677,31 @@ test('mobile Catalog Copy previews missing identities without staging or publish
       expectedTargetDraftRevision: 2,
     }),
   ]);
+});
+
+test('mobile Catalog Copy stages explicitly selected missing Category without publishing', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockPublishing(page, true);
+  await page.goto('/catalog/products/publishing');
+
+  await page.getByRole('button', { name: 'Inspect target master mappings' }).click();
+  await page.getByLabel('Create Category: Weekend Sides').check();
+  await page.getByRole('button', { name: 'Stage selected new entities in target draft' }).click();
+
+  await expect(page.getByText(/New Catalog entities staged in target draft/)).toBeVisible();
+  expect(commands).toHaveLength(2);
+  expect(commands[1]).toMatchObject({
+    type: 'catalog-copy.stage-created-entities',
+    sourceShopId: copySourceShopId,
+    targetShopId: shopId,
+    targetDraftId: draftId,
+    selectedSourceCategoryIds: ['11111111-1111-4111-8111-111111111120'],
+    selectedSourceProductIds: [],
+    creationFingerprint: 'c'.repeat(64),
+  });
+  expect(commands.every((command) => command.type !== 'draft.publish')).toBe(true);
 });
 
 test('Catalog Copy can create an authorized target draft before previewing', async ({ page }) => {
