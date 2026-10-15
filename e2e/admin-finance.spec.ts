@@ -67,7 +67,7 @@ const workspace = {
 async function mockFinance(
   page: Page,
   dayStatus: 'OPEN' | 'CLOSED' = 'OPEN',
-  options: { pendingSnapshot?: boolean } = {},
+  options: { pendingSnapshot?: boolean; pendingWithdrawal?: boolean } = {},
 ) {
   const postedCommands: Array<Record<string, unknown>> = [];
   await page.route('**/api/admin/session', async (route) => {
@@ -96,7 +96,8 @@ async function mockFinance(
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(
-          options.pendingSnapshot && command.type === 'finance.snapshot.adjust'
+          (options.pendingSnapshot && command.type === 'finance.snapshot.adjust') ||
+          (options.pendingWithdrawal && command.type === 'finance.owner-withdrawal')
             ? {
                 ok: true,
                 state: 'PENDING_APPROVAL',
@@ -206,6 +207,33 @@ test('Bank & Cash keeps tracked money distinct from profit and posts a transfer 
   expect(commands[0]?.commandId).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   );
+});
+
+test('owner withdrawal requests second-person approval without posting funds', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockFinance(page, 'OPEN', { pendingWithdrawal: true });
+  await page.goto('/finance');
+  await page.getByRole('button', { name: 'Money movement' }).click();
+  await page.getByLabel('Movement type').selectOption('OWNER_WITHDRAWAL');
+  await page.getByLabel('Account', { exact: true }).selectOption(cashAccountId);
+  await page.getByLabel('Amount (EGP)').fill('5.00');
+  await page.getByLabel('Reason').fill('Owner distribution');
+  await page.getByLabel('PIN re-authentication').fill('1234');
+  await page.getByRole('button', { name: 'Record movement' }).click();
+  await expect(page.getByRole('status')).toContainText('pending second-person approval');
+  await expect(page.getByText('Total tracked money')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Record movement' })).toBeDisabled();
+  expect(commands).toHaveLength(1);
+  expect(commands[0]).toMatchObject({
+    type: 'finance.owner-withdrawal',
+    shopId,
+    accountId: cashAccountId,
+    amountMinor: 500,
+    reason: 'Owner distribution',
+    requesterPin: '1234',
+  });
 });
 
 test('Finance Z correction shows pending approval without claiming a posted adjustment', async ({
