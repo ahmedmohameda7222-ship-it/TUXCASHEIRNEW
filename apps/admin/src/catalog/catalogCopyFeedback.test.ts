@@ -14,7 +14,7 @@ describe('Catalog Copy actionable server error handling', () => {
       ['stale_catalog_copy_preview', 'Refresh both shops'],
       ['stale_draft_revision', 'Refresh both shops'],
       ['catalog_copy_creation_conflict', 'explicit creation'],
-      ['catalog_copy_unresolved_entity_dependencies', 'modifier, combo or recipe'],
+      ['catalog_copy_unresolved_entity_dependencies', 'modifier or combo'],
       ['catalog_copy_target_draft_invalid', 'target draft'],
       ['invalid_catalog_copy_selection', 'selected entities'],
       ['command_id_conflict', 'different inputs'],
