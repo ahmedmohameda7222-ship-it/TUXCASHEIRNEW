@@ -177,7 +177,7 @@ export const settingsCommandSchema = z.union([
       type: z.literal('shop.lifecycle.update'),
       shopId: uuidSchema,
       expectedState: z.enum(['ACTIVE', 'SUSPENDED']),
-      targetState: z.enum(['ACTIVE', 'SUSPENDED']),
+      targetState: z.enum(['ACTIVE', 'SUSPENDED', 'ARCHIVED']),
       expectedLifecycleRevision: expectedEditVersionSchema,
       requesterPin: z.string().min(1).max(64).optional(),
     })
