@@ -10,6 +10,7 @@ on:
       - 'scripts/test-admin-approvals-audit-migration.mjs'
       - 'scripts/test-admin-shop-lifecycle-approvals-postgres.mjs'
       - 'scripts/test-admin-finance-snapshot-approval-postgres.mjs'
+      - 'scripts/test-admin-finance-owner-withdrawal-approval-postgres.mjs'
       - 'scripts/test-admin-approvals-audit-review-hardening*.mjs'
       - 'apps/admin/server/approvals/**'
       - 'apps/admin/server/audit/**'
@@ -32,6 +33,7 @@ on:
       - 'scripts/test-admin-approvals-audit-migration.mjs'
       - 'scripts/test-admin-shop-lifecycle-approvals-postgres.mjs'
       - 'scripts/test-admin-finance-snapshot-approval-postgres.mjs'
+      - 'scripts/test-admin-finance-owner-withdrawal-approval-postgres.mjs'
       - 'scripts/test-admin-approvals-audit-review-hardening*.mjs'
       - 'apps/admin/server/approvals/**'
       - 'apps/admin/server/audit/**'
@@ -201,3 +203,5 @@ jobs:
         run: node scripts/test-admin-shop-lifecycle-approvals-postgres.mjs
       - name: Finance snapshot second-person approval PostgreSQL behavior
         run: node scripts/test-admin-finance-snapshot-approval-postgres.mjs
+      - name: Owner withdrawal second-person approval PostgreSQL behavior
+        run: node scripts/test-admin-finance-owner-withdrawal-approval-postgres.mjs
