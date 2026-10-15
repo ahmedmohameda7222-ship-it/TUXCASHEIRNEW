@@ -175,6 +175,7 @@ function SectionContent(
     canManageShopLifecycle,
     onUpdateShopLifecycle,
     shopLifecycleUpdating,
+    shopLifecycleApprovalPending,
     canManageBusinessDefaults,
     canManagePaymentZones,
     onUpdateBusinessDefault,
