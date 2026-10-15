@@ -305,7 +305,7 @@ begin
   values(v_business_id,p_command_id,v_fingerprint,v_result);
   return v_result;
 end;
-$function$
+$function$;
 
 
 -- Preview independently checks current trusted actor, tenant, target account,
