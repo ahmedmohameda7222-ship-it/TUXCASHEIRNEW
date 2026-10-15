@@ -65,6 +65,12 @@ export const APPROVAL_RULE_ACTIONS: readonly ConfigurableApprovalAction[] = [
     thresholdKind: null,
   },
   {
+    actionType: 'FINANCE_CASHIER_RECONCILIATION',
+    label: 'Cashier reconciliation variance',
+    requesterPermission: 'finance.reconcile',
+    thresholdKind: 'minimumMinor',
+  },
+  {
     actionType: 'FINANCE_OWNER_WITHDRAWAL',
     label: 'Owner withdrawal',
     requesterPermission: 'finance.adjust',
