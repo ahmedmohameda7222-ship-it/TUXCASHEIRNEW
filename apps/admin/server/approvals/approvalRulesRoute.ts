@@ -81,7 +81,7 @@ export const approvalRuleWriteSchema = z
       return;
     }
     if (
-      ['SHOP_LIFECYCLE_CHANGE', 'FINANCE_SNAPSHOT_ADJUST', 'FINANCE_OWNER_WITHDRAWAL'].includes(
+      ['SHOP_LIFECYCLE_CHANGE', 'FINANCE_SNAPSHOT_ADJUST', 'FINANCE_OWNER_WITHDRAWAL', 'FINANCE_CASHIER_RECONCILIATION'].includes(
         value.actionType,
       ) &&
       !value.requiresSecondPerson
