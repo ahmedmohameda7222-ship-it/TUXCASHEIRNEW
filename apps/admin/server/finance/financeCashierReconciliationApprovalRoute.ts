@@ -8,6 +8,7 @@ import { createSupabaseApprovalServiceDependencies } from '../approvals/approval
 import {
   executeOrRequestCashierReconciliation,
   type CashierReconciliationResult,
+  type CashierReconciliationMutationResult,
 } from '../approvals/financeCashierReconciliationApproval.js';
 import type { AdminSupabaseClient } from '../supabaseAdmin.js';
 
@@ -137,7 +138,7 @@ export async function executeCashierReconciliationCommand(
     },
     command.requesterPin,
     () =>
-      client.rpc<CashierReconciliationResult>('finance_reconcile_cashier_v1', {
+      client.rpc<CashierReconciliationMutationResult>('finance_reconcile_cashier_v1', {
         p_actor_employee_id: context.principal.employeeId,
         p_shop_id: command.shopId,
         p_business_day_id: command.businessDayId,
