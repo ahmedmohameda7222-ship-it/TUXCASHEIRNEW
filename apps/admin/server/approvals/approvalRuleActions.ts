@@ -60,7 +60,7 @@ export const APPROVAL_RULE_ACTIONS: readonly ConfigurableApprovalAction[] = [
   },
   {
     actionType: 'SHOP_LIFECYCLE_CHANGE',
-    label: 'Shop suspension / reactivation',
+    label: 'Shop suspension / reactivation / archive',
     requesterPermission: 'shops.manage',
     thresholdKind: null,
   },
