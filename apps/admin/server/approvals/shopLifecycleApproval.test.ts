@@ -46,7 +46,7 @@ describe('Shop lifecycle approval: supported executable action', () => {
   it('lists only a real callable protected shop lifecycle approval action', () => {
     expect(APPROVAL_RULE_ACTIONS).toContainEqual({
       actionType: SHOP_LIFECYCLE_APPROVAL_ACTION,
-      label: 'Shop suspension / reactivation',
+      label: 'Shop suspension / reactivation / archive',
       requesterPermission: 'shops.manage',
       thresholdKind: null,
     });
@@ -74,6 +74,15 @@ describe('Shop lifecycle approval: supported executable action', () => {
       [rule],
     );
     expect(invalid).toEqual({ kind: 'INVALID', code: 'invalid_lifecycle_transition' });
+  });
+
+  it('routes archive through shop-first second-person approval instead of direct mutation', () => {
+    const archive = { ...payload, targetState: 'ARCHIVED' as const };
+    expect(evaluateShopLifecycleApprovalRouting(archive, actor, [rule])).toEqual({
+      kind: 'APPROVAL_REQUIRED',
+      ruleId: rule.id,
+    });
+    expect(evaluateShopLifecycleApprovalRouting(archive, actor, [])).toEqual({ kind: 'DIRECT' });
   });
 
   it('persists exact CAS payload without mutating the shop', async () => {
