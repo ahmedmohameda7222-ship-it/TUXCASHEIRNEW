@@ -138,6 +138,24 @@ const replay = rpc(execute(), 'ambiguous completion exact replay');
 if (!replay.ok || replay.lifecycleRevision !== 2 || replay.idempotentReplay !== true) {
   throw new Error('Lifecycle retry double-executed or lost receipt: ' + JSON.stringify(replay));
 }
+// Simulate the worker committing its separate completion receipt and then
+// receiving a duplicate network delivery. Canonical shop effect stays once.
+const lifecycleClaim = claims.find((x) => x.approval_request_id === created.requestId);
+if (!lifecycleClaim?.claim_token) throw new Error('Claim token absent');
+const completion = rpc(`public.complete_admin_approval_execution_v1(
+ '${created.requestId}'::uuid,'${lifecycleClaim.claim_token}','EXECUTED',
+ null,'{"idempotentReplay":false}'::jsonb,now())`,
+ 'complete durable shop lifecycle approval');
+if (!completion.ok) {
+ throw new Error('Approval execution completion was not committed: ' +
+   JSON.stringify(completion));
+}
+const completedReplay = rpc(execute(), 'repeat fully completed approved lifecycle');
+if (!completedReplay.ok || completedReplay.idempotentReplay !== true ||
+ completedReplay.lifecycleRevision !== 2) {
+ throw new Error('Completion replay is not exactly-once: ' +
+   JSON.stringify(completedReplay));
+}
 const after = sql(`select lifecycle_state||','||lifecycle_revision::text||
  ','||temporary_closed::text||','||online_orders_paused::text
  from public.shops where id='${S}'`);
