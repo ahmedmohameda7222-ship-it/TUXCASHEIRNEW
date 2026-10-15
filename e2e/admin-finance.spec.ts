@@ -64,13 +64,24 @@ const workspace = {
   unmappedPaymentMethodCount: 0,
 };
 
-async function mockFinance(page: Page, dayStatus: 'OPEN' | 'CLOSED' = 'OPEN') {
+async function mockFinance(
+  page: Page,
+  dayStatus: 'OPEN' | 'CLOSED' = 'OPEN',
+  options: { pendingSnapshot?: boolean } = {},
+) {
   const postedCommands: Array<Record<string, unknown>> = [];
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(session),
+    });
+  });
+  await page.route('**/api/admin/reauth', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true }),
     });
   });
   await page.route('**/api/admin/finance**', async (route) => {
@@ -84,7 +95,15 @@ async function mockFinance(page: Page, dayStatus: 'OPEN' | 'CLOSED' = 'OPEN') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ ok: true, replayed: false, commandId: command.commandId }),
+        body: JSON.stringify(
+          options.pendingSnapshot && command.type === 'finance.snapshot.adjust'
+            ? {
+                ok: true,
+                state: 'PENDING_APPROVAL',
+                approvalRequestId: 'f0000000-0000-4000-8000-000000000004',
+              }
+            : { ok: true, replayed: false, commandId: command.commandId },
+        ),
       });
       return;
     }
@@ -126,7 +145,23 @@ async function mockFinance(page: Page, dayStatus: 'OPEN' | 'CLOSED' = 'OPEN') {
         financialFinalized: false,
       };
     } else if (view === 'day-history') {
-      data = { snapshots: [], adjustments: [] };
+      data = options.pendingSnapshot
+        ? {
+            snapshots: [
+              {
+                id: 'e0000000-0000-4000-8000-000000000001',
+                business_day_id: businessDayId,
+                finalized_at: '2026-10-08T16:00:00Z',
+                snapshot: {
+                  startedAt: '2026-10-08T06:00:00Z',
+                  netSalesMinor: 120000,
+                  estimatedOperatingProfitMinor: 70000,
+                },
+              },
+            ],
+            adjustments: [],
+          }
+        : { snapshots: [], adjustments: [] };
     } else if (view === 'cashiers') {
       data = { workers: [], cashiers: [], reconciliations: [] };
     } else if (view === 'owner-summary') {
@@ -171,6 +206,32 @@ test('Bank & Cash keeps tracked money distinct from profit and posts a transfer 
   expect(commands[0]?.commandId).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   );
+});
+
+test('Finance Z correction shows pending approval without claiming a posted adjustment', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockFinance(page, 'CLOSED', { pendingSnapshot: true });
+  await page.goto('/finance/end-day');
+  await expect(page.getByRole('heading', { name: 'Financial Z history' })).toBeVisible();
+  await page.getByRole('button', { name: 'Append correction' }).first().click();
+  await page.getByLabel('Adjustment amount (EGP, signed)').fill('5.00');
+  await page.getByLabel('Reason').fill('Correct till value');
+  await page.getByLabel('PIN confirmation').fill('1234');
+  await page.getByRole('button', { name: 'Append correction' }).last().click();
+
+  await expect(page.getByRole('status')).toContainText('pending second-person approval');
+  await expect(page.getByText('Posted adjustments: EGP 0.00')).toBeVisible();
+  expect(commands).toHaveLength(1);
+  expect(commands[0]).toMatchObject({
+    type: 'finance.snapshot.adjust',
+    shopId,
+    snapshotId: 'e0000000-0000-4000-8000-000000000001',
+    amountMinor: 500,
+    reason: 'Correct till value',
+    requesterPin: '1234',
+  });
 });
 
 test('an OPEN Operations Business Day exposes non-closing X and never a Financial Z button', async ({
