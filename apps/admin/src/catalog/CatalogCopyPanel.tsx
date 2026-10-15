@@ -280,7 +280,9 @@ export function CatalogCopyPanel({
         {'Copy selected fields into the target catalog draft. '}
         {'Products and categories require canonical business master mappings. '}
         {'Product modifier links require mapped standalone products. '}
-        {'Missing entities, modifier definitions, recipes, and history are not copied.'}
+        {'Missing target categories or products are not yet copied. '}
+        {'Mapped modifier definitions and compatible recipe lines can be copied. '}
+        {'Historical sales and inventory balances are never copied.'}
       </p>
       {draft ? (
         <form onSubmit={(event) => void makePreview(event)}>
