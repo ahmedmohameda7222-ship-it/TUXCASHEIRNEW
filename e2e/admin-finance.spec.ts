@@ -218,7 +218,10 @@ test('Finance Z correction shows pending approval without claiming a posted adju
   await page.getByRole('button', { name: 'Append correction' }).first().click();
   await page.getByLabel('Adjustment amount (EGP, signed)').fill('5.00');
   await page.getByRole('textbox', { name: 'Reason', exact: true }).fill('Correct till value');
-  await page.getByRole('dialog', { name: 'Append financial correction' }).getByLabel('PIN confirmation').fill('1234');
+  await page
+    .getByRole('dialog', { name: 'Append financial correction' })
+    .getByLabel('PIN confirmation')
+    .fill('1234');
   await page.getByRole('button', { name: 'Append correction' }).last().click();
 
   await expect(page.getByRole('status')).toContainText('pending second-person approval');
