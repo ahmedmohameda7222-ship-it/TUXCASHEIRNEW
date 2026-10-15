@@ -38,7 +38,7 @@ create table auth.users(id uuid primary key);
 create function auth.uid() returns uuid language sql stable as $u$
  select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $u$;`,
 'reset only CI PostgreSQL');
-const target = '20261016090000_admin_finance_cashier_reconciliation_approval.sql';
+const target = '20261015201518_admin_finance_cashier_reconciliation_approval.sql';
 const migrations = readdirSync(resolve('supabase/migrations'))
   .filter((name) => /^\d+_.+\.sql$/.test(name))
   .sort();
