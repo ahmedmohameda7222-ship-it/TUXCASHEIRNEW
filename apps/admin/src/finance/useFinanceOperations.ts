@@ -194,7 +194,13 @@ export function useFinanceOperations(
           '/api/admin/finance',
           {
             method: 'POST',
-            body: JSON.stringify({ ...draft, commandId }),
+            body: JSON.stringify({
+              ...draft,
+              commandId,
+              ...(draft.type === 'finance.snapshot.adjust' && reauthPin !== undefined
+                ? { requesterPin: reauthPin }
+                : {}),
+            }),
           },
           token,
         );
