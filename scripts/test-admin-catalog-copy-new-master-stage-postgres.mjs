@@ -449,4 +449,107 @@ for (const role of ['anon','authenticated']) {
     'EXECUTE')`);
   if (permitted !== 'f') throw new Error('Unsafe entity Stage EXECUTE grant '+role);
 }
+// A newly created source-master Product may have a recipe, but the target
+// must have an explicit same-business inventory master binding with compatible
+// active unit and tracking semantics BEFORE any draft-only Stage is allowed.
+const SP3='70000000-0000-4000-8000-000000000013';
+const MP3='50000000-0000-4000-8000-000000000013';
+const SI3='90000000-0000-4000-8000-000000000013';
+const TI3='90000000-0000-4000-8000-000000000014';
+const MI3='91000000-0000-4000-8000-000000000013';
+sql(`
+ insert into public.products(
+ id,shop_id,category_id,slug,name,price_minor,active,sold_out,is_combo,sort_order
+ ) values ('${SP3}','${S}','${SC}','coffee-bread','Coffee Bread',16000,true,false,false,9);
+ insert into public.catalog_master_products(id,business_id,master_category_id,canonical_name)
+ values ('${MP3}','${B}','${MC}','Coffee Bread');
+ insert into public.catalog_product_shop_overrides(
+ business_id,master_product_id,shop_id,canonical_product_id,price_minor,visible,manual_sold_out
+ ) values ('${B}','${MP3}','${S}','${SP3}',16000,true,false);
+ insert into public.inventory_items(id,shop_id,name,unit_label,tracking_mode,active)
+ values ('${SI3}','${S}','Source flour','g','RECIPE_TRACKED',true),
+        ('${TI3}','${T}','Target flour','g','RECIPE_TRACKED',true);
+ insert into public.recipe_lines(shop_id,product_id,inventory_item_id,quantity_micros)
+ values ('${S}','${SP3}','${SI3}',2500000);
+ insert into public.catalog_master_inventory_items(
+ id,business_id,canonical_name,base_unit_label,tracking_mode)
+ values ('${MI3}','${B}','Flour','g','RECIPE_TRACKED');
+ `, 'new recipe-linked source master without any target inventory binding');
+const recipeSourceBundle=sql(
+  `select private.build_admin_catalog_bundle_v1('${S}'::uuid,2,now())::text`,
+  'source immutable published recipe version',
+);
+sql(`
+ insert into public.catalog_publish_versions(
+ business_id,shop_id,publish_version,operations_configuration_version,source_kind,bundle_json)
+ values ('${B}','${S}',2,2,'BASELINE',${quote(recipeSourceBundle)});
+ insert into public.operations_configuration_snapshots(shop_id,version,bundle_json)
+ values ('${S}',2,${quote(recipeSourceBundle)});
+ `, 'source recipe published version for new master');
+const recipeDraft=rpc(
+  `public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,2,
+    'Create new product with inventory-mapped recipe')`,
+  'recipe-linked target draft',
+);
+if(!recipeDraft.ok||!recipeDraft.draftId)
+  throw new Error('Cannot create recipe-linked target draft');
+const recipeArgs=`'${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,
+ '${recipeDraft.draftId}'::uuid,2::bigint,2::bigint,1::bigint`;
+const recipeMissing=rpc(
+  `public.preview_admin_catalog_missing_entities_v1(${recipeArgs})`,
+  'new Product existing Category recipe creation preview',
+);
+const newRecipeProduct=recipeMissing.products.find(p=>p.sourceProductId===SP3);
+if(!recipeMissing.ok||newRecipeProduct?.status!=='CREATE_REQUIRED')
+  throw new Error('New recipe Product was not identified for creation');
+const recipeStage=(cmd)=>`public.stage_admin_catalog_copy_created_entities_v1(
+ ${recipeArgs},array[]::uuid[],array['${SP3}'::uuid],
+ '${recipeMissing.creationFingerprint}','${cmd}')`;
+const unboundRecipe=rpc(recipeStage('recipe-unbound'), 'no target inventory binding');
+if(unboundRecipe.ok!==false||
+   unboundRecipe.code!=='catalog_copy_missing_target_dependencies') {
+ throw new Error('Unbound inventory Recipe was staged instead of fail closed: '+
+  JSON.stringify(unboundRecipe));
+}
+sql(`
+ insert into public.catalog_inventory_item_shop_bindings(
+ business_id,master_inventory_item_id,shop_id,inventory_item_id)
+ values ('${B}','${MI3}','${S}','${SI3}'),
+        ('${B}','${MI3}','${T}','${TI3}');
+ `, 'explicit source and target inventory business master mapping');
+const stagedRecipe=rpc(recipeStage('recipe-accepted'), 'draft-only inventory mapped recipe Stage');
+if(!stagedRecipe.ok||stagedRecipe.createdProducts!==1||stagedRecipe.draftRevision!==2)
+ throw new Error('Mapped recipe new Product not staged: '+JSON.stringify(stagedRecipe));
+const recipeLocal=newRecipeProduct.proposedTargetProductId;
+const stagedRecipeBundle=JSON.parse(sql(
+ `select working_bundle_json::text from public.catalog_drafts
+ where id='${recipeDraft.draftId}'`));
+const translated=stagedRecipeBundle.snapshot.recipeLines;
+if(translated?.length!==1||translated[0]?.productId!==recipeLocal||
+ translated[0]?.inventoryItemId!==TI3||translated[0]?.quantityMicros!==2500000||
+ translated[0]?.shopId!==T)
+ throw new Error('Draft Recipe lost/mis-mapped master IDs or microunits: '+JSON.stringify(translated));
+if(sql(`select count(*) from public.recipe_lines where shop_id='${T}'`)!=='0')
+ throw new Error('Recipe Stage mutated live target recipe before Publish');
+const recipePublished=rpc(
+ `public.publish_catalog_draft_v1(
+ '${OWNER}'::uuid,'${recipeDraft.draftId}'::uuid,2,2)`,
+ 'publish recipe-linked new Product through canonical authority');
+if(!recipePublished.ok||recipePublished.publishVersion!==3)
+ throw new Error('Recipe Product Publish failed: '+JSON.stringify(recipePublished));
+const liveRecipe=sql(`
+ select r.product_id::text||','||r.inventory_item_id::text||','||
+ r.quantity_micros::text||','||p.category_id::text||','||pb.master_product_id::text
+ from public.recipe_lines r
+ join public.products p on p.shop_id=r.shop_id and p.id=r.product_id
+ join public.catalog_product_shop_overrides pb
+   on pb.shop_id=p.shop_id and pb.canonical_product_id=p.id
+ where r.shop_id='${T}'`, 'canonical inventory recipe/Product master identity');
+if(liveRecipe!==[recipeLocal,TI3,'2500000',localCategoryId,MP3].join(',')) {
+  throw new Error('Published recipe-linked new Product lost master mapping: '+liveRecipe);
+}
+if(sql(`select count(*) from public.inventory_movements
+ where shop_id='${T}'`)!=='0')
+ throw new Error('Recipe setup generated stock movement or COGS before sale');
+
 console.log('Missing Catalog Category/Product Stage/Publish master identity integration passed.');
