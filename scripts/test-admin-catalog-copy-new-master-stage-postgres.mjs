@@ -140,6 +140,33 @@ if (
   !/^[0-9a-f]{64}$/.test(preview.creationFingerprint || '')
 ) throw new Error('Invalid source-master creation preview: ' + JSON.stringify(preview));
 
+// Archived master identities must never become newly linked target masters,
+// even when their immutable source publication still contains old source IDs.
+sql(`update public.catalog_master_categories set archived_at=now()
+ where id='${MC}'`, 'archive source Category master in isolated fixture');
+const archivedCategoryPreview = rpc(
+  `public.preview_admin_catalog_missing_entities_v1(${args})`,
+  'archived source Category master refused by Preview',
+);
+if (archivedCategoryPreview.categories?.[0]?.status !== 'MISSING_SOURCE_MASTER' ||
+    archivedCategoryPreview.categories?.[0]?.proposedTargetCategoryId != null) {
+  throw new Error('Archived source Category master offered a new target identity');
+}
+sql(`update public.catalog_master_categories set archived_at=null
+ where id='${MC}'`, 'restore Category master fixture');
+sql(`update public.catalog_master_products set archived_at=now()
+ where id='${MP}'`, 'archive source Product master in isolated fixture');
+const archivedProductPreview = rpc(
+  `public.preview_admin_catalog_missing_entities_v1(${args})`,
+  'archived source Product master refused by Preview',
+);
+if (archivedProductPreview.products?.[0]?.status !== 'MISSING_SOURCE_MASTER' ||
+    archivedProductPreview.products?.[0]?.proposedTargetProductId != null) {
+  throw new Error('Archived source Product master offered a new target identity');
+}
+sql(`update public.catalog_master_products set archived_at=null
+ where id='${MP}'`, 'restore Product master fixture');
+
 const stage = (commandId = 'create-cat-prod-1', fingerprint = preview.creationFingerprint) =>
   `public.stage_admin_catalog_copy_created_entities_v1(
     ${args},array['${SC}'::uuid],array['${SP}'::uuid],
@@ -301,6 +328,28 @@ try {
   foreignDenied = /FORBIDDEN|BUSINESS_MISMATCH/.test(String(error));
 }
 if (!foreignDenied) throw new Error('Foreign tenant could stage another business Catalog');
+
+// Archive a business master AFTER Stage and BEFORE Publish. The trusted
+// binder must revalidate current source-master eligibility inside the same
+// transaction, leaving zero partial live target rows on failure.
+sql(`update public.catalog_master_products set archived_at=now()
+ where id='${MP}'`, 'archive Product master after Stage');
+let archivedMasterRejected = false;
+try {
+  rpc(`public.publish_catalog_draft_v1(
+    '${OWNER}'::uuid,'${draft.draftId}'::uuid,2,1)`,
+    'stale archived master at target Publish');
+} catch (error) {
+  archivedMasterRejected = String(error).includes('TUX_CATALOG_COPY_PRODUCT_INTENT_INCOMPLETE');
+}
+if (!archivedMasterRejected) throw new Error('Archived master published as a live target binding');
+if (sql(`select count(*) from public.products where shop_id='${T}'`) !== '0' ||
+    sql(`select count(*) from public.catalog_product_shop_overrides
+      where shop_id='${T}'`) !== '0') {
+  throw new Error('Archived master Publish left partial target Catalog data');
+}
+sql(`update public.catalog_master_products set archived_at=null
+ where id='${MP}'`, 'restore Product master for normal publish');
 
 // A source publication changed between Stage and Publish must fail closed.
 // This creates/removes test-only versions in this loopback PostgreSQL fixture.
