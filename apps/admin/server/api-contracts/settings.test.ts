@@ -44,8 +44,9 @@ describe('Admin settings API contract', () => {
         targetState: 'ACTIVE',
       }).success,
     ).toBe(true);
+    // Shop archive must use the same revision-fenced, optionally approved lifecycle command.
     expect(settingsCommandSchema.safeParse({ ...input, targetState: 'ARCHIVED' }).success).toBe(
-      false,
+      true,
     );
     expect(settingsCommandSchema.safeParse({ ...input, targetState: 'ACTIVE' }).success).toBe(
       false,
