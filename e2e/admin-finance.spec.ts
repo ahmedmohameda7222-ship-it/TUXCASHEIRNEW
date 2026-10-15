@@ -217,7 +217,7 @@ test('Finance Z correction shows pending approval without claiming a posted adju
   await expect(page.getByRole('heading', { name: 'Financial Z history' })).toBeVisible();
   await page.getByRole('button', { name: 'Append correction' }).first().click();
   await page.getByLabel('Adjustment amount (EGP, signed)').fill('5.00');
-  await page.getByLabel('Reason').fill('Correct till value');
+  await page.getByRole('textbox', { name: 'Reason', exact: true }).fill('Correct till value');
   await page.getByLabel('PIN confirmation').fill('1234');
   await page.getByRole('button', { name: 'Append correction' }).last().click();
 
