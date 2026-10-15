@@ -103,11 +103,7 @@ export function CashierReconciliation({
     >
       <div className="tux-finance-form">
         <label htmlFor={cashierSelectId}>Cashier</label>
-        <select
-          id={cashierSelectId}
-          value={workerId}
-          onChange={(e) => setWorkerId(e.target.value)}
-        >
+        <select id={cashierSelectId} value={workerId} onChange={(e) => setWorkerId(e.target.value)}>
           <option value="">Choose cashier</option>
           {remaining.map((worker) => (
             <option key={worker.id} value={worker.id}>
