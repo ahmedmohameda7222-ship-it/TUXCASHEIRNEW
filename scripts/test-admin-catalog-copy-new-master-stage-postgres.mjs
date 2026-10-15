@@ -91,6 +91,11 @@ insert into public.catalog_product_shop_overrides(
 ) values ('${B}','${MP}','${S}','${SP}',12000,true,false);
 `, 'two-business source-only master fixture');
 
+// A target Inventory item must exist at the immutable publication used by the Draft.
+const TI3='90000000-0000-4000-8000-000000000014';
+sql(`insert into public.inventory_items(id,shop_id,name,unit_label,tracking_mode,active)
+ values ('${TI3}','${T}','Target flour','g','RECIPE_TRACKED',true)`,
+ 'target inventory available at publication');
 const sourceBundle = sql(
   `select private.build_admin_catalog_bundle_v1('${S}'::uuid,1,now())::text`,
   'source bundle',
@@ -455,7 +460,6 @@ for (const role of ['anon','authenticated']) {
 const SP3='70000000-0000-4000-8000-000000000013';
 const MP3='50000000-0000-4000-8000-000000000013';
 const SI3='90000000-0000-4000-8000-000000000013';
-const TI3='90000000-0000-4000-8000-000000000014';
 const MI3='91000000-0000-4000-8000-000000000013';
 sql(`
  insert into public.products(
@@ -467,8 +471,7 @@ sql(`
  business_id,master_product_id,shop_id,canonical_product_id,price_minor,visible,manual_sold_out
  ) values ('${B}','${MP3}','${S}','${SP3}',16000,true,false);
  insert into public.inventory_items(id,shop_id,name,unit_label,tracking_mode,active)
- values ('${SI3}','${S}','Source flour','g','RECIPE_TRACKED',true),
-        ('${TI3}','${T}','Target flour','g','RECIPE_TRACKED',true);
+ values ('${SI3}','${S}','Source flour','g','RECIPE_TRACKED',true);
  insert into public.recipe_lines(shop_id,product_id,inventory_item_id,quantity_micros)
  values ('${S}','${SP3}','${SI3}',2500000);
  insert into public.catalog_master_inventory_items(
