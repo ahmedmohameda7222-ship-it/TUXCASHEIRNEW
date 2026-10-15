@@ -22,6 +22,7 @@ const command = {
   businessDayId: '55555555-5555-4555-8555-555555555555',
   cashierWorkerId: '66666666-6666-4666-8666-666666666666',
   actualMinor: 1800,
+  expectedMinor: 1300,
   reason: 'Drawer variance',
   commandId: '77777777-7777-4777-8777-777777777777',
 };
