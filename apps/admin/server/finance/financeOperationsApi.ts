@@ -556,7 +556,7 @@ export async function handleAdvancedFinance(
         'finance.settlement.record': 'SETTLEMENT',
       } as const;
       const payload =
-        command.type === 'finance.owner-contribution' || command.type === 'finance.owner-withdrawal'
+        command.type === 'finance.owner-contribution'
           ? {
               fromAccountId: command.accountId,
               amountMinor: command.amountMinor,
