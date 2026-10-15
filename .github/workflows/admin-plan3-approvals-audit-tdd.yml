@@ -9,6 +9,7 @@ on:
       - 'supabase/migrations/**'
       - 'scripts/test-admin-approvals-audit-migration.mjs'
       - 'scripts/test-admin-shop-lifecycle-approvals-postgres.mjs'
+      - 'scripts/test-admin-finance-snapshot-approval-postgres.mjs'
       - 'scripts/test-admin-approvals-audit-review-hardening*.mjs'
       - 'apps/admin/server/approvals/**'
       - 'apps/admin/server/audit/**'
@@ -30,6 +31,7 @@ on:
       - 'supabase/migrations/**'
       - 'scripts/test-admin-approvals-audit-migration.mjs'
       - 'scripts/test-admin-shop-lifecycle-approvals-postgres.mjs'
+      - 'scripts/test-admin-finance-snapshot-approval-postgres.mjs'
       - 'scripts/test-admin-approvals-audit-review-hardening*.mjs'
       - 'apps/admin/server/approvals/**'
       - 'apps/admin/server/audit/**'
@@ -188,3 +190,5 @@ jobs:
         run: node scripts/test-admin-approvals-audit-review-hardening-round13.mjs
       - name: Shop lifecycle approved execution PostgreSQL behavior
         run: node scripts/test-admin-shop-lifecycle-approvals-postgres.mjs
+      - name: Finance snapshot second-person approval PostgreSQL behavior
+        run: node scripts/test-admin-finance-snapshot-approval-postgres.mjs
