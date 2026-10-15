@@ -520,6 +520,19 @@ sql(`
  values ('${B}','${MI3}','${S}','${SI3}'),
         ('${B}','${MI3}','${T}','${TI3}');
  `, 'explicit source and target inventory business master mapping');
+// Binding alone is insufficient: a currently inactive target recipe item
+// must fail closed even if the published snapshot was previously active.
+sql(`update public.inventory_items set active=false where id='${TI3}'`,
+ 'deactivate target recipe item after master mapping');
+const inactiveRecipe=rpc(
+ recipeStage('recipe-inactive'), 'inactive recipe item target Stage refusal');
+if(inactiveRecipe.ok!==false ||
+   inactiveRecipe.code!=='catalog_copy_incompatible_inventory_units') {
+ throw new Error('Inactive target inventory was copied into new Product recipe: '+
+   JSON.stringify(inactiveRecipe));
+}
+sql(`update public.inventory_items set active=true where id='${TI3}'`,
+ 'restore target inventory fixture');
 const stagedRecipe=rpc(recipeStage('recipe-accepted'), 'draft-only inventory mapped recipe Stage');
 if(!stagedRecipe.ok||stagedRecipe.createdProducts!==1||stagedRecipe.draftRevision!==2)
  throw new Error('Mapped recipe new Product not staged: '+JSON.stringify(stagedRecipe));
