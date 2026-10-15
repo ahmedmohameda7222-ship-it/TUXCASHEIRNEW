@@ -53,6 +53,10 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Inspect Catalog UI Prettier delta (temporary diagnostic)
+        run: |
+          npx prettier apps/admin/src/catalog/CatalogCopyPanel.tsx > /tmp/catalog-panel-formatted.tsx
+          diff -u apps/admin/src/catalog/CatalogCopyPanel.tsx /tmp/catalog-panel-formatted.tsx || true
       - name: Formatting
         run: npm run format:check
       - name: Lint
