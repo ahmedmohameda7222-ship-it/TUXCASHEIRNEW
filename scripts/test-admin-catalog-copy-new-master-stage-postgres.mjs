@@ -568,4 +568,80 @@ if(sql(`select count(*) from public.inventory_movements
  where shop_id='${T}'`)!=='0')
  throw new Error('Recipe setup generated stock movement or COGS before sale');
 
+// New Combo Product creation must translate source Combo→Beverage links
+// using the existing same-business Product master. The copied option must
+// point at the target-local beverage ID, never the source ID or display name.
+const SP4='70000000-0000-4000-8000-000000000015';
+const MP4='50000000-0000-4000-8000-000000000015';
+sql(`
+ insert into public.products(
+ id,shop_id,category_id,slug,name,price_minor,active,sold_out,is_combo,sort_order)
+ values ('${SP4}','${S}','${SC}','coffee-combo','Coffee combo',19000,true,false,true,10);
+ insert into public.catalog_master_products(id,business_id,master_category_id,canonical_name)
+ values ('${MP4}','${B}','${MC}','Coffee combo');
+ insert into public.catalog_product_shop_overrides(
+ business_id,master_product_id,shop_id,canonical_product_id,price_minor,visible,manual_sold_out)
+ values ('${B}','${MP4}','${S}','${SP4}',19000,true,false);
+ insert into public.combo_beverage_options(
+ shop_id,combo_product_id,beverage_product_id,sort_order)
+ values ('${S}','${SP4}','${SP}',4);
+ `, 'source Combo Product with mapped beverage dependency');
+const comboSourceBundle=sql(
+ `select private.build_admin_catalog_bundle_v1('${S}'::uuid,3,now())::text`,
+ 'source Combo publication');
+sql(`
+ insert into public.catalog_publish_versions(
+ business_id,shop_id,publish_version,operations_configuration_version,source_kind,bundle_json)
+ values ('${B}','${S}',3,3,'BASELINE',${quote(comboSourceBundle)});
+ insert into public.operations_configuration_snapshots(shop_id,version,bundle_json)
+ values ('${S}',3,${quote(comboSourceBundle)});
+ `, 'source Combo product immutable publication');
+const comboDraft=rpc(
+ `public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,3,
+  'Create Combo Product with master-mapped beverage')`,
+ 'target Combo draft');
+if(!comboDraft.ok||!comboDraft.draftId)
+ throw new Error('Could not create Combo target draft');
+const comboArgs=`'${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,
+ '${comboDraft.draftId}'::uuid,3::bigint,3::bigint,1::bigint`;
+const comboPreview=rpc(
+ `public.preview_admin_catalog_missing_entities_v1(${comboArgs})`,
+ 'missing Combo Product preview');
+const comboCandidate=comboPreview.products.find(x=>x.sourceProductId===SP4);
+if(!comboPreview.ok||comboCandidate?.status!=='CREATE_REQUIRED')
+ throw new Error('Missing source Combo master not presented for creation');
+const comboLocal=comboCandidate.proposedTargetProductId;
+const comboStage=rpc(
+ `public.stage_admin_catalog_copy_created_entities_v1(
+ ${comboArgs},array[]::uuid[],array['${SP4}'::uuid],
+ '${comboPreview.creationFingerprint}','create-combo-master-1')`,
+ 'stage new Combo and mapped beverage option');
+if(!comboStage.ok||comboStage.createdProducts!==1)
+ throw new Error('Master-mapped new Combo Product not staged: '+JSON.stringify(comboStage));
+const comboCandidateBundle=JSON.parse(sql(`
+ select working_bundle_json::text from public.catalog_drafts
+ where id='${comboDraft.draftId}'`, 'staged Combo draft'));
+const options=comboCandidateBundle.snapshot.comboBeverageOptions;
+if(options.length!==1 || options[0].comboProductId!==comboLocal ||
+   options[0].beverageProductId!==localProductId ||
+   options[0].shopId!==T || options[0].sortOrder!==4)
+ throw new Error('Combo option did not map source beverage to target-local ID');
+if(sql(`select count(*) from public.combo_beverage_options where shop_id='${T}'`)!=='0')
+ throw new Error('New Combo Stage changed live target options before Publish');
+const comboPublished=rpc(
+ `public.publish_catalog_draft_v1(
+ '${OWNER}'::uuid,'${comboDraft.draftId}'::uuid,2,3)`,
+ 'publish new Combo via canonical Catalog authority');
+if(!comboPublished.ok||comboPublished.publishVersion!==4)
+ throw new Error('Publishing new Combo Product rejected: '+JSON.stringify(comboPublished));
+const comboLive=sql(`
+ select c.combo_product_id::text||','||c.beverage_product_id::text||','||
+        c.sort_order::text||','||p.is_combo::text||','||bind.master_product_id::text
+ from public.combo_beverage_options c
+ join public.products p on p.shop_id=c.shop_id and p.id=c.combo_product_id
+ join public.catalog_product_shop_overrides bind
+  on bind.shop_id=p.shop_id and bind.canonical_product_id=p.id
+ where c.shop_id='${T}'`);
+if(comboLive!==[comboLocal,localProductId,'4','true',MP4].join(','))
+ throw new Error('Published Combo Product lacks target-local master-mapped option: '+comboLive);
 console.log('Missing Catalog Category/Product Stage/Publish master identity integration passed.');
