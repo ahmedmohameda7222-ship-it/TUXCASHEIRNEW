@@ -12,7 +12,9 @@ describe('Catalog Copy missing target-local Category/Product Stage boundary', ()
   it('exposes only a strict CSRF and permission-protected explicit selection', () => {
     expect(api).toContain("z.literal('catalog-copy.stage-created-entities')");
     expect(api).toContain("'stage_admin_catalog_copy_created_entities_v1'");
-    expect(api).toContain("requirePermission(principal, 'catalog.pricing', copy.data.targetShopId)");
+    expect(api).toContain(
+      "requirePermission(principal, 'catalog.pricing', copy.data.targetShopId)",
+    );
     expect(api).toContain('selectedSourceCategoryIds');
     expect(api).toContain('selectedSourceProductIds');
     expect(api).toContain('creationFingerprint');
