@@ -75,6 +75,16 @@ export const catalogCopySchema = z.discriminatedUnion('type', [
     .omit({ selectedDomains: true })
     .extend({ type: z.literal('catalog-copy.missing-preview') })
     .strict(),
+  catalogCopyBaseSchema
+    .omit({ selectedDomains: true })
+    .extend({
+      type: z.literal('catalog-copy.stage-created-entities'),
+      selectedSourceCategoryIds: z.array(uuidSchema).max(100),
+      selectedSourceProductIds: z.array(uuidSchema).max(200),
+      creationFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+      commandId: z.string().trim().min(1).max(128),
+    })
+    .strict(),
   catalogCopyBaseSchema.extend({ type: z.literal('catalog-copy.preview') }).strict(),
   catalogCopyBaseSchema
     .extend({
@@ -270,7 +280,8 @@ export default async function handler(
       'type' in rawCommand &&
       (rawCommand.type === 'catalog-copy.preview' ||
         rawCommand.type === 'catalog-copy.apply' ||
-        rawCommand.type === 'catalog-copy.missing-preview')
+        rawCommand.type === 'catalog-copy.missing-preview' ||
+        rawCommand.type === 'catalog-copy.stage-created-entities')
     ) {
       const copy = catalogCopySchema.safeParse(rawCommand);
       if (!copy.success || copy.data.sourceShopId === copy.data.targetShopId) {
@@ -291,6 +302,43 @@ export default async function handler(
             p_source_publish_version: copy.data.expectedSourcePublishVersion,
             p_target_publish_version: copy.data.expectedTargetPublishVersion,
             p_target_draft_revision: copy.data.expectedTargetDraftRevision,
+          },
+        );
+        if (result['ok'] !== true && result['ok'] !== false) {
+          sendJson(response, 502, { error: 'backend_contract_invalid' });
+          return;
+        }
+        sendJson(response, result['ok'] === true ? 200 : 409, result);
+        return;
+      }
+      if (copy.data.type === 'catalog-copy.stage-created-entities') {
+        const categories = copy.data.selectedSourceCategoryIds;
+        const products = copy.data.selectedSourceProductIds;
+        if (
+          categories.length + products.length === 0 ||
+          new Set(categories).size !== categories.length ||
+          new Set(products).size !== products.length
+        ) {
+          sendJson(response, 400, { error: 'invalid_catalog_copy_selection' });
+          return;
+        }
+        if (products.length > 0) {
+          requirePermission(principal, 'catalog.pricing', copy.data.targetShopId);
+        }
+        const result = await client.rpc<Readonly<Record<string, unknown>>>(
+          'stage_admin_catalog_copy_created_entities_v1',
+          {
+            p_employee_id: principal.employeeId,
+            p_source_shop_id: copy.data.sourceShopId,
+            p_target_shop_id: copy.data.targetShopId,
+            p_target_draft_id: copy.data.targetDraftId,
+            p_source_publish_version: copy.data.expectedSourcePublishVersion,
+            p_target_publish_version: copy.data.expectedTargetPublishVersion,
+            p_target_draft_revision: copy.data.expectedTargetDraftRevision,
+            p_source_category_ids: categories,
+            p_source_product_ids: products,
+            p_creation_fingerprint: copy.data.creationFingerprint,
+            p_command_id: copy.data.commandId,
           },
         );
         if (result['ok'] !== true && result['ok'] !== false) {
