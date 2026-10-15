@@ -65,6 +65,12 @@ export const APPROVAL_RULE_ACTIONS: readonly ConfigurableApprovalAction[] = [
     thresholdKind: null,
   },
   {
+    actionType: 'FINANCE_OWNER_WITHDRAWAL',
+    label: 'Owner withdrawal',
+    requesterPermission: 'finance.adjust',
+    thresholdKind: 'minimumMinor',
+  },
+  {
     actionType: 'FINANCE_SNAPSHOT_ADJUST',
     label: 'Financial Z correction',
     requesterPermission: 'finance.adjust',
