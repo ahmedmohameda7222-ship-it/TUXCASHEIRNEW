@@ -80,7 +80,10 @@ export const approvalRuleWriteSchema = z
       });
       return;
     }
-    if (value.actionType === 'SHOP_LIFECYCLE_CHANGE' && !value.requiresSecondPerson) {
+    if (
+      ['SHOP_LIFECYCLE_CHANGE', 'FINANCE_SNAPSHOT_ADJUST'].includes(value.actionType) &&
+      !value.requiresSecondPerson
+    ) {
       context.addIssue({
         code: 'custom',
         path: ['requiresSecondPerson'],
