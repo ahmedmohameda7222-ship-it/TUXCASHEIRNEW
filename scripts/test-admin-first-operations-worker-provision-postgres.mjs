@@ -185,6 +185,113 @@ const identity = sql(
   'atomic worker/link credential verification',
 );
 if (identity !== '1,true') throw new Error('Created worker/link credentials drifted: ' + identity);
+
+// Isolated multi-shop integration: canonical new Shop -> employee assignment ->
+// first Operations Worker. No mock API, no seed to the canonical live database.
+const newShopResult = JSON.parse(
+  sql(
+    `select public.create_admin_shop_v1(
+      '${O}'::uuid,'${S}'::uuid,'Operations expansion shop',null,null,
+      'integration-new-shop-1')::text`,
+    'authorized creation of another business shop',
+  ),
+);
+const INTEGRATED_SHOP = newShopResult.shopId;
+if (
+  newShopResult.ok !== true ||
+  typeof INTEGRATED_SHOP !== 'string' ||
+  !/^[0-9a-f-]{36}$/.test(INTEGRATED_SHOP)
+) throw new Error('New business shop was not created safely: ' + JSON.stringify(newShopResult));
+
+const newShopReplay = JSON.parse(
+  sql(
+    `select public.create_admin_shop_v1(
+      '${O}'::uuid,'${S}'::uuid,'Operations expansion shop',null,null,
+      'integration-new-shop-1')::text`,
+    'repeat identical new-shop command',
+  ),
+);
+if (
+  newShopReplay.ok !== true ||
+  newShopReplay.idempotentReplay !== true ||
+  newShopReplay.shopId !== INTEGRATED_SHOP
+) throw new Error('New-shop replay created an inconsistent shop');
+
+const newShopStatus = sql(
+  `select s.lifecycle_state||','||s.active::text||','||
+    s.temporary_closed::text||','||s.online_orders_paused::text
+    from public.shops s
+    join public.business_shops bs on bs.shop_id=s.id
+    where s.id='${INTEGRATED_SHOP}' and bs.business_id='${B}'`,
+  'new-shop closed intake and business-scoped setup',
+);
+if (newShopStatus !== 'ACTIVE,true,true,true') {
+  throw new Error('New shop did not start with safely closed intake: ' + newShopStatus);
+}
+
+const assignedToNewShop = JSON.parse(
+  sql(
+    `select public.assign_employee_to_shop_v1(
+      '${O}'::uuid,'${E}'::uuid,'${INTEGRATED_SHOP}'::uuid,
+      'integration-assign-employee-1')::text`,
+    'trusted employee assignment to new shop',
+  ),
+);
+if (
+  assignedToNewShop.ok !== true ||
+  assignedToNewShop.replayed !== false ||
+  assignedToNewShop.shopId !== INTEGRATED_SHOP
+) throw new Error('Authorized cross-shop assignment failed: '+JSON.stringify(assignedToNewShop));
+
+const newShopWorker = call(O, E, INTEGRATED_SHOP, 'integration-new-shop-worker-1');
+if (
+  newShopWorker.ok !== true ||
+  !newShopWorker.workerId ||
+  newShopWorker.workerId === created.workerId ||
+  newShopWorker.replayed !== false
+) throw new Error('New shop did not receive a distinct linked worker identity');
+const newShopWorkerReplay = call(O, E, INTEGRATED_SHOP, 'integration-new-shop-worker-1');
+if (
+  newShopWorkerReplay.ok !== true ||
+  newShopWorkerReplay.replayed !== true ||
+  newShopWorkerReplay.workerId !== newShopWorker.workerId
+) throw new Error('New shop worker provisioning is not idempotent');
+deny(call(O2, E, INTEGRATED_SHOP, 'foreign-integrated-worker-1'), 'shop_outside_business');
+
+const multiShopLinks = sql(
+  `select count(*)::text||','||
+    bool_and(w.pin_hash=e.pin_hash and w.pin_lookup_hash=e.pin_lookup_hash)::text
+    from public.employee_worker_links l
+    join public.workers w on w.id=l.worker_id and w.shop_id=l.shop_id
+    join public.business_employees e
+      on e.id=l.employee_id and e.business_id=l.business_id
+    where e.id='${E}' and l.shop_id in ('${S}','${INTEGRATED_SHOP}')`,
+  'canonical credential identity across two real isolated shop rows',
+);
+if (multiShopLinks !== '2,true') {
+  throw new Error('Cross-shop worker identity drift or duplicate link: '+multiShopLinks);
+}
+
+const copyForbiddenData = sql(
+  `select (select count(*) from public.orders where shop_id='${INTEGRATED_SHOP}')::text||
+    ','||(select count(*) from public.products where shop_id='${INTEGRATED_SHOP}')::text||
+    ','||(select count(*) from public.inventory_items
+           where shop_id='${INTEGRATED_SHOP}')::text`,
+  'new shop does not inherit historical orders/catalog/stock',
+);
+if (copyForbiddenData !== '0,0,0') {
+  throw new Error('New shop unexpectedly cloned source operational data: '+copyForbiddenData);
+}
+const newShopAudit = sql(
+  `select count(*) from public.admin_audit_events where business_id='${B}'
+    and shop_id='${INTEGRATED_SHOP}' and action_type in (
+      'SHOP_CREATED','EMPLOYEE_SHOP_ASSIGNED','OPERATIONS_WORKER_PROVISIONED')`,
+  'new-shop creation, staff assignment and worker provisioning audit chain',
+);
+if (newShopAudit !== '3') {
+  throw new Error('Cross-shop lifecycle audit events missing or duplicated: '+newShopAudit);
+}
+
 sql(
   "update public.shops set lifecycle_state='SUSPENDED', active=false, temporary_closed=true, online_orders_paused=true where id='" + S + "'",
   'suspended shop fixture',
