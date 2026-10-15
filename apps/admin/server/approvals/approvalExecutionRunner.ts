@@ -19,7 +19,7 @@ import { AdminSupabaseClient } from '../supabaseAdmin.js';
 import {
   createShopLifecycleApprovalExecutionEntries,
   type ApprovedShopLifecycleInput,
-  type ShopLifecycleApprovalResult,
+  type ApprovedShopLifecycleMutationResult,
 } from './shopLifecycleApproval.js';
 import {
   createApprovalExecutionRegistry,
@@ -147,7 +147,7 @@ export async function runProductionApprovalExecutionRunner(): Promise<ApprovalEx
     ),
     ...createShopLifecycleApprovalExecutionEntries({
       executeLifecycle(input: ApprovedShopLifecycleInput) {
-        return client.rpc<ShopLifecycleApprovalResult>(
+        return client.rpc<ApprovedShopLifecycleMutationResult>(
           'execute_approved_admin_shop_lifecycle_v1',
           {
             p_approval_request_id: input.approvalRequestId,
