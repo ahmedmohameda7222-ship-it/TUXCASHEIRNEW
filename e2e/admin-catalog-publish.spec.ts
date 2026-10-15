@@ -189,6 +189,44 @@ async function mockPublishing(
       });
       return;
     }
+    if (withCopy && body.type === 'catalog-copy.missing-preview') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          sourceShopId: copySourceShopId,
+          targetShopId: shopId,
+          targetDraftId: draftId,
+          expectedSourcePublishVersion: 17,
+          expectedTargetPublishVersion: 48,
+          expectedTargetDraftRevision: 2,
+          missingCategories: 1,
+          missingProducts: 0,
+          conflicts: 1,
+          allCategoriesAndProductsMapped: false,
+          categories: [
+            {
+              sourceCategoryId: '11111111-1111-4111-8111-111111111120',
+              sourceName: 'Weekend Sides',
+              masterCategoryId: '11111111-1111-4111-8111-111111111121',
+              targetCategoryId: null,
+              status: 'CREATE_REQUIRED',
+            },
+          ],
+          products: [
+            {
+              sourceProductId: '11111111-1111-4111-8111-111111111122',
+              sourceName: 'Milkshake',
+              masterProductId: '11111111-1111-4111-8111-111111111123',
+              targetProductId: null,
+              status: 'CONFLICT_NAME',
+            },
+          ],
+        }),
+      });
+      return;
+    }
     if (withCopy && body.type === 'catalog-copy.preview') {
       await route.fulfill({
         status: 200,
@@ -593,6 +631,31 @@ test('mobile Catalog Copy stages only selected product order through version-che
     expectedTargetDraftRevision: 2,
   });
   expect(typeof apply?.commandId).toBe('string');
+});
+
+test('mobile Catalog Copy previews missing identities without staging or publishing', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockPublishing(page, true);
+  await page.goto('/catalog/products/publishing');
+
+  await page.getByRole('button', { name: 'Inspect target master mappings' }).click();
+  await expect(page.getByText(/1 missing categories, 0 missing products/)).toBeVisible();
+  await expect(page.getByText(/1 mapping conflicts/)).toBeVisible();
+  await expect(page.getByText('Category: Weekend Sides — CREATE_REQUIRED')).toBeVisible();
+  await expect(page.getByText('Product: Milkshake — CONFLICT_NAME')).toBeVisible();
+  expect(commands).toEqual([
+    expect.objectContaining({
+      type: 'catalog-copy.missing-preview',
+      sourceShopId: copySourceShopId,
+      targetShopId: shopId,
+      targetDraftId: draftId,
+      expectedSourcePublishVersion: 17,
+      expectedTargetPublishVersion: 48,
+      expectedTargetDraftRevision: 2,
+    }),
+  ]);
 });
 
 test('Catalog Copy can create an authorized target draft before previewing', async ({ page }) => {
