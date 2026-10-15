@@ -460,9 +460,9 @@ export function SettingsPage() {
       </SettingsScheduleActionProvider>
       <ConfirmationDialog
         open={archiveConfirmOpen}
-        title={`Archive ${workspace.shop.name}?`}
-        description="If this shop has business or configuration history, it will be archived: new operational activity will be disabled and historical records will remain. If the shop has no recorded usage or configuration, it may be deleted instead."
-        confirmLabel="Archive shop"
+        title={`Delete unused shop ${workspace.shop.name}?`}
+        description="Only unused shops can be deleted here. To archive a used shop, use the approval-aware Archive shop control in Shop lifecycle."
+        confirmLabel="Delete unused shop"
         destructive
         pending={settings.deleteOrArchiveShop.isPending}
         onOpenChange={setArchiveConfirmOpen}
