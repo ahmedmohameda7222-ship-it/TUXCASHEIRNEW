@@ -17,6 +17,11 @@ import {
 } from '../staff/staffApproval.js';
 import { AdminSupabaseClient } from '../supabaseAdmin.js';
 import {
+  createOwnerWithdrawalApprovalExecutionEntries,
+  type ApprovedOwnerWithdrawalInput,
+  type OwnerWithdrawalMutationResult,
+} from './financeOwnerWithdrawalApproval.js';
+import {
   createFinanceSnapshotApprovalExecutionEntries,
   type ApprovedFinanceSnapshotExecutionInput,
   type ApprovedFinanceSnapshotMutationResult,
@@ -150,6 +155,25 @@ export async function runProductionApprovalExecutionRunner(): Promise<ApprovalEx
     ...createStaffApprovalExecutionEntries(
       createSupabaseStaffApprovalExecutionDependencies(client),
     ),
+    ...createOwnerWithdrawalApprovalExecutionEntries({
+      executeWithdrawal(input: ApprovedOwnerWithdrawalInput) {
+        return client.rpc<OwnerWithdrawalMutationResult>(
+          'execute_approved_admin_owner_withdrawal_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_account_id: input.accountId,
+            p_amount_minor: input.amountMinor,
+            p_reason: input.reason,
+            p_original_command_id: input.commandId,
+            p_approval_command_id: input.approvalCommandId,
+          },
+        );
+      },
+    }),
     ...createFinanceSnapshotApprovalExecutionEntries({
       executeAdjustment(input: ApprovedFinanceSnapshotExecutionInput) {
         return client.rpc<ApprovedFinanceSnapshotMutationResult>(
