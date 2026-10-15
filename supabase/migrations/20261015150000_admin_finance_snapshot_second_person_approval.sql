@@ -287,6 +287,10 @@ begin
    return jsonb_build_object('ok',false,
      'code','approval_finance_snapshot_not_claimed');
  end if;
+ -- Match the canonical direct command lock ordering before taking the Z row
+ -- lock; concurrent direct/approved retries for one command cannot deadlock.
+ perform pg_advisory_xact_lock(hashtextextended(
+   p_business_id::text||':finance-adjust:'||p_original_command_id,0));
  perform 1 from public.end_day_financial_snapshots z
    where z.id=p_snapshot_id and z.shop_id=p_shop_id
      and z.business_id=p_business_id for update;
