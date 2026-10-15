@@ -243,6 +243,41 @@ sql(`update public.catalog_drafts set working_bundle_json=${quoteJson(savedDraft
 sql(`insert into public.catalog_product_shop_overrides(
 business_id,master_product_id,shop_id,canonical_product_id,price_minor,visible,manual_sold_out
 ) values ('${B}','${MP}','${T}','${P2}',22000,true,false)`, 'restore mapping');
+
+sql(`delete from public.catalog_category_shop_bindings
+ where shop_id='${T}' and master_category_id='${MC}'`,
+ 'remove target category master binding in isolated dependency fixture');
+const missingCategoryDependency=rpc(
+ `public.preview_admin_catalog_missing_entities_v1(${missingEntityArgs()})`,
+ 'read-only missing category with mapped product dependency');
+if (!missingCategoryDependency.ok ||
+    missingCategoryDependency.categories[0]?.status !== 'CONFLICT_NAME' ||
+    missingCategoryDependency.products[0]?.status !== 'MISSING_TARGET_CATEGORY' ||
+    missingCategoryDependency.allCategoriesAndProductsMapped !== false) {
+ throw new Error('Mapped product hid missing target category dependency: '+
+  JSON.stringify(missingCategoryDependency));
+}
+const savedCategoryDraft=sql(`select working_bundle_json::text from public.catalog_drafts
+ where id='${draft.draftId}'`);
+sql(`update public.catalog_drafts set working_bundle_json=jsonb_set(
+ working_bundle_json,'{snapshot,categories}','[]'::jsonb
+) where id='${draft.draftId}'`, 'remove draft category for create-required preview');
+const bothCategoryAndProductMissing=rpc(
+ `public.preview_admin_catalog_missing_entities_v1(${missingEntityArgs()})`,
+ 'read-only category creation required while product master exists');
+if (!bothCategoryAndProductMissing.ok ||
+    bothCategoryAndProductMissing.missingCategories !== 1 ||
+    bothCategoryAndProductMissing.categories[0]?.status !== 'CREATE_REQUIRED' ||
+    bothCategoryAndProductMissing.products[0]?.status !== 'MISSING_TARGET_CATEGORY') {
+ throw new Error('Category creation prerequisite not exposed: '+
+  JSON.stringify(bothCategoryAndProductMissing));
+}
+sql(`update public.catalog_drafts set working_bundle_json=${quoteJson(savedCategoryDraft)}
+ where id='${draft.draftId}'`, 'restore target category draft');
+sql(`insert into public.catalog_category_shop_bindings(
+ business_id,master_category_id,shop_id,canonical_category_id)
+ values ('${B}','${MC}','${T}','${C2}')`, 'restore master category mapping');
+
 sql(`update public.shops set active=false,lifecycle_state='ARCHIVED' where id='${T}'`,
   'archive target in isolated fixture');
 assertDenied(rpc(`public.preview_admin_catalog_shop_copy_v1(${params()})`,'archived target'),
