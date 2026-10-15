@@ -3,7 +3,10 @@ import { createHash } from 'node:crypto';
 import type { AdminApprovalActor, AdminApprovalRule } from '@tux/admin-contracts';
 import { z } from 'zod';
 
-import { ApprovalTerminalCommandError, type ApprovalExecutionRegistryEntry } from './approvalExecutionService.js';
+import {
+  ApprovalTerminalCommandError,
+  type ApprovalExecutionRegistryEntry,
+} from './approvalExecutionService.js';
 import {
   createApprovalCommandRegistry,
   requestApproval,
@@ -54,7 +57,7 @@ function parsePayload(input: unknown): FinanceSnapshotApprovalPayload {
   return parsed.data;
 }
 
-export function createFinanceSnapshotApprovalCommandEntries(): readonly ApprovalCommandRegistryEntry[] {
+function financeSnapshotCommandEntries(): readonly ApprovalCommandRegistryEntry[] {
   return [
     {
       actionType: FINANCE_SNAPSHOT_APPROVAL_ACTION,
@@ -156,7 +159,13 @@ function stableApprovalCommandId(
       ]),
     )
     .digest('hex');
-  return `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-8${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
+  return [
+    digest.slice(0, 8),
+    digest.slice(8, 12),
+    `4${digest.slice(13, 16)}`,
+    `8${digest.slice(17, 20)}`,
+    digest.slice(20, 32),
+  ].join('-');
 }
 
 export async function executeOrRequestFinanceSnapshotAdjustment(
@@ -188,7 +197,7 @@ export async function executeOrRequestFinanceSnapshotAdjustment(
     },
     actor,
     deps,
-    createApprovalCommandRegistry(createFinanceSnapshotApprovalCommandEntries()),
+    createApprovalCommandRegistry(financeSnapshotCommandEntries()),
   );
   if (result['ok'] !== true) {
     return {
