@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const route = readFileSync(new URL('../../api/admin/catalog.ts', import.meta.url), 'utf8');
-const panel = readFileSync(new URL('../../src/catalog/CatalogCopyPanel.tsx', import.meta.url), 'utf8');
+const panel = readFileSync(
+  new URL('../../src/catalog/CatalogCopyPanel.tsx', import.meta.url),
+  'utf8',
+);
 
 describe('Catalog Copy entity identity preview boundary', () => {
   it('uses a strict authenticated and CSRF-protected Admin API path', () => {
