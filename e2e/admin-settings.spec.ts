@@ -33,7 +33,7 @@ async function mockSettings(
   authorizedShopIds: string[] = [shopId],
 ) {
   let settingsVersion = 7;
-  let shopLifecycleState: 'ACTIVE' | 'SUSPENDED' = 'ACTIVE';
+  let shopLifecycleState: 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED' = 'ACTIVE';
   let shopLifecycleRevision = 1;
   let orderType = {
     id: orderTypeId,
@@ -334,7 +334,20 @@ async function mockSettings(
         expectedLifecycleRevision: shopLifecycleRevision,
       });
       const newState = command.targetState;
-      expect(['ACTIVE', 'SUSPENDED']).toContain(newState);
+      expect(['ACTIVE', 'SUSPENDED', 'ARCHIVED']).toContain(newState);
+      // Browser requests must not archive the shop before the distinct approver acts.
+      if (newState === 'ARCHIVED') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            state: 'PENDING_APPROVAL',
+            approvalRequestId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          }),
+        });
+        return;
+      }
       shopLifecycleState = newState as 'ACTIVE' | 'SUSPENDED';
       shopLifecycleRevision += 1;
       await route.fulfill({
@@ -350,7 +363,7 @@ async function mockSettings(
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ ok: true, action: 'ARCHIVED' }),
+        body: JSON.stringify({ ok: true, action: 'DELETED' }),
       });
       return;
     }
@@ -675,19 +688,43 @@ test('shop lifecycle transitions are unavailable without shop management permiss
   await expect(page.getByRole('button', { name: 'Reactivate shop' })).toHaveCount(0);
 });
 
-test('confirms archive before routing shop lifecycle management through the trusted BFF', async ({
+test('requests second-person approval for used-shop archive without applying the state early', async ({
   page,
 }) => {
-  const { commands } = await mockSettings(page);
+  const { commands } = await mockSettings(page, ['settings.manage', 'shops.manage']);
 
   await page.goto('/settings/shop');
-  await page.getByRole('button', { name: 'Archive / delete unused shop' }).click();
+  await page.getByRole('button', { name: 'Archive shop' }).first().click();
   const confirmation = page.getByRole('dialog', { name: 'Archive TUX Maadi?' });
   await expect(confirmation).toBeVisible();
-  await expect(confirmation).toContainText('historical records will remain');
+  await expect(confirmation).toContainText('distinct authorized approver');
   await confirmation.getByRole('button', { name: 'Archive shop' }).click();
 
-  await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toEqual({
+    type: 'shop.lifecycle.update',
+    shopId,
+    expectedState: 'ACTIVE',
+    targetState: 'ARCHIVED',
+    expectedLifecycleRevision: 1,
+  });
+  await expect(page.getByRole('status')).toContainText('pending second-person approval');
+  await expect(page.getByRole('button', { name: 'Suspend shop' })).toBeVisible();
+});
+
+test('separately confirms deletion of an unused shop using the legacy trusted command', async ({
+  page,
+}) => {
+  const { commands } = await mockSettings(page, ['settings.manage', 'shops.manage']);
+
+  await page.goto('/settings/shop');
+  await page.getByRole('button', { name: 'Delete unused shop' }).click();
+  const confirmation = page.getByRole('dialog', { name: 'Delete unused shop TUX Maadi?' });
+  await expect(confirmation).toBeVisible();
+  await expect(confirmation).toContainText('Only unused shops can be deleted here');
+  await confirmation.getByRole('button', { name: 'Delete unused shop' }).click();
+
+  await expect.poll(() => commands.length).toBe(1);
   expect(commands[0]).toEqual({ type: 'shop.delete-or-archive', shopId });
 });
 
