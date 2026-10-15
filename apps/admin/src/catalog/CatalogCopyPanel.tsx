@@ -103,6 +103,7 @@ type MissingEntityPreview = {
   expectedSourcePublishVersion: number;
   expectedTargetPublishVersion: number;
   expectedTargetDraftRevision: number;
+  creationFingerprint: string;
   missingCategories: number;
   missingProducts: number;
   conflicts: number;
@@ -112,6 +113,7 @@ type MissingEntityPreview = {
     sourceName: string;
     targetCategoryId: string | null;
     masterCategoryId: string | null;
+    proposedTargetCategoryId: string | null;
     status: string;
   }>;
   products: Array<{
@@ -119,6 +121,8 @@ type MissingEntityPreview = {
     sourceName: string;
     targetProductId: string | null;
     masterProductId: string | null;
+    proposedTargetProductId: string | null;
+    proposedTargetCategoryId: string | null;
     status: string;
   }>;
 };
@@ -149,6 +153,9 @@ export function CatalogCopyPanel({
   const [domains, setDomains] = useState<Domain[]>(['productAvailability']);
   const [preview, setPreview] = useState<CopyPreview | null>(null);
   const [missingPreview, setMissingPreview] = useState<MissingEntityPreview | null>(null);
+  const [selectedMissingCategories, setSelectedMissingCategories] = useState<string[]>([]);
+  const [selectedMissingProducts, setSelectedMissingProducts] = useState<string[]>([]);
+  const [missingCreationCommandId, setMissingCreationCommandId] = useState('');
   const [commandId, setCommandId] = useState('');
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
@@ -175,6 +182,9 @@ export function CatalogCopyPanel({
 
   function reset() {
     setMissingPreview(null);
+    setSelectedMissingCategories([]);
+    setSelectedMissingProducts([]);
+    setMissingCreationCommandId('');
     setPreview(null);
     setCommandId('');
     setMessage('');
@@ -253,14 +263,75 @@ export function CatalogCopyPanel({
         result.expectedSourcePublishVersion !== source.currentPublishVersion ||
         result.expectedTargetPublishVersion !== targetPublishVersion ||
         result.expectedTargetDraftRevision !== draft.draftRevision ||
+        !/^[0-9a-f]{64}$/.test(result.creationFingerprint) ||
         !Array.isArray(result.categories) ||
         !Array.isArray(result.products)
       ) {
         throw new Error('Catalog entity mapping report could not be verified.');
       }
       setMissingPreview(result);
+      setMissingCreationCommandId(crypto.randomUUID());
     } catch (cause) {
       setError(catalogCopyErrorMessage(cause));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function toggleMissingEntity(kind: 'category' | 'product', id: string, checked: boolean) {
+    const change = (current: string[]) =>
+      checked ? [...current, id] : current.filter((item) => item !== id);
+    if (kind === 'category') {
+      setSelectedMissingCategories(change);
+    } else {
+      setSelectedMissingProducts(change);
+    }
+    setMissingCreationCommandId(crypto.randomUUID());
+  }
+
+  async function stageMissingEntities() {
+    if (
+      !draft ||
+      !currentMissingPreview ||
+      !missingCreationCommandId ||
+      pending ||
+      selectedMissingCategories.length + selectedMissingProducts.length === 0 ||
+      (selectedMissingProducts.length > 0 && !canPrice) ||
+      session.state.status !== 'authenticated'
+    ) {
+      return;
+    }
+    setPending(true);
+    setError('');
+    try {
+      const result = await adminFetch<{ ok: boolean; code?: string; draftRevision?: number }>(
+        '/api/admin/catalog',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'catalog-copy.stage-created-entities',
+            sourceShopId: activeSourceShopId,
+            targetShopId,
+            targetDraftId: draft.draftId,
+            expectedSourcePublishVersion: currentMissingPreview.expectedSourcePublishVersion,
+            expectedTargetPublishVersion: currentMissingPreview.expectedTargetPublishVersion,
+            expectedTargetDraftRevision: currentMissingPreview.expectedTargetDraftRevision,
+            selectedSourceCategoryIds: selectedMissingCategories,
+            selectedSourceProductIds: selectedMissingProducts,
+            creationFingerprint: currentMissingPreview.creationFingerprint,
+            commandId: missingCreationCommandId,
+          }),
+        },
+        session.state.session.csrfToken,
+      );
+      if (!result.ok || typeof result.draftRevision !== 'number') {
+        throw new Error(result.code ?? 'catalog_copy_creation_failed');
+      }
+      reset();
+      setMessage('New Catalog entities staged in target draft. Review and publish separately.');
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'catalog', targetShopId] });
+    } catch (cause) {
+      setError(`Creation not staged: ${catalogCopyErrorMessage(cause)}`);
     } finally {
       setPending(false);
     }
@@ -527,24 +598,78 @@ export function CatalogCopyPanel({
           <p>
             {currentMissingPreview.allCategoriesAndProductsMapped
               ? 'All source categories and products have mapped target-local identities.'
-              : 'Resolve missing master mappings or conflicting entities before staging. This report does not create or publish catalog records.'}
+              : 'Select only genuinely missing entities. The target draft is staged first; separate publication is required. Conflicts and unsupported modifiers, combos or recipes must be resolved explicitly.'}
           </p>
           <ul>
             {currentMissingPreview.categories
               .filter((category) => category.status !== 'MAPPED')
               .map((category) => (
                 <li key={category.sourceCategoryId}>
-                  Category: {category.sourceName} — {category.status}
+                  {category.status === 'CREATE_REQUIRED' &&
+                  category.proposedTargetCategoryId ? (
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={selectedMissingCategories.includes(category.sourceCategoryId)}
+                        disabled={pending}
+                        onChange={(event) =>
+                          toggleMissingEntity(
+                            'category',
+                            category.sourceCategoryId,
+                            event.currentTarget.checked,
+                          )
+                        }
+                      />
+                      Create Category: {category.sourceName}
+                    </label>
+                  ) : (
+                    <span>Category: {category.sourceName} — {category.status}</span>
+                  )}
                 </li>
               ))}
             {currentMissingPreview.products
               .filter((product) => product.status !== 'MAPPED')
               .map((product) => (
                 <li key={product.sourceProductId}>
-                  Product: {product.sourceName} — {product.status}
+                  {['CREATE_REQUIRED', 'MISSING_TARGET_CATEGORY'].includes(product.status) &&
+                  product.proposedTargetProductId ? (
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={selectedMissingProducts.includes(product.sourceProductId)}
+                        disabled={pending || !canPrice}
+                        onChange={(event) =>
+                          toggleMissingEntity(
+                            'product',
+                            product.sourceProductId,
+                            event.currentTarget.checked,
+                          )
+                        }
+                      />
+                      Create Product: {product.sourceName}
+                      {product.status === 'MISSING_TARGET_CATEGORY'
+                        ? ' (requires selecting its Category)'
+                        : ''}
+                    </label>
+                  ) : (
+                    <span>Product: {product.sourceName} — {product.status}</span>
+                  )}
                 </li>
               ))}
           </ul>
+          <button
+            type="button"
+            className="admin-secondary-button"
+            disabled={
+              pending ||
+              !missingCreationCommandId ||
+              selectedMissingCategories.length + selectedMissingProducts.length === 0 ||
+              (selectedMissingProducts.length > 0 && !canPrice)
+            }
+            onClick={() => void stageMissingEntities()}
+          >
+            {pending ? 'Staging…' : 'Stage selected new entities in target draft'}
+          </button>
         </section>
       ) : null}
       {error ? <p role="alert">{error}</p> : null}
