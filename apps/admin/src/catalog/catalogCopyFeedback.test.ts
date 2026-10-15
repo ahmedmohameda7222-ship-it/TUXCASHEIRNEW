@@ -20,9 +20,7 @@ describe('Catalog Copy actionable server error handling', () => {
   });
 
   it('preserves other known server response codes and has a safe unknown fallback', () => {
-    expect(catalogCopyErrorMessage(new Error('permission_forbidden'))).toBe(
-      'permission_forbidden',
-    );
+    expect(catalogCopyErrorMessage(new Error('permission_forbidden'))).toBe('permission_forbidden');
     expect(catalogCopyErrorMessage(null)).toBe('Catalog copy failed.');
   });
 });
