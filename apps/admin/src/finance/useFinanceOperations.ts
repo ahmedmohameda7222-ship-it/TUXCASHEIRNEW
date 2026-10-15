@@ -197,7 +197,8 @@ export function useFinanceOperations(
             body: JSON.stringify({
               ...draft,
               commandId,
-              ...(draft.type === 'finance.snapshot.adjust' && reauthPin !== undefined
+              ...((draft.type === 'finance.snapshot.adjust' ||
+                draft.type === 'finance.owner-withdrawal') && reauthPin !== undefined
                 ? { requesterPin: reauthPin }
                 : {}),
             }),
