@@ -243,7 +243,9 @@ test('cashier variance approval remains pending without falsely posting a count'
   await dialog.getByLabel('Variance reason, if different').fill('Verified drawer difference');
   await dialog.getByLabel('Requester PIN (if approval requires reauthentication)').fill('1234');
   await dialog.getByRole('button', { name: 'Record count' }).click();
-  await expect(dialog.getByRole('status')).toContainText('pending second-person approval');
+  await expect(
+    dialog.getByRole('status').filter({ hasText: 'pending second-person approval' }),
+  ).toBeVisible();
   await expect(
     dialog.getByRole('button', { name: 'Pending second-person approval' }),
   ).toBeDisabled();
