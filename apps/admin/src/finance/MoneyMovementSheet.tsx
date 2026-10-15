@@ -99,6 +99,7 @@ export function MoneyMovementSheet({
       onOpenChange={(next) => {
         if (!next) {
           setPin('');
+          setApprovalPending(false);
           onClose();
         }
       }}
@@ -111,7 +112,10 @@ export function MoneyMovementSheet({
             type="button"
             className="admin-secondary-button"
             disabled={operations.command.isPending}
-            onClick={onClose}
+            onClick={() => {
+              setApprovalPending(false);
+              onClose();
+            }}
           >
             Cancel
           </button>
