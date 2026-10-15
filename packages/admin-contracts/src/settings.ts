@@ -206,7 +206,7 @@ export type SettingWriteInput = {
 export type ShopLifecycleUpdateInput = {
   shopId: string;
   expectedState: 'ACTIVE' | 'SUSPENDED';
-  targetState: 'ACTIVE' | 'SUSPENDED';
+  targetState: 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
   expectedLifecycleRevision: number;
   requesterPin?: string;
 };
