@@ -17,6 +17,11 @@ import {
 } from '../staff/staffApproval.js';
 import { AdminSupabaseClient } from '../supabaseAdmin.js';
 import {
+  createShopLifecycleApprovalExecutionEntries,
+  type ApprovedShopLifecycleInput,
+  type ShopLifecycleApprovalResult,
+} from './shopLifecycleApproval.js';
+import {
   createApprovalExecutionRegistry,
   createApprovalExecutionService,
   createSupabaseApprovalExecutionDependencies,
@@ -140,6 +145,24 @@ export async function runProductionApprovalExecutionRunner(): Promise<ApprovalEx
     ...createStaffApprovalExecutionEntries(
       createSupabaseStaffApprovalExecutionDependencies(client),
     ),
+    ...createShopLifecycleApprovalExecutionEntries({
+      executeLifecycle(input: ApprovedShopLifecycleInput) {
+        return client.rpc<ShopLifecycleApprovalResult>(
+          'execute_approved_admin_shop_lifecycle_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_expected_lifecycle_revision: input.expectedLifecycleRevision,
+            p_expected_state: input.expectedState,
+            p_target_state: input.targetState,
+            p_command_id: input.originalCommandId,
+          },
+        );
+      },
+    }),
   ]);
   const service = createApprovalExecutionService({
     ...persistence,
