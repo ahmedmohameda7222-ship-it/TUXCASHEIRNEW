@@ -1,14 +1,14 @@
 import type { AdminApprovalActor, AdminApprovalRule } from '@tux/admin-contracts';
 import { describe, expect, it, vi } from 'vitest';
 
+import { ApprovalTerminalCommandError } from './approvalExecutionService';
+import { APPROVAL_RULE_ACTIONS } from './approvalRuleActions';
 import {
   createShopLifecycleApprovalExecutionEntries,
   evaluateShopLifecycleApprovalRouting,
   executeOrRequestShopLifecycle,
   SHOP_LIFECYCLE_APPROVAL_ACTION,
 } from './shopLifecycleApproval';
-import { ApprovalTerminalCommandError } from './approvalExecutionService';
-import { APPROVAL_RULE_ACTIONS } from './approvalRuleActions';
 
 const actor: AdminApprovalActor = {
   employeeId: 'a0000000-0000-4000-8000-000000000001',
@@ -89,7 +89,14 @@ describe('Shop lifecycle approval: supported executable action', () => {
       now: () => new Date('2026-10-15T07:00:00Z'),
     };
     const direct = vi.fn(async () => ({ ok: true as const, lifecycleRevision: 5 }));
-    const outcome = await executeOrRequestShopLifecycle(payload, actor, [rule], deps, undefined, direct);
+    const outcome = await executeOrRequestShopLifecycle(
+      payload,
+      actor,
+      [rule],
+      deps,
+      undefined,
+      direct,
+    );
     expect(outcome).toMatchObject({
       ok: true,
       state: 'PENDING_APPROVAL',
@@ -114,7 +121,11 @@ describe('Shop lifecycle approval: supported executable action', () => {
       decideRequest: vi.fn(async () => ({ ok: false as const, code: 'unused' })),
       createRequest: vi.fn(async (input) => {
         commands.push(input.commandId);
-        return { ok: true, requestId: 'f0000000-0000-4000-8000-000000000001', status: 'PENDING' as const };
+        return {
+          ok: true,
+          requestId: 'f0000000-0000-4000-8000-000000000001',
+          status: 'PENDING' as const,
+        };
       }),
       now: () => new Date('2026-10-15T07:00:00Z'),
     };
@@ -155,7 +166,9 @@ describe('Shop lifecycle approval: supported executable action', () => {
       attemptCount: 1,
       leaseExpiresAt: '2026-10-15T08:00:00Z',
     };
-    await expect(entry!.execute({ payload, claim, commandId: claim.commandId })).resolves.toMatchObject({
+    await expect(
+      entry!.execute({ payload, claim, commandId: claim.commandId }),
+    ).resolves.toMatchObject({
       result: { lifecycleRevision: 5 },
       idempotentReplay: false,
     });
