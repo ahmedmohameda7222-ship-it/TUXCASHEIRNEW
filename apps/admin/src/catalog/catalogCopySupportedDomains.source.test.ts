@@ -15,4 +15,9 @@ describe('Catalog Copy supported-domain disclosure', () => {
     expect(panel).toContain('Missing target categories or products are not yet copied.');
     expect(panel).toContain('Historical sales and inventory balances are never copied.');
   });
+  it('renders a contextual error when preview or apply fails because dependencies are missing', () => {
+    const panel = readFileSync(new URL('./CatalogCopyPanel.tsx', import.meta.url), 'utf8');
+
+    expect(panel).toContain('catalogCopyErrorMessage(cause)');
+  });
 });
