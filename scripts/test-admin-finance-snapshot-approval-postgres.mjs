@@ -62,8 +62,8 @@ sql(`
  insert into public.business_shops(business_id,shop_id)
  values ('${B}','${S}');
  insert into public.business_employees(id,business_id,display_name,role,active)
- values ('${E}','Owner finance requester','OWNER',true),
-        ('${A}','Owner finance reviewer','OWNER',true);
+ values ('${E}','${B}','Owner finance requester','OWNER',true),
+        ('${A}','${B}','Owner finance reviewer','OWNER',true);
  insert into public.employee_shop_assignments(business_id,employee_id,shop_id)
  values ('${B}','${E}','${S}'),('${B}','${A}','${S}');
  insert into public.workers(id,shop_id,display_name,pin_hash,active)
