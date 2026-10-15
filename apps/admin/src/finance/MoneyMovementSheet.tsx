@@ -147,7 +147,15 @@ export function MoneyMovementSheet({
           {action === 'OWNER_WITHDRAWAL' || action === 'OWNER_CONTRIBUTION'
             ? 'Account'
             : 'From account'}
-          <select value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)}>
+          <select
+            aria-label={
+              action === 'OWNER_WITHDRAWAL' || action === 'OWNER_CONTRIBUTION'
+                ? 'Account'
+                : 'From account'
+            }
+            value={fromAccountId}
+            onChange={(e) => setFromAccountId(e.target.value)}
+          >
             <option value="">Choose an account</option>
             {active
               .filter((account) => action !== 'BANK_DEPOSIT' || account.accountType === 'CASH')
