@@ -145,8 +145,7 @@ begin
     p_reason,null,null,'{}'::jsonb);
   return jsonb_build_object('ok',true,'replayed',false,'adjustmentId',v_id);
 end;
-$function$
-
+$function$;
 
 create or replace function public.preview_admin_finance_snapshot_adjustment_v1(
  p_actor_employee_id uuid,p_shop_id uuid,p_snapshot_id uuid,
