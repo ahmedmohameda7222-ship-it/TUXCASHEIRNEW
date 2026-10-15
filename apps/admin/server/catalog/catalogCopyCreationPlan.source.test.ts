@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const sql = readFileSync(
   new URL(
-    '../../../../supabase/migrations/20261015025923_admin_catalog_copy_missing_category_dependency.sql',
+    '../../../../supabase/migrations/20261015070000_admin_catalog_copy_creation_proposal.sql',
     import.meta.url,
   ),
   'utf8',
@@ -22,6 +22,6 @@ describe('Catalog Copy explicit missing-entity creation proposal', () => {
     expect(sql).toContain('p_source_publish_version');
     expect(sql).toContain('p_target_publish_version');
     expect(sql).toContain('p_target_draft_revision');
-    expect(sql).toContain('catalog_copy_missing_target_dependencies');
+    expect(sql).toContain('missing_target_category');
   });
 });
