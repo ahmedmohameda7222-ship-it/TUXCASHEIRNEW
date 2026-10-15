@@ -36,6 +36,10 @@ declare
   v_effect_amount bigint;
   v_effect_account uuid;
   v_payment_effect text;
+  v_rule public.admin_approval_rules%rowtype;
+  v_minimum numeric;
+  v_approval_context uuid;
+  v_original_payload jsonb;
 begin
   if p_action not in ('TRANSFER','BANK_DEPOSIT','OWNER_CONTRIBUTION',
                       'OWNER_WITHDRAWAL','EXPENSE','SETTLEMENT')
