@@ -6,6 +6,7 @@ import type {
 } from '@tux/admin-contracts';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
+import { ConfirmationDialog } from '../components/overlay/AdminDialog';
 import { SettingsSchedulePanel } from './SettingsSchedulePanel';
 import type {
   ShopIdentityUpdateDraft,
@@ -511,6 +512,7 @@ export function ShopsPage({
 }) {
   const shop = workspace.shop;
   const [lifecyclePin, setLifecyclePin] = useState('');
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const [identity, setIdentity] = useState<IdentityForm>({
     name: shop.name,
     address: shop.address ?? '',
@@ -665,6 +667,35 @@ export function ShopsPage({
           >
             {shop.lifecycleState === 'ACTIVE' ? 'Suspend shop' : 'Reactivate shop'}
           </button>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={busy || lifecycleUpdating}
+            onClick={() => setArchiveConfirmOpen(true)}
+          >
+            Archive shop
+          </button>
+          <ConfirmationDialog
+            open={archiveConfirmOpen}
+            title={`Archive ${shop.name}?`}
+            description="This closes the shop to new operations and preserves its history. A configured approval rule requires a distinct authorized approver."
+            confirmLabel="Archive shop"
+            destructive
+            pending={lifecycleUpdating}
+            onOpenChange={setArchiveConfirmOpen}
+            onConfirm={async () => {
+              if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined) return;
+              const requesterPin = lifecyclePin.trim();
+              setLifecyclePin('');
+              await onUpdateLifecycle({
+                expectedState: shop.lifecycleState,
+                targetState: 'ARCHIVED',
+                expectedLifecycleRevision: shop.lifecycleRevision,
+                ...(requesterPin === '' ? {} : { requesterPin }),
+              });
+              setArchiveConfirmOpen(false);
+            }}
+          />
         </div>
       ) : null}
 
@@ -972,8 +1003,8 @@ export function ShopsPage({
       {onDeleteOrArchive ? (
         <div className="admin-settings-danger-zone">
           <div>
-            <strong>Archive shop</strong>
-            <span>Used shops are archived instead of deleting historical authority.</span>
+            <strong>Delete unused shop</strong>
+            <span>Used shops must be archived through the approval-aware lifecycle control above.</span>
           </div>
           <button
             className="admin-secondary-button"
@@ -981,7 +1012,7 @@ export function ShopsPage({
             disabled={busy}
             onClick={onDeleteOrArchive}
           >
-            Archive / delete unused shop
+            Delete unused shop
           </button>
         </div>
       ) : null}
