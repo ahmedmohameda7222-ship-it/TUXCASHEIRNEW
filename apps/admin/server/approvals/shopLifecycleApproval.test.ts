@@ -1,6 +1,8 @@
 import type { AdminApprovalActor, AdminApprovalRule } from '@tux/admin-contracts';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { ApprovalServiceDependencies } from './approvalService';
+
 import { ApprovalTerminalCommandError } from './approvalExecutionService';
 import { APPROVAL_RULE_ACTIONS } from './approvalRuleActions';
 import {
@@ -48,7 +50,7 @@ describe('Shop lifecycle approval: supported executable action', () => {
     });
   });
 
-  it('resolves shop rules ahead of business defaults and fails closed on malformed thresholds', () => {
+  it('prefers shop rules and rejects malformed thresholds', () => {
     const defaultRule = { ...rule, id: 'business-rule', shopId: null };
     expect(evaluateShopLifecycleApprovalRouting(payload, actor, [])).toEqual({ kind: 'DIRECT' });
     expect(evaluateShopLifecycleApprovalRouting(payload, actor, [defaultRule])).toEqual({
@@ -64,17 +66,16 @@ describe('Shop lifecycle approval: supported executable action', () => {
         { ...rule, thresholdContext: { minimumMinor: 500 } },
       ]),
     ).toEqual({ kind: 'INVALID', code: 'approval_shop_lifecycle_rule_invalid' });
-    expect(
-      evaluateShopLifecycleApprovalRouting(
-        { ...payload, targetState: 'ACTIVE' },
-        actor,
-        [rule],
-      ),
-    ).toEqual({ kind: 'INVALID', code: 'invalid_lifecycle_transition' });
+    const invalid = evaluateShopLifecycleApprovalRouting(
+      { ...payload, targetState: 'ACTIVE' },
+      actor,
+      [rule],
+    );
+    expect(invalid).toEqual({ kind: 'INVALID', code: 'invalid_lifecycle_transition' });
   });
 
-  it('serializes exact CAS payload to approval request but never calls the direct mutation', async () => {
-    const createRequest = vi.fn(async (input) => ({
+  it('persists exact CAS payload without mutating the shop', async () => {
+    const createRequest = vi.fn(async (input: Parameters<ApprovalServiceDependencies['createRequest']>[0]) => ({
       ok: true,
       requestId: 'f0000000-0000-4000-8000-000000000001',
       status: 'PENDING' as const,
@@ -119,7 +120,7 @@ describe('Shop lifecycle approval: supported executable action', () => {
       loadRule: vi.fn(async () => rule),
       verifyEmployeePin: vi.fn(async () => true),
       decideRequest: vi.fn(async () => ({ ok: false as const, code: 'unused' })),
-      createRequest: vi.fn(async (input) => {
+      createRequest: vi.fn(async (input: Parameters<ApprovalServiceDependencies['createRequest']>[0]) => {
         commands.push(input.commandId);
         return {
           ok: true,
@@ -145,7 +146,7 @@ describe('Shop lifecycle approval: supported executable action', () => {
     expect(direct).not.toHaveBeenCalled();
   });
 
-  it('runner rejects foreign shop claims and forwards exact authorized claim identities', async () => {
+  it('runner rejects foreign claims and forwards execution identity', async () => {
     const executeLifecycle = vi.fn(async () => ({
       ok: true as const,
       lifecycleRevision: 5,
