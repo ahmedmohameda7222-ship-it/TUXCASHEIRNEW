@@ -106,7 +106,7 @@ const exec=(approver=A,amount=500)=>`public.execute_approved_admin_owner_withdra
  '${req.requestId}'::uuid,'${B}'::uuid,'${S}'::uuid,
  '${E}'::uuid,'${approver}'::uuid,'${F}'::uuid,
  ${amount},'Owner draw','${CMD}','${ACMD}'::uuid)`;
-denied(rpc(exec(E),'self approval denial'),'approval_owner_withdrawal_payload_or_state_mismatch');
+denied(rpc(exec(E),'self approval denial'),'invalid_approved_owner_withdrawal');
 denied(rpc(exec(A,600),'tampered approved amount'),'approval_owner_withdrawal_payload_or_state_mismatch');
 const executed=rpc(exec(),'approved owner withdrawal');
 if(!executed.ok||executed.commandId!==CMD)throw new Error('Approved owner withdrawal did not post');
