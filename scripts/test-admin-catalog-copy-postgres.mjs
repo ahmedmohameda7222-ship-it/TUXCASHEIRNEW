@@ -138,6 +138,27 @@ insert into public.admin_employee_permissions(business_id,employee_id,permission
 values ('${B}','${EDITOR}','catalog.view','ALLOW'),
        ('${B}','${EDITOR}','catalog.edit','ALLOW'),
        ('${B}','${EDITOR}','catalog.pricing','DENY');`, 'scoped catalog manager');
+// The diagnostic is independently authorized and does not require pricing rights.
+const scopedMissingArgs=missingEntityArgs().replace(
+  `'${OWNER}'::uuid`,`'${EDITOR}'::uuid`
+);
+const scopedMissingReport=rpc(
+  `public.preview_admin_catalog_missing_entities_v1(${scopedMissingArgs})`,
+  'scoped manager read-only missing-entity preview'
+);
+if(!scopedMissingReport.ok || scopedMissingReport.products[0]?.status!=='MAPPED')
+  throw new Error('Scoped manager could not preview the canonical identity mapping');
+
+let otherBusinessDenied=false;
+try {
+  rpc(`public.preview_admin_catalog_missing_entities_v1(
+    '${OTHER}'::uuid,'${S}'::uuid,'${T}'::uuid,'${draft.draftId}'::uuid,
+    1::bigint,1::bigint,1::bigint)`, 'foreign business missing-entity preview');
+} catch(error) {
+  otherBusinessDenied=/FORBIDDEN|BUSINESS_MISMATCH/.test(String(error));
+}
+if(!otherBusinessDenied) throw new Error('Foreign business could inspect catalog mapping');
+
 const scopedArgs=(domains)=>params(S,T,1,1,domains).replace(
   `'${OWNER}'::uuid`,`'${EDITOR}'::uuid`
 );
