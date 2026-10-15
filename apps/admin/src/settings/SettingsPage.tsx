@@ -51,6 +51,7 @@ export type SettingsWorkspaceViewProps = {
   canManageShopLifecycle?: boolean;
   onUpdateShopLifecycle?: (draft: ShopLifecycleUpdateDraft) => void | Promise<void>;
   shopLifecycleUpdating?: boolean;
+  shopLifecycleApprovalPending?: boolean;
   canManageBusinessDefaults?: boolean;
   canManagePaymentZones?: boolean;
   onUpdateBusinessDefault?: (draft: SettingOverrideUpdateDraft) => void | Promise<void>;
@@ -213,6 +214,7 @@ function SectionContent(
             canManageLifecycle={canManageShopLifecycle === true}
             onUpdateLifecycle={onUpdateShopLifecycle}
             lifecycleUpdating={shopLifecycleUpdating === true}
+            lifecycleApprovalPending={shopLifecycleApprovalPending === true}
             onUpdateOperationalState={(draft) => void onUpdateOperationalState(draft)}
             onUpdateIdentity={onUpdateShopIdentity}
             onUpsertWeeklyHours={onUpsertWeeklyHours}
@@ -410,7 +412,14 @@ export function SettingsPage() {
             (principal.role === 'OWNER' || principal.role === 'ADMIN') &&
             principal.permissions.includes('shops.manage')
           }
-          onUpdateShopLifecycle={(draft) => settings.updateShopLifecycle.mutateAsync(draft)}
+          onUpdateShopLifecycle={(draft) =>
+            settings.updateShopLifecycle.mutateAsync(draft).then(() => {})
+          }
+          shopLifecycleApprovalPending={
+            settings.updateShopLifecycle.data?.ok === true &&
+            'state' in settings.updateShopLifecycle.data &&
+            settings.updateShopLifecycle.data.state === 'PENDING_APPROVAL'
+          }
           shopLifecycleUpdating={settings.updateShopLifecycle.isPending}
           canManageBusinessDefaults={canManageBusinessDefaults}
           canManagePaymentZones={principal.permissions.includes('settings.manage')}
