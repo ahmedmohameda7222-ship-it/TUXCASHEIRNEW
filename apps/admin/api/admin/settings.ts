@@ -10,6 +10,7 @@ import {
   requireSessionCsrf,
 } from '../../server/adminAuthService.js';
 import { AdminAuthorizationError } from '../../server/authorization.js';
+import { executeShopLifecycleSettingsCommand } from '../../server/settings/shopLifecycleApprovalRoute.js';
 import { getAdminServerEnv } from '../../server/env.js';
 import {
   firstHeader,
@@ -28,7 +29,6 @@ import {
 } from '../../server/settings/settingsService.js';
 import {
   updateShopIdentity,
-  updateShopLifecycle,
   upsertShopSpecialHours,
   upsertShopWeeklyHours,
 } from '../../server/settings/settingsShopManagement.js';
@@ -179,6 +179,7 @@ export const settingsCommandSchema = z.union([
       expectedState: z.enum(['ACTIVE', 'SUSPENDED']),
       targetState: z.enum(['ACTIVE', 'SUSPENDED']),
       expectedLifecycleRevision: expectedEditVersionSchema,
+      requesterPin: z.string().min(1).max(64).optional(),
     })
     .strict()
     .refine((input) => input.expectedState !== input.targetState),
@@ -466,9 +467,16 @@ export default async function handler(
           ...(await updateShopOperationalState(client, command, principal)),
         });
         return;
-      case 'shop.lifecycle.update':
-        sendJson(response, 200, { ...(await updateShopLifecycle(client, command, principal)) });
+      case 'shop.lifecycle.update': {
+        // loadPrincipal already validated session CSRF for this POST.
+        const sessionToken = readAdminSessionToken(firstHeader(request.headers.cookie));
+        if (!sessionToken) throw new AdminAuthError('session_required', 401);
+        const context = await loadAdminSession(sessionToken, client);
+        sendJson(response, 200, {
+          ...(await executeShopLifecycleSettingsCommand(client, context, command, request)),
+        });
         return;
+      }
       case 'shop.identity.update':
         sendJson(response, 200, { ...(await updateShopIdentity(client, command, principal)) });
         return;
