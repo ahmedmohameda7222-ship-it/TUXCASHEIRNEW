@@ -40,7 +40,7 @@ create function auth.uid() returns uuid language sql stable as $do$
 const migrations = readdirSync(resolve('supabase/migrations'))
   .filter((x) => /^\d+_.+\.sql$/.test(x))
   .sort();
-const target = '20261015085527_admin_shop_lifecycle_open_request_lock.sql';
+const target = '20261016020000_admin_shop_archive_lifecycle_approval.sql';
 const index = migrations.indexOf(target);
 if (index < 0) throw new Error('Missing expected shop lifecycle approval SQL migration');
 for (const name of migrations.slice(0, index + 1)) {
@@ -216,4 +216,58 @@ for (const role of ['anon', 'authenticated']) {
     throw new Error('Direct untrusted execution grant: ' + role);
   }
 }
-console.log('Shop lifecycle approval PostgreSQL: direct guard, second approver, payload, CAS, replay, audit and permissions passed.');
+// Archive uses the same CAS-fenced, second-person shop lifecycle command.
+const CMD3 = '95555555-5555-4555-8555-555555555557';
+const archivePayload = {
+  shopId: S, expectedLifecycleRevision: 3,
+  expectedState: 'ACTIVE', targetState: 'ARCHIVED',
+};
+deny(rpc(direct(3,'ACTIVE','ARCHIVED'), 'archive direct bypass'),
+  'shop_lifecycle_approval_required');
+const archiveRequest = rpc(`public.create_admin_approval_request_v1(
+ '${B}'::uuid,'${S}'::uuid,'${E}'::uuid,null,'${RULE}'::uuid,
+ 'SHOP_LIFECYCLE_CHANGE','${CMD3}'::uuid,'${JSON.stringify(archivePayload)}'::jsonb,
+ 'Archive used shop')`, 'create versioned archive request');
+if (!archiveRequest.ok) throw new Error('Archive approval was not persisted');
+sql(`update public.admin_approval_rules set active=false where id='${RULE}'`,
+ 'disable rule with archive pending');
+deny(rpc(direct(3,'ACTIVE','ARCHIVED'), 'archive despite pending approval'),
+ 'shop_lifecycle_approval_required');
+deny(rpc(direct(3,'ACTIVE','SUSPENDED'), 'altered intent after policy disable'),
+ 'shop_lifecycle_approval_required');
+deny(rpc(`public.delete_or_archive_shop_v1('${E}'::uuid,'${S}'::uuid)`,
+ 'legacy archive bypass'), 'shop_lifecycle_approval_required');
+if (sql(`select lifecycle_state||','||lifecycle_revision::text from public.shops
+ where id='${S}'`) !== 'ACTIVE,3') throw new Error('Shop mutated before archive approval');
+sql(`update public.admin_approval_rules set active=true where id='${RULE}'`,
+ 'restore rule before archive decision');
+const archiveDecision = rpc(`public.decide_admin_approval_request_v1(
+ '${archiveRequest.requestId}'::uuid,'${A}'::uuid,null,'APPROVE','Archive allowed')`,
+ 'archive distinct-person decision');
+if (!archiveDecision.ok) throw new Error('Second-person archive decision failed');
+const archiveClaims = JSON.parse(sql(`select coalesce(jsonb_agg(to_jsonb(c)),'[]'::jsonb)::text
+ from public.claim_admin_approval_execution_v1('archive-test',now(),10,300) c`));
+const archiveClaim = archiveClaims.find(x => x.approval_request_id === archiveRequest.requestId);
+if (!archiveClaim?.claim_token) throw new Error('Approved archive was not claimed');
+const archiveExecute = `public.execute_approved_admin_shop_lifecycle_v1(
+ '${archiveRequest.requestId}'::uuid,'${B}'::uuid,'${S}'::uuid,'${E}'::uuid,
+ '${A}'::uuid,3,'ACTIVE','ARCHIVED','${CMD3}'::uuid)`;
+const archiveResult = rpc(archiveExecute, 'execute approved archive');
+if (!archiveResult.ok || archiveResult.lifecycleRevision !== 4) {
+ throw new Error('Approved archive failed: ' + JSON.stringify(archiveResult));
+}
+const archiveReplay = rpc(archiveExecute, 'replay approved archive');
+if (!archiveReplay.ok || archiveReplay.idempotentReplay !== true ||
+ archiveReplay.lifecycleRevision !== 4) throw new Error('Archive replay broke exactly-once execution');
+if (sql(`select lifecycle_state||','||lifecycle_revision::text||','||active::text||','||
+ temporary_closed::text||','||online_orders_paused::text from public.shops
+ where id='${S}'`) !== 'ARCHIVED,4,false,true,true') {
+ throw new Error('Archive did not safely close operational intake');
+}
+if (sql(`select count(*) from private.admin_shop_lifecycle_approval_receipts
+ where shop_id='${S}'`) !== '2') throw new Error('Archive receipt not exactly once');
+if (sql(`select count(*) from public.admin_audit_events
+ where shop_id='${S}' and action_type='SHOP_LIFECYCLE_APPROVED_APPLIED'`) !== '2') {
+ throw new Error('Archive approval audit not exactly once');
+}
+console.log('Shop lifecycle approval PostgreSQL: suspension, archive, pending command lock, CAS, replay and audit passed.');
