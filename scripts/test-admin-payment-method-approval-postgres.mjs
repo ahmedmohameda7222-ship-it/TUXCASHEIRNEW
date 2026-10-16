@@ -37,7 +37,7 @@ create function auth.uid() returns uuid language sql stable as $do$
  select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $do$;`, 'isolated fixture');
 const migrations = readdirSync(resolve('supabase/migrations'))
   .filter((x) => /^\d+_.+\.sql$/.test(x)).sort();
-const target = '20261016015709_admin_payment_method_update_approval.sql';
+const target = '20261016032000_admin_payment_zone_second_person_approval.sql';
 const index = migrations.indexOf(target);
 if (index < 0) throw new Error('Missing payment approval migration');
 for (const name of migrations.slice(0, index + 1)) {
@@ -139,3 +139,72 @@ for (const role of ['anon','authenticated']) {
   'EXECUTE')`)!=='f') throw new Error('Unsafe SQL privilege for '+role);
 }
 console.log('Payment method approval: policy/direct fence, pending disable lock, distinct approver, exact CAS, once-only receipt and audit passed.');
+
+const Z = '97777777-7777-4777-8777-777777777777';
+const ZR = '94444444-4444-4444-8444-444444444445';
+const ZC = '95555555-5555-4555-8555-555555555556';
+sql(`insert into public.delivery_zones(id,shop_id,name,fee_minor,active,sort_order)
+values ('${Z}','${S}','Test zone',100,true,0);
+insert into public.admin_approval_rules(
+id,business_id,shop_id,action_type,requester_permission,approver_permission,
+requires_second_person,threshold_context,active)
+values ('${ZR}','${B}',null,'SETTINGS_PAYMENT_ZONE_CHANGE',
+'settings.manage','approvals.review',true,'{}'::jsonb,true)`, 'zone policy fixture');
+const zone = {
+  shopId:S,paymentMethodId:PM,deliveryZoneId:Z,
+  allowed:false,expectedAllowed:null,expectedSettingsVersion:0,
+};
+const directZone = (allowed = false) => `public.upsert_admin_payment_zone_rule_v1(
+  '${E}'::uuid,'${S}'::uuid,'${PM}'::uuid,'${Z}'::uuid,${allowed},null,0)`;
+deny(rpc(directZone(),'zone approval direct denial'),'payment_zone_approval_required');
+const zoneCreated=rpc(`public.create_admin_approval_request_v1(
+'${B}'::uuid,'${S}'::uuid,'${E}'::uuid,null,'${ZR}'::uuid,
+'SETTINGS_PAYMENT_ZONE_CHANGE','${ZC}'::uuid,
+'${JSON.stringify(zone)}'::jsonb,'Zone restriction')`,'zone approval request');
+if(!zoneCreated.ok||!zoneCreated.requestId)throw Error('Cannot create zone request');
+sql(`update public.admin_approval_rules set active=false where id='${ZR}'`);
+deny(rpc(directZone(),'zone pending rule-off bypass'),'payment_zone_approval_required');
+deny(rpc(directZone(true),'zone changed value pending bypass'),'payment_zone_approval_required');
+if(sql(`select count(*) from public.payment_method_zone_rules
+where payment_method_id='${PM}' and delivery_zone_id='${Z}'`)!=='0')
+ throw Error('Zone restriction applied before second approval');
+sql(`update public.admin_approval_rules set active=true where id='${ZR}'`);
+const zoneApproved=rpc(`public.decide_admin_approval_request_v1(
+'${zoneCreated.requestId}'::uuid,'${A}'::uuid,null,'APPROVE','Approved')`,'zone second person');
+if(!zoneApproved.ok)throw Error('Second approver rejected zone request');
+const zoneClaims=JSON.parse(sql(`select coalesce(jsonb_agg(to_jsonb(c)),'[]'::jsonb)::text
+from public.claim_admin_approval_execution_v1('zone-test',now(),10,300)c`));
+const zClaim=zoneClaims.find(x=>x.approval_request_id===zoneCreated.requestId);
+if(!zClaim?.claim_token)throw Error('Zone approval claim missing');
+const executeZone = (approver=A,allowed=false) =>
+`public.execute_approved_admin_payment_zone_rule_v1(
+'${zoneCreated.requestId}'::uuid,'${B}'::uuid,'${S}'::uuid,
+'${E}'::uuid,'${approver}'::uuid,'${PM}'::uuid,'${Z}'::uuid,
+${allowed},null,0,'${ZC}'::uuid)`;
+deny(rpc(executeZone(E),'zone self approval'),'approval_payment_zone_payload_or_state_mismatch');
+deny(rpc(executeZone(A,true),'zone tampered command'),'approval_payment_zone_payload_or_state_mismatch');
+const zoneApplied=rpc(executeZone(),'zone protected apply');
+if(!zoneApplied.ok)throw Error('Zone approval did not execute: '+JSON.stringify(zoneApplied));
+const zoneAgain=rpc(executeZone(),'zone protected duplicate');
+if(!zoneAgain.ok||zoneAgain.idempotentReplay!==true)throw Error('Zone receipt replay failed');
+const zoneCompletion=rpc(`public.complete_admin_approval_execution_v1(
+'${zoneCreated.requestId}'::uuid,'${zClaim.claim_token}','EXECUTED',
+null,'{}'::jsonb,now())`,'zone completion');
+if(!zoneCompletion.ok)throw Error('Zone completion not durable');
+const zoneAfter=rpc(executeZone(),'zone completed duplicate');
+if(!zoneAfter.ok||zoneAfter.idempotentReplay!==true)throw Error('Zone completed replay failed');
+if(sql(`select allowed::text from public.payment_method_zone_rules where
+payment_method_id='${PM}' and delivery_zone_id='${Z}'`)!=='false')
+throw Error('Incorrect approved zone restriction');
+if(sql(`select count(*) from private.admin_payment_zone_approval_receipts
+where payment_method_id='${PM}' and delivery_zone_id='${Z}'`)!=='1')
+throw Error('Zone once-only receipt missing');
+if(sql(`select count(*) from public.admin_audit_events
+where action_type='SETTINGS_PAYMENT_ZONE_APPROVED_APPLIED' and shop_id='${S}'`)!=='1')
+throw Error('Zone approval audit not exactly once');
+for(const role of ['anon','authenticated']){
+ if(sql(`select has_function_privilege('${role}',
+'public.execute_approved_admin_payment_zone_rule_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,boolean,boolean,bigint,uuid)',
+'EXECUTE')`)!=='f')throw Error('Zone SQL exposure to '+role);
+}
+console.log('Zone rule approval: isolated second-person, pending bypass, payload fence, once-only replay/audit passed.');
