@@ -220,6 +220,14 @@ const taxStage=(value,expected)=>
 '${E}'::uuid,'${S}'::uuid,'checkout.taxBps','${value}'::jsonb,${expected})`;
 const stage=rpc(taxStage(1400,'null'),'stage changed tax rate');
 if(!stage.ok||stage.version!==1)throw Error('Cannot stage tax change: '+JSON.stringify(stage));
+// RED: a schedule accepted before policy activation must be rejected if the
+// approval policy is active when the scheduler tries to publish it.
+const prePolicySchedule=rpc(`public.schedule_shop_settings_publish_v1(
+'${E}'::uuid,'${S}'::uuid,1,
+(now() at time zone 'Africa/Cairo' + interval '3 days')::timestamp)`,
+'pre-existing schedule before checkout approval policy');
+if(!prePolicySchedule.ok||!prePolicySchedule.scheduleId)
+ throw Error('Cannot create pre-rule scheduled publish');
 const ratePreview=rpc(`public.preview_admin_checkout_rate_publish_v1(
 '${E}'::uuid,'${S}'::uuid,1)`,'preview checkout rate changes');
 if(!ratePreview.ok||ratePreview.ratesChanged!==true||
@@ -235,6 +243,24 @@ const configuredRateRule=rpc(`public.upsert_admin_approval_rule_v1(
 'SETTINGS_CHECKOUT_RATE_PUBLISH','settings.manage','approvals.review',
 true,false,3600,'{}'::jsonb,true,1)`,'trusted rate rule CAS');
 if(!configuredRateRule.ok)throw Error('Cannot configure rate rule');
+
+const unsafeSchedule=rpc(`public.schedule_shop_settings_publish_v1(
+'${E}'::uuid,'${S}'::uuid,1,
+(now() at time zone 'Africa/Cairo' + interval '4 days')::timestamp)`,
+'configured rate approval must block scheduled publish');
+deny(unsafeSchedule,'checkout_rate_publish_approval_required');
+sql(`update public.scheduled_config_changes set status='CLAIMED',
+attempt_count=1,claimed_at=now()
+where id='${prePolicySchedule.scheduleId}'`,'claim pre-rule scheduled request');
+const scheduledKey=sql(`select idempotency_key from public.scheduled_config_changes
+where id='${prePolicySchedule.scheduleId}'`);
+deny(rpc(`public.apply_scheduled_shop_config_change_v1(
+'${prePolicySchedule.scheduleId}'::uuid,'${scheduledKey}',1)`,
+'policy-activated scheduled execution rejection'),'checkout_rate_publish_approval_required');
+if(sql(`select coalesce(max(settings_version),0) from public.shop_settings_versions
+where shop_id='${S}'`)!=='1')
+ throw Error('Unapproved scheduled rate publication changed version');
+
 const directPublish=()=>`public.publish_shop_settings_v1('${E}'::uuid,'${S}'::uuid,1)`;
 deny(rpc(directPublish(),'direct rate publication rejected'),'checkout_rate_publish_approval_required');
 const publishPayload={shopId:S,expectedSettingsVersion:1,payloadFingerprint:ratePreview.payloadFingerprint};
