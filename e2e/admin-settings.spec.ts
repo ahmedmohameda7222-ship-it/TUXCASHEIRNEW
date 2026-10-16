@@ -687,7 +687,7 @@ test('shop lifecycle transitions are unavailable without shop management permiss
   await expect(page.getByRole('button', { name: 'Suspend shop' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Reactivate shop' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Archive shop' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Delete unused shop' })).toHaveCount(0);
+  await expect(page.locator('.admin-settings-danger-zone')).toHaveCount(0);
 });
 
 test('requests second-person approval for used-shop archive without applying the state early', async ({
