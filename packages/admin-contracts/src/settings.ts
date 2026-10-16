@@ -151,6 +151,11 @@ export type ResolvedSetting<T = unknown> =
 export type ShopDeleteOrArchiveResult =
   { ok: true; action: 'ARCHIVED' } | { ok: true; action: 'DELETED' } | { ok: false; code: string };
 
+export type SettingsPublishApprovalResult =
+  | SettingsPublishResult
+  | { ok: true; state: 'PENDING_APPROVAL'; approvalRequestId: string; idempotentReplay?: boolean }
+  | { ok: true; idempotentReplay: true };
+
 export type SettingsPublishResult =
   | { ok: true; settingsVersion: number; operationsConfigurationVersion: number }
   | { ok: false; code: 'stale_settings_version'; currentVersion: number }
@@ -347,7 +352,11 @@ export type PaymentMethodEditInput = {
 };
 
 export type SettingsCommand =
-  | ({ type: 'settings.publish' } & { shopId: string; expectedSettingsVersion: number })
+  | ({ type: 'settings.publish' } & {
+      shopId: string;
+      expectedSettingsVersion: number;
+      requesterPin?: string;
+    })
   | ({ type: 'shop.operational-state.update' } & ShopOperationalStateUpdateInput)
   | ({ type: 'shop.lifecycle.update' } & ShopLifecycleUpdateInput)
   | ({ type: 'shop.identity.update' } & ShopIdentityUpdateInput)

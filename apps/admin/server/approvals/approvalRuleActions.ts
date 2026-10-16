@@ -59,6 +59,12 @@ export const APPROVAL_RULE_ACTIONS: readonly ConfigurableApprovalAction[] = [
     thresholdKind: 'minimumQuantityImpact',
   },
   {
+    actionType: 'SETTINGS_CHECKOUT_RATE_PUBLISH',
+    label: 'Checkout tax / service rate publication',
+    requesterPermission: 'settings.manage',
+    thresholdKind: null,
+  },
+  {
     actionType: 'SETTINGS_PAYMENT_ZONE_CHANGE',
     label: 'Payment zone restrictions',
     requesterPermission: 'settings.manage',

@@ -32,6 +32,11 @@ import {
   type ApprovedFinanceSnapshotMutationResult,
 } from './financeSnapshotApproval.js';
 import {
+  createSettingsCheckoutRateApprovalExecutionEntries,
+  type ApprovedSettingsCheckoutRatePublish,
+} from './settingsCheckoutRatePublishApproval.js';
+import type { SettingsPublishResult } from '@tux/admin-contracts';
+import {
   createSettingsPaymentZoneApprovalExecutionEntries,
   type ApprovedSettingsPaymentZoneChange,
   type SettingsPaymentZoneMutationResult,
@@ -225,6 +230,23 @@ export async function runProductionApprovalExecutionRunner(): Promise<ApprovalEx
             p_reason: input.reason,
             p_original_command_id: input.commandId,
             p_expected_adjustment_count: input.expectedAdjustmentCount,
+            p_command_id: input.approvalCommandId,
+          },
+        );
+      },
+    }),
+    ...createSettingsCheckoutRateApprovalExecutionEntries({
+      publish(input: ApprovedSettingsCheckoutRatePublish) {
+        return client.rpc<SettingsPublishResult>(
+          'execute_approved_admin_checkout_rate_publish_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_expected_settings_version: input.expectedSettingsVersion,
+            p_payload_fingerprint: input.payloadFingerprint,
             p_command_id: input.approvalCommandId,
           },
         );

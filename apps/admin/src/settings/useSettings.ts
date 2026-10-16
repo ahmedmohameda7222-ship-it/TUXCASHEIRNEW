@@ -13,6 +13,7 @@ import type {
   SettingWriteResult,
   SettingsCommand,
   SettingsPublishResult,
+  SettingsPublishApprovalResult,
   ShopDeleteOrArchiveResult,
   ShopIdentityUpdateInput,
   ShopLifecycleUpdateInput,
@@ -238,9 +239,9 @@ export function useSettings(shopId: string | undefined, includeSchedules = false
   }
 
   const publish = useMutation({
-    mutationFn: async (): Promise<void> => {
+    mutationFn: async (requesterPin?: string): Promise<SettingsPublishApprovalResult> => {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
-      const result = await adminFetch<SettingsPublishResult>(
+      const result = await adminFetch<SettingsPublishApprovalResult>(
         '/api/admin/settings',
         {
           method: 'POST',
@@ -248,11 +249,18 @@ export function useSettings(shopId: string | undefined, includeSchedules = false
             type: 'settings.publish',
             shopId,
             expectedSettingsVersion: latestWorkspace().settingsVersion,
+            ...(requesterPin ? { requesterPin } : {}),
           }),
         },
         csrfTokenForMutation(session),
       );
-      requirePublishSuccess(result);
+      if (!result.ok) {
+        throw new SettingsUiError(
+          result.code,
+          'currentVersion' in result ? result.currentVersion : undefined,
+        );
+      }
+      return result;
     },
     onSuccess: invalidateWorkspace,
   });

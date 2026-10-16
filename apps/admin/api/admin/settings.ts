@@ -36,6 +36,7 @@ import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAd
 
 const POSTGRES_INTEGER_MAX = 2_147_483_647;
 import { executeSettingsPaymentMethodCommand } from '../../server/settings/settingsPaymentMethodApprovalRoute.js';
+import { executeSettingsCheckoutRatePublish } from '../../server/settings/settingsCheckoutRatePublishRoute.js';
 
 const uuidSchema = z.string().uuid();
 const expectedRowVersionSchema = z.number().int().positive().nullable();
@@ -163,6 +164,7 @@ export const settingsCommandSchema = z.union([
       type: z.literal('settings.publish'),
       shopId: uuidSchema,
       expectedSettingsVersion: expectedSettingsVersionSchema,
+      requesterPin: z.string().min(1).max(64).optional(),
     })
     .strict(),
   z
@@ -456,15 +458,15 @@ export default async function handler(
     const command = parsed.data as SettingsCommand;
 
     switch (command.type) {
-      case 'settings.publish':
+      case 'settings.publish': {
+        const sessionToken = readAdminSessionToken(firstHeader(request.headers.cookie));
+        if (!sessionToken) throw new AdminAuthError('session_required', 401);
+        const context = await loadAdminSession(sessionToken, client);
         sendJson(response, 200, {
-          ...(await service.publishSettings(
-            command.shopId,
-            command.expectedSettingsVersion,
-            principal,
-          )),
+          ...(await executeSettingsCheckoutRatePublish(client, context, command, request)),
         });
         return;
+      }
       case 'shop.operational-state.update':
         sendJson(response, 200, {
           ...(await updateShopOperationalState(client, command, principal)),
