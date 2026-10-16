@@ -267,7 +267,7 @@ end $$;
 
 
 -- Price-approval regression runs inside isolated local PostgreSQL only.
-do $
+do $$
 declare
   v_business uuid:='00000000-0000-4000-8000-000000000001';
   v_shop uuid:='17000000-0000-4000-8000-000000000001';
@@ -339,21 +339,7 @@ begin
     v_requester,v_target_draft,2,3);
   if v_preview->>'ok' is distinct from 'true'
      or (v_preview->>'maxPriceDeltaMinor')::bigint<>7500
-     or v_preview->>'candidateFingerprint' !~ '^[a-f0-9]{32}
-const result = spawnSync(
-  'psql',
-  [databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', '-c', behaviorSql],
-  { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
-);
-
-if (result.status !== 0) {
-  process.stderr.write(result.stdout ?? '');
-  process.stderr.write(result.stderr ?? '');
-  throw new Error(`Admin catalog publish controls behavioral test failed with exit code ${result.status}.`);
-}
-
-console.log('Admin catalog publish controls static and PostgreSQL behavioral invariants passed.');
- then
+     or v_preview->>'candidateFingerprint' !~ '^[a-f0-9]{32}$' then
     raise exception 'Trusted catalog price preview invalid: %',v_preview;
   end if;
   v_impact:=(v_preview->>'maxPriceDeltaMinor')::bigint;
@@ -438,9 +424,9 @@ console.log('Admin catalog publish controls static and PostgreSQL behavioral inv
      where shop_id=v_shop and id='47000000-0000-4000-8000-000000000001')<>9000 then
     raise exception 'Approved catalog price did not publish exact price';
   end if;
-end $;
+end $$;
 
-do $
+do $$
 declare v_signature text;
 begin
   foreach v_signature in array array[
@@ -453,7 +439,7 @@ begin
       raise exception 'Unsafe catalog price RPC privileges: %',v_signature;
     end if;
   end loop;
-end $;
+end $$;
 
 rollback;
 `;
