@@ -31,6 +31,7 @@ async function mockSettings(
     sortOrder: number;
   }[] = [],
   authorizedShopIds: string[] = [shopId],
+  pendingPaymentApproval = false,
 ) {
   let settingsVersion = 7;
   let shopLifecycleState: 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED' = 'ACTIVE';
@@ -271,6 +272,18 @@ async function mockSettings(
         expectedSettingsVersion: settingsVersion,
         expectedEditVersion: paymentMethod.editVersion,
       });
+      if (pendingPaymentApproval) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            state: 'PENDING_APPROVAL',
+            approvalRequestId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          }),
+        });
+        return;
+      }
       paymentMethod = {
         ...paymentMethod,
         displayName: String(command.displayName),
@@ -506,6 +519,38 @@ test('edits payment flags and preserves the settings CAS boundary', async ({ pag
     requiresReference: true,
     manualConfirmationRequired: true,
   });
+});
+
+test('keeps an approved payment edit pending instead of mutating the method', async ({ page }) => {
+  const { commands } = await mockSettings(
+    page,
+    ownerSession.principal.permissions,
+    'OWNER',
+    [],
+    [shopId],
+    true,
+  );
+  await page.goto('/settings/payments');
+  await page.getByRole('button', { name: 'Edit Cash' }).click();
+  await page.getByLabel('Available for').selectOption('ONLINE');
+  await page.getByLabel('Requester PIN (when required by approval policy)').fill('2468');
+  await page.getByRole('button', { name: 'Save payment method' }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'second person must approve' }),
+  ).toBeVisible();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'payment-method.update',
+    shopId,
+    paymentMethodId,
+    channel: 'ONLINE',
+    requesterPin: '2468',
+    expectedSettingsVersion: 7,
+    expectedEditVersion: 5,
+  });
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Edit Cash' })).toBeVisible();
+  await expect(page.getByText('In-store & Online').first()).toBeVisible();
 });
 
 test('changes refund policy with a captured settings and row CAS', async ({ page }) => {

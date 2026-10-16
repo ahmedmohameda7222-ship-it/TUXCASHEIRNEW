@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { ApprovalServiceDependencies } from './approvalService';
 import { APPROVAL_RULE_ACTIONS } from './approvalRuleActions';
+import { approvalRuleWriteSchema } from './approvalRulesRoute';
 import {
   SETTINGS_PAYMENT_METHOD_APPROVAL_ACTION,
   createSettingsPaymentMethodApprovalExecutionEntries,
@@ -46,6 +47,27 @@ const rule: AdminApprovalRule = {
 };
 
 describe('Sensitive payment-method update approval', () => {
+  it('rejects false second-person policy and unsupported payment thresholds', () => {
+    const base = {
+      type: 'rule.upsert' as const,
+      ruleId: null,
+      shopId,
+      actionType: SETTINGS_PAYMENT_METHOD_APPROVAL_ACTION,
+      requesterPermission: 'settings.manage' as const,
+      approverPermission: 'approvals.review' as const,
+      requiresSecondPerson: true,
+      requiresRequesterRepin: false,
+      expiresAfterSeconds: 3600,
+      threshold: { kind: 'none' as const },
+      active: true,
+      expectedVersion: null,
+    };
+    expect(approvalRuleWriteSchema.safeParse(base).success).toBe(true);
+    expect(approvalRuleWriteSchema.safeParse({ ...base, requiresSecondPerson: false }).success).toBe(false);
+    expect(approvalRuleWriteSchema.safeParse({
+      ...base, threshold: { kind: 'minimumMinor', value: 1 },
+    }).success).toBe(false);
+  });
   it('advertises a real discrete payment update runner, not all Settings writes', () => {
     expect(APPROVAL_RULE_ACTIONS).toContainEqual({
       actionType: SETTINGS_PAYMENT_METHOD_APPROVAL_ACTION,
