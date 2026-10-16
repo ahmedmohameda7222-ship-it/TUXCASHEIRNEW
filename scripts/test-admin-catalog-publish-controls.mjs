@@ -265,6 +265,196 @@ begin
   end loop;
 end $$;
 
+
+-- Price-approval regression runs inside isolated local PostgreSQL only.
+do $
+declare
+  v_business uuid:='00000000-0000-4000-8000-000000000001';
+  v_shop uuid:='17000000-0000-4000-8000-000000000001';
+  v_requester uuid:='27000000-0000-4000-8000-000000000001';
+  v_approver uuid:='27000000-0000-4000-8000-000000000002';
+  v_rule uuid:='57000000-0000-4000-8000-000000000001';
+  v_command uuid:='58000000-0000-4000-8000-000000000001';
+  v_schedule_draft uuid;
+  v_target_draft uuid;
+  v_request uuid;
+  v_claim record;
+  v_draft jsonb;
+  v_apply jsonb;
+  v_preview jsonb;
+  v_out jsonb;
+  v_payload jsonb;
+  v_fingerprint text;
+  v_impact bigint;
+  v_receipt_count int;
+begin
+  insert into public.business_employees(id,business_id,display_name,role,active)
+   values(v_approver,v_business,'Price approval reviewer','OWNER',true);
+  insert into public.employee_shop_assignments(business_id,employee_id,shop_id)
+   values(v_business,v_approver,v_shop);
+
+  -- Future schedule accepted before rule activation; executor must still fence
+  -- it when high-impact approval becomes mandatory.
+  v_draft:=public.create_catalog_draft_v1(v_requester,v_shop,3,'Price future schedule');
+  v_schedule_draft:=(v_draft->>'draftId')::uuid;
+  v_apply:=public.apply_catalog_draft_change_v1(
+    v_requester,v_schedule_draft,1,
+    jsonb_build_object('bundleJson',jsonb_set(
+      v_draft->'bundleJson','{snapshot,products,0,priceMinor}',
+      '9900'::jsonb,false)));
+  if v_apply->>'ok' is distinct from 'true' then
+    raise exception 'Catalog future price draft failed: %',v_apply;
+  end if;
+  v_out:=public.schedule_catalog_draft_v1(
+    v_requester,v_schedule_draft,2,3,timestamp '2099-09-11 09:00:00');
+  if v_out->>'ok' is distinct from 'true' then
+    raise exception 'Cannot accept pre-rule catalog schedule: %',v_out;
+  end if;
+
+  v_draft:=public.create_catalog_draft_v1(v_requester,v_shop,3,'Price publish approval');
+  v_target_draft:=(v_draft->>'draftId')::uuid;
+  v_apply:=public.apply_catalog_draft_change_v1(
+    v_requester,v_target_draft,1,
+    jsonb_build_object('bundleJson',jsonb_set(
+      v_draft->'bundleJson','{snapshot,products,0,priceMinor}',
+      '9000'::jsonb,false)));
+  if v_apply->>'ok' is distinct from 'true' then
+    raise exception 'Catalog price approval draft failed: %',v_apply;
+  end if;
+
+  insert into public.admin_approval_rules(
+    id,business_id,shop_id,action_type,requester_permission,approver_permission,
+    requires_second_person,threshold_context,active
+  ) values (
+    v_rule,v_business,null,'CATALOG_PRICE_PUBLISH','catalog.pricing',
+    'approvals.review',true,'{"minimumMinor":5000}'::jsonb,true
+  );
+
+  v_out:=public.publish_catalog_draft_scheduled_v1(
+    v_requester,v_schedule_draft,2,3);
+  if v_out->>'code' <> 'catalog_price_approval_required' then
+    raise exception 'Pre-existing high-price schedule bypassed approval: %',v_out;
+  end if;
+  v_preview:=public.preview_admin_catalog_price_publish_v1(
+    v_requester,v_target_draft,2,3);
+  if v_preview->>'ok' is distinct from 'true'
+     or (v_preview->>'maxPriceDeltaMinor')::bigint<>7500
+     or v_preview->>'candidateFingerprint' !~ '^[a-f0-9]{32}
+const result = spawnSync(
+  'psql',
+  [databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', '-c', behaviorSql],
+  { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+);
+
+if (result.status !== 0) {
+  process.stderr.write(result.stdout ?? '');
+  process.stderr.write(result.stderr ?? '');
+  throw new Error(`Admin catalog publish controls behavioral test failed with exit code ${result.status}.`);
+}
+
+console.log('Admin catalog publish controls static and PostgreSQL behavioral invariants passed.');
+ then
+    raise exception 'Trusted catalog price preview invalid: %',v_preview;
+  end if;
+  v_impact:=(v_preview->>'maxPriceDeltaMinor')::bigint;
+  v_fingerprint:=v_preview->>'candidateFingerprint';
+  v_out:=public.publish_catalog_draft_v1(v_requester,v_target_draft,2,3);
+  if v_out->>'code'<>'catalog_price_approval_required' then
+    raise exception 'Catalog direct price approval bypass: %',v_out;
+  end if;
+  v_out:=public.schedule_catalog_draft_v1(
+    v_requester,v_target_draft,2,3,timestamp '2099-09-11 10:00:00');
+  if v_out->>'code'<>'catalog_price_approval_required' then
+    raise exception 'New price schedule approval bypass: %',v_out;
+  end if;
+
+  v_payload:=jsonb_build_object(
+    'shopId',v_shop,'draftId',v_target_draft,'expectedDraftRevision',2,
+    'expectedVersion',3,'maxPriceDeltaMinor',v_impact,
+    'candidateFingerprint',v_fingerprint);
+  v_out:=public.create_admin_approval_request_v1(
+    v_business,v_shop,v_requester,null,v_rule,'CATALOG_PRICE_PUBLISH',
+    v_command,v_payload,'High price publication');
+  if v_out->>'ok' is distinct from 'true' then
+    raise exception 'Catalog approval request rejected: %',v_out;
+  end if;
+  v_request:=(v_out->>'requestId')::uuid;
+  update public.admin_approval_rules set active=false where id=v_rule;
+  v_out:=public.publish_catalog_draft_v1(v_requester,v_target_draft,2,3);
+  if v_out->>'code'<>'catalog_price_approval_required' then
+    raise exception 'Catalog pending rule-off bypass: %',v_out;
+  end if;
+  update public.admin_approval_rules set active=true where id=v_rule;
+
+  v_out:=public.decide_admin_approval_request_v1(
+    v_request,v_approver,null,'APPROVE','Approved');
+  if v_out->>'ok' is distinct from 'true' then
+    raise exception 'Catalog price second person denied: %',v_out;
+  end if;
+  select * into v_claim from public.claim_admin_approval_execution_v1(
+    'catalog-price-test',now(),10,300)
+   where approval_request_id=v_request;
+  if not found then raise exception 'Catalog price command not claimed'; end if;
+  v_out:=public.execute_approved_admin_catalog_price_publish_v1(
+    v_request,v_business,v_shop,v_requester,v_requester,
+    v_target_draft,2,3,v_impact,v_fingerprint,v_command);
+  if v_out->>'code'<>'approval_catalog_price_payload_or_state_mismatch' then
+    raise exception 'Self approval accepted for catalog pricing: %',v_out;
+  end if;
+  v_out:=public.execute_approved_admin_catalog_price_publish_v1(
+    v_request,v_business,v_shop,v_requester,v_approver,
+    v_target_draft,2,3,v_impact,'00000000000000000000000000000000',v_command);
+  if v_out->>'code'<>'approval_catalog_price_payload_or_state_mismatch' then
+    raise exception 'Catalog price tampered digest accepted: %',v_out;
+  end if;
+  v_out:=public.execute_approved_admin_catalog_price_publish_v1(
+    v_request,v_business,v_shop,v_requester,v_approver,
+    v_target_draft,2,3,v_impact,v_fingerprint,v_command);
+  if v_out->>'ok' is distinct from 'true' or (v_out->>'publishVersion')::bigint<>4 then
+    raise exception 'Approved catalog price publish failed: %',v_out;
+  end if;
+  v_out:=public.execute_approved_admin_catalog_price_publish_v1(
+    v_request,v_business,v_shop,v_requester,v_approver,
+    v_target_draft,2,3,v_impact,v_fingerprint,v_command);
+  if v_out->>'ok' is distinct from 'true' or v_out->>'idempotentReplay'<>'true' then
+    raise exception 'Catalog price approval replay not once-only: %',v_out;
+  end if;
+  v_out:=public.complete_admin_approval_execution_v1(
+    v_request,v_claim.claim_token,'EXECUTED',null,'{}'::jsonb,now());
+  if v_out->>'ok' is distinct from 'true' then
+    raise exception 'Catalog price approval completion missing: %',v_out;
+  end if;
+  select count(*) into v_receipt_count
+  from private.admin_catalog_price_publish_approval_receipts
+  where shop_id=v_shop;
+  if v_receipt_count<>1 then
+    raise exception 'Catalog price duplicated protected receipt: %',v_receipt_count;
+  end if;
+  v_out:=public.restore_catalog_publish_version_v1(v_requester,v_shop,1,4);
+  if v_out->>'code'<>'catalog_price_approval_required' then
+    raise exception 'Historical high-price rollback bypassed approval: %',v_out;
+  end if;
+  if (select price_minor from public.products
+     where shop_id=v_shop and id='47000000-0000-4000-8000-000000000001')<>9000 then
+    raise exception 'Approved catalog price did not publish exact price';
+  end if;
+end $;
+
+do $
+declare v_signature text;
+begin
+  foreach v_signature in array array[
+    'public.preview_admin_catalog_price_publish_v1(uuid,uuid,bigint,bigint)',
+    'public.execute_approved_admin_catalog_price_publish_v1(uuid,uuid,uuid,uuid,uuid,uuid,bigint,bigint,bigint,text,uuid)'
+  ] loop
+    if has_function_privilege('anon',v_signature,'EXECUTE')
+      or has_function_privilege('authenticated',v_signature,'EXECUTE')
+      or not has_function_privilege('service_role',v_signature,'EXECUTE') then
+      raise exception 'Unsafe catalog price RPC privileges: %',v_signature;
+    end if;
+  end loop;
+end $;
+
 rollback;
 `;
 
