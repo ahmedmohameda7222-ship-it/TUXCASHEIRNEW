@@ -37,7 +37,7 @@ create function auth.uid() returns uuid language sql stable as $do$
  select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $do$;`, 'isolated fixture');
 const migrations = readdirSync(resolve('supabase/migrations'))
   .filter((x) => /^\d+_.+\.sql$/.test(x)).sort();
-const target = '20261016090000_admin_payment_method_create_second_person_approval.sql';
+const target = '20261016080723_admin_payment_method_create_second_person_approval.sql';
 const index = migrations.indexOf(target);
 if (index < 0) throw new Error('Missing payment approval migration');
 for (const name of migrations.slice(0, index + 1)) {
