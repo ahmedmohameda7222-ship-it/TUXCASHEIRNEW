@@ -31,6 +31,7 @@ async function mockPublishing(
   withCopy = false,
   copyPreviewOverrides: Record<string, unknown> = {},
   startWithoutDraft = false,
+  pendingPriceApproval = false,
 ) {
   let currentPublishVersion = 48;
   let pendingSchedule = true;
@@ -352,6 +353,18 @@ async function mockPublishing(
       return;
     }
     if (body.type === 'draft.publish') {
+      if (pendingPriceApproval) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            state: 'PENDING_APPROVAL',
+            approvalRequestId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          }),
+        });
+        return;
+      }
       currentPublishVersion += 1;
       await route.fulfill({
         status: 200,
@@ -535,6 +548,28 @@ test('publish review shows version-fenced draft diff, history, and Cairo schedul
     expectedVersion: 48,
     localScheduledAt: '2099-09-12T08:00',
   });
+});
+
+test('catalog price approval remains pending without falsely publishing prices', async ({
+  page,
+}) => {
+  const fixture = await mockPublishing(page, false, {}, false, true);
+  await page.goto('/catalog/products/publishing');
+
+  await page.getByRole('button', { name: 'Publish now' }).click();
+  await expect(
+    page.getByText('Catalog publication requested. A second person must approve before it goes live.'),
+  ).toBeVisible();
+  await expect(page.getByText('Catalog published.')).toHaveCount(0);
+  expect(fixture.commands.at(-1)).toMatchObject({
+    type: 'draft.publish',
+    draftId,
+    shopId,
+    expectedDraftRevision: 2,
+    expectedVersion: 48,
+  });
+  await page.reload();
+  await expect(page.getByText('Version 48')).toBeVisible();
 });
 
 test('publish history restores as a new version and pending schedules can be cancelled', async ({
