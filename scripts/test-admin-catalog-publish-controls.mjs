@@ -558,6 +558,28 @@ begin
   ) then
     raise exception 'Tenant B product leaked into tenant A catalog history';
   end if;
+  -- The owner of tenant A must not create a draft for tenant B.
+  -- Both structured permission denials and SQL permission exceptions fail closed.
+  declare
+    v_denied boolean := false;
+  begin
+    begin
+      v_create := public.create_catalog_draft_v1(
+        '27000000-0000-4000-8000-000000000001',
+        '17000000-0000-4000-8000-000000000002',1,
+        'Cross-tenant mutation must fail');
+      v_denied := v_create->>'ok' is distinct from 'true';
+    exception when others then
+      v_denied := true;
+    end;
+    if not v_denied then
+      raise exception 'Tenant A owner created an unauthorized draft in tenant B';
+    end if;
+  end;
+  if (select count(*) from public.catalog_drafts
+      where shop_id='17000000-0000-4000-8000-000000000002') <> 1 then
+    raise exception 'Cross-business draft attempt modified shop B draft count';
+  end if;
 end;
 $catalog_two_businesses$;
 
