@@ -44,3 +44,15 @@ A role/permission check or recent reauthentication is **not** a configurable sec
 For each confirmed missing in-scope action, demonstrate below/equal/above threshold, absent/malformed context, shop override/business fallback, requester and approver authorization, second-person + PIN, wrong-shop/business denial, approval/rejection, stale revision, crash/retry and once-only protected side effects. Verify the protected domain command is not executed before authorization. Classify unit/contract/isolated PostgreSQL/mocked E2E/authenticated full-stack separately.
 
 **Current ruling: `CORRECTIONS STILL REQUIRED`.** No unsupported new action was inserted; no migration or financial/operational record was modified by this coverage audit.
+
+## 2026-10-16 — Superseding actionable approval scope checkpoint (PR #119)
+
+The historical action table above predates the completed Finance Z, Cashier Reconciliation, Owner Withdrawal, and Shop Archive corrections. Current `approvalRuleActions.ts` has **12** actionable entries connected to production-runner implementations:
+
+`ORDER_REFUND`, `ORDER_RETURN`, `EMPLOYEE_PIN_CHANGE`, `EMPLOYEE_ROLE_CHANGE`, `EMPLOYEE_PERMISSION_CHANGE`, `EMPLOYEE_SUSPEND`, `INVENTORY_ADJUST`, `SHOP_LIFECYCLE_CHANGE` (now including **archive**), `FINANCE_CASHIER_RECONCILIATION`, `FINANCE_OWNER_WITHDRAWAL`, `FINANCE_SNAPSHOT_ADJUST`, and `STAFF_PAYMENT`.
+
+**Still absent by design:** configurable approval for high-risk Settings payment policy changes, tax/service-charge setting edits or publication, and large Catalog published price changes. Existing permission, CSRF, trusted SQL and CAS do not imply a second-person approved execution contract. These remain **INCOMPLETE** until true worker/receipt/SQL enforcement is tested; do not whitelist a dummy action.
+
+**Transfers ruling:** Plan 7 standard transfers, bank deposits and Owner Contributions have direct `finance.adjust` authority, mandatory reason, tenant-scoped account locking, idempotent business+command receipt and immutable audit, but approved Plans 3/7 do **not** explicitly require a separately configurable numeric approval threshold for these movement types. Owner Withdrawals already have their independent rule. Do not add an unsupported transfer action without Planner-approved separate risk semantics.
+
+**Evidence split:** Catalog copy and lifecycle approvals have extensive isolated PostgreSQL/browser-mocked CI. A real two-shop authenticated PR #119 release crossing Admin, Menu and Operations/COGS remains unverified (only one canonical production shop and no matching PR #119 Admin preview). This is a release-level acceptance blocker, not proof of database contract failure.
