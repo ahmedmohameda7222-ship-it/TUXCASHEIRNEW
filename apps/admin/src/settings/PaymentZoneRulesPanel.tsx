@@ -17,6 +17,8 @@ export function PaymentZoneRulesPanel({ workspace }: { workspace: AdminSettingsW
   const session = useAdminSession();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+  const [approvalNotice, setApprovalNotice] = useState<string | null>(null);
+  const [requesterPin, setRequesterPin] = useState('');
   const shopId = workspace.shop.id;
   const queryKey = ['admin', 'payment-zone-rules', shopId] as const;
   const rules = useQuery({
@@ -34,7 +36,10 @@ export function PaymentZoneRulesPanel({ workspace }: { workspace: AdminSettingsW
       expectedAllowed: boolean | null;
     }) => {
       if (session.state.status !== 'authenticated') throw new Error('session_required');
-      const result = await adminFetch<{ ok: boolean; code?: string }>(
+      const result = await adminFetch<
+        | { ok: true; state?: 'PENDING_APPROVAL'; approvalRequestId?: string }
+        | { ok: false; code: string }
+      >(
         '/api/admin/payment-zone-rules',
         {
           method: 'POST',
@@ -43,15 +48,25 @@ export function PaymentZoneRulesPanel({ workspace }: { workspace: AdminSettingsW
             shopId,
             ...input,
             expectedSettingsVersion: workspace.settingsVersion,
+            ...(requesterPin.trim() ? { requesterPin: requesterPin.trim() } : {}),
           }),
         },
         session.state.session.csrfToken,
       );
-      if (!result.ok) throw new Error(result.code ?? 'payment_zone_update_failed');
+      if (!result.ok) throw new Error(result.code);
+      return result;
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       setError(null);
-      await queryClient.invalidateQueries({ queryKey });
+      setRequesterPin('');
+      if (result.state === 'PENDING_APPROVAL') {
+        setApprovalNotice(
+          'Payment zone change requested. A second person must approve before the restriction changes.',
+        );
+      } else {
+        setApprovalNotice(null);
+        await queryClient.invalidateQueries({ queryKey });
+      }
     },
     onError: (cause) =>
       setError(cause instanceof Error ? cause.message : 'Unable to update payment policy'),
@@ -66,6 +81,18 @@ export function PaymentZoneRulesPanel({ workspace }: { workspace: AdminSettingsW
         Restrict supported payment methods separately for each delivery zone. Changes apply to
         future orders only after Publish settings; historical payments are unaffected.
       </p>
+      <label className="admin-field">
+        <span>Requester PIN (when required by approval policy)</span>
+        <input
+          type="password"
+          autoComplete="off"
+          maxLength={64}
+          value={requesterPin}
+          disabled={update.isPending}
+          onChange={(event) => setRequesterPin(event.currentTarget.value)}
+        />
+      </label>
+      {approvalNotice ? <p role="status">{approvalNotice}</p> : null}
       {rules.isLoading ? <p>Loading payment restrictions…</p> : null}
       {rules.isError ? <p role="alert">Unable to load payment restrictions.</p> : null}
       {error ? (
@@ -101,6 +128,7 @@ export function PaymentZoneRulesPanel({ workspace }: { workspace: AdminSettingsW
                     disabled={update.isPending}
                     onClick={() => {
                       setError(null);
+                      setApprovalNotice(null);
                       update.mutate({
                         paymentMethodId: method.id,
                         deliveryZoneId: zone.id,
