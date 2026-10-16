@@ -63,10 +63,15 @@ describe('Sensitive payment-method update approval', () => {
       expectedVersion: null,
     };
     expect(approvalRuleWriteSchema.safeParse(base).success).toBe(true);
-    expect(approvalRuleWriteSchema.safeParse({ ...base, requiresSecondPerson: false }).success).toBe(false);
-    expect(approvalRuleWriteSchema.safeParse({
-      ...base, threshold: { kind: 'minimumMinor', value: 1 },
-    }).success).toBe(false);
+    expect(
+      approvalRuleWriteSchema.safeParse({ ...base, requiresSecondPerson: false }).success,
+    ).toBe(false);
+    expect(
+      approvalRuleWriteSchema.safeParse({
+        ...base,
+        threshold: { kind: 'minimumMinor', value: 1 },
+      }).success,
+    ).toBe(false);
   });
   it('advertises a real discrete payment update runner, not all Settings writes', () => {
     expect(APPROVAL_RULE_ACTIONS).toContainEqual({
