@@ -63,7 +63,7 @@ insert into public.employee_shop_assignments(business_id,employee_id,shop_id)
 insert into public.payment_methods(
  id,shop_id,display_name,logic_type,requires_reconciliation,active,
  sort_order,channel,requires_reference,manual_confirmation_required,refund_allowed)
- values ('${PM}','Card','CARD',true,true,0,'POS',false,false,true);
+ values ('${PM}','${S}','Card','CARD',true,true,0,'POS',false,false,true);
 insert into public.admin_approval_rules(
  id,business_id,shop_id,action_type,requester_permission,approver_permission,
  requires_second_person,threshold_context,active)
