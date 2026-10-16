@@ -101,6 +101,7 @@ jobs:
           apps/admin/server/approvals/shopLifecycleApproval.test.ts
           apps/admin/server/approvals/settingsPaymentMethodApproval.test.ts
           apps/admin/server/approvals/settingsPaymentZoneApproval.test.ts
+          apps/admin/server/approvals/settingsCheckoutRatePublishApproval.test.ts
           apps/admin/server/approvals/financeSnapshotApproval.test.ts
           apps/admin/server/approvals/financeOwnerWithdrawalApproval.test.ts
           apps/admin/server/approvals/financeCashierReconciliationApproval.test.ts
