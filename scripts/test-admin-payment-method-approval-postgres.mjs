@@ -217,7 +217,7 @@ if(!baselinePublish.ok||baselinePublish.settingsVersion!==1)
  throw Error('Fixture baseline publication failed: '+JSON.stringify(baselinePublish));
 const taxStage=(value,expected)=>
 `public.upsert_shop_setting_override_v1(
-'${E}'::uuid,'${S}'::uuid,'checkout.taxBps',${value}::jsonb,${expected})`;
+'${E}'::uuid,'${S}'::uuid,'checkout.taxBps','${value}'::jsonb,${expected})`;
 const stage=rpc(taxStage(1400,'null'),'stage changed tax rate');
 if(!stage.ok||stage.version!==1)throw Error('Cannot stage tax change: '+JSON.stringify(stage));
 const ratePreview=rpc(`public.preview_admin_checkout_rate_publish_v1(
