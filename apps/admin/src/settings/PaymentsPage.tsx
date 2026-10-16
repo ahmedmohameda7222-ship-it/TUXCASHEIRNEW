@@ -399,7 +399,7 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                         const requesterPin = event.currentTarget.value;
                         setDraft((current) =>
                           current
-                            ? { ...current, requesterPin: requesterPin || undefined }
+                            ? { ...current, requesterPin }
                             : current,
                         );
                       }}

@@ -94,6 +94,14 @@ jobs:
             echo
             echo "FINANCE_PRETTIER_END_${file}"
           done
+      - name: Preview payment approval Prettier for exact source normalization
+        run: |
+          for file in apps/admin/server/approvals/settingsPaymentMethodApproval.test.ts apps/admin/server/approvals/settingsPaymentMethodApproval.ts apps/admin/server/settings/settingsPaymentMethodApprovalRoute.ts apps/admin/src/settings/PaymentsPage.tsx apps/admin/src/settings/SettingsPage.tsx; do
+            echo "PAYMENT_FMT_BEGIN_${file}"
+            npx prettier "$file" | base64 -w0
+            echo
+            echo "PAYMENT_FMT_END_${file}"
+          done
       - name: Plan 3 approval and audit services
         run: >-
           npx vitest run
