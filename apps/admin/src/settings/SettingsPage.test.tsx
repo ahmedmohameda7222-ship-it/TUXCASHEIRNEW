@@ -116,11 +116,12 @@ const workspace: AdminSettingsWorkspace = {
 
 const noop = vi.fn();
 
-function renderSection(section: SettingsSection): string {
+function renderSection(section: SettingsSection, canManageShopLifecycle = true): string {
   return renderToStaticMarkup(
     <SettingsWorkspaceView
       workspace={workspace}
       section={section}
+      canManageShopLifecycle={canManageShopLifecycle}
       onSectionChange={noop}
       onPublish={noop}
       publishing={false}
@@ -179,7 +180,7 @@ describe('Settings workspace', () => {
   });
 
   it('hides unused-shop deletion for users without shops.manage', () => {
-    const html = renderSection('shop');
+    const html = renderSection('shop', false);
     expect(html).not.toContain('Delete unused shop');
   });
 
