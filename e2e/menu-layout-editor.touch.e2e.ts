@@ -21,26 +21,6 @@ async function expectSelectedCategoryInsideRail(page: Parameters<typeof menuCate
   expect(selectedBox!.x + selectedBox!.width).toBeLessThanOrEqual(railBox!.x + railBox!.width + 1);
 }
 
-async function persistedBrowserLayout(page: Parameters<typeof menuCategoryTabs>[0]) {
-  return page.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('tux-operations-v2');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    const value = await new Promise<unknown>((resolve, reject) => {
-      const tx = db.transaction('workerMenuLayouts', 'readonly');
-      const req = tx
-        .objectStore('workerMenuLayouts')
-        .get('10000000-0000-4000-8000-000000000001:20000000-0000-4000-8000-000000000001');
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-    db.close();
-    return value;
-  });
-}
-
 test('real touch reorder persists, cancel restores, and mobile editor stays reachable', async ({
   page,
 }, testInfo) => {
@@ -74,15 +54,14 @@ test('real touch reorder persists, cancel restores, and mobile editor stays reac
   await page.getByRole('button', { name: 'Edit menu' }).click();
   await expect.poll(() => menuLayoutDraftSnapshot(page)).toEqual(persistedDraft);
 
-  console.log('MENU_LAYOUT_PRE_CANCEL_SAVED', JSON.stringify(await persistedBrowserLayout(page)));
   cards = menuEditProductCards(page);
   await touchDrag(cards.nth(1), cards.nth(0), page);
   await expect(menuEditProductCards(page).nth(0)).toContainText('Single Smashed Patty');
-  console.log('MENU_LAYOUT_POST_DRAG_SAVED', JSON.stringify(await persistedBrowserLayout(page)));
+  // Touch drop completion is asynchronous: wait for DnD cleanup before cancelling the draft.
+  await expect(page.locator('.menu-edit-product-card-dragging')).toHaveCount(0);
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  console.log('MENU_LAYOUT_POST_CANCEL_SAVED', JSON.stringify(await persistedBrowserLayout(page)));
+  await expect(page.getByRole('button', { name: 'Edit menu' })).toHaveAttribute('aria-pressed', 'false');
   await page.getByRole('button', { name: 'Edit menu' }).click();
-  console.log('MENU_LAYOUT_REOPEN_SAVED', JSON.stringify(await persistedBrowserLayout(page)));
   await expect.poll(() => menuLayoutDraftSnapshot(page)).toEqual(persistedDraft);
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 
