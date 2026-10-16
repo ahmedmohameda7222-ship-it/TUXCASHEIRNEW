@@ -36,8 +36,7 @@ export type ApprovedSettingsPaymentZoneChange = SettingsPaymentZoneApprovalPaylo
   approvalCommandId: string;
 };
 export type SettingsPaymentZoneMutationResult =
-  | { ok: true; idempotentReplay?: boolean }
-  | { ok: false; code: string; currentVersion?: number };
+  { ok: true; idempotentReplay?: boolean } | { ok: false; code: string; currentVersion?: number };
 export type SettingsPaymentZoneApprovalResult =
   | SettingsPaymentZoneMutationResult
   | { ok: true; state: 'PENDING_APPROVAL'; approvalRequestId: string };
@@ -94,7 +93,9 @@ const commandEntry: ApprovalCommandRegistryEntry = {
 };
 
 export function createSettingsPaymentZoneApprovalExecutionEntries(deps: {
-  executeChange(input: ApprovedSettingsPaymentZoneChange): Promise<SettingsPaymentZoneMutationResult>;
+  executeChange(
+    input: ApprovedSettingsPaymentZoneChange,
+  ): Promise<SettingsPaymentZoneMutationResult>;
 }): readonly ApprovalExecutionRegistryEntry[] {
   return [
     {

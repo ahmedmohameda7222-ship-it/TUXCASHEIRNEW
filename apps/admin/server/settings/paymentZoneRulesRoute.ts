@@ -68,10 +68,7 @@ type ApprovalRuleRow = {
 };
 
 function readApprovalRule(row: ApprovalRuleRow): AdminApprovalRule {
-  if (
-    !isAdminPermission(row.requester_permission) ||
-    !isAdminPermission(row.approver_permission)
-  ) {
+  if (!isAdminPermission(row.requester_permission) || !isAdminPermission(row.approver_permission)) {
     throw new Error('payment_zone_approval_rule_permission_invalid');
   }
   return {
@@ -92,7 +89,6 @@ function readApprovalRule(row: ApprovalRuleRow): AdminApprovalRule {
     active: row.active,
   };
 }
-
 
 async function authenticated(
   request: AdminRequest,

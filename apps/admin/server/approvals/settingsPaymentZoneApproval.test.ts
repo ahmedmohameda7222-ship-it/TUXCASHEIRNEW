@@ -63,31 +63,48 @@ describe('Payment zone restriction: optional second-person approval', () => {
       expectedVersion: null,
     };
     expect(approvalRuleWriteSchema.safeParse(command).success).toBe(true);
-    expect(approvalRuleWriteSchema.safeParse({ ...command, requiresSecondPerson: false }).success)
-      .toBe(false);
-    expect(approvalRuleWriteSchema.safeParse({
-      ...command,
-      threshold: { kind: 'minimumMinor', value: 1 },
-    }).success).toBe(false);
+    expect(
+      approvalRuleWriteSchema.safeParse({ ...command, requiresSecondPerson: false }).success,
+    ).toBe(false);
+    expect(
+      approvalRuleWriteSchema.safeParse({
+        ...command,
+        threshold: { kind: 'minimumMinor', value: 1 },
+      }).success,
+    ).toBe(false);
   });
   it('selects specific shop rule and rejects invalid threshold or malformed CAS', () => {
     const fallback = { ...rule, shopId: null, id: 'fallback' };
     expect(evaluateSettingsPaymentZoneRouting(payload, actor, [])).toEqual({ kind: 'DIRECT' });
     expect(evaluateSettingsPaymentZoneRouting(payload, actor, [fallback, rule])).toEqual({
-      kind: 'APPROVAL_REQUIRED', ruleId: rule.id,
+      kind: 'APPROVAL_REQUIRED',
+      ruleId: rule.id,
     });
-    expect(evaluateSettingsPaymentZoneRouting(payload, actor, [
-      { ...rule, thresholdContext: { minimumMinor: 1 } },
-    ])).toEqual({ kind: 'INVALID', code: 'approval_payment_zone_rule_invalid' });
-    expect(evaluateSettingsPaymentZoneRouting({
-      ...payload, expectedSettingsVersion: -1,
-    }, actor, [rule])).toEqual({ kind: 'INVALID', code: 'invalid_payment_zone_change' });
+    expect(
+      evaluateSettingsPaymentZoneRouting(payload, actor, [
+        { ...rule, thresholdContext: { minimumMinor: 1 } },
+      ]),
+    ).toEqual({ kind: 'INVALID', code: 'approval_payment_zone_rule_invalid' });
+    expect(
+      evaluateSettingsPaymentZoneRouting(
+        {
+          ...payload,
+          expectedSettingsVersion: -1,
+        },
+        actor,
+        [rule],
+      ),
+    ).toEqual({ kind: 'INVALID', code: 'invalid_payment_zone_change' });
   });
   it('never calls the mutation while a second-person request is pending', async () => {
-    const createRequest = vi.fn(async (input: Parameters<ApprovalServiceDependencies['createRequest']>[0]) => ({
-      ok: true, requestId: 'f0000000-0000-4000-8000-000000000002',
-      status: 'PENDING' as const, persistedPayload: input.commandPayload,
-    }));
+    const createRequest = vi.fn(
+      async (input: Parameters<ApprovalServiceDependencies['createRequest']>[0]) => ({
+        ok: true,
+        requestId: 'f0000000-0000-4000-8000-000000000002',
+        status: 'PENDING' as const,
+        persistedPayload: input.commandPayload,
+      }),
+    );
     const deps: ApprovalServiceDependencies = {
       loadRequest: vi.fn(async () => null),
       loadRule: vi.fn(async () => rule),
@@ -98,14 +115,25 @@ describe('Payment zone restriction: optional second-person approval', () => {
     };
     const direct = vi.fn(async () => ({ ok: true as const }));
     const result = await executeOrRequestSettingsPaymentZoneUpdate(
-      payload, actor, [rule], deps, undefined, direct,
+      payload,
+      actor,
+      [rule],
+      deps,
+      undefined,
+      direct,
     );
-    expect(result).toEqual({ ok: true, state: 'PENDING_APPROVAL',
-      approvalRequestId: 'f0000000-0000-4000-8000-000000000002' });
+    expect(result).toEqual({
+      ok: true,
+      state: 'PENDING_APPROVAL',
+      approvalRequestId: 'f0000000-0000-4000-8000-000000000002',
+    });
     expect(direct).not.toHaveBeenCalled();
-    expect(createRequest).toHaveBeenCalledWith(expect.objectContaining({
-      actionType: SETTINGS_PAYMENT_ZONE_APPROVAL_ACTION, commandPayload: payload,
-    }));
+    expect(createRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionType: SETTINGS_PAYMENT_ZONE_APPROVAL_ACTION,
+        commandPayload: payload,
+      }),
+    );
   });
   it('stable command for exact retry and replay changes with optimistic state', async () => {
     const ids: string[] = [];
@@ -116,16 +144,42 @@ describe('Payment zone restriction: optional second-person approval', () => {
       decideRequest: vi.fn(async () => ({ ok: false as const, code: 'unused' })),
       createRequest: vi.fn(async (input) => {
         ids.push(input.commandId);
-        return { ok: true, requestId: 'f0000000-0000-4000-8000-000000000002', status: 'PENDING' as const };
+        return {
+          ok: true,
+          requestId: 'f0000000-0000-4000-8000-000000000002',
+          status: 'PENDING' as const,
+        };
       }),
       now: () => new Date('2026-10-16T00:00:00Z'),
     };
     const direct = vi.fn(async () => ({ ok: true as const }));
-    await executeOrRequestSettingsPaymentZoneUpdate(payload, actor, [rule], deps, undefined, direct);
-    await executeOrRequestSettingsPaymentZoneUpdate(payload, actor, [rule], deps, undefined, direct);
-    await executeOrRequestSettingsPaymentZoneUpdate({
-      ...payload, expectedAllowed: false,
-    }, actor, [rule], deps, undefined, direct);
+    await executeOrRequestSettingsPaymentZoneUpdate(
+      payload,
+      actor,
+      [rule],
+      deps,
+      undefined,
+      direct,
+    );
+    await executeOrRequestSettingsPaymentZoneUpdate(
+      payload,
+      actor,
+      [rule],
+      deps,
+      undefined,
+      direct,
+    );
+    await executeOrRequestSettingsPaymentZoneUpdate(
+      {
+        ...payload,
+        expectedAllowed: false,
+      },
+      actor,
+      [rule],
+      deps,
+      undefined,
+      direct,
+    );
     expect(ids[0]).toBe(ids[1]);
     expect(ids[2]).not.toBe(ids[0]);
     expect(direct).not.toHaveBeenCalled();
@@ -136,20 +190,34 @@ describe('Payment zone restriction: optional second-person approval', () => {
     expect(entry).toBeDefined();
     const claim = {
       approvalRequestId: 'f0000000-0000-4000-8000-000000000002',
-      businessId: actor.businessId, shopId: payload.shopId,
+      businessId: actor.businessId,
+      shopId: payload.shopId,
       requesterEmployeeId: actor.employeeId,
       approverEmployeeId: 'a0000000-0000-4000-8000-000000000002',
       actionType: SETTINGS_PAYMENT_ZONE_APPROVAL_ACTION,
       commandId: 'f0000000-0000-4000-8000-000000000003',
       commandPayload: payload,
-      claimToken: 'claim', attemptCount: 1, leaseExpiresAt: '2026-10-16T01:00:00Z',
+      claimToken: 'claim',
+      attemptCount: 1,
+      leaseExpiresAt: '2026-10-16T01:00:00Z',
     };
-    await expect(entry!.execute({ commandId: claim.commandId, payload, claim: {
-      ...claim, shopId: 'c0000000-0000-4000-8000-000000000002',
-    } })).rejects.toThrow('approval_payment_zone_scope_invalid');
+    await expect(
+      entry!.execute({
+        commandId: claim.commandId,
+        payload,
+        claim: {
+          ...claim,
+          shopId: 'c0000000-0000-4000-8000-000000000002',
+        },
+      }),
+    ).rejects.toThrow('approval_payment_zone_scope_invalid');
     await entry!.execute({ commandId: claim.commandId, payload, claim });
-    expect(executeChange).toHaveBeenCalledWith(expect.objectContaining({
-      ...payload, businessId: actor.businessId, approvalRequestId: claim.approvalRequestId,
-    }));
+    expect(executeChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ...payload,
+        businessId: actor.businessId,
+        approvalRequestId: claim.approvalRequestId,
+      }),
+    );
   });
 });
