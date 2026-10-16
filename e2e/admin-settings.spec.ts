@@ -615,6 +615,7 @@ test('pending approved payment creation is not falsely presented as available', 
   await page.getByLabel('New payment method name').fill('Mobile Wallet');
   await page.getByLabel('Payment type').selectOption('DIGITAL');
   await page.getByLabel('New method availability').selectOption('BOTH');
+  await page.getByLabel('Refunds allowed for new payments').uncheck();
   await page.getByLabel('Requester PIN (when required by approval policy)').fill('2468');
   await page.getByRole('button', { name: 'Create payment method' }).click();
   await expect(
