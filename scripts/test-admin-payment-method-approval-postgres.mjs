@@ -37,7 +37,7 @@ create function auth.uid() returns uuid language sql stable as $do$
  select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $do$;`, 'isolated fixture');
 const migrations = readdirSync(resolve('supabase/migrations'))
   .filter((x) => /^\d+_.+\.sql$/.test(x)).sort();
-const target = '20261016064343_admin_payment_zone_second_person_approval.sql';
+const target = '20261016100000_admin_checkout_rates_publish_second_person_approval.sql';
 const index = migrations.indexOf(target);
 if (index < 0) throw new Error('Missing payment approval migration');
 for (const name of migrations.slice(0, index + 1)) {
@@ -208,3 +208,90 @@ for(const role of ['anon','authenticated']){
 'EXECUTE')`)!=='f')throw Error('Zone SQL exposure to '+role);
 }
 console.log('Zone rule approval: isolated second-person, pending bypass, payload fence, once-only replay/audit passed.');
+
+const RATES_RULE='94444444-4444-4444-8444-444444444446';
+const RATES_CMD='95555555-5555-4555-8555-555555555557';
+const baselinePublish=rpc(`public.publish_shop_settings_v1(
+'${E}'::uuid,'${S}'::uuid,0)`,'initial no-policy settings publication');
+if(!baselinePublish.ok||baselinePublish.settingsVersion!==1)
+ throw Error('Fixture baseline publication failed: '+JSON.stringify(baselinePublish));
+const taxStage=(value,expected)=>
+`public.upsert_shop_setting_override_v1(
+'${E}'::uuid,'${S}'::uuid,'checkout.taxBps',${value}::jsonb,${expected})`;
+const stage=rpc(taxStage(1400,'null'),'stage changed tax rate');
+if(!stage.ok||stage.version!==1)throw Error('Cannot stage tax change: '+JSON.stringify(stage));
+const ratePreview=rpc(`public.preview_admin_checkout_rate_publish_v1(
+'${E}'::uuid,'${S}'::uuid,1)`,'preview checkout rate changes');
+if(!ratePreview.ok||ratePreview.ratesChanged!==true||
+ !/^[a-f0-9]{32}$/.test(ratePreview.payloadFingerprint))
+ throw Error('Rate preview not trusted/hashed: '+JSON.stringify(ratePreview));
+sql(`insert into public.admin_approval_rules(
+id,business_id,shop_id,action_type,requester_permission,approver_permission,
+requires_second_person,threshold_context,active)
+values ('${RATES_RULE}','${B}',null,'SETTINGS_CHECKOUT_RATE_PUBLISH',
+'settings.manage','approvals.review',true,'{}'::jsonb,true)`,'rate publish rule');
+const configuredRateRule=rpc(`public.upsert_admin_approval_rule_v1(
+'${E}'::uuid,'${S}'::uuid,'${RATES_RULE}'::uuid,null,
+'SETTINGS_CHECKOUT_RATE_PUBLISH','settings.manage','approvals.review',
+true,false,3600,'{}'::jsonb,true,1)`,'trusted rate rule CAS');
+if(!configuredRateRule.ok)throw Error('Cannot configure rate rule');
+const directPublish=()=>`public.publish_shop_settings_v1('${E}'::uuid,'${S}'::uuid,1)`;
+deny(rpc(directPublish(),'direct rate publication rejected'),'checkout_rate_publish_approval_required');
+const publishPayload={shopId:S,expectedSettingsVersion:1,payloadFingerprint:ratePreview.payloadFingerprint};
+const rateRequest=rpc(`public.create_admin_approval_request_v1(
+'${B}'::uuid,'${S}'::uuid,'${E}'::uuid,null,'${RATES_RULE}'::uuid,
+'SETTINGS_CHECKOUT_RATE_PUBLISH','${RATES_CMD}'::uuid,
+'${JSON.stringify(publishPayload)}'::jsonb,'Checkout tax change')`,'queue rate approval');
+if(!rateRequest.ok||!rateRequest.requestId)throw Error('Rate request not durable');
+sql(`update public.admin_approval_rules set active=false where id='${RATES_RULE}'`);
+deny(rpc(directPublish(),'pending rate policy disabled'),'checkout_rate_publish_approval_required');
+const changedDraft=rpc(taxStage(1500,'1'),'tamper staged tax rate after request');
+if(!changedDraft.ok)throw Error('Staging tampered fixture failed');
+deny(rpc(directPublish(),'pending changed tax digest'),'checkout_rate_publish_approval_required');
+sql(`update public.admin_approval_rules set active=true where id='${RATES_RULE}'`);
+const rateDecision=rpc(`public.decide_admin_approval_request_v1(
+'${rateRequest.requestId}'::uuid,'${A}'::uuid,null,'APPROVE','Approved')`,'rate second approval');
+if(!rateDecision.ok)throw Error('Tax second approver rejected');
+const rateClaims=JSON.parse(sql(`select coalesce(jsonb_agg(to_jsonb(c)),'[]'::jsonb)::text
+from public.claim_admin_approval_execution_v1('tax-test',now(),10,300)c`));
+const rateClaim=rateClaims.find(x=>x.approval_request_id===rateRequest.requestId);
+if(!rateClaim?.claim_token)throw Error('Rate approval not claimed');
+const executeRates=(approver=A,fp=ratePreview.payloadFingerprint)=>
+`public.execute_approved_admin_checkout_rate_publish_v1(
+'${rateRequest.requestId}'::uuid,'${B}'::uuid,'${S}'::uuid,
+'${E}'::uuid,'${approver}'::uuid,1,'${fp}','${RATES_CMD}'::uuid)`;
+deny(rpc(executeRates(E),'deny self-approved rate publish'),'approval_checkout_rate_payload_or_state_mismatch');
+deny(rpc(executeRates(A,'00000000000000000000000000000000'),'deny changed digest'),'approval_checkout_rate_payload_or_state_mismatch');
+deny(rpc(executeRates(),'reject changed effective draft at worker'),'checkout_rate_publish_approval_required');
+const restore=rpc(taxStage(1400,'2'),'restore exact approved candidate');
+if(!restore.ok)throw Error('Could not restore approved candidate');
+const stillSame=rpc(`public.preview_admin_checkout_rate_publish_v1(
+'${E}'::uuid,'${S}'::uuid,1)`,'check same candidate digest');
+if(stillSame.payloadFingerprint!==ratePreview.payloadFingerprint)
+ throw Error('Candidate digest mutated despite same published contents');
+const posted=rpc(executeRates(),'second-person publish exact candidate');
+if(!posted.ok||posted.settingsVersion!==2)throw Error('Approved tax publish failed: '+JSON.stringify(posted));
+const rateReplay=rpc(executeRates(),'replay approved rate publish');
+if(!rateReplay.ok||rateReplay.idempotentReplay!==true)
+ throw Error('Approved rate replay not idempotent: '+JSON.stringify(rateReplay));
+const rateCompletion=rpc(`public.complete_admin_approval_execution_v1(
+'${rateRequest.requestId}'::uuid,'${rateClaim.claim_token}','EXECUTED',
+null,'{}'::jsonb,now())`,'complete rate worker');
+if(!rateCompletion.ok)throw Error('Rate completion not durable');
+const rateAfter=rpc(executeRates(),'fully completed rate replay');
+if(!rateAfter.ok||rateAfter.idempotentReplay!==true)
+ throw Error('Rate full completion replay failed');
+if(sql(`select count(*) from private.admin_checkout_rate_publish_approval_receipts
+where shop_id='${S}'`)!=='1')throw Error('Rate publish receipt not unique');
+if(sql(`select count(*) from public.admin_audit_events
+where action_type='SETTINGS_CHECKOUT_RATE_APPROVED_PUBLISHED' and shop_id='${S}'`)!=='1')
+throw Error('Rate published audit not exactly once');
+if(sql(`select (settings_json->'settings'->'values'->>'checkout.taxBps')
+from public.shop_settings_versions where shop_id='${S}' and settings_version=2`)!=='1400')
+throw Error('Published tax rate not approved value');
+for(const role of ['anon','authenticated']){
+ if(sql(`select has_function_privilege('${role}',
+'public.execute_approved_admin_checkout_rate_publish_v1(uuid,uuid,uuid,uuid,uuid,bigint,text,uuid)',
+'EXECUTE')`)!=='f')throw Error('Tax approval RPC exposed to '+role);
+}
+console.log('Checkout Tax publish: active and disabled-rule denial, changed draft digest, second-person, once-only receipt/audit passed.');
