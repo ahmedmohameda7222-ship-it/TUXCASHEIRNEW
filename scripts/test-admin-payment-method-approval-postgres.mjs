@@ -37,7 +37,7 @@ create function auth.uid() returns uuid language sql stable as $do$
  select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $do$;`, 'isolated fixture');
 const migrations = readdirSync(resolve('supabase/migrations'))
   .filter((x) => /^\d+_.+\.sql$/.test(x)).sort();
-const target = '20261016072738_admin_checkout_rates_publish_second_person_approval.sql';
+const target = '20261016090000_admin_payment_method_create_second_person_approval.sql';
 const index = migrations.indexOf(target);
 if (index < 0) throw new Error('Missing payment approval migration');
 for (const name of migrations.slice(0, index + 1)) {
@@ -327,3 +327,93 @@ for(const role of ['anon','authenticated']){
 'EXECUTE')`)!=='f')throw Error('Tax approval RPC exposed to '+role);
 }
 console.log('Checkout Tax publish: active and disabled-rule denial, changed draft digest, second-person, once-only receipt/audit passed.');
+
+
+const CREATE_RULE='94444444-4444-4444-8444-444444444447';
+const CREATE_APPROVAL_CMD='95555555-5555-4555-8555-555555555558';
+const CREATE_IDEMPOTENCY='create-new-card-test';
+const newPayment = {
+  shopId:S,commandId:CREATE_IDEMPOTENCY,displayName:'Digital Wallet',
+  logicType:'DIGITAL',active:true,sortOrder:20,channel:'BOTH',
+  requiresReference:true,manualConfirmationRequired:false,
+  refundAllowed:false,expectedSettingsVersion:2,
+};
+sql(`insert into public.admin_approval_rules(
+ id,business_id,shop_id,action_type,requester_permission,approver_permission,
+ requires_second_person,threshold_context,active)
+ values ('${CREATE_RULE}','${B}',null,'SETTINGS_PAYMENT_METHOD_CREATE',
+ 'settings.manage','approvals.review',true,'{}'::jsonb,true)`,'create payment approval rule');
+const configuredCreate=rpc(`public.upsert_admin_approval_rule_v1(
+ '${E}'::uuid,'${S}'::uuid,'${CREATE_RULE}'::uuid,null,
+ 'SETTINGS_PAYMENT_METHOD_CREATE','settings.manage','approvals.review',
+ true,false,3600,'{}'::jsonb,true,1)`,'trusted payment create rule');
+if(!configuredCreate.ok)throw Error('Payment create rule invalid');
+const directCreate=(id=CREATE_IDEMPOTENCY,name='Digital Wallet')=>
+`public.create_admin_payment_method_v2(
+ '${E}'::uuid,'${S}'::uuid,'${name}','DIGITAL',true,20,
+ 'BOTH',true,false,false,2,'${id}')`;
+deny(rpc(directCreate(),'configured direct payment create'),
+'payment_method_create_approval_required');
+deny(rpc(`public.create_admin_payment_method_v1(
+ '${E}'::uuid,'${S}'::uuid,'Legacy Digital','DIGITAL',
+ true,21,'BOTH',true,false,2,'legacy-create-bypass')`,
+ 'legacy direct create bypass'),'payment_method_create_approval_required');
+const createdCreate=rpc(`public.create_admin_approval_request_v1(
+ '${B}'::uuid,'${S}'::uuid,'${E}'::uuid,null,'${CREATE_RULE}'::uuid,
+ 'SETTINGS_PAYMENT_METHOD_CREATE','${CREATE_APPROVAL_CMD}'::uuid,
+ '${JSON.stringify(newPayment)}'::jsonb,'Add wallet payment')`, 'create payment approval request');
+if(!createdCreate.ok||!createdCreate.requestId)throw Error('Missing payment create approval request');
+sql(`update public.admin_approval_rules set active=false where id='${CREATE_RULE}'`);
+deny(rpc(directCreate(),'pending direct payment create bypass'),
+'payment_method_create_approval_required');
+deny(rpc(directCreate('different-command','Changed Name'),'changed id bypass'),
+'payment_method_create_approval_required');
+const pendingMethods=sql(`select count(*) from public.payment_methods
+ where shop_id='${S}' and display_name='Digital Wallet'`);
+if(pendingMethods!=='0')throw Error('Payment method materialized before second approval');
+sql(`update public.admin_approval_rules set active=true where id='${CREATE_RULE}'`);
+const createApproved=rpc(`public.decide_admin_approval_request_v1(
+ '${createdCreate.requestId}'::uuid,'${A}'::uuid,null,'APPROVE','Approved')`,'create second approver');
+if(!createApproved.ok)throw Error('Payment create second person rejected');
+const createClaims=JSON.parse(sql(`select coalesce(jsonb_agg(to_jsonb(c)),'[]'::jsonb)::text
+ from public.claim_admin_approval_execution_v1('create-test',now(),10,300)c`));
+const createClaim=createClaims.find(x=>x.approval_request_id===createdCreate.requestId);
+if(!createClaim?.claim_token)throw Error('Payment create request not claimable');
+const executeCreate=(approver=A,name='Digital Wallet')=>
+`public.execute_approved_admin_payment_method_create_v1(
+ '${createdCreate.requestId}'::uuid,'${B}'::uuid,'${S}'::uuid,
+ '${E}'::uuid,'${approver}'::uuid,'${CREATE_IDEMPOTENCY}',
+ '${name}','DIGITAL',true,20,'BOTH',true,false,false,2,
+ '${CREATE_APPROVAL_CMD}'::uuid)`;
+deny(rpc(executeCreate(E),'self-create denial'),
+'approval_payment_create_payload_or_state_mismatch');
+deny(rpc(executeCreate(A,'Tampered'),'changed name approval denial'),
+'approval_payment_create_payload_or_state_mismatch');
+const createdPayment=rpc(executeCreate(),'trusted create execution');
+if(!createdPayment.ok||!createdPayment.paymentMethodId||createdPayment.editVersion!==1)
+ throw Error('Payment create not committed: '+JSON.stringify(createdPayment));
+const createReplay=rpc(executeCreate(),'same approved create replay');
+if(!createReplay.ok||createReplay.idempotentReplay!==true||
+ createReplay.paymentMethodId!==createdPayment.paymentMethodId)
+ throw Error('Payment method create replay failed');
+const createCompleted=rpc(`public.complete_admin_approval_execution_v1(
+ '${createdCreate.requestId}'::uuid,'${createClaim.claim_token}',
+ 'EXECUTED',null,'{}'::jsonb,now())`,'payment create worker complete');
+if(!createCompleted.ok)throw Error('Payment create worker completion failed');
+const createFinalReplay=rpc(executeCreate(),'completed payment create replay');
+if(!createFinalReplay.ok||createFinalReplay.idempotentReplay!==true)
+ throw Error('Payment create approval not replay-safe after completion');
+if(sql(`select count(*) from private.admin_payment_method_create_approval_receipts
+ where shop_id='${S}'`)!=='1')throw Error('Payment create receipt count not one');
+if(sql(`select count(*) from public.admin_audit_events
+ where action_type='SETTINGS_PAYMENT_METHOD_APPROVED_CREATED' and shop_id='${S}'`)!=='1')
+ throw Error('Payment create approval audit should be once-only');
+if(sql(`select count(*) from public.payment_methods
+ where shop_id='${S}' and display_name='Digital Wallet' and refund_allowed=false`)!=='1')
+ throw Error('Payment create policy or count incorrect');
+for(const role of ['anon','authenticated']){
+ if(sql(`select has_function_privilege('${role}',
+ 'public.execute_approved_admin_payment_method_create_v1(uuid,uuid,uuid,uuid,uuid,text,text,text,boolean,integer,text,boolean,boolean,boolean,bigint,uuid)',
+ 'EXECUTE')`)!=='f')throw Error('Unsafe approved-create EXECUTE for '+role);
+}
+console.log('Payment method CREATE approval: active/disabled policy, legacy bypass, distinct person, exact payload and once-only receipts passed.');
