@@ -59,6 +59,12 @@ export const APPROVAL_RULE_ACTIONS: readonly ConfigurableApprovalAction[] = [
     thresholdKind: 'minimumQuantityImpact',
   },
   {
+    actionType: 'CATALOG_PRICE_PUBLISH',
+    label: 'Large catalog price publication',
+    requesterPermission: 'catalog.pricing',
+    thresholdKind: 'minimumMinor',
+  },
+  {
     actionType: 'SETTINGS_CHECKOUT_RATE_PUBLISH',
     label: 'Checkout tax / service rate publication',
     requesterPermission: 'settings.manage',

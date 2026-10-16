@@ -7,6 +7,7 @@ import {
   requireSessionCsrf,
 } from '../../server/adminAuthService.js';
 import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
+import { executeCatalogPricePublish } from '../../server/catalog/catalogPricePublishRoute.js';
 import { resumeCatalogDraft } from '../../server/catalog/catalogDraftResume.js';
 import {
   CatalogServiceError,
@@ -130,6 +131,7 @@ export const catalogCommandSchema = z.discriminatedUnion('type', [
       shopId: uuidSchema,
       expectedDraftRevision: z.number().int().positive(),
       expectedVersion: z.number().int().nonnegative(),
+      requesterPin: z.string().min(1).max(64).optional(),
     })
     .strict(),
   z
@@ -405,9 +407,15 @@ export default async function handler(
       case 'draft.save':
         sendJson(response, 200, { ...(await service.saveCatalogDraftChange(command, principal)) });
         return;
-      case 'draft.publish':
-        sendJson(response, 200, { ...(await service.publishCatalogDraft(command, principal)) });
+      case 'draft.publish': {
+        const token = readAdminSessionToken(firstHeader(request.headers.cookie));
+        if (!token) throw new AdminAuthError('session_required', 401);
+        const context = await loadAdminSession(token, client);
+        sendJson(response, 200, {
+          ...(await executeCatalogPricePublish(client, context, command, request)),
+        });
         return;
+      }
       case 'availability.set':
         sendJson(response, 200, {
           ...(await service.setImmediateAvailability(command, principal)),

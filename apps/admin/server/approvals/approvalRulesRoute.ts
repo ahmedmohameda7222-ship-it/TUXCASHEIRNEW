@@ -82,6 +82,7 @@ export const approvalRuleWriteSchema = z
     }
     if (
       [
+        'CATALOG_PRICE_PUBLISH',
         'SETTINGS_CHECKOUT_RATE_PUBLISH',
         'SETTINGS_PAYMENT_ZONE_CHANGE',
         'SETTINGS_PAYMENT_METHOD_CREATE',
@@ -101,8 +102,10 @@ export const approvalRuleWriteSchema = z
             ? 'shop_lifecycle_second_person_required'
             : value.actionType === 'FINANCE_SNAPSHOT_ADJUST'
               ? 'finance_snapshot_second_person_required'
-              : value.actionType === 'SETTINGS_CHECKOUT_RATE_PUBLISH'
-                ? 'checkout_rate_second_person_required'
+              : value.actionType === 'CATALOG_PRICE_PUBLISH'
+                ? 'catalog_price_second_person_required'
+                : value.actionType === 'SETTINGS_CHECKOUT_RATE_PUBLISH'
+                  ? 'checkout_rate_second_person_required'
                 : value.actionType === 'SETTINGS_PAYMENT_ZONE_CHANGE'
                   ? 'payment_zone_second_person_required'
                   : value.actionType === 'SETTINGS_PAYMENT_METHOD_CREATE'

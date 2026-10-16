@@ -32,6 +32,11 @@ import {
   type ApprovedFinanceSnapshotMutationResult,
 } from './financeSnapshotApproval.js';
 import {
+  createCatalogPricePublishApprovalExecutionEntries,
+  type ApprovedCatalogPricePublish,
+} from '../catalog/catalogPricePublishApproval.js';
+import type { CatalogPublishResult } from '@tux/admin-contracts';
+import {
   createSettingsCheckoutRateApprovalExecutionEntries,
   type ApprovedSettingsCheckoutRatePublish,
 } from './settingsCheckoutRatePublishApproval.js';
@@ -235,6 +240,26 @@ export async function runProductionApprovalExecutionRunner(): Promise<ApprovalEx
             p_reason: input.reason,
             p_original_command_id: input.commandId,
             p_expected_adjustment_count: input.expectedAdjustmentCount,
+            p_command_id: input.approvalCommandId,
+          },
+        );
+      },
+    }),
+    ...createCatalogPricePublishApprovalExecutionEntries({
+      publish(input: ApprovedCatalogPricePublish) {
+        return client.rpc<CatalogPublishResult>(
+          'execute_approved_admin_catalog_price_publish_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_draft_id: input.draftId,
+            p_expected_draft_revision: input.expectedDraftRevision,
+            p_expected_publish_version: input.expectedVersion,
+            p_max_price_delta_minor: input.maxPriceDeltaMinor,
+            p_candidate_fingerprint: input.candidateFingerprint,
             p_command_id: input.approvalCommandId,
           },
         );
