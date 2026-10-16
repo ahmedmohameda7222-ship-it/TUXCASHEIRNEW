@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 
-import type { AdminApprovalActor, AdminApprovalRule, SettingsPublishResult } from '@tux/admin-contracts';
+import type {
+  AdminApprovalActor,
+  AdminApprovalRule,
+  SettingsPublishResult,
+} from '@tux/admin-contracts';
 import { z } from 'zod';
 
 import {
@@ -16,11 +20,13 @@ import {
 
 export const SETTINGS_CHECKOUT_RATE_PUBLISH_ACTION = 'SETTINGS_CHECKOUT_RATE_PUBLISH';
 
-const schema = z.object({
-  shopId: z.string().uuid(),
-  expectedSettingsVersion: z.number().int().nonnegative().safe(),
-  payloadFingerprint: z.string().regex(/^[a-f0-9]{32}$/),
-}).strict();
+const schema = z
+  .object({
+    shopId: z.string().uuid(),
+    expectedSettingsVersion: z.number().int().nonnegative().safe(),
+    payloadFingerprint: z.string().regex(/^[a-f0-9]{32}$/),
+  })
+  .strict();
 
 export type SettingsCheckoutRatePublishPayload = z.infer<typeof schema>;
 export type ApprovedSettingsCheckoutRatePublish = SettingsCheckoutRatePublishPayload & {
@@ -91,37 +97,44 @@ const commandEntry: ApprovalCommandRegistryEntry = {
 export function createSettingsCheckoutRateApprovalExecutionEntries(deps: {
   publish(input: ApprovedSettingsCheckoutRatePublish): Promise<SettingsPublishResult>;
 }): readonly ApprovalExecutionRegistryEntry[] {
-  return [{
-    actionType: SETTINGS_CHECKOUT_RATE_PUBLISH_ACTION,
-    async execute({ payload, claim }) {
-      const command = parse(payload);
-      if (claim.shopId !== command.shopId) {
-        throw new ApprovalTerminalCommandError('approval_checkout_rate_scope_invalid');
-      }
-      const result = await deps.publish({
-        ...command,
-        businessId: claim.businessId,
-        approvalRequestId: claim.approvalRequestId,
-        requesterEmployeeId: claim.requesterEmployeeId,
-        approverEmployeeId: claim.approverEmployeeId,
-        approvalCommandId: claim.commandId,
-      });
-      if (!result.ok) {
-        throw new ApprovalTerminalCommandError(result.code);
-      }
-      if (!Number.isSafeInteger(result.settingsVersion) || result.settingsVersion < 1) {
-        throw new Error('approval_checkout_rate_result_invalid');
-      }
-      return { result, idempotentReplay: false };
+  return [
+    {
+      actionType: SETTINGS_CHECKOUT_RATE_PUBLISH_ACTION,
+      async execute({ payload, claim }) {
+        const command = parse(payload);
+        if (claim.shopId !== command.shopId) {
+          throw new ApprovalTerminalCommandError('approval_checkout_rate_scope_invalid');
+        }
+        const result = await deps.publish({
+          ...command,
+          businessId: claim.businessId,
+          approvalRequestId: claim.approvalRequestId,
+          requesterEmployeeId: claim.requesterEmployeeId,
+          approverEmployeeId: claim.approverEmployeeId,
+          approvalCommandId: claim.commandId,
+        });
+        if (!result.ok) {
+          throw new ApprovalTerminalCommandError(result.code);
+        }
+        if (!Number.isSafeInteger(result.settingsVersion) || result.settingsVersion < 1) {
+          throw new Error('approval_checkout_rate_result_invalid');
+        }
+        return { result, idempotentReplay: false };
+      },
     },
-  }];
+  ];
 }
 
 function commandId(actor: AdminApprovalActor, payload: SettingsCheckoutRatePublishPayload): string {
   const hex = createHash('sha256')
-    .update(JSON.stringify([
-      SETTINGS_CHECKOUT_RATE_PUBLISH_ACTION, actor.businessId, actor.employeeId, payload,
-    ]))
+    .update(
+      JSON.stringify([
+        SETTINGS_CHECKOUT_RATE_PUBLISH_ACTION,
+        actor.businessId,
+        actor.employeeId,
+        payload,
+      ]),
+    )
     .digest('hex');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }

@@ -94,14 +94,6 @@ jobs:
             echo
             echo "FINANCE_PRETTIER_END_${file}"
           done
-      - name: Preview checkout rate approval formatting
-        run: |
-          for file in apps/admin/server/approvals/approvalRulesRoute.ts apps/admin/server/approvals/settingsCheckoutRatePublishApproval.test.ts apps/admin/server/approvals/settingsCheckoutRatePublishApproval.ts apps/admin/server/settings/settingsCheckoutRatePublishRoute.ts apps/admin/src/settings/SettingsPage.tsx; do
-            echo "CHECKOUT_FMT_BEGIN_${file}"
-            npx prettier "$file" | base64 -w0
-            echo
-            echo "CHECKOUT_FMT_END_${file}"
-          done
       - name: Plan 3 approval and audit services
         run: >-
           npx vitest run

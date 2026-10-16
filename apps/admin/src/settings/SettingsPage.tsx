@@ -61,10 +61,9 @@ export type SettingsWorkspaceViewProps = {
   onUpdateBusinessDefault?: (draft: SettingOverrideUpdateDraft) => void | Promise<void>;
   businessDefaultUpdating?: boolean;
   onSectionChange(section: SettingsSection): void;
-  onPublish(requesterPin?: string):
-    | void
-    | SettingsPublishApprovalResult
-    | Promise<void | SettingsPublishApprovalResult>;
+  onPublish(
+    requesterPin?: string,
+  ): void | SettingsPublishApprovalResult | Promise<void | SettingsPublishApprovalResult>;
   publishing: boolean;
   onUpdateOperationalState(draft: ShopOperationalStateUpdateDraft): void | Promise<void>;
   operationalStateUpdating: boolean;
@@ -310,7 +309,9 @@ export function SettingsWorkspaceView({
       const result = await onPublish(publishPin || undefined);
       setPublishPin('');
       if (result && 'state' in result && result.state === 'PENDING_APPROVAL') {
-        setPublishFeedback('Checkout rate publication requested. A second person must approve before the settings are published.');
+        setPublishFeedback(
+          'Checkout rate publication requested. A second person must approve before the settings are published.',
+        );
       } else {
         setPublishFeedback('Settings published.');
       }

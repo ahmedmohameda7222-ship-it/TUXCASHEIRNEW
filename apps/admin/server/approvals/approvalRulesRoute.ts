@@ -104,9 +104,9 @@ export const approvalRuleWriteSchema = z
                 ? 'checkout_rate_second_person_required'
                 : value.actionType === 'SETTINGS_PAYMENT_ZONE_CHANGE'
                   ? 'payment_zone_second_person_required'
-                : value.actionType === 'SETTINGS_PAYMENT_METHOD_CHANGE'
-                  ? 'payment_method_second_person_required'
-                  : 'finance_owner_withdrawal_second_person_required',
+                  : value.actionType === 'SETTINGS_PAYMENT_METHOD_CHANGE'
+                    ? 'payment_method_second_person_required'
+                    : 'finance_owner_withdrawal_second_person_required',
       });
     }
     if (value.requesterPermission !== action.requesterPermission) {

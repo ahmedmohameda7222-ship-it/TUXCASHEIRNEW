@@ -1,7 +1,4 @@
-import type {
-  AdminApprovalRule,
-  AdminPermission,
-} from '@tux/admin-contracts';
+import type { AdminApprovalRule, AdminPermission } from '@tux/admin-contracts';
 
 import type { AdminSessionContext } from '../adminAuthService.js';
 import { isAdminPermission } from '../adminContractRuntime.js';
@@ -49,7 +46,10 @@ export async function executeSettingsCheckoutRatePublish(
     p_expected_settings_version: command.expectedSettingsVersion,
   });
   if (!preview.ok) return preview;
-  if (!/^[a-f0-9]{32}$/.test(preview.payloadFingerprint) || typeof preview.ratesChanged !== 'boolean') {
+  if (
+    !/^[a-f0-9]{32}$/.test(preview.payloadFingerprint) ||
+    typeof preview.ratesChanged !== 'boolean'
+  ) {
     return { ok: false, code: 'checkout_rate_preview_invalid' };
   }
   const rows = await client.select<RuleRow[]>(
@@ -63,7 +63,10 @@ export async function executeSettingsCheckoutRatePublish(
     }),
   );
   const rules: AdminApprovalRule[] = rows.map((row) => {
-    if (!isAdminPermission(row.requester_permission) || !isAdminPermission(row.approver_permission)) {
+    if (
+      !isAdminPermission(row.requester_permission) ||
+      !isAdminPermission(row.approver_permission)
+    ) {
       throw new Error('checkout_rate_approval_rule_permission_invalid');
     }
     return {
@@ -114,7 +117,9 @@ export async function executeSettingsCheckoutRatePublish(
     command.requesterPin,
     () =>
       createSettingsService(createSupabaseSettingsStore(client)).publishSettings(
-        command.shopId, command.expectedSettingsVersion, principal,
+        command.shopId,
+        command.expectedSettingsVersion,
+        principal,
       ),
   );
 }
