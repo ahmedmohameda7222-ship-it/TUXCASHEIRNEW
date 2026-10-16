@@ -35,6 +35,8 @@ import {
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
 
 const POSTGRES_INTEGER_MAX = 2_147_483_647;
+import { executeSettingsPaymentMethodCommand } from '../../server/settings/settingsPaymentMethodApprovalRoute.js';
+
 const uuidSchema = z.string().uuid();
 const expectedRowVersionSchema = z.number().int().positive().nullable();
 const expectedSettingsVersionSchema = z.number().int().nonnegative();
@@ -366,6 +368,7 @@ export const settingsCommandSchema = z.union([
       refundAllowed: z.boolean(),
       expectedSettingsVersion: expectedSettingsVersionSchema,
       expectedEditVersion: expectedEditVersionSchema,
+      requesterPin: z.string().min(1).max(64).optional(),
     })
     .strict(),
 ]);
@@ -512,9 +515,15 @@ export default async function handler(
       case 'payment-method.create':
         sendJson(response, 200, { ...(await service.createPaymentMethod(command, principal)) });
         return;
-      case 'payment-method.update':
-        sendJson(response, 200, { ...(await service.updatePaymentMethod(command, principal)) });
+      case 'payment-method.update': {
+        const sessionToken = readAdminSessionToken(firstHeader(request.headers.cookie));
+        if (!sessionToken) throw new AdminAuthError('session_required', 401);
+        const context = await loadAdminSession(sessionToken, client);
+        sendJson(response, 200, {
+          ...(await executeSettingsPaymentMethodCommand(client, context, command, request)),
+        });
         return;
+      }
     }
   } catch (error) {
     handleFailure(response, error);

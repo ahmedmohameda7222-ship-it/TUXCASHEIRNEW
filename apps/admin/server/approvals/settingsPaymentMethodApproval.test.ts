@@ -49,7 +49,7 @@ describe('Sensitive payment-method update approval', () => {
   it('advertises a real discrete payment update runner, not all Settings writes', () => {
     expect(APPROVAL_RULE_ACTIONS).toContainEqual({
       actionType: SETTINGS_PAYMENT_METHOD_APPROVAL_ACTION,
-      label: 'Payment method changes',
+      label: 'Payment method updates',
       requesterPermission: 'settings.manage',
       thresholdKind: null,
     });

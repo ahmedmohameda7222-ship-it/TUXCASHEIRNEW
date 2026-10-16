@@ -166,6 +166,11 @@ export type ReasonCodeWriteResult =
   | { ok: false; code: 'stale_reason_code_version'; currentVersion: number }
   | { ok: false; code: string };
 
+export type PaymentMethodUpdateResult =
+  | CanonicalSettingsRowEditResult
+  | { ok: true; state: 'PENDING_APPROVAL'; approvalRequestId: string; idempotentReplay?: boolean }
+  | { ok: true; idempotentReplay: true };
+
 export type CanonicalSettingsRowEditResult =
   | { ok: true; editVersion: number }
   | { ok: false; code: 'stale_settings_version'; currentVersion: number }
@@ -326,6 +331,8 @@ export type PaymentMethodCreateInput = {
 
 export type PaymentMethodEditInput = {
   shopId: string;
+  /** Only passed for optional second-person approval requester reauthentication. */
+  requesterPin?: string;
   paymentMethodId: string;
   displayName: string;
   active: boolean;

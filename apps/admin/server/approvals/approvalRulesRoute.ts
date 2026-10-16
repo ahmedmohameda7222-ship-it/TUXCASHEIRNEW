@@ -82,6 +82,7 @@ export const approvalRuleWriteSchema = z
     }
     if (
       [
+        'SETTINGS_PAYMENT_METHOD_CHANGE',
         'SHOP_LIFECYCLE_CHANGE',
         'FINANCE_SNAPSHOT_ADJUST',
         'FINANCE_OWNER_WITHDRAWAL',

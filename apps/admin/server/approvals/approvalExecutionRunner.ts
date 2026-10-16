@@ -32,6 +32,11 @@ import {
   type ApprovedFinanceSnapshotMutationResult,
 } from './financeSnapshotApproval.js';
 import {
+  createSettingsPaymentMethodApprovalExecutionEntries,
+  type ApprovedSettingsPaymentMethodUpdate,
+  type SettingsPaymentMethodMutationResult,
+} from './settingsPaymentMethodApproval.js';
+import {
   createShopLifecycleApprovalExecutionEntries,
   type ApprovedShopLifecycleInput,
   type ApprovedShopLifecycleMutationResult,
@@ -215,6 +220,31 @@ export async function runProductionApprovalExecutionRunner(): Promise<ApprovalEx
             p_reason: input.reason,
             p_original_command_id: input.commandId,
             p_expected_adjustment_count: input.expectedAdjustmentCount,
+            p_command_id: input.approvalCommandId,
+          },
+        );
+      },
+    }),
+    ...createSettingsPaymentMethodApprovalExecutionEntries({
+      executeUpdate(input: ApprovedSettingsPaymentMethodUpdate) {
+        return client.rpc<SettingsPaymentMethodMutationResult>(
+          'execute_approved_admin_payment_method_update_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_payment_method_id: input.paymentMethodId,
+            p_display_name: input.displayName,
+            p_active: input.active,
+            p_sort_order: input.sortOrder,
+            p_channel: input.channel,
+            p_requires_reference: input.requiresReference,
+            p_manual_confirmation_required: input.manualConfirmationRequired,
+            p_refund_allowed: input.refundAllowed,
+            p_expected_settings_version: input.expectedSettingsVersion,
+            p_expected_edit_version: input.expectedEditVersion,
             p_command_id: input.approvalCommandId,
           },
         );
