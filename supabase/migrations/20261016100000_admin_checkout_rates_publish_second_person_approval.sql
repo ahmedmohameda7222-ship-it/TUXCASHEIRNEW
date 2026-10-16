@@ -297,8 +297,7 @@ begin
     p_local_scheduled_at
   );
 end;
-$function$
-
+$function$;
 
 CREATE OR REPLACE FUNCTION public.apply_scheduled_shop_config_change_v1(p_change_id uuid, p_idempotency_key text, p_attempt_count integer)
  RETURNS jsonb
@@ -531,8 +530,7 @@ begin
     'operationsConfigurationVersion', v_next_operations_version
   );
 end;
-$function$
-
+$function$;
 
 revoke all on function public.schedule_shop_settings_publish_v1(uuid,uuid,bigint,timestamp without time zone) from public,anon,authenticated;
 grant execute on function public.schedule_shop_settings_publish_v1(uuid,uuid,bigint,timestamp without time zone) to service_role;
