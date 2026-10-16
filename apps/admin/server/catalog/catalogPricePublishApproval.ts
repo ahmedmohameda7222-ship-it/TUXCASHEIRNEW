@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 
-import type { AdminApprovalActor, AdminApprovalRule, CatalogPublishResult } from '@tux/admin-contracts';
+import type {
+  AdminApprovalActor,
+  AdminApprovalRule,
+  CatalogPublishResult,
+} from '@tux/admin-contracts';
 import { z } from 'zod';
 
 import {
@@ -43,7 +47,8 @@ export type CatalogPricePublishApprovalResult =
 
 function parse(value: unknown): CatalogPricePublishPayload {
   const parsed = schema.safeParse(value);
-  if (!parsed.success) throw new ApprovalTerminalCommandError('approval_catalog_price_payload_invalid');
+  if (!parsed.success)
+    throw new ApprovalTerminalCommandError('approval_catalog_price_payload_invalid');
   return parsed.data;
 }
 

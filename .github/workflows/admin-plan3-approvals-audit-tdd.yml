@@ -94,14 +94,6 @@ jobs:
             echo
             echo "FINANCE_PRETTIER_END_${file}"
           done
-      - name: Inspect catalog price approval formatting
-        run: |
-          for file in apps/admin/server/approvals/approvalExecutionRunner.ts apps/admin/server/approvals/approvalRulesRoute.ts apps/admin/server/catalog/catalogPricePublishApproval.test.ts apps/admin/server/catalog/catalogPricePublishApproval.ts; do
-            echo "CATALOG_FMT_BEGIN_${file}"
-            npx prettier "$file" | base64 -w0
-            echo
-            echo "CATALOG_FMT_END_${file}"
-          done
       - name: Plan 3 approval and audit services
         run: >-
           npx vitest run

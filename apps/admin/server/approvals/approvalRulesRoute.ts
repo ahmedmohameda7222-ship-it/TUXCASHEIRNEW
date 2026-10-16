@@ -106,13 +106,13 @@ export const approvalRuleWriteSchema = z
                 ? 'catalog_price_second_person_required'
                 : value.actionType === 'SETTINGS_CHECKOUT_RATE_PUBLISH'
                   ? 'checkout_rate_second_person_required'
-                : value.actionType === 'SETTINGS_PAYMENT_ZONE_CHANGE'
-                  ? 'payment_zone_second_person_required'
-                  : value.actionType === 'SETTINGS_PAYMENT_METHOD_CREATE'
-                    ? 'payment_method_create_second_person_required'
-                    : value.actionType === 'SETTINGS_PAYMENT_METHOD_CHANGE'
-                      ? 'payment_method_second_person_required'
-                      : 'finance_owner_withdrawal_second_person_required',
+                  : value.actionType === 'SETTINGS_PAYMENT_ZONE_CHANGE'
+                    ? 'payment_zone_second_person_required'
+                    : value.actionType === 'SETTINGS_PAYMENT_METHOD_CREATE'
+                      ? 'payment_method_create_second_person_required'
+                      : value.actionType === 'SETTINGS_PAYMENT_METHOD_CHANGE'
+                        ? 'payment_method_second_person_required'
+                        : 'finance_owner_withdrawal_second_person_required',
       });
     }
     if (value.requesterPermission !== action.requesterPermission) {

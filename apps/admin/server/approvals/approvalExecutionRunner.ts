@@ -247,22 +247,19 @@ export async function runProductionApprovalExecutionRunner(): Promise<ApprovalEx
     }),
     ...createCatalogPricePublishApprovalExecutionEntries({
       publish(input: ApprovedCatalogPricePublish) {
-        return client.rpc<CatalogPublishResult>(
-          'execute_approved_admin_catalog_price_publish_v1',
-          {
-            p_approval_request_id: input.approvalRequestId,
-            p_business_id: input.businessId,
-            p_shop_id: input.shopId,
-            p_requester_employee_id: input.requesterEmployeeId,
-            p_approver_employee_id: input.approverEmployeeId,
-            p_draft_id: input.draftId,
-            p_expected_draft_revision: input.expectedDraftRevision,
-            p_expected_publish_version: input.expectedVersion,
-            p_max_price_delta_minor: input.maxPriceDeltaMinor,
-            p_candidate_fingerprint: input.candidateFingerprint,
-            p_command_id: input.approvalCommandId,
-          },
-        );
+        return client.rpc<CatalogPublishResult>('execute_approved_admin_catalog_price_publish_v1', {
+          p_approval_request_id: input.approvalRequestId,
+          p_business_id: input.businessId,
+          p_shop_id: input.shopId,
+          p_requester_employee_id: input.requesterEmployeeId,
+          p_approver_employee_id: input.approverEmployeeId,
+          p_draft_id: input.draftId,
+          p_expected_draft_revision: input.expectedDraftRevision,
+          p_expected_publish_version: input.expectedVersion,
+          p_max_price_delta_minor: input.maxPriceDeltaMinor,
+          p_candidate_fingerprint: input.candidateFingerprint,
+          p_command_id: input.approvalCommandId,
+        });
       },
     }),
     ...createSettingsCheckoutRateApprovalExecutionEntries({
