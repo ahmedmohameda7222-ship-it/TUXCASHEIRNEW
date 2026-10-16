@@ -170,13 +170,6 @@ function requireReasonCodeWriteSuccess(result: ReasonCodeWriteResult): void {
     'currentVersion' in result ? result.currentVersion : undefined,
   );
 }
-function requirePublishSuccess(result: SettingsPublishResult): void {
-  if (result.ok) return;
-  throw new SettingsUiError(
-    result.code,
-    'currentVersion' in result ? result.currentVersion : undefined,
-  );
-}
 function requireShopManagementSuccess(result: ShopManagementWriteResult): void {
   if (result.ok) return;
   throw new SettingsUiError(

@@ -1,4 +1,8 @@
-import type { AdminSettingsWorkspace, PaymentMethodUpdateResult } from '@tux/admin-contracts';
+import type {
+  AdminSettingsWorkspace,
+  PaymentMethodUpdateResult,
+  SettingsPublishApprovalResult,
+} from '@tux/admin-contracts';
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 
@@ -57,7 +61,10 @@ export type SettingsWorkspaceViewProps = {
   onUpdateBusinessDefault?: (draft: SettingOverrideUpdateDraft) => void | Promise<void>;
   businessDefaultUpdating?: boolean;
   onSectionChange(section: SettingsSection): void;
-  onPublish(): void | Promise<void>;
+  onPublish(requesterPin?: string):
+    | void
+    | SettingsPublishApprovalResult
+    | Promise<void | SettingsPublishApprovalResult>;
   publishing: boolean;
   onUpdateOperationalState(draft: ShopOperationalStateUpdateDraft): void | Promise<void>;
   operationalStateUpdating: boolean;
@@ -295,6 +302,22 @@ export function SettingsWorkspaceView({
   publishing,
   ...sectionProps
 }: SettingsWorkspaceViewProps) {
+  const [publishPin, setPublishPin] = useState('');
+  const [publishFeedback, setPublishFeedback] = useState<string | null>(null);
+  async function publish() {
+    setPublishFeedback(null);
+    try {
+      const result = await onPublish(publishPin || undefined);
+      setPublishPin('');
+      if (result && 'state' in result && result.state === 'PENDING_APPROVAL') {
+        setPublishFeedback('Checkout rate publication requested. A second person must approve before the settings are published.');
+      } else {
+        setPublishFeedback('Settings published.');
+      }
+    } catch (cause) {
+      setPublishFeedback(cause instanceof Error ? cause.message : 'Unable to publish settings.');
+    }
+  }
   return (
     <main className="admin-settings-workspace" data-settings-version={workspace.settingsVersion}>
       <header className="admin-settings-workspace__header">
@@ -304,14 +327,26 @@ export function SettingsWorkspaceView({
           <p className="admin-field__help">Shop settings and operational controls</p>
         </div>
         <div className="admin-settings-workspace__publish">
+          <label className="admin-field">
+            <span>Requester PIN (if required for approval)</span>
+            <input
+              type="password"
+              autoComplete="off"
+              maxLength={64}
+              value={publishPin}
+              disabled={publishing}
+              onChange={(event) => setPublishPin(event.currentTarget.value)}
+            />
+          </label>
           <button
             className="admin-primary-button"
             type="button"
             disabled={publishing}
-            onClick={() => void onPublish()}
+            onClick={() => void publish()}
           >
             {publishing ? 'Publishing…' : 'Publish settings'}
           </button>
+          {publishFeedback ? <p role="status">{publishFeedback}</p> : null}
           <p className="admin-field__help">
             Configuration edits publish here. Emergency shop controls publish immediately.
           </p>
@@ -431,7 +466,7 @@ export function SettingsPage() {
           onUpdateBusinessDefault={(draft) => settings.updateBusinessDefault.mutateAsync(draft)}
           businessDefaultUpdating={settings.updateBusinessDefault.isPending}
           onSectionChange={(nextSection) => navigate(settingsLocationForSection(nextSection))}
-          onPublish={() => settings.publish.mutateAsync()}
+          onPublish={(pin) => settings.publish.mutateAsync(pin)}
           publishing={settings.publish.isPending}
           onUpdateOperationalState={(draft) => settings.updateOperationalState.mutateAsync(draft)}
           operationalStateUpdating={settings.updateOperationalState.isPending}
