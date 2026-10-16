@@ -33,6 +33,7 @@ async function mockSettings(
   authorizedShopIds: string[] = [shopId],
   pendingPaymentApproval = false,
   pendingZoneApproval = false,
+  pendingCheckoutPublishApproval = false,
 ) {
   let settingsVersion = 7;
   let shopLifecycleState: 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED' = 'ACTIVE';
@@ -335,11 +336,23 @@ async function mockSettings(
     }
 
     if (command.type === 'settings.publish') {
-      expect(command).toEqual({
+      expect(command).toMatchObject({
         type: 'settings.publish',
         shopId,
         expectedSettingsVersion: settingsVersion,
       });
+      if (pendingCheckoutPublishApproval) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            state: 'PENDING_APPROVAL',
+            approvalRequestId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+          }),
+        });
+        return;
+      }
       settingsVersion += 1;
       await route.fulfill({
         status: 200,
@@ -456,6 +469,36 @@ test('edits checkout and receipt overrides with CAS, then publishes settings', a
     shopId,
     expectedSettingsVersion: 7,
   });
+});
+
+test('keeps checkout tax publication pending until a second person approves', async ({
+  page,
+}) => {
+  const { commands } = await mockSettings(
+    page,
+    ownerSession.principal.permissions,
+    'OWNER',
+    [],
+    [shopId],
+    false,
+    false,
+    true,
+  );
+  await page.goto('/settings/checkout');
+  await page.getByLabel('Requester PIN (if required for approval)').fill('2468');
+  await page.getByRole('button', { name: 'Publish settings' }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'second person must approve' }),
+  ).toBeVisible();
+  expect(commands).toHaveLength(1);
+  expect(commands[0]).toMatchObject({
+    type: 'settings.publish',
+    shopId,
+    expectedSettingsVersion: 7,
+    requesterPin: '2468',
+  });
+  await page.reload();
+  await expect(page.locator('[data-settings-version="7"]')).toBeVisible();
 });
 
 test('keeps a payment zone restriction unchanged until approved by another person', async ({
