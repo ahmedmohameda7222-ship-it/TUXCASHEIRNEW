@@ -1,4 +1,4 @@
-import type { AdminSettingsWorkspace, PaymentMethodUpdateResult } from '@tux/admin-contracts';
+import type { AdminSettingsWorkspace, PaymentMethodCreateResult, PaymentMethodUpdateResult } from '@tux/admin-contracts';
 import { useState, type FormEvent } from 'react';
 
 import { sortOrderAfterMove } from './settingsModel';
@@ -7,7 +7,10 @@ import type { PaymentMethodCreateDraft, PaymentMethodUpdateDraft } from './useSe
 export type PaymentsPageProps = {
   workspace: AdminSettingsWorkspace;
   updating: boolean;
-  onCreate(draft: PaymentMethodCreateDraft): void | Promise<void>;
+  onCreate(draft: PaymentMethodCreateDraft):
+    | void
+    | PaymentMethodCreateResult
+    | Promise<void | PaymentMethodCreateResult>;
   onUpdate(
     draft: PaymentMethodUpdateDraft,
   ): void | PaymentMethodUpdateResult | Promise<void | PaymentMethodUpdateResult>;
@@ -32,7 +35,17 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
     if (!createDraft || updating || !createDraft.displayName.trim()) return;
     setError(null);
     try {
-      await onCreate({ ...createDraft, displayName: createDraft.displayName.trim() });
+      const result = await onCreate({
+        ...createDraft,
+        displayName: createDraft.displayName.trim(),
+      });
+      if (result && 'state' in result && result.state === 'PENDING_APPROVAL') {
+        setNotice(
+          'Payment method creation requested. A second person must approve it before it is available.',
+        );
+      } else {
+        setNotice('Payment method created.');
+      }
       setCreateDraft(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to create payment method.');
@@ -229,6 +242,22 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
               <span>Refunds allowed for new payments</span>
             </label>
           </div>
+          <label className="admin-field">
+            <span>Requester PIN (when required by approval policy)</span>
+            <input
+              type="password"
+              autoComplete="off"
+              maxLength={64}
+              value={createDraft.requesterPin ?? ''}
+              disabled={updating}
+              onChange={(event) => {
+                const requesterPin = event.currentTarget.value;
+                setCreateDraft((current) =>
+                  current ? { ...current, requesterPin } : current,
+                );
+              }}
+            />
+          </label>
           {error ? <p className="admin-field__error">{error}</p> : null}
           <div className="admin-settings-row__main">
             <button className="admin-primary-button" type="submit" disabled={updating}>

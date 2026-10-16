@@ -1,5 +1,6 @@
 import type {
   AdminSettingsWorkspace,
+  PaymentMethodCreateResult,
   PaymentMethodUpdateResult,
   SettingsPublishApprovalResult,
 } from '@tux/admin-contracts';
@@ -81,7 +82,9 @@ export type SettingsWorkspaceViewProps = {
   onCreateOrderType(draft: OrderTypeCreateDraft): void | Promise<void>;
   onUpdateOrderType(draft: OrderTypeUpdateDraft): void | Promise<void>;
   orderTypeUpdating: boolean;
-  onCreatePaymentMethod(draft: PaymentMethodCreateDraft): void | Promise<void>;
+  onCreatePaymentMethod(
+    draft: PaymentMethodCreateDraft,
+  ): void | PaymentMethodCreateResult | Promise<void | PaymentMethodCreateResult>;
   onUpdatePaymentMethod(
     draft: PaymentMethodUpdateDraft,
   ): void | PaymentMethodUpdateResult | Promise<void | PaymentMethodUpdateResult>;
