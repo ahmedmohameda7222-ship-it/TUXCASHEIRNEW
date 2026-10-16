@@ -94,12 +94,6 @@ jobs:
             echo
             echo "FINANCE_PRETTIER_END_${file}"
           done
-      - name: Preview checkout browser acceptance formatting
-        run: |
-          echo CHECKOUT_E2E_FORMAT_BEGIN
-          npx prettier e2e/admin-settings.spec.ts | base64 -w0
-          echo
-          echo CHECKOUT_E2E_FORMAT_END
       - name: Plan 3 approval and audit services
         run: >-
           npx vitest run

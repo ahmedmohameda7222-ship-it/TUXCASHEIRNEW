@@ -471,9 +471,7 @@ test('edits checkout and receipt overrides with CAS, then publishes settings', a
   });
 });
 
-test('keeps checkout tax publication pending until a second person approves', async ({
-  page,
-}) => {
+test('keeps checkout tax publication pending until a second person approves', async ({ page }) => {
   const { commands } = await mockSettings(
     page,
     ownerSession.principal.permissions,
