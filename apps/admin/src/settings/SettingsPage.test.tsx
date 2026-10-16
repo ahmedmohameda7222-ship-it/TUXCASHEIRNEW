@@ -178,6 +178,11 @@ describe('Settings workspace', () => {
     expect(html).toContain('Emergency shop controls publish immediately');
   });
 
+  it('hides unused-shop deletion for users without shops.manage', () => {
+    const html = renderSection('shop');
+    expect(html).not.toContain('Delete unused shop');
+  });
+
   it('shows editable receipt settings with business-facing source labels', () => {
     const html = renderToStaticMarkup(
       <ReceiptsPage workspace={workspace} onUpdate={noop} updating={false} />,
