@@ -192,7 +192,15 @@ export default async function handler(
         active: 'eq.true',
       }),
     );
-    const { requesterPin, ...payload } = parsed.data;
+    const { requesterPin } = parsed.data;
+    const payload = {
+      shopId: parsed.data.shopId,
+      paymentMethodId: parsed.data.paymentMethodId,
+      deliveryZoneId: parsed.data.deliveryZoneId,
+      allowed: parsed.data.allowed,
+      expectedAllowed: parsed.data.expectedAllowed,
+      expectedSettingsVersion: parsed.data.expectedSettingsVersion,
+    };
     const base = createSupabaseApprovalServiceDependencies(client);
     const limiter = createAdminPinRateLimitRpc(client);
     const value = await executeOrRequestSettingsPaymentZoneUpdate(
