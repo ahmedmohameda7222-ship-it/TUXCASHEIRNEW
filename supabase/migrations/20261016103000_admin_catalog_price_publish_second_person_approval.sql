@@ -125,7 +125,7 @@ begin
       p_employee_id,v_draft.shop_id,'catalog.pricing');
   end if;
   return jsonb_build_object('ok',true,'shopId',v_draft.shop_id,
-    'maxPriceDeltaMinor',v_impact,'candidateFingerprint',md5(v_bundle::text));
+    'maxPriceDeltaMinor',v_impact,'candidateFingerprint',md5(v_draft.working_bundle_json::text));
 end;
 $price_preview$;
 
@@ -272,7 +272,7 @@ begin
 
   v_price_impact:=private.admin_catalog_price_max_delta_v1(
     v_draft.shop_id,v_bundle);
-  v_price_fingerprint:=md5(v_bundle::text);
+  v_price_fingerprint:=md5(v_draft.working_bundle_json::text);
   v_price_approved:=exists (
     select 1 from public.admin_approval_requests a
     where a.id=nullif(
@@ -375,30 +375,42 @@ begin
     return v_schedule_resolution;
   end if;
 
-  -- Reject new high-impact schedules at acceptance; existing scheduled
-  -- publications are also protected in the common publish executor.
+  -- Avoid changing ordinary schedule/rebase behavior when no price rule
+  -- exists. Active price policy or an open price request requires preview/CAS.
   declare
     v_preview jsonb;
     v_business_id uuid;
+    v_shop_id uuid;
   begin
-    v_preview:=public.preview_admin_catalog_price_publish_v1(
-      p_employee_id,p_draft_id,p_expected_draft_revision,
-      p_expected_base_publish_version);
-    if v_preview->>'ok' is distinct from 'true' then return v_preview; end if;
-    select d.business_id into v_business_id from public.catalog_drafts d
-      where d.id=p_draft_id;
-    if private.admin_catalog_price_requires_approval_v1(
-      v_business_id,(v_preview->>'shopId')::uuid,
-      (v_preview->>'maxPriceDeltaMinor')::bigint)
-      or exists (
-        select 1 from public.admin_approval_requests a
-        where a.business_id=v_business_id
-          and a.shop_id=(v_preview->>'shopId')::uuid
-          and a.action_type='CATALOG_PRICE_PUBLISH'
-          and a.status in ('PENDING','APPROVED','EXECUTING')
-          and a.command_payload->>'draftId'=p_draft_id::text
-      ) then
-      return jsonb_build_object('ok',false,'code','catalog_price_approval_required');
+    select business_id,shop_id into v_business_id,v_shop_id
+      from public.catalog_drafts where id=p_draft_id;
+    if exists (
+      select 1 from public.admin_approval_rules r
+      where r.business_id=v_business_id and r.active
+        and r.action_type='CATALOG_PRICE_PUBLISH'
+        and (r.shop_id=v_shop_id or r.shop_id is null)
+    ) or exists (
+      select 1 from public.admin_approval_requests a
+      where a.business_id=v_business_id and a.shop_id=v_shop_id
+        and a.action_type='CATALOG_PRICE_PUBLISH'
+        and a.status in ('PENDING','APPROVED','EXECUTING')
+        and a.command_payload->>'draftId'=p_draft_id::text
+    ) then
+      v_preview:=public.preview_admin_catalog_price_publish_v1(
+        p_employee_id,p_draft_id,p_expected_draft_revision,
+        p_expected_base_publish_version);
+      if v_preview->>'ok' is distinct from 'true' then return v_preview; end if;
+      if private.admin_catalog_price_requires_approval_v1(
+        v_business_id,v_shop_id,(v_preview->>'maxPriceDeltaMinor')::bigint)
+        or exists (
+          select 1 from public.admin_approval_requests a
+          where a.business_id=v_business_id and a.shop_id=v_shop_id
+            and a.action_type='CATALOG_PRICE_PUBLISH'
+            and a.status in ('PENDING','APPROVED','EXECUTING')
+            and a.command_payload->>'draftId'=p_draft_id::text
+        ) then
+        return jsonb_build_object('ok',false,'code','catalog_price_approval_required');
+      end if;
     end if;
   end;
 
