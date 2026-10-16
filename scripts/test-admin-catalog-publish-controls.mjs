@@ -452,7 +452,9 @@ declare v_signature text;
 begin
   foreach v_signature in array array[
     'public.preview_admin_catalog_price_publish_v1(uuid,uuid,bigint,bigint)',
-    'public.execute_approved_admin_catalog_price_publish_v1(uuid,uuid,uuid,uuid,uuid,uuid,bigint,bigint,bigint,text,uuid)'
+    'public.execute_approved_admin_catalog_price_publish_v1(uuid,uuid,uuid,uuid,uuid,uuid,bigint,bigint,bigint,text,uuid)',
+    'private.admin_catalog_price_max_delta_v1(uuid,jsonb)',
+    'private.admin_catalog_price_requires_approval_v1(uuid,uuid,bigint)'
   ] loop
     if has_function_privilege('anon',v_signature,'EXECUTE')
       or has_function_privilege('authenticated',v_signature,'EXECUTE')
