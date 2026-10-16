@@ -100,6 +100,7 @@ jobs:
           apps/admin/server/approvals/approvalService.test.ts
           apps/admin/server/approvals/shopLifecycleApproval.test.ts
           apps/admin/server/approvals/settingsPaymentMethodApproval.test.ts
+          apps/admin/server/approvals/settingsPaymentZoneApproval.test.ts
           apps/admin/server/approvals/financeSnapshotApproval.test.ts
           apps/admin/server/approvals/financeOwnerWithdrawalApproval.test.ts
           apps/admin/server/approvals/financeCashierReconciliationApproval.test.ts
@@ -208,7 +209,7 @@ jobs:
         run: node scripts/test-admin-approvals-audit-review-hardening-round13.mjs
       - name: Shop lifecycle approved execution PostgreSQL behavior
         run: node scripts/test-admin-shop-lifecycle-approvals-postgres.mjs
-      - name: Payment method update approved execution PostgreSQL behavior
+      - name: Payment method and payment-zone second-person approval PostgreSQL behavior
         run: node scripts/test-admin-payment-method-approval-postgres.mjs
       - name: Finance snapshot second-person approval PostgreSQL behavior
         run: node scripts/test-admin-finance-snapshot-approval-postgres.mjs
