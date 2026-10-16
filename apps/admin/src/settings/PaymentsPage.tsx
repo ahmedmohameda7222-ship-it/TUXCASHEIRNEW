@@ -1,4 +1,8 @@
-import type { AdminSettingsWorkspace, PaymentMethodCreateResult, PaymentMethodUpdateResult } from '@tux/admin-contracts';
+import type {
+  AdminSettingsWorkspace,
+  PaymentMethodCreateResult,
+  PaymentMethodUpdateResult,
+} from '@tux/admin-contracts';
 import { useState, type FormEvent } from 'react';
 
 import { sortOrderAfterMove } from './settingsModel';
@@ -7,10 +11,9 @@ import type { PaymentMethodCreateDraft, PaymentMethodUpdateDraft } from './useSe
 export type PaymentsPageProps = {
   workspace: AdminSettingsWorkspace;
   updating: boolean;
-  onCreate(draft: PaymentMethodCreateDraft):
-    | void
-    | PaymentMethodCreateResult
-    | Promise<void | PaymentMethodCreateResult>;
+  onCreate(
+    draft: PaymentMethodCreateDraft,
+  ): void | PaymentMethodCreateResult | Promise<void | PaymentMethodCreateResult>;
   onUpdate(
     draft: PaymentMethodUpdateDraft,
   ): void | PaymentMethodUpdateResult | Promise<void | PaymentMethodUpdateResult>;
@@ -252,9 +255,7 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
               disabled={updating}
               onChange={(event) => {
                 const requesterPin = event.currentTarget.value;
-                setCreateDraft((current) =>
-                  current ? { ...current, requesterPin } : current,
-                );
+                setCreateDraft((current) => (current ? { ...current, requesterPin } : current));
               }}
             />
           </label>

@@ -598,7 +598,9 @@ test('creates payment methods with a retry-safe trusted settings command', async
   expect(typeof commands[0]?.commandId).toBe('string');
 });
 
-test('pending approved payment creation is not falsely presented as available', async ({ page }) => {
+test('pending approved payment creation is not falsely presented as available', async ({
+  page,
+}) => {
   const { commands } = await mockSettings(
     page,
     ownerSession.principal.permissions,

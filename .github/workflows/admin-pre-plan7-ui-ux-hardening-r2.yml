@@ -53,14 +53,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Preview payment-create Prettier exact source
-        run: |
-          for file in apps/admin/server/approvals/approvalRulesRoute.ts apps/admin/server/approvals/settingsPaymentMethodCreateApproval.test.ts apps/admin/src/settings/PaymentsPage.tsx e2e/admin-settings.spec.ts; do
-            echo "CREATE_FMT_BEGIN_${file}"
-            npx prettier "$file" | base64 -w0
-            echo
-            echo "CREATE_FMT_END_${file}"
-          done
       - name: Formatting
         run: npm run format:check
       - name: Lint
