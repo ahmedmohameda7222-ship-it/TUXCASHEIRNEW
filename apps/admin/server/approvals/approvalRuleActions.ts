@@ -71,6 +71,12 @@ export const APPROVAL_RULE_ACTIONS: readonly ConfigurableApprovalAction[] = [
     thresholdKind: null,
   },
   {
+    actionType: 'SETTINGS_PAYMENT_METHOD_CREATE',
+    label: 'Payment method creation',
+    requesterPermission: 'settings.manage',
+    thresholdKind: null,
+  },
+  {
     actionType: 'SETTINGS_PAYMENT_METHOD_CHANGE',
     label: 'Payment method updates',
     requesterPermission: 'settings.manage',

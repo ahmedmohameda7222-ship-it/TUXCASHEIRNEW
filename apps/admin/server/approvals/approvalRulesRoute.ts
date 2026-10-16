@@ -84,6 +84,7 @@ export const approvalRuleWriteSchema = z
       [
         'SETTINGS_CHECKOUT_RATE_PUBLISH',
         'SETTINGS_PAYMENT_ZONE_CHANGE',
+        'SETTINGS_PAYMENT_METHOD_CREATE',
         'SETTINGS_PAYMENT_METHOD_CHANGE',
         'SHOP_LIFECYCLE_CHANGE',
         'FINANCE_SNAPSHOT_ADJUST',
@@ -104,8 +105,10 @@ export const approvalRuleWriteSchema = z
                 ? 'checkout_rate_second_person_required'
                 : value.actionType === 'SETTINGS_PAYMENT_ZONE_CHANGE'
                   ? 'payment_zone_second_person_required'
-                  : value.actionType === 'SETTINGS_PAYMENT_METHOD_CHANGE'
-                    ? 'payment_method_second_person_required'
+                  : value.actionType === 'SETTINGS_PAYMENT_METHOD_CREATE'
+                    ? 'payment_method_create_second_person_required'
+                    : value.actionType === 'SETTINGS_PAYMENT_METHOD_CHANGE'
+                      ? 'payment_method_second_person_required'
                     : 'finance_owner_withdrawal_second_person_required',
       });
     }

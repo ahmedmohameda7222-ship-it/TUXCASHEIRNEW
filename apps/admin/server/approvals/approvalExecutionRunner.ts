@@ -42,6 +42,11 @@ import {
   type SettingsPaymentZoneMutationResult,
 } from './settingsPaymentZoneApproval.js';
 import {
+  createPaymentMethodCreateApprovalExecutionEntries,
+  type ApprovedPaymentMethodCreate,
+  type PaymentMethodCreateMutationResult,
+} from './settingsPaymentMethodCreateApproval.js';
+import {
   createSettingsPaymentMethodApprovalExecutionEntries,
   type ApprovedSettingsPaymentMethodUpdate,
   type SettingsPaymentMethodMutationResult,
@@ -268,6 +273,31 @@ export async function runProductionApprovalExecutionRunner(): Promise<ApprovalEx
             p_expected_allowed: input.expectedAllowed,
             p_expected_settings_version: input.expectedSettingsVersion,
             p_command_id: input.approvalCommandId,
+          },
+        );
+      },
+    }),
+    ...createPaymentMethodCreateApprovalExecutionEntries({
+      executeCreate(input: ApprovedPaymentMethodCreate) {
+        return client.rpc<PaymentMethodCreateMutationResult>(
+          'execute_approved_admin_payment_method_create_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_original_command_id: input.commandId,
+            p_display_name: input.displayName,
+            p_logic_type: input.logicType,
+            p_active: input.active,
+            p_sort_order: input.sortOrder,
+            p_channel: input.channel,
+            p_requires_reference: input.requiresReference,
+            p_manual_confirmation_required: input.manualConfirmationRequired,
+            p_refund_allowed: input.refundAllowed,
+            p_expected_settings_version: input.expectedSettingsVersion,
+            p_approval_command_id: input.approvalCommandId,
           },
         );
       },

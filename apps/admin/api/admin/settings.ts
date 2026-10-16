@@ -35,6 +35,7 @@ import {
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
 
 const POSTGRES_INTEGER_MAX = 2_147_483_647;
+import { executeSettingsPaymentMethodCreate } from '../../server/settings/settingsPaymentMethodCreateRoute.js';
 import { executeSettingsPaymentMethodCommand } from '../../server/settings/settingsPaymentMethodApprovalRoute.js';
 import { executeSettingsCheckoutRatePublish } from '../../server/settings/settingsCheckoutRatePublishRoute.js';
 
@@ -325,6 +326,7 @@ export const settingsCommandSchema = z.union([
       sortOrder: sortOrderSchema,
       expectedSettingsVersion: expectedSettingsVersionSchema,
       commandId: z.string().trim().min(1).max(160),
+      requesterPin: z.string().min(1).max(64).optional(),
     })
     .strict(),
   z
@@ -514,9 +516,15 @@ export default async function handler(
       case 'order-type.update':
         sendJson(response, 200, { ...(await service.updateOrderType(command, principal)) });
         return;
-      case 'payment-method.create':
-        sendJson(response, 200, { ...(await service.createPaymentMethod(command, principal)) });
+      case 'payment-method.create': {
+        const sessionToken = readAdminSessionToken(firstHeader(request.headers.cookie));
+        if (!sessionToken) throw new AdminAuthError('session_required', 401);
+        const context = await loadAdminSession(sessionToken, client);
+        sendJson(response, 200, {
+          ...(await executeSettingsPaymentMethodCreate(client, context, command, request)),
+        });
         return;
+      }
       case 'payment-method.update': {
         const sessionToken = readAdminSessionToken(firstHeader(request.headers.cookie));
         if (!sessionToken) throw new AdminAuthError('session_required', 401);

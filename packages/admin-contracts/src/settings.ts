@@ -171,6 +171,12 @@ export type ReasonCodeWriteResult =
   | { ok: false; code: 'stale_reason_code_version'; currentVersion: number }
   | { ok: false; code: string };
 
+export type PaymentMethodCreateResult =
+  | { ok: true; paymentMethodId: string; editVersion: number; idempotentReplay?: boolean }
+  | { ok: true; state: 'PENDING_APPROVAL'; approvalRequestId: string }
+  | { ok: true; idempotentReplay: true }
+  | { ok: false; code: string; currentVersion?: number };
+
 export type PaymentMethodUpdateResult =
   | CanonicalSettingsRowEditResult
   | { ok: true; state: 'PENDING_APPROVAL'; approvalRequestId: string; idempotentReplay?: boolean }
@@ -321,6 +327,8 @@ export type OrderTypeEditInput = {
 
 export type PaymentMethodCreateInput = {
   shopId: string;
+  /** Requester reauthentication only: never persisted in approval command. */
+  requesterPin?: string;
   displayName: string;
   logicType: AdminPaymentMethodDetail['logicType'];
   active: boolean;
