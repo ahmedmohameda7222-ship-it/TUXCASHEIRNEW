@@ -32,6 +32,7 @@ async function mockSettings(
   }[] = [],
   authorizedShopIds: string[] = [shopId],
   pendingPaymentApproval = false,
+  pendingZoneApproval = false,
 ) {
   let settingsVersion = 7;
   let shopLifecycleState: 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED' = 'ACTIVE';
@@ -100,6 +101,18 @@ async function mockSettings(
     }
     const command = request.postDataJSON() as Record<string, unknown>;
     paymentZoneCommands.push(command);
+    if (pendingZoneApproval) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          state: 'PENDING_APPROVAL',
+          approvalRequestId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        }),
+      });
+      return;
+    }
     const current = paymentZoneRules.find(
       (rule) =>
         rule.paymentMethodId === command.paymentMethodId &&
@@ -443,6 +456,39 @@ test('edits checkout and receipt overrides with CAS, then publishes settings', a
     shopId,
     expectedSettingsVersion: 7,
   });
+});
+
+test('keeps a payment zone restriction unchanged until approved by another person', async ({
+  page,
+}) => {
+  const zoneId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const { paymentZoneCommands } = await mockSettings(
+    page,
+    ownerSession.principal.permissions,
+    'OWNER',
+    [{ id: zoneId, name: 'Maadi', active: true, feeMinor: 3000, sortOrder: 10 }],
+    [shopId],
+    false,
+    true,
+  );
+  await page.goto('/settings/checkout');
+  await page.getByLabel('Requester PIN (when required by approval policy)').fill('2468');
+  await page.getByRole('button', { name: 'Restrict' }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'second person must approve' }),
+  ).toBeVisible();
+  expect(paymentZoneCommands).toHaveLength(1);
+  expect(paymentZoneCommands[0]).toMatchObject({
+    type: 'payment-zone.upsert',
+    shopId,
+    paymentMethodId,
+    deliveryZoneId: zoneId,
+    allowed: false,
+    expectedAllowed: null,
+    expectedSettingsVersion: 7,
+    requesterPin: '2468',
+  });
+  await expect(page.getByRole('button', { name: 'Restrict' })).toBeVisible();
 });
 
 test('restricts a published payment method for a delivery zone through CAS authority', async ({
