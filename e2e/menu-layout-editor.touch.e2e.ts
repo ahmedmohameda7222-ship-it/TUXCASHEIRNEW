@@ -30,9 +30,9 @@ async function persistedBrowserLayout(page: Parameters<typeof menuCategoryTabs>[
     });
     const value = await new Promise<unknown>((resolve, reject) => {
       const tx = db.transaction('workerMenuLayouts', 'readonly');
-      const req = tx.objectStore('workerMenuLayouts').get(
-        '10000000-0000-4000-8000-000000000001:20000000-0000-4000-8000-000000000001',
-      );
+      const req = tx
+        .objectStore('workerMenuLayouts')
+        .get('10000000-0000-4000-8000-000000000001:20000000-0000-4000-8000-000000000001');
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
     });
