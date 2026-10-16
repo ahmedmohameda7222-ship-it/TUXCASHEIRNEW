@@ -34,6 +34,7 @@ async function mockSettings(
   pendingPaymentApproval = false,
   pendingZoneApproval = false,
   pendingCheckoutPublishApproval = false,
+  pendingPaymentCreateApproval = false,
 ) {
   let settingsVersion = 7;
   let shopLifecycleState: 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED' = 'ACTIVE';
@@ -271,6 +272,18 @@ async function mockSettings(
       expect(command.refundAllowed).toBe(false);
       expect(command).not.toHaveProperty('requiresReconciliation');
       expect(command).not.toHaveProperty('integrationReference');
+      if (pendingPaymentCreateApproval) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            state: 'PENDING_APPROVAL',
+            approvalRequestId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          }),
+        });
+        return;
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -583,6 +596,43 @@ test('creates payment methods with a retry-safe trusted settings command', async
     expectedSettingsVersion: 7,
   });
   expect(typeof commands[0]?.commandId).toBe('string');
+});
+
+test('pending approved payment creation is not falsely presented as available', async ({ page }) => {
+  const { commands } = await mockSettings(
+    page,
+    ownerSession.principal.permissions,
+    'OWNER',
+    [],
+    [shopId],
+    false,
+    false,
+    false,
+    true,
+  );
+  await page.goto('/settings/payments');
+  await page.getByRole('button', { name: 'Add payment method' }).click();
+  await page.getByLabel('New payment method name').fill('Mobile Wallet');
+  await page.getByLabel('Payment type').selectOption('DIGITAL');
+  await page.getByLabel('New method availability').selectOption('BOTH');
+  await page.getByLabel('Requester PIN (when required by approval policy)').fill('2468');
+  await page.getByRole('button', { name: 'Create payment method' }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'second person must approve' }),
+  ).toBeVisible();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'payment-method.create',
+    shopId,
+    displayName: 'Mobile Wallet',
+    logicType: 'DIGITAL',
+    requesterPin: '2468',
+    expectedSettingsVersion: 7,
+  });
+  expect(typeof commands[0]?.commandId).toBe('string');
+  await page.reload();
+  await expect(page.getByText('Mobile Wallet')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Edit Cash' })).toBeVisible();
 });
 
 test('edits payment flags and preserves the settings CAS boundary', async ({ page }) => {
