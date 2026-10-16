@@ -32,6 +32,11 @@ import {
   type ApprovedFinanceSnapshotMutationResult,
 } from './financeSnapshotApproval.js';
 import {
+  createSettingsPaymentZoneApprovalExecutionEntries,
+  type ApprovedSettingsPaymentZoneChange,
+  type SettingsPaymentZoneMutationResult,
+} from './settingsPaymentZoneApproval.js';
+import {
   createSettingsPaymentMethodApprovalExecutionEntries,
   type ApprovedSettingsPaymentMethodUpdate,
   type SettingsPaymentMethodMutationResult,
@@ -220,6 +225,26 @@ export async function runProductionApprovalExecutionRunner(): Promise<ApprovalEx
             p_reason: input.reason,
             p_original_command_id: input.commandId,
             p_expected_adjustment_count: input.expectedAdjustmentCount,
+            p_command_id: input.approvalCommandId,
+          },
+        );
+      },
+    }),
+    ...createSettingsPaymentZoneApprovalExecutionEntries({
+      executeChange(input: ApprovedSettingsPaymentZoneChange) {
+        return client.rpc<SettingsPaymentZoneMutationResult>(
+          'execute_approved_admin_payment_zone_rule_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_payment_method_id: input.paymentMethodId,
+            p_delivery_zone_id: input.deliveryZoneId,
+            p_allowed: input.allowed,
+            p_expected_allowed: input.expectedAllowed,
+            p_expected_settings_version: input.expectedSettingsVersion,
             p_command_id: input.approvalCommandId,
           },
         );

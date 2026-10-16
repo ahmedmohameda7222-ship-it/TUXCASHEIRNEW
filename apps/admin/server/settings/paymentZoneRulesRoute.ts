@@ -1,10 +1,24 @@
-import type { AdminSessionPrincipal } from '@tux/admin-contracts';
+import type {
+  AdminApprovalRule,
+  AdminPermission,
+  AdminSessionPrincipal,
+} from '@tux/admin-contracts';
 import { z } from 'zod';
 
+import { isAdminPermission } from '../adminContractRuntime.js';
+import { createAdminPinRateLimitRpc } from '../loginRateLimit.js';
+import { verifyApprovalPinWithRateLimit } from '../approvals/approvalPinRateLimit.js';
+import { createSupabaseApprovalServiceDependencies } from '../approvals/approvalService.js';
+import {
+  executeOrRequestSettingsPaymentZoneUpdate,
+  SETTINGS_PAYMENT_ZONE_APPROVAL_ACTION,
+  type SettingsPaymentZoneMutationResult,
+} from '../approvals/settingsPaymentZoneApproval.js';
 import { AdminAuthError, loadAdminSession, requireSessionCsrf } from '../adminAuthService.js';
 import { AdminAuthorizationError, requirePermission } from '../authorization.js';
 import { getAdminServerEnv } from '../env.js';
 import {
+  clientFingerprint,
   firstHeader,
   readJsonObject,
   requireSameOrigin,
@@ -26,6 +40,7 @@ export const paymentZoneRuleCommandSchema = z
     allowed: z.boolean(),
     expectedAllowed: z.boolean().nullable(),
     expectedSettingsVersion: z.number().int().nonnegative(),
+    requesterPin: z.string().min(1).max(64).optional(),
   })
   .strict();
 
@@ -38,6 +53,46 @@ type ZoneRule = {
   delivery_zone_id: string;
   allowed: boolean;
 };
+
+type ApprovalRuleRow = {
+  id: string;
+  business_id: string;
+  shop_id: string | null;
+  action_type: string;
+  requester_permission: string;
+  approver_permission: string;
+  requires_second_person: boolean;
+  requires_requester_repin: boolean;
+  threshold_context: unknown;
+  active: boolean;
+};
+
+function readApprovalRule(row: ApprovalRuleRow): AdminApprovalRule {
+  if (
+    !isAdminPermission(row.requester_permission) ||
+    !isAdminPermission(row.approver_permission)
+  ) {
+    throw new Error('payment_zone_approval_rule_permission_invalid');
+  }
+  return {
+    id: row.id,
+    businessId: row.business_id,
+    shopId: row.shop_id,
+    actionType: row.action_type,
+    requesterPermission: row.requester_permission as AdminPermission,
+    approverPermission: row.approver_permission as AdminPermission,
+    requiresSecondPerson: row.requires_second_person,
+    requiresRequesterRepin: row.requires_requester_repin,
+    thresholdContext:
+      typeof row.threshold_context === 'object' &&
+      row.threshold_context !== null &&
+      !Array.isArray(row.threshold_context)
+        ? (row.threshold_context as Readonly<Record<string, unknown>>)
+        : {},
+    active: row.active,
+  };
+}
+
 
 async function authenticated(
   request: AdminRequest,
@@ -124,32 +179,58 @@ export default async function handler(
     }
     const principal = await authenticated(request, client, true);
     assertPaymentZoneScope(principal, parsed.data.shopId);
-    const value = await client.rpc<unknown>('upsert_admin_payment_zone_rule_v1', {
-      p_employee_id: principal.employeeId,
-      p_shop_id: parsed.data.shopId,
-      p_payment_method_id: parsed.data.paymentMethodId,
-      p_delivery_zone_id: parsed.data.deliveryZoneId,
-      p_allowed: parsed.data.allowed,
-      p_expected_allowed: parsed.data.expectedAllowed,
-      p_expected_settings_version: parsed.data.expectedSettingsVersion,
-    });
-    if (
-      typeof value !== 'object' ||
-      value === null ||
-      Array.isArray(value) ||
-      !('ok' in value) ||
-      typeof value.ok !== 'boolean'
-    ) {
-      sendJson(response, 502, { error: 'backend_contract_invalid' });
-      return;
-    }
+    const sessionToken = readAdminSessionToken(firstHeader(request.headers.cookie));
+    if (!sessionToken) throw new AdminAuthError('session_required', 401);
+    const context = await loadAdminSession(sessionToken, client);
+    const ruleRows = await client.select<ApprovalRuleRow[]>(
+      'admin_approval_rules',
+      new URLSearchParams({
+        select:
+          'id,business_id,shop_id,action_type,requester_permission,approver_permission,requires_second_person,requires_requester_repin,threshold_context,active',
+        business_id: `eq.${principal.businessId}`,
+        action_type: `eq.${SETTINGS_PAYMENT_ZONE_APPROVAL_ACTION}`,
+        active: 'eq.true',
+      }),
+    );
+    const { requesterPin, ...payload } = parsed.data;
+    const base = createSupabaseApprovalServiceDependencies(client);
+    const limiter = createAdminPinRateLimitRpc(client);
+    const value = await executeOrRequestSettingsPaymentZoneUpdate(
+      payload,
+      { ...principal, sessionId: context.session.id },
+      ruleRows.map(readApprovalRule),
+      {
+        ...base,
+        verifyEmployeePin(employeeId, pin) {
+          return verifyApprovalPinWithRateLimit(
+            {
+              employeeId,
+              sessionId: context.session.id,
+              pin,
+              fingerprint: clientFingerprint(request),
+              rateLimitSecret: getAdminServerEnv().rateLimitSecret,
+            },
+            { verifyEmployeePin: base.verifyEmployeePin, limiter },
+          );
+        },
+      },
+      requesterPin,
+      () =>
+        client.rpc<SettingsPaymentZoneMutationResult>('upsert_admin_payment_zone_rule_v1', {
+          p_employee_id: principal.employeeId,
+          p_shop_id: payload.shopId,
+          p_payment_method_id: payload.paymentMethodId,
+          p_delivery_zone_id: payload.deliveryZoneId,
+          p_allowed: payload.allowed,
+          p_expected_allowed: payload.expectedAllowed,
+          p_expected_settings_version: payload.expectedSettingsVersion,
+        }),
+    );
     if (value.ok) {
-      sendJson(response, 200, { ok: true });
+      sendJson(response, 200, value);
       return;
     }
-    const code =
-      'code' in value && typeof value.code === 'string' ? value.code : 'backend_contract_invalid';
-    sendJson(response, 200, { ok: false, code });
+    sendJson(response, 200, value);
   } catch (error) {
     fail(response, error);
   }
