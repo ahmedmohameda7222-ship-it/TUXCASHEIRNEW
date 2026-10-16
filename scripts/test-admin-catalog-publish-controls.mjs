@@ -287,6 +287,7 @@ declare
   v_fingerprint text;
   v_impact bigint;
   v_receipt_count int;
+  v_mixed_impact bigint;
 begin
   insert into public.business_employees(id,business_id,display_name,role,active)
    values(v_approver,v_business,'Price approval reviewer','OWNER',true);
@@ -330,6 +331,11 @@ begin
     'approvals.review',true,'{"minimumMinor":5000}'::jsonb,true
   );
 
+  if private.admin_catalog_price_requires_approval_v1(v_business,v_shop,4999)
+    or not private.admin_catalog_price_requires_approval_v1(v_business,v_shop,5000)
+    or not private.admin_catalog_price_requires_approval_v1(v_business,v_shop,5001) then
+    raise exception 'Catalog price policy did not enforce below/equal/above threshold';
+  end if;
   v_out:=public.publish_catalog_draft_scheduled_v1(
     v_requester,v_schedule_draft,2,3);
   if v_out->>'code' <> 'catalog_price_approval_required' then
@@ -415,6 +421,21 @@ begin
   where shop_id=v_shop;
   if v_receipt_count<>1 then
     raise exception 'Catalog price duplicated protected receipt: %',v_receipt_count;
+  end if;
+  select private.admin_catalog_price_max_delta_v1(
+    v_shop,jsonb_build_object(
+      'snapshot',jsonb_build_object(
+        'products',jsonb_build_array(
+          jsonb_build_object('id','47000000-0000-4000-8000-000000000001',
+            'priceMinor',2000)),
+        'modifiers',jsonb_build_array(
+          jsonb_build_object('id','99000000-0000-4000-8000-000000000001',
+            'priceMinor',7200))
+      )
+    )
+  ) into v_mixed_impact;
+  if v_mixed_impact<>7200 then
+    raise exception 'Catalog mixed product/modifier price impact must use maximum trusted delta: %',v_mixed_impact;
   end if;
   v_out:=public.restore_catalog_publish_version_v1(v_requester,v_shop,1,4);
   if v_out->>'code'<>'catalog_price_approval_required' then

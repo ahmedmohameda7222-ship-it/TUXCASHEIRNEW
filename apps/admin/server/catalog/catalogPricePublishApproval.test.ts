@@ -54,6 +54,9 @@ describe('Catalog large price publication approval', () => {
     expect(
       evaluateCatalogPricePublishRouting({ ...payload, maxPriceDeltaMinor: 3999 }, actor, [rule]),
     ).toEqual({ kind: 'DIRECT' });
+    expect(
+      evaluateCatalogPricePublishRouting({ ...payload, maxPriceDeltaMinor: 4000 }, actor, [rule]),
+    ).toEqual({ kind: 'APPROVAL_REQUIRED', ruleId: rule.id });
     expect(evaluateCatalogPricePublishRouting(payload, actor, [broad, rule])).toEqual({
       kind: 'APPROVAL_REQUIRED',
       ruleId: rule.id,
