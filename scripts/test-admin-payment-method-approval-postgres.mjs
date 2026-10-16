@@ -271,6 +271,12 @@ const rateRequest=rpc(`public.create_admin_approval_request_v1(
 if(!rateRequest.ok||!rateRequest.requestId)throw Error('Rate request not durable');
 sql(`update public.admin_approval_rules set active=false where id='${RATES_RULE}'`);
 deny(rpc(directPublish(),'pending rate policy disabled'),'checkout_rate_publish_approval_required');
+
+const pendingRateSchedule=rpc(`public.schedule_shop_settings_publish_v1(
+'${E}'::uuid,'${S}'::uuid,1,
+(now() at time zone 'Africa/Cairo' + interval '5 days')::timestamp)`,
+'disabled policy must not allow a pending rate approval to be scheduled');
+deny(pendingRateSchedule,'checkout_rate_publish_approval_required');
 const changedDraft=rpc(taxStage(1500,'1'),'tamper staged tax rate after request');
 if(!changedDraft.ok)throw Error('Staging tampered fixture failed');
 deny(rpc(directPublish(),'pending changed tax digest'),'checkout_rate_publish_approval_required');
