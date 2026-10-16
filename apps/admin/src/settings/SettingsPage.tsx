@@ -1,4 +1,4 @@
-import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
+import type { AdminSettingsWorkspace, PaymentMethodUpdateResult } from '@tux/admin-contracts';
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 
@@ -76,7 +76,10 @@ export type SettingsWorkspaceViewProps = {
   onUpdateOrderType(draft: OrderTypeUpdateDraft): void | Promise<void>;
   orderTypeUpdating: boolean;
   onCreatePaymentMethod(draft: PaymentMethodCreateDraft): void | Promise<void>;
-  onUpdatePaymentMethod(draft: PaymentMethodUpdateDraft): void | Promise<void>;
+  onUpdatePaymentMethod(draft: PaymentMethodUpdateDraft):
+    | void
+    | PaymentMethodUpdateResult
+    | Promise<void | PaymentMethodUpdateResult>;
   paymentMethodUpdating: boolean;
 };
 

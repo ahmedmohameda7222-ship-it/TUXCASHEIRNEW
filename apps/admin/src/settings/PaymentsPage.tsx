@@ -1,4 +1,4 @@
-import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
+import type { AdminSettingsWorkspace, PaymentMethodUpdateResult } from '@tux/admin-contracts';
 import { useState, type FormEvent } from 'react';
 
 import { sortOrderAfterMove } from './settingsModel';
@@ -8,7 +8,10 @@ export type PaymentsPageProps = {
   workspace: AdminSettingsWorkspace;
   updating: boolean;
   onCreate(draft: PaymentMethodCreateDraft): void | Promise<void>;
-  onUpdate(draft: PaymentMethodUpdateDraft): void | Promise<void>;
+  onUpdate(draft: PaymentMethodUpdateDraft):
+    | void
+    | PaymentMethodUpdateResult
+    | Promise<void | PaymentMethodUpdateResult>;
 };
 
 function channelLabel(
@@ -23,6 +26,7 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
   const [draft, setDraft] = useState<PaymentMethodUpdateDraft | null>(null);
   const [createDraft, setCreateDraft] = useState<PaymentMethodCreateDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function submitCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -37,6 +41,8 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
   }
 
   function beginEdit(method: AdminSettingsWorkspace['paymentMethods'][number]) {
+    setNotice(null);
+    setError(null);
     setDraft({
       paymentMethodId: method.id,
       displayName: method.displayName,
@@ -56,8 +62,19 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
     if (!draft || updating) return;
     const displayName = draft.displayName.trim();
     if (!displayName) return;
-    await onUpdate({ ...draft, displayName });
-    setDraft(null);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await onUpdate({ ...draft, displayName });
+      if (result && 'state' in result && result.state === 'PENDING_APPROVAL') {
+        setNotice('Payment update requested. A second person must approve it before the method changes.');
+      } else {
+        setNotice('Payment method updated.');
+      }
+      setDraft(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to update payment method.');
+    }
   }
 
   return (
@@ -72,6 +89,7 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
       <p className="admin-settings-muted">
         Choose where each payment method is available and what staff must enter at checkout.
       </p>
+      {notice ? <p role="status" className="admin-settings-muted">{notice}</p> : null}
       <p className="admin-settings-muted">
         Refund eligibility is captured when a payment is taken. Changes affect future payments only.
       </p>
@@ -369,7 +387,26 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                     />
                     <span>Refunds allowed for new payments</span>
                   </label>
+                  <label className="admin-field">
+                    <span>Requester PIN (when required by approval policy)</span>
+                    <input
+                      type="password"
+                      autoComplete="off"
+                      maxLength={64}
+                      value={draft.requesterPin ?? ''}
+                      disabled={updating}
+                      onChange={(event) => {
+                        const requesterPin = event.currentTarget.value;
+                        setDraft((current) =>
+                          current
+                            ? { ...current, requesterPin: requesterPin || undefined }
+                            : current,
+                        );
+                      }}
+                    />
+                  </label>
                 </div>
+                {error ? <p className="admin-field__error" role="alert">{error}</p> : null}
                 <div className="admin-settings-row__main">
                   <button className="admin-primary-button" type="submit" disabled={updating}>
                     {updating ? 'Saving…' : 'Save payment method'}

@@ -7,6 +7,7 @@ import type {
   OrderTypeCreateInput,
   PaymentMethodCreateInput,
   PaymentMethodEditInput,
+  PaymentMethodUpdateResult,
   ReasonCodeWriteInput,
   ReasonCodeWriteResult,
   SettingWriteResult,
@@ -113,6 +114,7 @@ export function buildPaymentMethodUpdateCommand(
     refundAllowed: draft.refundAllowed,
     expectedSettingsVersion: draft.expectedSettingsVersion,
     expectedEditVersion: draft.expectedEditVersion,
+    ...(draft.requesterPin ? { requesterPin: draft.requesterPin } : {}),
   };
 }
 
@@ -473,9 +475,9 @@ export function useSettings(shopId: string | undefined, includeSchedules = false
   });
 
   const updatePaymentMethod = useMutation({
-    mutationFn: async (draft: PaymentMethodUpdateDraft): Promise<void> => {
+    mutationFn: async (draft: PaymentMethodUpdateDraft): Promise<PaymentMethodUpdateResult> => {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
-      const result = await adminFetch<CanonicalSettingsRowEditResult>(
+      const result = await adminFetch<PaymentMethodUpdateResult>(
         '/api/admin/settings',
         {
           method: 'POST',
@@ -483,7 +485,13 @@ export function useSettings(shopId: string | undefined, includeSchedules = false
         },
         csrfTokenForMutation(session),
       );
-      requireCanonicalEditSuccess(result);
+      if (!result.ok) {
+        throw new SettingsUiError(
+          result.code,
+          'currentVersion' in result ? result.currentVersion : undefined,
+        );
+      }
+      return result;
     },
     onSuccess: invalidateWorkspace,
   });
