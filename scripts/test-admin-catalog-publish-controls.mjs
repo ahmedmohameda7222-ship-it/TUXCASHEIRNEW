@@ -464,6 +464,103 @@ begin
   end loop;
 end $$;
 
+
+-- Same chain in a second business/shop ensures admin catalog versions,
+-- live menu products and Operations snapshots never leak between shops.
+insert into public.businesses(id,name)
+values ('00000000-0000-4000-8000-000000000002','Catalog isolated second tenant');
+insert into public.shops(id,name,active)
+values ('17000000-0000-4000-8000-000000000002','Catalog isolated second shop',true);
+insert into public.business_shops(business_id,shop_id)
+values ('00000000-0000-4000-8000-000000000002','17000000-0000-4000-8000-000000000002');
+insert into public.business_employees(id,business_id,display_name,role,active)
+values ('27000000-0000-4000-8000-000000000003',
+        '00000000-0000-4000-8000-000000000002','Shop B catalog OWNER','OWNER',true);
+insert into public.menu_categories(id,shop_id,slug,name,description,sort_order,active)
+values ('37000000-0000-4000-8000-000000000002',
+        '17000000-0000-4000-8000-000000000002',
+        'catalog-b-category','Tenant B category','Isolated fixture',0,true);
+insert into public.products(
+  id,shop_id,category_id,slug,name,description,price_minor,image_key,
+  family,best_seller,active,sold_out,is_combo,sort_order
+) values (
+  '47000000-0000-4000-8000-000000000002',
+  '17000000-0000-4000-8000-000000000002',
+  '37000000-0000-4000-8000-000000000002',
+  'catalog-b-product','Tenant B Product','Isolated fixture',2200,null,
+  'FIXTURE',false,true,false,false,0
+);
+
+do $catalog_two_businesses$
+declare
+  v_create jsonb;
+  v_apply jsonb;
+  v_publish jsonb;
+  v_draft_id uuid;
+  v_bundle jsonb;
+  v_a_version bigint;
+  v_a_ops integer;
+  v_a_product_price bigint;
+begin
+  select coalesce(max(publish_version),0) into v_a_version
+    from public.catalog_publish_versions
+    where shop_id='17000000-0000-4000-8000-000000000001';
+  select coalesce(max(version),0) into v_a_ops
+    from public.operations_configuration_snapshots
+    where shop_id='17000000-0000-4000-8000-000000000001';
+  select price_minor into v_a_product_price from public.products
+    where id='47000000-0000-4000-8000-000000000001';
+  v_create := public.create_catalog_draft_v1(
+    '27000000-0000-4000-8000-000000000003',
+    '17000000-0000-4000-8000-000000000002',0,'Tenant B own draft');
+  if v_create->>'ok' is distinct from 'true' then
+    raise exception 'Shop B draft creation failed: %',v_create;
+  end if;
+  v_draft_id := (v_create->>'draftId')::uuid;
+  v_bundle := jsonb_set(v_create->'bundleJson',
+    '{snapshot,products,0,priceMinor}','2300'::jsonb,false);
+  v_apply := public.apply_catalog_draft_change_v1(
+    '27000000-0000-4000-8000-000000000003',v_draft_id,1,
+    jsonb_build_object('bundleJson',v_bundle));
+  if v_apply->>'ok' is distinct from 'true' then
+    raise exception 'Shop B draft staging failed: %',v_apply;
+  end if;
+  v_publish := public.publish_catalog_draft_v1(
+    '27000000-0000-4000-8000-000000000003',v_draft_id,2,0);
+  if v_publish->>'ok' is distinct from 'true'
+     or (v_publish->>'publishVersion')::bigint <> 1 then
+    raise exception 'Shop B publish failed: %',v_publish;
+  end if;
+  if (select price_minor from public.products
+      where id='47000000-0000-4000-8000-000000000002') <> 2300 then
+    raise exception 'Shop B published price not materialized';
+  end if;
+  if (select count(*) from public.catalog_publish_versions
+      where shop_id='17000000-0000-4000-8000-000000000002') <> 1
+    or (select count(*) from public.operations_configuration_snapshots
+        where shop_id='17000000-0000-4000-8000-000000000002') <> 1 then
+    raise exception 'Shop B catalog/Operations publication missing or duplicated';
+  end if;
+  if (select coalesce(max(publish_version),0)
+      from public.catalog_publish_versions
+      where shop_id='17000000-0000-4000-8000-000000000001') <> v_a_version
+    or (select coalesce(max(version),0)
+        from public.operations_configuration_snapshots
+        where shop_id='17000000-0000-4000-8000-000000000001') <> v_a_ops
+    or (select price_minor from public.products
+        where id='47000000-0000-4000-8000-000000000001') <> v_a_product_price then
+    raise exception 'Publishing shop B unexpectedly modified tenant A catalog or Operations';
+  end if;
+  if exists (
+    select 1 from public.catalog_publish_versions
+    where shop_id='17000000-0000-4000-8000-000000000001'
+      and bundle_json::text like '%Tenant B Product%'
+  ) then
+    raise exception 'Tenant B product leaked into tenant A catalog history';
+  end if;
+end;
+$catalog_two_businesses$;
+
 rollback;
 `;
 
