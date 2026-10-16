@@ -61,17 +61,24 @@ describe('Sensitive payment-method update approval', () => {
       kind: 'APPROVAL_REQUIRED',
       ruleId: rule.id,
     });
-    expect(evaluateSettingsPaymentMethodRouting(payload, actor, [
-      { ...rule, thresholdContext: { minimumMinor: 1 } },
-    ])).toEqual({ kind: 'INVALID', code: 'approval_payment_rule_invalid' });
-    expect(evaluateSettingsPaymentMethodRouting({ ...payload, expectedEditVersion: -1 }, actor, [rule]))
-      .toEqual({ kind: 'INVALID', code: 'invalid_payment_method_change' });
+    expect(
+      evaluateSettingsPaymentMethodRouting(payload, actor, [
+        { ...rule, thresholdContext: { minimumMinor: 1 } },
+      ]),
+    ).toEqual({ kind: 'INVALID', code: 'approval_payment_rule_invalid' });
+    expect(
+      evaluateSettingsPaymentMethodRouting({ ...payload, expectedEditVersion: -1 }, actor, [rule]),
+    ).toEqual({ kind: 'INVALID', code: 'invalid_payment_method_change' });
   });
   it('queues an exact CAS payload without calling the direct updater', async () => {
-    const createRequest = vi.fn(async (input: Parameters<ApprovalServiceDependencies['createRequest']>[0]) => ({
-      ok: true, requestId: 'f0000000-0000-4000-8000-000000000002',
-      status: 'PENDING' as const, persistedPayload: input.commandPayload,
-    }));
+    const createRequest = vi.fn(
+      async (input: Parameters<ApprovalServiceDependencies['createRequest']>[0]) => ({
+        ok: true,
+        requestId: 'f0000000-0000-4000-8000-000000000002',
+        status: 'PENDING' as const,
+        persistedPayload: input.commandPayload,
+      }),
+    );
     const deps: ApprovalServiceDependencies = {
       loadRequest: vi.fn(async () => null),
       loadRule: vi.fn(async () => rule),
@@ -82,18 +89,26 @@ describe('Sensitive payment-method update approval', () => {
     };
     const direct = vi.fn(async () => ({ ok: true as const, editVersion: 3 }));
     const outcome = await executeOrRequestSettingsPaymentMethodUpdate(
-      payload, actor, [rule], deps, undefined, direct,
+      payload,
+      actor,
+      [rule],
+      deps,
+      undefined,
+      direct,
     );
     expect(outcome).toEqual({
-      ok: true, state: 'PENDING_APPROVAL',
+      ok: true,
+      state: 'PENDING_APPROVAL',
       approvalRequestId: 'f0000000-0000-4000-8000-000000000002',
     });
     expect(direct).not.toHaveBeenCalled();
-    expect(createRequest).toHaveBeenCalledWith(expect.objectContaining({
-      actionType: SETTINGS_PAYMENT_METHOD_APPROVAL_ACTION,
-      requesterEmployeeId: actor.employeeId,
-      commandPayload: payload,
-    }));
+    expect(createRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionType: SETTINGS_PAYMENT_METHOD_APPROVAL_ACTION,
+        requesterEmployeeId: actor.employeeId,
+        commandPayload: payload,
+      }),
+    );
   });
   it('uses a stable command for exact retries and changes it for a changed edit revision', async () => {
     const ids: string[] = [];
@@ -104,15 +119,38 @@ describe('Sensitive payment-method update approval', () => {
       decideRequest: vi.fn(async () => ({ ok: false as const, code: 'unused' })),
       createRequest: vi.fn(async (input) => {
         ids.push(input.commandId);
-        return { ok: true, requestId: 'f0000000-0000-4000-8000-000000000002', status: 'PENDING' as const };
+        return {
+          ok: true,
+          requestId: 'f0000000-0000-4000-8000-000000000002',
+          status: 'PENDING' as const,
+        };
       }),
       now: () => new Date('2026-10-16T00:00:00Z'),
     };
     const direct = vi.fn(async () => ({ ok: true as const, editVersion: 3 }));
-    await executeOrRequestSettingsPaymentMethodUpdate(payload, actor, [rule], deps, undefined, direct);
-    await executeOrRequestSettingsPaymentMethodUpdate(payload, actor, [rule], deps, undefined, direct);
     await executeOrRequestSettingsPaymentMethodUpdate(
-      { ...payload, expectedEditVersion: 3 }, actor, [rule], deps, undefined, direct,
+      payload,
+      actor,
+      [rule],
+      deps,
+      undefined,
+      direct,
+    );
+    await executeOrRequestSettingsPaymentMethodUpdate(
+      payload,
+      actor,
+      [rule],
+      deps,
+      undefined,
+      direct,
+    );
+    await executeOrRequestSettingsPaymentMethodUpdate(
+      { ...payload, expectedEditVersion: 3 },
+      actor,
+      [rule],
+      deps,
+      undefined,
+      direct,
     );
     expect(ids[0]).toBe(ids[1]);
     expect(ids[2]).not.toBe(ids[0]);
@@ -124,22 +162,35 @@ describe('Sensitive payment-method update approval', () => {
     expect(entry).toBeDefined();
     const claim = {
       approvalRequestId: 'f0000000-0000-4000-8000-000000000002',
-      businessId: actor.businessId, shopId,
+      businessId: actor.businessId,
+      shopId,
       requesterEmployeeId: actor.employeeId,
       approverEmployeeId: 'a0000000-0000-4000-8000-000000000002',
       actionType: SETTINGS_PAYMENT_METHOD_APPROVAL_ACTION,
       commandId: 'f0000000-0000-4000-8000-000000000003',
       commandPayload: payload,
-      claimToken: 'claim', attemptCount: 1, leaseExpiresAt: '2026-10-16T01:00:00Z',
+      claimToken: 'claim',
+      attemptCount: 1,
+      leaseExpiresAt: '2026-10-16T01:00:00Z',
     };
-    await expect(entry!.execute({ commandId: claim.commandId, payload, claim: {
-      ...claim, shopId: 'c0000000-0000-4000-8000-000000000002',
-    } })).rejects.toThrow('approval_payment_scope_invalid');
+    await expect(
+      entry!.execute({
+        commandId: claim.commandId,
+        payload,
+        claim: {
+          ...claim,
+          shopId: 'c0000000-0000-4000-8000-000000000002',
+        },
+      }),
+    ).rejects.toThrow('approval_payment_scope_invalid');
     await entry!.execute({ commandId: claim.commandId, payload, claim });
-    expect(executeUpdate).toHaveBeenCalledWith(expect.objectContaining({
-      ...payload, businessId: actor.businessId,
-      approvalRequestId: claim.approvalRequestId,
-      approverEmployeeId: claim.approverEmployeeId,
-    }));
+    expect(executeUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ...payload,
+        businessId: actor.businessId,
+        approvalRequestId: claim.approvalRequestId,
+        approverEmployeeId: claim.approverEmployeeId,
+      }),
+    );
   });
 });

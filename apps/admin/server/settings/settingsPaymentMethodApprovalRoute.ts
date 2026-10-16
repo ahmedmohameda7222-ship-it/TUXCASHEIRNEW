@@ -111,6 +111,10 @@ export async function executeSettingsPaymentMethodCommand(
       },
     },
     command.requesterPin,
-    () => createSettingsService(createSupabaseSettingsStore(client)).updatePaymentMethod(command, context.principal),
+    () =>
+      createSettingsService(createSupabaseSettingsStore(client)).updatePaymentMethod(
+        command,
+        context.principal,
+      ),
   );
 }

@@ -8,10 +8,9 @@ export type PaymentsPageProps = {
   workspace: AdminSettingsWorkspace;
   updating: boolean;
   onCreate(draft: PaymentMethodCreateDraft): void | Promise<void>;
-  onUpdate(draft: PaymentMethodUpdateDraft):
-    | void
-    | PaymentMethodUpdateResult
-    | Promise<void | PaymentMethodUpdateResult>;
+  onUpdate(
+    draft: PaymentMethodUpdateDraft,
+  ): void | PaymentMethodUpdateResult | Promise<void | PaymentMethodUpdateResult>;
 };
 
 function channelLabel(
@@ -67,7 +66,9 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
     try {
       const result = await onUpdate({ ...draft, displayName });
       if (result && 'state' in result && result.state === 'PENDING_APPROVAL') {
-        setNotice('Payment update requested. A second person must approve it before the method changes.');
+        setNotice(
+          'Payment update requested. A second person must approve it before the method changes.',
+        );
       } else {
         setNotice('Payment method updated.');
       }
@@ -89,7 +90,11 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
       <p className="admin-settings-muted">
         Choose where each payment method is available and what staff must enter at checkout.
       </p>
-      {notice ? <p role="status" className="admin-settings-muted">{notice}</p> : null}
+      {notice ? (
+        <p role="status" className="admin-settings-muted">
+          {notice}
+        </p>
+      ) : null}
       <p className="admin-settings-muted">
         Refund eligibility is captured when a payment is taken. Changes affect future payments only.
       </p>
@@ -397,16 +402,16 @@ export function PaymentsPage({ workspace, updating, onCreate, onUpdate }: Paymen
                       disabled={updating}
                       onChange={(event) => {
                         const requesterPin = event.currentTarget.value;
-                        setDraft((current) =>
-                          current
-                            ? { ...current, requesterPin }
-                            : current,
-                        );
+                        setDraft((current) => (current ? { ...current, requesterPin } : current));
                       }}
                     />
                   </label>
                 </div>
-                {error ? <p className="admin-field__error" role="alert">{error}</p> : null}
+                {error ? (
+                  <p className="admin-field__error" role="alert">
+                    {error}
+                  </p>
+                ) : null}
                 <div className="admin-settings-row__main">
                   <button className="admin-primary-button" type="submit" disabled={updating}>
                     {updating ? 'Saving…' : 'Save payment method'}

@@ -76,10 +76,9 @@ export type SettingsWorkspaceViewProps = {
   onUpdateOrderType(draft: OrderTypeUpdateDraft): void | Promise<void>;
   orderTypeUpdating: boolean;
   onCreatePaymentMethod(draft: PaymentMethodCreateDraft): void | Promise<void>;
-  onUpdatePaymentMethod(draft: PaymentMethodUpdateDraft):
-    | void
-    | PaymentMethodUpdateResult
-    | Promise<void | PaymentMethodUpdateResult>;
+  onUpdatePaymentMethod(
+    draft: PaymentMethodUpdateDraft,
+  ): void | PaymentMethodUpdateResult | Promise<void | PaymentMethodUpdateResult>;
   paymentMethodUpdating: boolean;
 };
 

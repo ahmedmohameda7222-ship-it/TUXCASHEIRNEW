@@ -133,7 +133,14 @@ function commandId(
   payload: SettingsPaymentMethodApprovalPayload,
 ): string {
   const hex = createHash('sha256')
-    .update(JSON.stringify([SETTINGS_PAYMENT_METHOD_APPROVAL_ACTION, actor.businessId, actor.employeeId, payload]))
+    .update(
+      JSON.stringify([
+        SETTINGS_PAYMENT_METHOD_APPROVAL_ACTION,
+        actor.businessId,
+        actor.employeeId,
+        payload,
+      ]),
+    )
     .digest('hex');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
@@ -170,7 +177,10 @@ export async function executeOrRequestSettingsPaymentMethodUpdate(
     createApprovalCommandRegistry([commandEntry]),
   );
   if (result['ok'] !== true) {
-    return { ok: false, code: typeof result['code'] === 'string' ? result['code'] : 'approval_request_failed' };
+    return {
+      ok: false,
+      code: typeof result['code'] === 'string' ? result['code'] : 'approval_request_failed',
+    };
   }
   if (typeof result['requestId'] !== 'string') {
     return { ok: false, code: 'approval_response_invalid' };
