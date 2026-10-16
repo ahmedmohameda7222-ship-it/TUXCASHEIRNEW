@@ -220,7 +220,9 @@ function SectionContent(
             onUpdateIdentity={onUpdateShopIdentity}
             onUpsertWeeklyHours={onUpsertWeeklyHours}
             onUpsertSpecialHours={onUpsertSpecialHours}
-            onDeleteOrArchive={() => void onDeleteOrArchiveShop()}
+            {...(canManageShopLifecycle === true
+              ? { onDeleteOrArchive: () => void onDeleteOrArchiveShop() }
+              : {})}
             busy={operationalStateUpdating || shopManagementUpdating || deletingOrArchivingShop}
           />
         </>
