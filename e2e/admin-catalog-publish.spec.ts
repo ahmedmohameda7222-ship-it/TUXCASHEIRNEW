@@ -559,7 +559,9 @@ test('catalog price approval remains pending without falsely publishing prices',
   await page.getByLabel('Requester PIN (when required by approval policy)').fill('2468');
   await page.getByRole('button', { name: 'Publish now' }).click();
   await expect(
-    page.getByText('Catalog publication requested. A second person must approve before it goes live.'),
+    page.getByText(
+      'Catalog publication requested. A second person must approve before it goes live.',
+    ),
   ).toBeVisible();
   await expect(page.getByText('Catalog published.')).toHaveCount(0);
   expect(fixture.commands.at(-1)).toMatchObject({

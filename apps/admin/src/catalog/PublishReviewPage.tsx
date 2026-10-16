@@ -171,7 +171,9 @@ export function PublishReviewPage() {
       });
       setRequesterPin('');
       if ('state' in result && result.state === 'PENDING_APPROVAL') {
-        setNotice('Catalog publication requested. A second person must approve before it goes live.');
+        setNotice(
+          'Catalog publication requested. A second person must approve before it goes live.',
+        );
       } else if ('idempotentReplay' in result && result.idempotentReplay) {
         setNotice('Catalog publication already processed. Refresh to inspect the live version.');
       } else {
