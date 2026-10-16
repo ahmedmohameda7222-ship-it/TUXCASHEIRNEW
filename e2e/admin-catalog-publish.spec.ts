@@ -556,6 +556,7 @@ test('catalog price approval remains pending without falsely publishing prices',
   const fixture = await mockPublishing(page, false, {}, false, true);
   await page.goto('/catalog/products/publishing');
 
+  await page.getByLabel('Requester PIN (when required by approval policy)').fill('2468');
   await page.getByRole('button', { name: 'Publish now' }).click();
   await expect(
     page.getByText('Catalog publication requested. A second person must approve before it goes live.'),
@@ -567,6 +568,7 @@ test('catalog price approval remains pending without falsely publishing prices',
     shopId,
     expectedDraftRevision: 2,
     expectedVersion: 48,
+    requesterPin: '2468',
   });
   await page.reload();
   await expect(page.getByText('Version 48')).toBeVisible();

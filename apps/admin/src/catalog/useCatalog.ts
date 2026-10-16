@@ -9,7 +9,7 @@ import type {
   CatalogJsonValue,
   CatalogProductDetail,
   CatalogPublishingWorkspace,
-  CatalogPublishResult,
+  CatalogPricePublishRequestResult,
   CatalogRestoreVersionResult,
   CatalogScheduleResult,
   CatalogWorkspace,
@@ -528,9 +528,10 @@ export function useCatalogPublishing(shopId: string | undefined) {
       draftId: string;
       expectedDraftRevision: number;
       expectedVersion: number;
+      requesterPin?: string;
     }) => {
       if (!shopId) throw new CatalogUiError('concrete_shop_required');
-      const result = await adminFetch<CatalogPublishResult>(
+      const result = await adminFetch<CatalogPricePublishRequestResult>(
         '/api/admin/catalog',
         { method: 'POST', body: JSON.stringify({ type: 'draft.publish', shopId, ...input }) },
         csrfTokenForMutation(session),

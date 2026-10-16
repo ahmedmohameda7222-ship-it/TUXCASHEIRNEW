@@ -289,6 +289,12 @@ export type CatalogPublishResult =
       currentDraftRevision?: number;
     };
 
+/** Price-governed publish returns a request, not a live version, until approved. */
+export type CatalogPricePublishRequestResult =
+  | CatalogPublishResult
+  | { ok: true; state: 'PENDING_APPROVAL'; approvalRequestId: string }
+  | { ok: true; idempotentReplay: true };
+
 export type CatalogImmediateAvailabilityResult =
   | {
       ok: true;
