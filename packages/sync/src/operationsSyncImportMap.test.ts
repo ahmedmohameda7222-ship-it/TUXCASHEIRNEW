@@ -8,7 +8,10 @@ const rawBase = 'https://raw.githubusercontent.com/ahmedmohameda7222-ship-it/TUX
 
 describe('operations-sync deployment dependency provenance', () => {
   it('pins the deployed materializer and domain to the reviewed CAS-capable baseline', () => {
-    const mapUrl = new URL('../../../supabase/functions/operations-sync/deno.json', import.meta.url);
+    const mapUrl = new URL(
+      '../../../supabase/functions/operations-sync/deno.json',
+      import.meta.url,
+    );
     const rawJson = readFileSync(mapUrl, 'utf8');
     const imports = (JSON.parse(rawJson) as { imports: Record<string, string> }).imports;
 
