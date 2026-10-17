@@ -169,6 +169,7 @@ describe('CRM service', () => {
       totalUsageLimit: null,
       perCustomerUsageLimit: null,
       stackingPolicy: 'ONE_ORDER_LEVEL',
+      targetSegments: [],
     };
     await service.upsertPromotion(
       {

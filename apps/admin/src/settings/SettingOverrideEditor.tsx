@@ -2,7 +2,7 @@ import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { resolveWorkspaceSetting, settingSourceLabel } from './settingsModel';
-import type { SettingOverrideUpdateDraft } from './useSettings';
+import type { SettingOverrideUpdateDraft, SettingRestoreDraft } from './useSettings';
 
 type SettingEditorKind = 'text' | 'integer' | 'boolean';
 
@@ -19,7 +19,9 @@ type SettingOverrideEditorProps = {
   formatValue?(value: unknown): string;
   parseInput?(raw: string): unknown;
   updating: boolean;
+  scope?: 'shop' | 'business';
   onUpdate(draft: SettingOverrideUpdateDraft): void | Promise<void>;
+  onRestore?: ((draft: SettingRestoreDraft) => void | Promise<void>) | undefined;
 };
 
 export type SettingEditorState = {
@@ -78,11 +80,14 @@ export function SettingOverrideEditor({
   formatValue,
   parseInput,
   updating,
+  scope = 'shop',
   onUpdate,
+  onRestore,
 }: SettingOverrideEditorProps) {
   const resolved = resolveWorkspaceSetting(workspace, settingKey);
   const resolvedRaw = formatValue ? formatValue(resolved.value) : initialText(resolved.value, kind);
-  const resolvedExpectedVersion = resolved.source === 'shop' ? resolved.version : null;
+  const resolvedExpectedVersion =
+    resolved.source === (scope === 'business' ? 'business' : 'shop') ? resolved.version : null;
   const latestResolvedRef = useRef({
     raw: resolvedRaw,
     expectedVersion: resolvedExpectedVersion,
@@ -121,6 +126,21 @@ export function SettingOverrideEditor({
     }
   }
 
+  async function restoreInherited() {
+    if (!onRestore || editor.expectedVersion === null || updating) return;
+    setError(null);
+    try {
+      await onRestore({ settingKey, expectedVersion: editor.expectedVersion });
+      const inheritedValue = workspace.businessDefaults.find(
+        (row) => row.key === settingKey,
+      )?.value;
+      const raw = formatValue ? formatValue(inheritedValue) : initialText(inheritedValue, kind);
+      setEditor({ raw, baselineRaw: raw, expectedVersion: null });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to restore inheritance.');
+    }
+  }
+
   return (
     <form
       className="admin-catalog-editor__section is-compact"
@@ -129,7 +149,9 @@ export function SettingOverrideEditor({
     >
       <div className="admin-catalog-editor__section-heading">
         <div>
-          <p className="admin-catalog-editor__eyebrow">{settingSourceLabel(resolved.source)}</p>
+          <p className="admin-catalog-editor__eyebrow">
+            {scope === 'business' ? 'Business default' : settingSourceLabel(resolved.source)}
+          </p>
           <h3>{label}</h3>
         </div>
       </div>
@@ -167,8 +189,22 @@ export function SettingOverrideEditor({
       {help ? <p className="admin-field__help">{help}</p> : null}
       {error ? <p className="admin-field__error">{error}</p> : null}
       <button className="admin-secondary-button" type="submit" disabled={updating}>
-        {updating ? 'Saving…' : `Save ${label}`}
+        {updating
+          ? 'Saving…'
+          : scope === 'business'
+            ? `Save business default: ${label}`
+            : `Save ${label}`}
       </button>
+      {scope === 'shop' && resolved.source === 'shop' && onRestore ? (
+        <button
+          className="admin-secondary-button"
+          type="button"
+          disabled={updating}
+          onClick={() => void restoreInherited()}
+        >
+          Restore inherited value: {label}
+        </button>
+      ) : null}
     </form>
   );
 }

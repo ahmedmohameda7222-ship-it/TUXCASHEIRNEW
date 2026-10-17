@@ -80,11 +80,20 @@ describe('Plan 2 final acceptance review regressions', () => {
     expect(migration).toContain('update_admin_shop_identity_v1');
   });
 
-  it('does not advertise an unenforced refund policy control', () => {
+  it('offers editable refund policy only with immutable trusted refund enforcement', () => {
     const payments = source('../settings/PaymentsPage.tsx');
+    const capture = source(
+      '../../../../supabase/migrations/20261011222517_admin_payment_refund_policy_snapshot.sql',
+    );
+    const enforcement = source(
+      '../../../../supabase/migrations/20261011222729_admin_payment_refund_allowed_enforcement.sql',
+    );
 
-    expect(payments).not.toContain('<span>Refund allowed</span>');
-    expect(payments).not.toContain('<span>Refund blocked</span>');
-    expect(payments).not.toContain('checked={draft.refundAllowed}');
+    expect(payments).toContain('checked={draft.refundAllowed}');
+    expect(payments).toContain('Changes affect future payments only');
+    expect(capture).toContain('CREATE TRIGGER payments_capture_refund_policy');
+    expect(capture).toContain('refund_allowed_snapshot');
+    expect(enforcement.match(/if not v_payment\.refund_allowed_snapshot then/g)).toHaveLength(2);
+    expect(enforcement).toContain('refund_not_allowed_for_payment');
   });
 });

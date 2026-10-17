@@ -194,11 +194,22 @@ export function useFinanceOperations(
           '/api/admin/finance',
           {
             method: 'POST',
-            body: JSON.stringify({ ...draft, commandId }),
+            body: JSON.stringify({
+              ...draft,
+              commandId,
+              ...((draft.type === 'finance.snapshot.adjust' ||
+                draft.type === 'finance.owner-withdrawal' ||
+                draft.type === 'finance.cashier.reconcile') &&
+              reauthPin !== undefined
+                ? { requesterPin: reauthPin }
+                : {}),
+            }),
           },
           token,
         );
-        commands.complete(draft.type, draft);
+        if (result['state'] !== 'PENDING_APPROVAL') {
+          commands.complete(draft.type, draft);
+        }
         return result;
       } catch (error) {
         if (error instanceof AdminApiError && error.status < 500) {

@@ -1,4 +1,8 @@
-import type { CatalogJsonObject, CatalogProductDetail } from '@tux/admin-contracts';
+import type {
+  CatalogCategorySummary,
+  CatalogJsonObject,
+  CatalogProductDetail,
+} from '@tux/admin-contracts';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'wouter';
 
@@ -19,6 +23,7 @@ export type ProductEditorDraft = {
 
 export type ProductEditorProps = {
   product: CatalogProductDetail;
+  categories?: readonly CatalogCategorySummary[];
   canEdit: boolean;
   canPrice: boolean;
   initialAdvancedOpen?: boolean;
@@ -62,11 +67,15 @@ function changedPathsFor(original: CatalogProductDetail, next: CatalogProductDet
   if (original.priceMinor !== next.priceMinor) paths.push('products[].priceMinor');
   if (original.active !== next.active) paths.push('products[].active');
   if (original.bestSeller !== next.bestSeller) paths.push('products[].bestSeller');
+  if (original.categoryId !== next.categoryId) paths.push('products[].categoryId');
+  if (original.isCombo !== next.isCombo) paths.push('products[].isCombo');
+  if (original.sortOrder !== next.sortOrder) paths.push('products[].sortOrder');
   return paths;
 }
 
 export function ProductEditor({
   product,
+  categories = [],
   canEdit,
   canPrice,
   initialAdvancedOpen = false,
@@ -82,6 +91,9 @@ export function ProductEditor({
   const [price, setPrice] = useState(() => formatEgpMinor(product.priceMinor));
   const [bestSeller, setBestSeller] = useState(product.bestSeller);
   const [visible, setVisible] = useState(product.active);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(product.categoryId);
+  const [comboEnabled, setComboEnabled] = useState(product.isCombo);
+  const [sortOrder, setSortOrder] = useState(String(product.sortOrder));
   const [modifierState, setModifierState] = useState<
     Record<string, { linked: boolean; maxQuantity: string }>
   >({});
@@ -112,7 +124,7 @@ export function ProductEditor({
       ),
     );
     setComboState(
-      product.isCombo
+      comboEnabled
         ? Object.fromEntries(
             advancedModel.comboOptions.map((option) => [option.productId, option.selected]),
           )
@@ -126,7 +138,7 @@ export function ProductEditor({
         ]),
       ),
     );
-  }, [advancedModel, product.isCombo]);
+  }, [advancedModel, comboEnabled]);
 
   const draftPreview = useMemo(() => {
     let priceMinor = product.priceMinor;
@@ -142,8 +154,22 @@ export function ProductEditor({
       priceMinor,
       bestSeller,
       active: visible,
+      categoryId: selectedCategoryId,
+      isCombo: comboEnabled,
+      sortOrder: Number(sortOrder),
     };
-  }, [bestSeller, canPrice, description, name, price, product, visible]);
+  }, [
+    bestSeller,
+    canPrice,
+    description,
+    name,
+    price,
+    product,
+    visible,
+    selectedCategoryId,
+    comboEnabled,
+    sortOrder,
+  ]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -153,13 +179,15 @@ export function ProductEditor({
       priceMinor: canPrice ? parseEgpToMinor(price) : product.priceMinor,
     };
     if (!next.name) throw new Error('invalid_product_name');
+    if (!next.categoryId || !Number.isSafeInteger(next.sortOrder) || next.sortOrder < 0)
+      throw new Error('invalid_product_menu_structure');
     const advanced = advancedModel
       ? buildProductAdvancedDraft({
           shopId: product.shopId,
           productId: product.id,
-          model: product.isCombo ? advancedModel : { ...advancedModel, comboOptions: [] },
+          model: comboEnabled ? advancedModel : { ...advancedModel, comboOptions: [] },
           modifierState,
-          comboState: product.isCombo ? comboState : {},
+          comboState: comboEnabled ? comboState : {},
           recipeState,
         })
       : undefined;
@@ -216,6 +244,46 @@ export function ProductEditor({
             maxLength={600}
             rows={3}
             onChange={(event) => setDescription(event.currentTarget.value)}
+          />
+        </label>
+        <label className="admin-field">
+          <span>Product category</span>
+          <select
+            value={selectedCategoryId}
+            disabled={readOnly || categories.length === 0}
+            onChange={(event) => setSelectedCategoryId(event.currentTarget.value)}
+          >
+            {categories
+              .filter((category) => category.active || category.id === selectedCategoryId)
+              .map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+          </select>
+        </label>
+        <label className="admin-check-field">
+          <input
+            type="checkbox"
+            checked={comboEnabled}
+            disabled={readOnly}
+            onChange={(event) => {
+              const next = event.currentTarget.checked;
+              setComboEnabled(next);
+              if (next && !advancedModel) void onRequestAdvanced?.();
+            }}
+          />
+          <span>Combo product</span>
+        </label>
+        <label className="admin-field">
+          <span>Sort order</span>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={sortOrder}
+            disabled={readOnly}
+            onChange={(event) => setSortOrder(event.currentTarget.value)}
           />
         </label>
       </section>
@@ -371,7 +439,7 @@ export function ProductEditor({
             )}
           </section>
 
-          {product.isCombo ? (
+          {comboEnabled ? (
             <section className="admin-catalog-editor__section is-compact">
               <h2>Combo Options</h2>
               {advancedModel ? (

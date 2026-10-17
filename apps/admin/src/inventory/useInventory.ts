@@ -9,7 +9,7 @@ import type {
 
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
-import { createRetainedCommandIds } from '../lib/retainedCommandIds';
+import { createRetainedCommandIds, isPendingApprovalResult } from '../lib/retainedCommandIds';
 
 export class InventoryUiError extends Error {
   constructor(readonly code: string) {
@@ -74,7 +74,7 @@ export function useInventory(shopId: string | undefined, inventoryItemId: string
       { method: 'POST', body: JSON.stringify(command) },
       csrfTokenForMutation(session),
     );
-    onAuthoritativeResponse?.();
+    if (!isPendingApprovalResult(result)) onAuthoritativeResponse?.();
     if (!result.ok) throw new InventoryUiError(result.code);
     return result;
   }
@@ -95,6 +95,34 @@ export function useInventory(shopId: string | undefined, inventoryItemId: string
     if (shopId) await queryClient.invalidateQueries({ queryKey: inventoryQueryKey(shopId) });
   }
 
+  const manageDefinition = useMutation({
+    mutationFn: async (input: {
+      type:
+        | 'item.create'
+        | 'item.update'
+        | 'item.archive'
+        | 'item.restore'
+        | 'conversion.create'
+        | 'conversion.update'
+        | 'conversion.archive'
+        | 'conversion.restore';
+      entityId: string | null;
+      expectedVersion: number | null;
+      payload: Record<string, unknown>;
+    }) => {
+      return postRetained('inventory.definition.' + input.type, input, (commandId) => ({
+        ...input,
+        shopId: shopId!,
+        commandId,
+      }));
+    },
+    onSuccess: async () => {
+      await invalidate();
+      if (shopId)
+        await queryClient.invalidateQueries({ queryKey: ['admin', 'purchasing', shopId] });
+    },
+  });
+
   const adjustStock = useMutation({
     mutationFn: async (input: {
       inventoryItemId: string;
@@ -102,12 +130,17 @@ export function useInventory(shopId: string | undefined, inventoryItemId: string
       reasonCodeId: string;
       note: string | null;
       emergencyNegativeOverride: boolean;
+      requesterPin?: string;
     }) => {
-      return postRetained('adjust', input, (retainedCommandId) => ({
+      // Do not put the PIN in the retained command fingerprint: it is used
+      // as a persistent command key. Only the one-shot HTTPS request may carry it.
+      const { requesterPin, ...intent } = input;
+      return postRetained('adjust', intent, (retainedCommandId) => ({
         type: 'adjust',
         shopId: shopId!,
         commandId: retainedCommandId,
-        ...input,
+        ...intent,
+        ...(requesterPin ? { requesterPin } : {}),
       }));
     },
     onSuccess: invalidate,
@@ -213,6 +246,7 @@ export function useInventory(shopId: string | undefined, inventoryItemId: string
   return {
     workspaceQuery,
     itemHistoryQuery,
+    manageDefinition,
     adjustStock,
     recordWaste,
     beginStocktake,

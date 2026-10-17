@@ -2,25 +2,37 @@ import type {
   AdminPurchasingWorkspace,
   AdminSessionPrincipal,
   CreatePurchaseOrderInput,
+  CancelPurchaseOrderInput,
   CreateSupplierInput,
+  ManageSupplierInput,
   PurchasingCommandResult,
   ReceivePurchaseInput,
   ReturnPurchaseInput,
+  ReplaceDraftPurchaseOrderLinesInput,
   UpdatePurchaseOrderInput,
 } from '@tux/admin-contracts';
 
-import { requirePermission } from '../authorization.js';
+import { requireBusinessWidePermission, requirePermission } from '../authorization.js';
 
 export interface PurchasingStore {
   loadWorkspace(shopId: string, businessId: string): Promise<AdminPurchasingWorkspace>;
   createSupplier(
     input: CreateSupplierInput & { employeeId: string; businessId: string },
   ): Promise<PurchasingCommandResult>;
+  manageSupplier(
+    input: ManageSupplierInput & { employeeId: string },
+  ): Promise<PurchasingCommandResult>;
   createPurchaseOrder(
     input: CreatePurchaseOrderInput & { employeeId: string; businessId: string },
   ): Promise<PurchasingCommandResult>;
   updatePurchaseOrder(
     input: UpdatePurchaseOrderInput & { employeeId: string },
+  ): Promise<PurchasingCommandResult>;
+  replaceDraftPurchaseOrderLines(
+    input: ReplaceDraftPurchaseOrderLinesInput & { employeeId: string },
+  ): Promise<PurchasingCommandResult>;
+  cancelPurchaseOrder(
+    input: CancelPurchaseOrderInput & { employeeId: string },
   ): Promise<PurchasingCommandResult>;
   orderPurchaseOrder(input: {
     employeeId: string;
@@ -59,6 +71,14 @@ export function createPurchasingService(store: PurchasingStore) {
       });
     },
 
+    async manageSupplier(
+      input: ManageSupplierInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<PurchasingCommandResult> {
+      requireBusinessWidePermission(principal, 'purchasing.manage', input.shopId);
+      return store.manageSupplier({ ...input, employeeId: principal.employeeId });
+    },
+
     async createPurchaseOrder(
       input: CreatePurchaseOrderInput,
       principal: AdminSessionPrincipal,
@@ -77,6 +97,22 @@ export function createPurchasingService(store: PurchasingStore) {
     ): Promise<PurchasingCommandResult> {
       requirePermission(principal, 'purchasing.manage', input.shopId);
       return store.updatePurchaseOrder({ ...input, employeeId: principal.employeeId });
+    },
+
+    async replaceDraftPurchaseOrderLines(
+      input: ReplaceDraftPurchaseOrderLinesInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<PurchasingCommandResult> {
+      requirePermission(principal, 'purchasing.manage', input.shopId);
+      return store.replaceDraftPurchaseOrderLines({ ...input, employeeId: principal.employeeId });
+    },
+
+    async cancelPurchaseOrder(
+      input: CancelPurchaseOrderInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<PurchasingCommandResult> {
+      requirePermission(principal, 'purchasing.manage', input.shopId);
+      return store.cancelPurchaseOrder({ ...input, employeeId: principal.employeeId });
     },
 
     async orderPurchaseOrder(

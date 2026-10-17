@@ -2,6 +2,7 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 import { ADMIN_WIDE_TABLET_VIEWPORTS } from './adminViewports';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const copySourceShopId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const draftId = '55555555-5555-4555-8555-555555555555';
 const scheduleId = '66666666-6666-4666-8666-666666666666';
 
@@ -10,7 +11,14 @@ const ownerSession = {
     employeeId: '33333333-3333-4333-8333-333333333333',
     businessId: '44444444-4444-4444-8444-444444444444',
     role: 'OWNER',
-    permissions: ['catalog.view', 'catalog.edit', 'catalog.pricing', 'catalog.publish'],
+    permissions: [
+      'catalog.view',
+      'catalog.edit',
+      'catalog.pricing',
+      'catalog.publish',
+      'inventory.view',
+      'inventory.adjust',
+    ],
     shopIds: [shopId],
   },
   csrfToken: 'a'.repeat(64),
@@ -18,22 +26,53 @@ const ownerSession = {
 
 type Command = Record<string, unknown> & { type?: string };
 
-async function mockPublishing(page: Page) {
+async function mockPublishing(
+  page: Page,
+  withCopy = false,
+  copyPreviewOverrides: Record<string, unknown> = {},
+  startWithoutDraft = false,
+  pendingPriceApproval = false,
+) {
   let currentPublishVersion = 48;
   let pendingSchedule = true;
+  let hasCopyDraft = !startWithoutDraft;
   const commands: Command[] = [];
 
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(ownerSession),
+      body: JSON.stringify(
+        withCopy
+          ? {
+              ...ownerSession,
+              principal: {
+                ...ownerSession.principal,
+                shopIds: [shopId, copySourceShopId],
+              },
+            }
+          : ownerSession,
+      ),
     });
   });
 
   await page.route('**/api/admin/catalog**', async (route: Route) => {
     const request = route.request();
     const url = new URL(request.url());
+
+    if (
+      withCopy &&
+      request.method() === 'GET' &&
+      url.searchParams.get('view') === 'publishing' &&
+      url.searchParams.get('shopId') === copySourceShopId
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ shopId: copySourceShopId, currentPublishVersion: 17 }),
+      });
+      return;
+    }
 
     if (request.method() === 'GET' && url.searchParams.get('view') === 'publishing') {
       await route.fulfill({
@@ -80,7 +119,7 @@ async function mockPublishing(page: Page) {
                 recipeLines: 0,
               },
             },
-          ],
+          ].filter(() => hasCopyDraft),
           schedules: pendingSchedule
             ? [
                 {
@@ -142,6 +181,133 @@ async function mockPublishing(page: Page) {
     const body = request.postDataJSON() as Command;
     commands.push(body);
 
+    if (withCopy && body.type === 'draft.create') {
+      hasCopyDraft = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, draftId, draftRevision: 2, basePublishVersion: 48 }),
+      });
+      return;
+    }
+    if (withCopy && body.type === 'catalog-copy.missing-preview') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          sourceShopId: copySourceShopId,
+          targetShopId: shopId,
+          targetDraftId: draftId,
+          expectedSourcePublishVersion: 17,
+          expectedTargetPublishVersion: 48,
+          expectedTargetDraftRevision: 2,
+          creationFingerprint: 'c'.repeat(64),
+          missingCategories: 1,
+          missingProducts: 0,
+          conflicts: 1,
+          allCategoriesAndProductsMapped: false,
+          categories: [
+            {
+              sourceCategoryId: '11111111-1111-4111-8111-111111111120',
+              sourceName: 'Weekend Sides',
+              masterCategoryId: '11111111-1111-4111-8111-111111111121',
+              targetCategoryId: null,
+              proposedTargetCategoryId: '11111111-1111-5111-8111-111111111124',
+              status: 'CREATE_REQUIRED',
+            },
+          ],
+          products: [
+            {
+              sourceProductId: '11111111-1111-4111-8111-111111111122',
+              sourceName: 'Milkshake',
+              masterProductId: '11111111-1111-4111-8111-111111111123',
+              targetProductId: null,
+              proposedTargetProductId: null,
+              proposedTargetCategoryId: null,
+              status: 'CONFLICT_NAME',
+            },
+          ],
+        }),
+      });
+      return;
+    }
+    if (withCopy && body.type === 'catalog-copy.stage-created-entities') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          targetDraftId: draftId,
+          draftRevision: 3,
+          createdCategories: 1,
+          createdProducts: 0,
+          createdCategoryIds: ['11111111-1111-5111-8111-111111111124'],
+          createdProductIds: [],
+          publishRequired: true,
+        }),
+      });
+      return;
+    }
+    if (withCopy && body.type === 'catalog-copy.preview') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          sourceShopId: copySourceShopId,
+          targetShopId: shopId,
+          targetDraftId: draftId,
+          mappedProducts: 1,
+          changedProducts: 1,
+          mappedCategories: 0,
+          changedCategories: 0,
+          mappedComboBeverageOptions: 0,
+          changedComboBeverageOptions: 0,
+          comboDifferences: [],
+          mappedProductModifierLinks: 0,
+          changedProductModifierLinks: 0,
+          productModifierLinkDifferences: [],
+          mappedModifierDefinitions: 0,
+          changedModifierDefinitions: 0,
+          modifierDefinitionDifferences: [],
+          mappedRecipeLines: 0,
+          changedRecipeLines: 0,
+          recipeDifferences: [],
+          categoryDifferences: [],
+          fingerprint: 'e'.repeat(64),
+          expectedSourcePublishVersion: 17,
+          expectedTargetPublishVersion: 48,
+          expectedTargetDraftRevision: 2,
+          selectedDomains: ['productOrder'],
+          differences: [
+            {
+              targetProductId: '11111111-1111-4111-8111-111111111111',
+              productName: 'Classic Smash',
+              sortOrderBefore: 40,
+              sortOrderAfter: 5,
+              priceBeforeMinor: 1550,
+              priceAfterMinor: 1550,
+              activeBefore: true,
+              activeAfter: true,
+              soldOutBefore: false,
+              soldOutAfter: false,
+            },
+          ],
+          ...copyPreviewOverrides,
+        }),
+      });
+      return;
+    }
+    if (withCopy && body.type === 'catalog-copy.apply') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, draftRevision: 3 }),
+      });
+      return;
+    }
+
     if (body.type === 'version.restore') {
       currentPublishVersion += 1;
       await route.fulfill({
@@ -187,6 +353,18 @@ async function mockPublishing(page: Page) {
       return;
     }
     if (body.type === 'draft.publish') {
+      if (pendingPriceApproval) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            state: 'PENDING_APPROVAL',
+            approvalRequestId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          }),
+        });
+        return;
+      }
       currentPublishVersion += 1;
       await route.fulfill({
         status: 200,
@@ -372,6 +550,32 @@ test('publish review shows version-fenced draft diff, history, and Cairo schedul
   });
 });
 
+test('catalog price approval remains pending without falsely publishing prices', async ({
+  page,
+}) => {
+  const fixture = await mockPublishing(page, false, {}, false, true);
+  await page.goto('/catalog/products/publishing');
+
+  await page.getByLabel('Requester PIN (when required by approval policy)').fill('2468');
+  await page.getByRole('button', { name: 'Publish now' }).click();
+  await expect(
+    page.getByText(
+      'Catalog publication requested. A second person must approve before it goes live.',
+    ),
+  ).toBeVisible();
+  await expect(page.getByText('Catalog published.')).toHaveCount(0);
+  expect(fixture.commands.at(-1)).toMatchObject({
+    type: 'draft.publish',
+    draftId,
+    shopId,
+    expectedDraftRevision: 2,
+    expectedVersion: 48,
+    requesterPin: '2468',
+  });
+  await page.reload();
+  await expect(page.getByText('Version 48')).toBeVisible();
+});
+
 test('publish history restores as a new version and pending schedules can be cancelled', async ({
   page,
 }) => {
@@ -447,6 +651,305 @@ test('advanced product controls load from a version-fenced draft and save canoni
       quantityMicros: 750000,
     }),
   );
+});
+
+test('mobile Catalog Copy stages only selected product order through version-checked draft', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockPublishing(page, true);
+  await page.goto('/catalog/products/publishing');
+
+  await expect(page.getByRole('heading', { name: 'Selective catalog copy' })).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Product availability' }).uncheck();
+  await page
+    .getByRole('checkbox', { name: 'Product display order (mapped products only)' })
+    .check();
+  await page.getByRole('button', { name: 'Preview catalog copy' }).click();
+
+  await expect(page.getByText('Order: 40 → 5.')).toBeVisible();
+  const preview = commands.find((command) => command.type === 'catalog-copy.preview');
+  expect(preview).toMatchObject({
+    sourceShopId: copySourceShopId,
+    targetShopId: shopId,
+    targetDraftId: draftId,
+    expectedSourcePublishVersion: 17,
+    expectedTargetPublishVersion: 48,
+    expectedTargetDraftRevision: 2,
+    selectedDomains: ['productOrder'],
+  });
+
+  await page.getByRole('button', { name: 'Apply to target draft' }).click();
+  await expect(page.getByText(/Copy staged in the target draft/)).toBeVisible();
+  const apply = commands.find((command) => command.type === 'catalog-copy.apply');
+  expect(apply).toMatchObject({
+    sourceShopId: copySourceShopId,
+    targetShopId: shopId,
+    targetDraftId: draftId,
+    selectedDomains: ['productOrder'],
+    previewFingerprint: 'e'.repeat(64),
+    expectedTargetDraftRevision: 2,
+  });
+  expect(typeof apply?.commandId).toBe('string');
+});
+
+test('mobile Catalog Copy previews missing identities without staging or publishing', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockPublishing(page, true);
+  await page.goto('/catalog/products/publishing');
+
+  await page.getByRole('button', { name: 'Inspect target master mappings' }).click();
+  await expect(page.getByText(/1 missing categories, 0 missing products/)).toBeVisible();
+  await expect(page.getByText(/1 mapping conflicts/)).toBeVisible();
+  await expect(page.getByLabel('Create Category: Weekend Sides')).toBeVisible();
+  await expect(page.getByText('Product: Milkshake — CONFLICT_NAME')).toBeVisible();
+  expect(commands).toEqual([
+    expect.objectContaining({
+      type: 'catalog-copy.missing-preview',
+      sourceShopId: copySourceShopId,
+      targetShopId: shopId,
+      targetDraftId: draftId,
+      expectedSourcePublishVersion: 17,
+      expectedTargetPublishVersion: 48,
+      expectedTargetDraftRevision: 2,
+    }),
+  ]);
+});
+
+test('mobile Catalog Copy stages explicitly selected missing Category without publishing', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockPublishing(page, true);
+  await page.goto('/catalog/products/publishing');
+
+  await page.getByRole('button', { name: 'Inspect target master mappings' }).click();
+  await page.getByLabel('Create Category: Weekend Sides').check();
+  await page.getByRole('button', { name: 'Stage selected new entities in target draft' }).click();
+
+  await expect(page.getByText(/New Catalog entities staged in target draft/)).toBeVisible();
+  expect(commands).toHaveLength(2);
+  expect(commands[1]).toMatchObject({
+    type: 'catalog-copy.stage-created-entities',
+    sourceShopId: copySourceShopId,
+    targetShopId: shopId,
+    targetDraftId: draftId,
+    selectedSourceCategoryIds: ['11111111-1111-4111-8111-111111111120'],
+    selectedSourceProductIds: [],
+    creationFingerprint: 'c'.repeat(64),
+  });
+  expect(commands.every((command) => command.type !== 'draft.publish')).toBe(true);
+});
+
+test('Catalog Copy can create an authorized target draft before previewing', async ({ page }) => {
+  const { commands } = await mockPublishing(page, true, {}, true);
+  await page.goto('/catalog/products/publishing');
+
+  await expect(
+    page.getByText('Create an authorized catalog draft for this shop before copying.'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Create target draft for copy' }).click();
+  await expect(page.getByRole('button', { name: 'Preview catalog copy' })).toBeVisible();
+  expect(commands.find((command) => command.type === 'draft.create')).toMatchObject({
+    type: 'draft.create',
+    shopId,
+    expectedVersion: 48,
+  });
+});
+
+test('Catalog Copy previews and stages unit-safe master-mapped recipe lines', async ({ page }) => {
+  const { commands } = await mockPublishing(page, true, {
+    selectedDomains: ['recipeLines'],
+    changedProducts: 0,
+    differences: [],
+    mappedRecipeLines: 1,
+    changedRecipeLines: 1,
+    recipeDifferences: [
+      {
+        targetProductId: '11111111-1111-4111-8111-111111111112',
+        targetInventoryItemId: '11111111-1111-4111-8111-111111111114',
+        quantityBeforeMicros: null,
+        quantityAfterMicros: 2500000,
+      },
+    ],
+  });
+  await page.goto('/catalog/products/publishing');
+  await page.getByRole('checkbox', { name: 'Product availability' }).uncheck();
+  await page
+    .getByRole('checkbox', {
+      name: 'Recipe quantities (explicit inventory masters and matching base units)',
+    })
+    .check();
+  await page.getByRole('button', { name: 'Preview catalog copy' }).click();
+  await expect(page.getByText(/1 mapped recipe lines/)).toBeVisible();
+  await expect(page.getByText(/2500000/)).toBeVisible();
+  await page.getByRole('button', { name: 'Apply to target draft' }).click();
+  expect(commands.find((command) => command.type === 'catalog-copy.preview')).toMatchObject({
+    selectedDomains: ['recipeLines'],
+  });
+  expect(commands.find((command) => command.type === 'catalog-copy.apply')).toMatchObject({
+    selectedDomains: ['recipeLines'],
+  });
+});
+
+test('Catalog Copy previews and stages mapped modifier definitions', async ({ page }) => {
+  const { commands } = await mockPublishing(page, true, {
+    selectedDomains: ['modifierDefinitions'],
+    changedProducts: 0,
+    differences: [],
+    mappedModifierDefinitions: 1,
+    changedModifierDefinitions: 1,
+    modifierDefinitionDifferences: [
+      {
+        targetModifierId: '11111111-1111-4111-8111-111111111113',
+        nameBefore: 'Target modifier',
+        nameAfter: 'Source modifier',
+        priceBeforeMinor: 600,
+        priceAfterMinor: 500,
+        activeBefore: true,
+        activeAfter: true,
+        sortOrderBefore: 8,
+        sortOrderAfter: 3,
+      },
+    ],
+  });
+  await page.goto('/catalog/products/publishing');
+  await page.getByRole('checkbox', { name: 'Product availability' }).uncheck();
+  await page
+    .getByRole('checkbox', {
+      name: 'Modifier definitions (mapped names, prices, active status and order)',
+    })
+    .check();
+  await page.getByRole('button', { name: 'Preview catalog copy' }).click();
+  await expect(page.getByText(/1 mapped modifier definitions/)).toBeVisible();
+  await expect(page.getByText(/Target modifier/)).toBeVisible();
+  await page.getByRole('button', { name: 'Apply to target draft' }).click();
+  expect(commands.find((command) => command.type === 'catalog-copy.preview')).toMatchObject({
+    selectedDomains: ['modifierDefinitions'],
+  });
+  expect(commands.find((command) => command.type === 'catalog-copy.apply')).toMatchObject({
+    selectedDomains: ['modifierDefinitions'],
+  });
+});
+
+test('Catalog Copy previews and stages mapped product modifier links', async ({ page }) => {
+  const { commands } = await mockPublishing(page, true, {
+    selectedDomains: ['productModifierLinks'],
+    mappedProducts: 3,
+    changedProducts: 0,
+    differences: [],
+    mappedProductModifierLinks: 1,
+    changedProductModifierLinks: 1,
+    productModifierLinkDifferences: [
+      {
+        targetProductId: '11111111-1111-4111-8111-111111111112',
+        targetModifierId: '11111111-1111-4111-8111-111111111113',
+        maxQuantityBefore: null,
+        maxQuantityAfter: 2,
+        sortOrderBefore: null,
+        sortOrderAfter: 6,
+      },
+    ],
+  });
+  await page.goto('/catalog/products/publishing');
+  await page.getByRole('checkbox', { name: 'Product availability' }).uncheck();
+  await page
+    .getByRole('checkbox', {
+      name: 'Product modifier links (mapped standalone products only)',
+    })
+    .check();
+  await page.getByRole('button', { name: 'Preview catalog copy' }).click();
+  await expect(page.getByText(/1 mapped modifier links/)).toBeVisible();
+  await expect(page.getByText(/1 link changes/)).toBeVisible();
+  await page.getByRole('button', { name: 'Apply to target draft' }).click();
+  expect(commands.find((command) => command.type === 'catalog-copy.preview')).toMatchObject({
+    selectedDomains: ['productModifierLinks'],
+  });
+  expect(commands.find((command) => command.type === 'catalog-copy.apply')).toMatchObject({
+    selectedDomains: ['productModifierLinks'],
+  });
+});
+
+test('Catalog Copy previews and stages mapped combo beverage options', async ({ page }) => {
+  const { commands } = await mockPublishing(page, true, {
+    selectedDomains: ['comboBeverageOptions'],
+    mappedProducts: 3,
+    changedProducts: 0,
+    differences: [],
+    mappedComboBeverageOptions: 1,
+    changedComboBeverageOptions: 1,
+    comboDifferences: [
+      {
+        targetComboProductId: '11111111-1111-4111-8111-111111111112',
+        targetBeverageProductId: '11111111-1111-4111-8111-111111111113',
+        sortOrderBefore: null,
+        sortOrderAfter: 11,
+      },
+    ],
+  });
+  await page.goto('/catalog/products/publishing');
+  await page.getByRole('checkbox', { name: 'Product availability' }).uncheck();
+  await page
+    .getByRole('checkbox', { name: 'Combo beverage options (mapped products only)' })
+    .check();
+  await page.getByRole('button', { name: 'Preview catalog copy' }).click();
+  await expect(page.getByText(/1 combo beverage options mapped/)).toBeVisible();
+  await expect(page.getByText(/option changes/)).toBeVisible();
+  await page.getByRole('button', { name: 'Apply to target draft' }).click();
+  expect(commands.find((command) => command.type === 'catalog-copy.preview')).toMatchObject({
+    selectedDomains: ['comboBeverageOptions'],
+  });
+  expect(commands.find((command) => command.type === 'catalog-copy.apply')).toMatchObject({
+    selectedDomains: ['comboBeverageOptions'],
+  });
+});
+
+test('Catalog Copy remaps product categories before staging', async ({ page }) => {
+  const { commands } = await mockPublishing(page, true, {
+    selectedDomains: ['productCategoryAssignments'],
+    differences: [
+      {
+        targetProductId: '11111111-1111-4111-8111-111111111111',
+        productName: 'Classic Smash',
+        categoryIdBefore: 'target-category-before',
+        categoryIdAfter: 'target-category-mapped',
+      },
+    ],
+  });
+  await page.goto('/catalog/products/publishing');
+  await page.getByRole('checkbox', { name: 'Product availability' }).uncheck();
+  await page
+    .getByRole('checkbox', {
+      name: 'Product category assignments (mapped products and categories)',
+    })
+    .check();
+  await page.getByRole('button', { name: 'Preview catalog copy' }).click();
+  await expect(page.getByText(/Category: target-category-before/)).toBeVisible();
+  await expect(page.getByText(/target-category-mapped/)).toBeVisible();
+  await page.getByRole('button', { name: 'Apply to target draft' }).click();
+  expect(commands.find((command) => command.type === 'catalog-copy.preview')).toMatchObject({
+    selectedDomains: ['productCategoryAssignments'],
+  });
+  expect(commands.find((command) => command.type === 'catalog-copy.apply')).toMatchObject({
+    selectedDomains: ['productCategoryAssignments'],
+  });
+});
+
+test('Catalog Copy rejects a preview for another source shop before staging', async ({ page }) => {
+  await mockPublishing(page, true, {
+    sourceShopId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+  });
+  await page.goto('/catalog/products/publishing');
+  await page.getByRole('checkbox', { name: 'Product availability' }).uncheck();
+  await page
+    .getByRole('checkbox', { name: 'Product display order (mapped products only)' })
+    .check();
+  await page.getByRole('button', { name: 'Preview catalog copy' }).click();
+
+  await expect(page.getByRole('alert')).toContainText('Catalog preview could not be verified.');
+  await expect(page.getByRole('button', { name: 'Apply to target draft' })).toHaveCount(0);
 });
 
 for (const viewport of ADMIN_WIDE_TABLET_VIEWPORTS) {

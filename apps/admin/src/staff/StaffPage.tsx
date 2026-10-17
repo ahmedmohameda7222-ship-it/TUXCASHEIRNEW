@@ -204,6 +204,9 @@ export function StaffPage() {
               }}
               shopId={shopId}
               canManage={canManage}
+              canProvisionWorker={
+                canManage && (principal.role === 'OWNER' || principal.role === 'ADMIN')
+              }
               canPay={canPay}
               financeAccounts={staff.workspaceQuery.data?.financeAccounts ?? []}
               workers={staff.workspaceQuery.data?.workers ?? []}

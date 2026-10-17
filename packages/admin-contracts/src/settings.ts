@@ -53,6 +53,7 @@ export type AdminShopSettingsSummary = {
   id: string;
   name: string;
   lifecycleState: ShopLifecycleState;
+  lifecycleRevision?: number;
   active: boolean;
   address: string | null;
   contactPhone: string | null;
@@ -150,6 +151,11 @@ export type ResolvedSetting<T = unknown> =
 export type ShopDeleteOrArchiveResult =
   { ok: true; action: 'ARCHIVED' } | { ok: true; action: 'DELETED' } | { ok: false; code: string };
 
+export type SettingsPublishApprovalResult =
+  | SettingsPublishResult
+  | { ok: true; state: 'PENDING_APPROVAL'; approvalRequestId: string; idempotentReplay?: boolean }
+  | { ok: true; idempotentReplay: true };
+
 export type SettingsPublishResult =
   | { ok: true; settingsVersion: number; operationsConfigurationVersion: number }
   | { ok: false; code: 'stale_settings_version'; currentVersion: number }
@@ -165,6 +171,17 @@ export type ReasonCodeWriteResult =
   | { ok: false; code: 'stale_reason_code_version'; currentVersion: number }
   | { ok: false; code: string };
 
+export type PaymentMethodCreateResult =
+  | { ok: true; paymentMethodId: string; editVersion: number; idempotentReplay?: boolean }
+  | { ok: true; state: 'PENDING_APPROVAL'; approvalRequestId: string }
+  | { ok: true; idempotentReplay: true }
+  | { ok: false; code: string; currentVersion?: number };
+
+export type PaymentMethodUpdateResult =
+  | CanonicalSettingsRowEditResult
+  | { ok: true; state: 'PENDING_APPROVAL'; approvalRequestId: string; idempotentReplay?: boolean }
+  | { ok: true; idempotentReplay: true };
+
 export type CanonicalSettingsRowEditResult =
   | { ok: true; editVersion: number }
   | { ok: false; code: 'stale_settings_version'; currentVersion: number }
@@ -172,15 +189,42 @@ export type CanonicalSettingsRowEditResult =
   | { ok: false; code: string };
 
 export type ShopManagementWriteResult =
-  | { ok: true; hoursId?: string; deactivated?: boolean }
+  | {
+      ok: true;
+      hoursId?: string;
+      deactivated?: boolean;
+      lifecycleRevision?: number;
+      idempotentReplay?: boolean;
+    }
+  | {
+      ok: true;
+      state: 'PENDING_APPROVAL';
+      approvalRequestId: string;
+      idempotentReplay?: boolean;
+    }
+  | { ok: false; code: 'stale_shop_lifecycle'; currentVersion: number }
   | { ok: false; code: 'stale_settings_version'; currentVersion: number }
   | { ok: false; code: string };
+
+export type SettingRestoreInput = {
+  shopId: string;
+  settingKey: string;
+  expectedVersion: number;
+};
 
 export type SettingWriteInput = {
   shopId: string;
   settingKey: string;
   value: unknown;
   expectedVersion: number | null;
+};
+
+export type ShopLifecycleUpdateInput = {
+  shopId: string;
+  expectedState: 'ACTIVE' | 'SUSPENDED';
+  targetState: 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
+  expectedLifecycleRevision: number;
+  requesterPin?: string;
 };
 
 export type ShopOperationalStateUpdateInput = {
@@ -260,6 +304,16 @@ export type ReasonCodeWriteInput = {
   expectedVersion: number | null;
 };
 
+export type OrderTypeCreateInput = {
+  shopId: string;
+  name: string;
+  behavior: AdminOrderTypeConfiguration['behavior'];
+  active: boolean;
+  sortOrder: number;
+  expectedSettingsVersion: number;
+  commandId: string;
+};
+
 export type OrderTypeEditInput = {
   shopId: string;
   orderTypeId: string;
@@ -271,8 +325,27 @@ export type OrderTypeEditInput = {
   expectedEditVersion: number;
 };
 
+export type PaymentMethodCreateInput = {
+  shopId: string;
+  /** Requester reauthentication only: never persisted in approval command. */
+  requesterPin?: string;
+  displayName: string;
+  logicType: AdminPaymentMethodDetail['logicType'];
+  active: boolean;
+  sortOrder: number;
+  channel: PaymentMethodChannel;
+  requiresReference: boolean;
+  manualConfirmationRequired: boolean;
+  /** Snapshot policy, enforced by the trusted refund path on future payments. */
+  refundAllowed: boolean;
+  expectedSettingsVersion: number;
+  commandId: string;
+};
+
 export type PaymentMethodEditInput = {
   shopId: string;
+  /** Only passed for optional second-person approval requester reauthentication. */
+  requesterPin?: string;
   paymentMethodId: string;
   displayName: string;
   active: boolean;
@@ -280,21 +353,29 @@ export type PaymentMethodEditInput = {
   channel: PaymentMethodChannel;
   requiresReference: boolean;
   manualConfirmationRequired: boolean;
-  /** Canonical final-product policy. Editing remains locked until the trusted refund boundary enforces it. */
+  /** Trusted payment snapshots enforce this policy for future payments; history is immutable. */
   refundAllowed: boolean;
   expectedSettingsVersion: number;
   expectedEditVersion: number;
 };
 
 export type SettingsCommand =
-  | ({ type: 'settings.publish' } & { shopId: string; expectedSettingsVersion: number })
+  | ({ type: 'settings.publish' } & {
+      shopId: string;
+      expectedSettingsVersion: number;
+      requesterPin?: string;
+    })
   | ({ type: 'shop.operational-state.update' } & ShopOperationalStateUpdateInput)
+  | ({ type: 'shop.lifecycle.update' } & ShopLifecycleUpdateInput)
   | ({ type: 'shop.identity.update' } & ShopIdentityUpdateInput)
   | ({ type: 'shop.weekly-hours.upsert' } & ShopWeeklyHoursUpsertInput)
   | ({ type: 'shop.special-hours.upsert' } & ShopSpecialHoursUpsertInput)
   | ({ type: 'shop.delete-or-archive' } & { shopId: string })
   | ({ type: 'setting.default.upsert' } & SettingWriteInput)
   | ({ type: 'setting.override.upsert' } & SettingWriteInput)
+  | ({ type: 'setting.override.restore' } & SettingRestoreInput)
   | ({ type: 'reason-code.upsert' } & ReasonCodeWriteInput)
+  | ({ type: 'order-type.create' } & OrderTypeCreateInput)
   | ({ type: 'order-type.update' } & OrderTypeEditInput)
+  | ({ type: 'payment-method.create' } & PaymentMethodCreateInput)
   | ({ type: 'payment-method.update' } & PaymentMethodEditInput);

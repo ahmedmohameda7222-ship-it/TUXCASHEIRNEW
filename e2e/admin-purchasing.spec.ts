@@ -74,7 +74,14 @@ async function mockPurchasing(
         body: JSON.stringify({
           shopId,
           suppliers,
-          inventoryItems: [{ id: itemId, name: 'Beef', unitLabel: 'kg' }],
+          inventoryItems: [
+            {
+              id: itemId,
+              name: 'Beef',
+              unitLabel: 'kg',
+              purchaseUnits: [{ label: 'case', baseMicrosPerPurchaseUnit }],
+            },
+          ],
           purchaseOrders: [
             {
               id: poId,
@@ -353,7 +360,8 @@ test('purchase order creation excludes inactive suppliers from options and defau
   await expect(supplierSelect.getByRole('option', { name: 'Archived Foods' })).toHaveCount(0);
   await expect(supplierSelect).toHaveValue(supplierId);
 
-  await page.getByLabel('Order quantity (purchase units)').fill('1');
+  await page.getByLabel('Quantity (purchase units)').fill('1');
+  await page.getByLabel('Expected cost per purchase unit (EGP)').fill('240');
   await page.getByRole('button', { name: 'Create purchase order' }).click();
 
   await expect.poll(() => fixture.commands.length).toBe(1);
@@ -376,7 +384,8 @@ test('purchase order defaults adopt the first supplier created after an initiall
 
   await openPurchaseOrders(page);
   await page.getByRole('button', { name: 'New purchase order' }).click();
-  await page.getByLabel('Order quantity (purchase units)').fill('1');
+  await page.getByLabel('Quantity (purchase units)').fill('1');
+  await page.getByLabel('Expected cost per purchase unit (EGP)').fill('240');
   await page.getByRole('button', { name: 'Create purchase order' }).click();
 
   await expect.poll(() => fixture.commands.length).toBe(2);

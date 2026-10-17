@@ -31,7 +31,7 @@ describe('orders Round 2 presentation', () => {
   it('uses a compact mobile filter disclosure and friendly list labels', () => {
     const page = read('OrdersPage.tsx');
 
-    expect(page).toContain('<details className="admin-orders-filters"');
+    expect(page).toMatch(/<details\s+className="admin-orders-filters"/);
     expect(page).toContain('orderStatusLabel');
     expect(page).toContain('orderSourceLabel');
   });

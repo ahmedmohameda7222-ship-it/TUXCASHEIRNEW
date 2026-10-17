@@ -48,8 +48,11 @@ export function PurchasingPage() {
   const workspace = purchasing.workspace.data;
   const mutationError = latestMutationError([
     purchasing.createSupplier,
+    purchasing.manageSupplier,
     purchasing.createPurchaseOrder,
     purchasing.updatePurchaseOrder,
+    purchasing.replaceDraftPurchaseOrderLines,
+    purchasing.cancelPurchaseOrder,
     purchasing.orderPurchaseOrder,
     purchasing.receivePurchase,
     purchasing.returnPurchase,
@@ -107,6 +110,8 @@ export function PurchasingPage() {
   }
 
   const canManage = principal.permissions.includes('purchasing.manage');
+  const canManageLifecycle =
+    canManage && (principal.role === 'OWNER' || principal.role === 'ADMIN');
   const canReceive = principal.permissions.includes('purchasing.receive');
 
   return (
@@ -159,9 +164,15 @@ export function PurchasingPage() {
                   <SuppliersPage
                     suppliers={workspace.suppliers}
                     canManage={canManage}
-                    pending={purchasing.createSupplier.isPending}
+                    canManageLifecycle={canManageLifecycle}
+                    pending={
+                      purchasing.createSupplier.isPending || purchasing.manageSupplier.isPending
+                    }
                     onCreate={(input, onSuccess) =>
                       purchasing.createSupplier.mutate(input, { onSuccess })
+                    }
+                    onManage={(input, onSuccess) =>
+                      purchasing.manageSupplier.mutate(input, { onSuccess })
                     }
                   />
                 ),
@@ -176,7 +187,37 @@ export function PurchasingPage() {
                 order={selected}
                 canManage={canManage}
                 canReceive={canReceive}
+                cancelling={purchasing.cancelPurchaseOrder.isPending}
+                onCancel={() =>
+                  purchasing.cancelPurchaseOrder.mutate({
+                    purchaseOrderId: selected.id,
+                    expectedVersion: selected.version,
+                  })
+                }
                 ordering={purchasing.orderPurchaseOrder.isPending}
+                updating={purchasing.updatePurchaseOrder.isPending}
+                inventoryItems={workspace.inventoryItems}
+                replacing={purchasing.replaceDraftPurchaseOrderLines.isPending}
+                onReplaceLines={(lines, onSuccess) =>
+                  purchasing.replaceDraftPurchaseOrderLines.mutate(
+                    {
+                      purchaseOrderId: selected.id,
+                      expectedVersion: selected.version,
+                      lines,
+                    },
+                    { onSuccess },
+                  )
+                }
+                onUpdate={(input, onSuccess) =>
+                  purchasing.updatePurchaseOrder.mutate(
+                    {
+                      purchaseOrderId: selected.id,
+                      expectedVersion: selected.version,
+                      ...input,
+                    },
+                    { onSuccess },
+                  )
+                }
                 onOrder={() =>
                   purchasing.orderPurchaseOrder.mutate({
                     purchaseOrderId: selected.id,

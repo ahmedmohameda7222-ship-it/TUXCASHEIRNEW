@@ -55,12 +55,15 @@ function store(overrides: Partial<SettingsStore> = {}): SettingsStore {
     deleteOrArchiveShop: vi.fn(async () => ({ ok: true as const, action: 'ARCHIVED' as const })),
     upsertBusinessDefault: vi.fn(async () => ({ ok: true as const, version: 1 })),
     upsertShopOverride: vi.fn(async () => ({ ok: true as const, version: 1 })),
+    restoreShopOverride: vi.fn(async () => ({ ok: true as const, version: 1 })),
     upsertReasonCode: vi.fn(async (input) => ({
       ok: true as const,
       reasonCodeId: input.reasonCodeId ?? 'reason-code-1',
       version: 1,
     })),
+    createOrderType: vi.fn(async () => ({ ok: true as const, editVersion: 1 })),
     updateOrderType: vi.fn(async () => ({ ok: true as const, editVersion: 2 })),
+    createPaymentMethod: vi.fn(async () => ({ ok: true as const, editVersion: 1 })),
     updatePaymentMethod: vi.fn(async () => ({ ok: true as const, editVersion: 2 })),
     ...overrides,
   };
@@ -139,6 +142,27 @@ describe('Admin settings service', () => {
     });
   });
 
+  it('authorizes order type creation with an expected settings version and command ID', async () => {
+    const createOrderType = vi.fn(async () => ({ ok: true as const, editVersion: 1 }));
+    const service = createSettingsService(store({ createOrderType }));
+    const input = {
+      shopId: 'shop-1',
+      name: 'Counter pickup',
+      behavior: 'TAKE_AWAY' as const,
+      active: true,
+      sortOrder: 30,
+      expectedSettingsVersion: 4,
+      commandId: 'retry-safe-create-id',
+    };
+    await expect(service.createOrderType(input, owner)).resolves.toMatchObject({
+      ok: true,
+    });
+    expect(createOrderType).toHaveBeenCalledWith({
+      ...input,
+      employeeId: 'employee-1',
+    });
+  });
+
   it('updates a canonical order type through a shop and row version-fenced trusted command', async () => {
     const updateOrderType = vi.fn(async () => ({ ok: true as const, editVersion: 3 }));
     const service = createSettingsService(store({ updateOrderType }));
@@ -188,6 +212,34 @@ describe('Admin settings service', () => {
       employeeId: 'employee-1',
       ...input,
     });
+  });
+
+  it('creates payment methods using the refund-aware trusted RPC with explicit policy', async () => {
+    const rpc = vi.fn(async () => ({ ok: true, editVersion: 1 }));
+    const settingsStore = createSupabaseSettingsStore({ rpc } as unknown as AdminSupabaseClient);
+    await expect(
+      settingsStore.createPaymentMethod({
+        employeeId: 'employee-1',
+        shopId: 'shop-1',
+        displayName: 'Non-refundable voucher',
+        logicType: 'OTHER',
+        active: true,
+        sortOrder: 40,
+        channel: 'POS',
+        requiresReference: true,
+        manualConfirmationRequired: true,
+        refundAllowed: false,
+        expectedSettingsVersion: 3,
+        commandId: 'create-payment-1',
+      }),
+    ).resolves.toEqual({ ok: true, editVersion: 1 });
+    expect(rpc).toHaveBeenCalledWith(
+      'create_admin_payment_method_v2',
+      expect.objectContaining({
+        p_refund_allowed: false,
+        p_command_id: 'create-payment-1',
+      }),
+    );
   });
 
   it('filters payment methods by active state and POS/ONLINE channel', () => {

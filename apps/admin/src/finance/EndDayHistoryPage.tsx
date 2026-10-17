@@ -13,6 +13,7 @@ export function EndDayHistoryPage({ shopId, canAdjust }: { shopId: string; canAd
   const [reason, setReason] = useState('');
   const [pin, setPin] = useState('');
   const [validation, setValidation] = useState<string | null>(null);
+  const [pendingApprovalId, setPendingApprovalId] = useState<string | null>(null);
 
   function adjust() {
     if (!snapshotId) return;
@@ -33,7 +34,13 @@ export function EndDayHistoryPage({ shopId, canAdjust }: { shopId: string; canAd
           reauthPin: pin,
         },
         {
-          onSuccess: () => {
+          onSuccess: (result) => {
+            setPendingApprovalId(
+              result['state'] === 'PENDING_APPROVAL' &&
+                typeof result['approvalRequestId'] === 'string'
+                ? result['approvalRequestId']
+                : null,
+            );
             setSnapshotId(null);
             setAmount('');
             setReason('');
@@ -49,6 +56,12 @@ export function EndDayHistoryPage({ shopId, canAdjust }: { shopId: string; canAd
   return (
     <section aria-label="Immutable financial Z history" className="tux-finance-day-history">
       <h2>Financial Z history</h2>
+      {pendingApprovalId ? (
+        <p role="status" className="admin-field__help">
+          Financial correction is pending second-person approval. No adjustment has been posted.
+          Request ID: {pendingApprovalId}
+        </p>
+      ) : null}
       {operations.dayHistoryQuery.isLoading ? (
         <LoadingState title="Loading finalized days" />
       ) : null}

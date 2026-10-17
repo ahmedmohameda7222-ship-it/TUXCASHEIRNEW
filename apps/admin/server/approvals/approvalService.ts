@@ -123,15 +123,31 @@ function ruleThresholdMatches(
   rule: AdminApprovalRule,
   context: ApprovalRequirementContext,
 ): boolean {
+  const keys = Object.keys(rule.thresholdContext);
+  if (
+    keys.length > 1 ||
+    keys.some((key) => key !== 'minimumMinor' && key !== 'minimumQuantityImpact') ||
+    keys.some((key) => {
+      const value = rule.thresholdContext[key];
+      return typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0;
+    })
+  ) {
+    throw new Error('approval_threshold_context_invalid');
+  }
   const minimumMinor = rule.thresholdContext['minimumMinor'];
   if (typeof minimumMinor === 'number' && Number.isFinite(minimumMinor)) {
-    return context.amountMinor === undefined || context.amountMinor >= minimumMinor;
+    return (
+      context.amountMinor !== undefined &&
+      Number.isFinite(context.amountMinor) &&
+      context.amountMinor >= minimumMinor
+    );
   }
 
   const minimumQuantityImpact = rule.thresholdContext['minimumQuantityImpact'];
   if (typeof minimumQuantityImpact === 'number' && Number.isFinite(minimumQuantityImpact)) {
     return (
-      context.quantityImpact === undefined ||
+      context.quantityImpact !== undefined &&
+      Number.isFinite(context.quantityImpact) &&
       Math.abs(context.quantityImpact) >= Math.abs(minimumQuantityImpact)
     );
   }

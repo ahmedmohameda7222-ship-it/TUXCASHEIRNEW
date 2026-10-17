@@ -12,6 +12,44 @@ import {
 } from '../../api/admin/inventory';
 
 describe('Admin inventory route', () => {
+  it('validates explicit create-versus-attach master binding commands', async () => {
+    const { inventoryMasterBindSchema } = await import('../../api/admin/inventory');
+    const base = {
+      type: 'master.bind',
+      shopId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      inventoryItemId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      commandId: 'inventory-master-1',
+    } as const;
+    expect(
+      inventoryMasterBindSchema.safeParse({
+        ...base,
+        masterInventoryItemId: null,
+        canonicalName: 'Business flour',
+      }).success,
+    ).toBe(true);
+    expect(
+      inventoryMasterBindSchema.safeParse({
+        ...base,
+        masterInventoryItemId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        canonicalName: null,
+      }).success,
+    ).toBe(true);
+    expect(
+      inventoryMasterBindSchema.safeParse({
+        ...base,
+        masterInventoryItemId: null,
+        canonicalName: null,
+      }).success,
+    ).toBe(false);
+    expect(
+      inventoryMasterBindSchema.safeParse({
+        ...base,
+        masterInventoryItemId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        canonicalName: 'Auto-match this name',
+      }).success,
+    ).toBe(false);
+  });
+
   it('mounts the real InventoryPage instead of the generic placeholder', async () => {
     const source = await readFile(resolve('apps/admin/src/app/routes.tsx'), 'utf8');
     expect(source).toContain('const InventoryPage = lazy(() =>');
@@ -241,6 +279,23 @@ describe('Admin inventory route', () => {
     expect(source).toContain("id: `in.(${context.principal.shopIds.join(',')})`");
     expect(source).toContain('preferredSupplierName: row.preferredSupplierId');
     expect(source).toContain('shops: shopRows');
+  });
+
+  it('maps locked recipe units to an actionable conflict', async () => {
+    const apiSource = await readFile(resolve('apps/admin/api/admin/inventory.ts'), 'utf8');
+    const pageSource = await readFile(
+      resolve('apps/admin/src/inventory/InventoryPage.tsx'),
+      'utf8',
+    );
+
+    expect(apiSource).toContain(
+      "error.responseBody.includes('catalog_inventory_master_unit_locked')",
+    );
+    expect(apiSource).toContain(
+      "sendJson(response, 409, { error: 'inventory_master_unit_locked' })",
+    );
+    expect(pageSource).toContain("code.includes('inventory_master_unit_locked')");
+    expect(pageSource).toContain('business-wide recipe master binding');
   });
 
   it('retains one command ID for retries of the same inventory or purchasing intent', async () => {

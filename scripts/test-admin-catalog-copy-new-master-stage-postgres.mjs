@@ -1,0 +1,800 @@
+import { spawn, spawnSync } from 'node:child_process';
+import { readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+const db = process.env.TEST_DATABASE_URL;
+if (!db) {
+  console.log('Missing-master Catalog Copy PostgreSQL skipped: TEST_DATABASE_URL unset');
+  process.exit(0);
+}
+if (!['localhost', '127.0.0.1', '::1'].includes(new URL(db).hostname)) {
+  throw new Error('Refusing to reset a non-loopback PostgreSQL database');
+}
+function sql(query, label = 'SQL') {
+  const result = spawnSync('psql', [db, '-X', '-v', 'ON_ERROR_STOP=1', '-At', '-c', query], {
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) throw new Error(label + ': ' + (result.stderr || result.stdout));
+  return result.stdout.trim();
+}
+function file(name) {
+  const result = spawnSync(
+    'psql',
+    [db, '-X', '-v', 'ON_ERROR_STOP=1', '-f', resolve('supabase/migrations', name)],
+    { encoding: 'utf8' },
+  );
+  if (result.status !== 0) throw new Error(name + ': ' + (result.stderr || result.stdout));
+}
+function rpc(command, label) {
+  return JSON.parse(sql('select (' + command + ')::text', label));
+}
+function quote(value) {
+  return "'" + value.replaceAll("'", "''") + "'::jsonb";
+}
+sql(`drop schema if exists public cascade; create schema public;
+drop schema if exists private cascade; create schema private;
+drop schema if exists auth cascade; create schema auth;
+drop schema if exists storage cascade; create schema storage;
+create table storage.buckets(id text primary key,name text unique not null,public boolean not null default false);
+do $roles$ begin
+ if not exists(select 1 from pg_roles where rolname='anon') then create role anon noinherit; end if;
+ if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated noinherit; end if;
+ if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role noinherit; end if;
+end $roles$;
+grant usage on schema public to anon,authenticated,service_role;
+create table auth.users(id uuid primary key);
+create function auth.uid() returns uuid language sql stable as $auth$
+ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $auth$;`, 'isolated database reset');
+const migration = '20261015064909_admin_catalog_copy_new_combo_options.sql';
+const files = readdirSync(resolve('supabase/migrations')).filter((name) =>
+  /^\d+_.+\.sql$/.test(name),
+).sort();
+const idx = files.indexOf(migration);
+if (idx < 0) throw new Error('Missing category/product staging migration source');
+for (const name of files.slice(0, idx + 1)) file(name);
+
+const B = '10000000-0000-4000-8000-000000000011';
+const FOREIGN_B = '10000000-0000-4000-8000-000000000012';
+const S = '20000000-0000-4000-8000-000000000011';
+const T = '20000000-0000-4000-8000-000000000012';
+const FOREIGN_S = '20000000-0000-4000-8000-000000000013';
+const OWNER = '30000000-0000-4000-8000-000000000011';
+const FOREIGN_OWNER = '30000000-0000-4000-8000-000000000012';
+const MC = '40000000-0000-4000-8000-000000000011';
+const MP = '50000000-0000-4000-8000-000000000011';
+const SC = '60000000-0000-4000-8000-000000000011';
+const SP = '70000000-0000-4000-8000-000000000011';
+sql(`
+insert into public.businesses(id,name) values ('${B}','Owner Business'),('${FOREIGN_B}','Other Business');
+insert into public.shops(id,name,active,lifecycle_state) values
+ ('${S}','Published source',true,'ACTIVE'),('${T}','Blank target',true,'ACTIVE'),
+ ('${FOREIGN_S}','Foreign',true,'ACTIVE');
+insert into public.business_shops(business_id,shop_id) values
+ ('${B}','${S}'),('${B}','${T}'),('${FOREIGN_B}','${FOREIGN_S}');
+insert into public.business_employees(id,business_id,display_name,role,active) values
+ ('${OWNER}','${B}','Owner','OWNER',true),
+ ('${FOREIGN_OWNER}','${FOREIGN_B}','Foreign Owner','OWNER',true);
+insert into public.menu_categories(id,shop_id,slug,name,sort_order,active)
+values ('${SC}','${S}','specials','Specials',3,true);
+insert into public.products(
+ id,shop_id,category_id,slug,name,price_minor,active,sold_out,is_combo,sort_order
+) values ('${SP}','${S}','${SC}','coffee','Coffee',12000,true,false,false,4);
+insert into public.catalog_master_categories(id,business_id,canonical_name)
+values ('${MC}','${B}','Specials');
+insert into public.catalog_category_shop_bindings(
+ business_id,master_category_id,shop_id,canonical_category_id
+) values ('${B}','${MC}','${S}','${SC}');
+insert into public.catalog_master_products(id,business_id,master_category_id,canonical_name)
+values ('${MP}','${B}','${MC}','Coffee');
+insert into public.catalog_product_shop_overrides(
+ business_id,master_product_id,shop_id,canonical_product_id,price_minor,visible,manual_sold_out
+) values ('${B}','${MP}','${S}','${SP}',12000,true,false);
+`, 'two-business source-only master fixture');
+
+// A target Inventory item must exist at the immutable publication used by the Draft.
+const TI3='90000000-0000-4000-8000-000000000014';
+sql(`insert into public.inventory_items(id,shop_id,name,unit_label,tracking_mode,active)
+ values ('${TI3}','${T}','Target flour','g','RECIPE_TRACKED',true)`,
+ 'target inventory available at publication');
+const sourceBundle = sql(
+  `select private.build_admin_catalog_bundle_v1('${S}'::uuid,1,now())::text`,
+  'source bundle',
+);
+const targetBundle = sql(
+  `select private.build_admin_catalog_bundle_v1('${T}'::uuid,1,now())::text`,
+  'blank target bundle',
+);
+sql(`
+insert into public.catalog_publish_versions(
+ business_id,shop_id,publish_version,operations_configuration_version,source_kind,bundle_json
+) values ('${B}','${S}',1,1,'BASELINE',${quote(sourceBundle)}),
+ ('${B}','${T}',1,1,'BASELINE',${quote(targetBundle)});
+insert into public.operations_configuration_snapshots(shop_id,version,bundle_json)
+values ('${S}',1,${quote(sourceBundle)}),('${T}',1,${quote(targetBundle)});
+`, 'published source and empty target baselines');
+
+// This is the same public SQL projection consumed by the deployed Menu
+// catalog-public Edge Function, not a synthetic React/API mock.
+const publicMenuBefore = rpc(
+  `public.read_catalog_public_v1('${T}'::uuid)`,
+  'target Menu projection before Catalog Copy',
+);
+if (publicMenuBefore.shop?.id !== T ||
+    publicMenuBefore.categories.length !== 0 ||
+    publicMenuBefore.products.length !== 0) {
+  throw new Error('Unpublished Category/Product leaked to target Menu');
+}
+const draft = rpc(
+  `public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,1,'Import missing entities')`,
+  'target draft',
+);
+if (!draft.ok || !draft.draftId) throw new Error('Cannot create target draft');
+const args = `'${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,
+ '${draft.draftId}'::uuid,1::bigint,1::bigint,1::bigint`;
+const preview = rpc(
+  `public.preview_admin_catalog_missing_entities_v1(${args})`,
+  'trusted missing-entity preview',
+);
+const category = preview.categories?.[0];
+const product = preview.products?.[0];
+if (
+  !preview.ok ||
+  category?.status !== 'CREATE_REQUIRED' ||
+  product?.status !== 'MISSING_TARGET_CATEGORY' ||
+  product?.proposedTargetCategoryId !== category?.proposedTargetCategoryId ||
+  !/^[0-9a-f]{64}$/.test(preview.creationFingerprint || '')
+) throw new Error('Invalid source-master creation preview: ' + JSON.stringify(preview));
+
+// Archived master identities must never become newly linked target masters,
+// even when their immutable source publication still contains old source IDs.
+sql(`update public.catalog_master_categories set archived_at=now()
+ where id='${MC}'`, 'archive source Category master in isolated fixture');
+const archivedCategoryPreview = rpc(
+  `public.preview_admin_catalog_missing_entities_v1(${args})`,
+  'archived source Category master refused by Preview',
+);
+if (archivedCategoryPreview.categories?.[0]?.status !== 'MISSING_SOURCE_MASTER' ||
+    archivedCategoryPreview.categories?.[0]?.proposedTargetCategoryId != null) {
+  throw new Error('Archived source Category master offered a new target identity');
+}
+sql(`update public.catalog_master_categories set archived_at=null
+ where id='${MC}'`, 'restore Category master fixture');
+sql(`update public.catalog_master_products set archived_at=now()
+ where id='${MP}'`, 'archive source Product master in isolated fixture');
+const archivedProductPreview = rpc(
+  `public.preview_admin_catalog_missing_entities_v1(${args})`,
+  'archived source Product master refused by Preview',
+);
+if (archivedProductPreview.products?.[0]?.status !== 'MISSING_SOURCE_MASTER' ||
+    archivedProductPreview.products?.[0]?.proposedTargetProductId != null) {
+  throw new Error('Archived source Product master offered a new target identity');
+}
+sql(`update public.catalog_master_products set archived_at=null
+ where id='${MP}'`, 'restore Product master fixture');
+
+const stage = (commandId = 'create-cat-prod-1', fingerprint = preview.creationFingerprint) =>
+  `public.stage_admin_catalog_copy_created_entities_v1(
+    ${args},array['${SC}'::uuid],array['${SP}'::uuid],
+    '${fingerprint}','${commandId}')`;
+// Two source Categories may be distinct under existing case-sensitive
+// uniqueness but still collide after normalization. Never silently stage both.
+const SC2 = '60000000-0000-4000-8000-000000000012';
+const MC2 = '40000000-0000-4000-8000-000000000012';
+sql(`insert into public.menu_categories(id,shop_id,name,sort_order,active)
+ values ('${SC2}','${S}','specials',5,true);
+ insert into public.catalog_master_categories(id,business_id,canonical_name)
+ values ('${MC2}','${B}','specials');
+ insert into public.catalog_category_shop_bindings(
+ business_id,master_category_id,shop_id,canonical_category_id)
+ values ('${B}','${MC2}','${S}','${SC2}')`, 'casefold source category fixture');
+const duplicateNamesBundle = sql(
+  `select private.build_admin_catalog_bundle_v1('${S}'::uuid,1,now())::text`,
+  'duplicate source names under independent master IDs',
+);
+sql(`update public.catalog_publish_versions set bundle_json=${quote(duplicateNamesBundle)}
+ where shop_id='${S}' and publish_version=1;
+ update public.operations_configuration_snapshots set bundle_json=${quote(duplicateNamesBundle)}
+ where shop_id='${S}' and version=1;`, 'isolated casefold source snapshot');
+const ambiguousPreview = rpc(
+  `public.preview_admin_catalog_missing_entities_v1(${args})`,
+  'trusted ambiguous source category preview');
+if(!ambiguousPreview.ok || ambiguousPreview.categories.length!==2) {
+  throw new Error('Ambiguous source master identity fixture was not accepted');
+}
+const ambiguous = rpc(
+  `public.stage_admin_catalog_copy_created_entities_v1(
+    ${args},array['${SC}'::uuid,'${SC2}'::uuid],array['${SP}'::uuid],
+    '${ambiguousPreview.creationFingerprint}','casefold-conflict-1')`,
+  'reject casefold-colliding source entities');
+if(ambiguous.ok!==false || ambiguous.code!=='catalog_copy_target_name_conflict') {
+  throw new Error('Two casefold-colliding masters were staged: '+JSON.stringify(ambiguous));
+}
+sql(`update public.catalog_publish_versions set bundle_json=${quote(sourceBundle)}
+ where shop_id='${S}' and publish_version=1;
+ update public.operations_configuration_snapshots set bundle_json=${quote(sourceBundle)}
+ where shop_id='${S}' and version=1;`, 'restore isolated published source fixture');
+
+// Force an immutable audit write to fail after the canonical Draft CAS and
+// private intent inserts. The entire command must roll back transactionally.
+sql(`create function public.reject_test_catalog_creation_audit() returns trigger
+language plpgsql as $forced$ begin
+ if new.action_type='CATALOG_COPY_STAGED' then
+   raise exception 'TUX_CREATION_AUDIT_FORCED_ROLLBACK';
+ end if;
+ return new;
+end; $forced$;
+create trigger reject_test_catalog_creation_audit
+ before insert on public.admin_audit_events for each row
+ execute function public.reject_test_catalog_creation_audit();`, 'isolated audit rollback injection');
+let auditRollback = false;
+try {
+  rpc(stage('creation-rollback'), 'failure after staged Draft write');
+} catch (error) {
+  auditRollback = String(error).includes('TUX_CREATION_AUDIT_FORCED_ROLLBACK');
+}
+sql(`drop trigger reject_test_catalog_creation_audit on public.admin_audit_events;
+drop function public.reject_test_catalog_creation_audit();`, 'remove isolated audit trigger');
+if (!auditRollback) throw new Error('Audit failure did not abort Catalog entity Stage');
+if (sql(`select draft_revision from public.catalog_drafts where id='${draft.draftId}'`) !== '1' ||
+    sql(`select count(*) from private.admin_catalog_copy_creation_intents
+          where target_draft_id='${draft.draftId}'`) !== '0' ||
+    sql(`select count(*) from public.admin_catalog_copy_receipts
+          where command_id='creation-rollback'`) !== '0') {
+  throw new Error('Failed Stage left partial Draft change, mapping intent or receipt');
+}
+// Issue two identical commands through independent PostgreSQL sessions.
+// Both requests carry the same immutable actor/payload identity: exactly one
+// may mutate the Draft and the other must receive its durable replay receipt.
+function concurrentStage(command) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      'psql',
+      [db, '-X', '-v', 'ON_ERROR_STOP=1', '-At', '-c', 'select (' + command + ')::text'],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    let output = '';
+    let error = '';
+    child.stdout.on('data', (chunk) => { output += chunk.toString(); });
+    child.stderr.on('data', (chunk) => { error += chunk.toString(); });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error('Concurrent Stage failed: ' + error));
+        return;
+      }
+      try {
+        resolve(JSON.parse(output.trim()));
+      } catch (cause) {
+        reject(new Error('Invalid concurrent Stage response: ' + String(cause)));
+      }
+    });
+  });
+}
+const concurrentResults = await Promise.all([
+  concurrentStage(stage()),
+  concurrentStage(stage()),
+]);
+const originalStages = concurrentResults.filter((result) =>
+  result.ok === true && result.replayed === false,
+);
+const replayStages = concurrentResults.filter((result) =>
+  result.ok === true && result.replayed === true,
+);
+if (originalStages.length !== 1 || replayStages.length !== 1 ||
+    originalStages[0].draftRevision !== replayStages[0].draftRevision) {
+  throw new Error('Two simultaneous commands generated duplicate or missing Stage effects: ' +
+    JSON.stringify(concurrentResults));
+}
+const staged = originalStages[0];
+if (!staged.ok || staged.draftRevision !== 2 || staged.createdCategories !== 1 ||
+    staged.createdProducts !== 1 || staged.publishRequired !== true) {
+  throw new Error('Missing Catalog entities not coherently staged: ' + JSON.stringify(staged));
+}
+const localCategoryId = staged.createdCategoryIds?.[0];
+const localProductId = staged.createdProductIds?.[0];
+if (localCategoryId !== category.proposedTargetCategoryId ||
+    localProductId !== product.proposedTargetProductId ||
+    localCategoryId === SC || localProductId === SP) {
+  throw new Error('New local IDs differ from reviewable source-master plan');
+}
+const savedDraft = JSON.parse(sql(
+  `select working_bundle_json::text from public.catalog_drafts where id='${draft.draftId}'`,
+));
+if (savedDraft.snapshot.categories[0]?.id !== localCategoryId ||
+    savedDraft.snapshot.products[0]?.id !== localProductId ||
+    savedDraft.snapshot.products[0]?.categoryId !== localCategoryId) {
+  throw new Error('Target draft has orphaned or source-shop identities');
+}
+if (sql(`select (select count(*) from public.menu_categories where shop_id='${T}')::text||
+  ','||(select count(*) from public.products where shop_id='${T}')::text`) !== '0,0') {
+  throw new Error('Stage mutated target live Catalog before publish');
+}
+const replay = rpc(stage(), 'exact command replay');
+if (!replay.ok || replay.replayed !== true || replay.draftRevision !== 2) {
+  throw new Error('Creation command was not replay-safe');
+}
+const changedCommand = rpc(stage('create-cat-prod-1', '0'.repeat(64)), 'command collision');
+if (changedCommand.ok !== false || changedCommand.code !== 'command_id_conflict') {
+  throw new Error('Changed fingerprint reused creation command ID');
+}
+const stale = rpc(stage('second-stale-create'), 'stale target Draft creation');
+if (stale.ok !== false || stale.code !== 'stale_draft_revision') {
+  throw new Error('Second creation command bypassed target draft revision');
+}
+if (sql(`select count(*) from private.admin_catalog_copy_creation_intents
+ where target_draft_id='${draft.draftId}'`) !== '2') {
+  throw new Error('Category and Product intent mapping not durable before publish');
+}
+let foreignDenied = false;
+try {
+  rpc(stage('foreign-create').replace(`'${OWNER}'::uuid`, `'${FOREIGN_OWNER}'::uuid`),
+    'cross-business Catalog entity creation');
+} catch (error) {
+  foreignDenied = /FORBIDDEN|BUSINESS_MISMATCH/.test(String(error));
+}
+if (!foreignDenied) throw new Error('Foreign tenant could stage another business Catalog');
+
+// Archive a business master AFTER Stage and BEFORE Publish. The trusted
+// binder must revalidate current source-master eligibility inside the same
+// transaction, leaving zero partial live target rows on failure.
+sql(`update public.catalog_master_products set archived_at=now()
+ where id='${MP}'`, 'archive Product master after Stage');
+let archivedMasterRejected = false;
+try {
+  rpc(`public.publish_catalog_draft_v1(
+    '${OWNER}'::uuid,'${draft.draftId}'::uuid,2,1)`,
+    'stale archived master at target Publish');
+} catch (error) {
+  archivedMasterRejected = String(error).includes('TUX_CATALOG_COPY_PRODUCT_INTENT_INCOMPLETE');
+}
+if (!archivedMasterRejected) throw new Error('Archived master published as a live target binding');
+if (sql(`select count(*) from public.products where shop_id='${T}'`) !== '0' ||
+    sql(`select count(*) from public.catalog_product_shop_overrides
+      where shop_id='${T}'`) !== '0') {
+  throw new Error('Archived master Publish left partial target Catalog data');
+}
+sql(`update public.catalog_master_products set archived_at=null
+ where id='${MP}'`, 'restore Product master for normal publish');
+
+// A source publication changed between Stage and Publish must fail closed.
+// This creates/removes test-only versions in this loopback PostgreSQL fixture.
+sql(`insert into public.catalog_publish_versions(
+ business_id,shop_id,publish_version,operations_configuration_version,source_kind,bundle_json)
+ values ('${B}','${S}',2,2,'BASELINE',${quote(sourceBundle)});
+insert into public.operations_configuration_snapshots(shop_id,version,bundle_json)
+ values ('${S}',2,${quote(sourceBundle)})`, 'isolated newer source publication');
+let stalePublishRejected=false;
+try {
+  rpc(`public.publish_catalog_draft_v1(
+    '${OWNER}'::uuid,'${draft.draftId}'::uuid,2,1)`,
+    'stale source publication at target Publish');
+} catch(error) {
+  stalePublishRejected=String(error).includes('TUX_CATALOG_COPY_SOURCE_PUBLICATION_STALE');
+}
+if(!stalePublishRejected) throw new Error('Target publisher ignored newer source version');
+if(sql(`select count(*) from public.products where shop_id='${T}'`)!=='0' ||
+   sql(`select count(*) from public.catalog_product_shop_overrides
+       where shop_id='${T}'`)!=='0' ||
+   sql(`select status||','||draft_revision::text from public.catalog_drafts
+        where id='${draft.draftId}'`)!=='DRAFT,2') {
+  throw new Error('Stale source publish partially changed target Catalog');
+}
+// Restore ONLY the isolated version fixture to exercise successful publication.
+sql(`delete from public.catalog_publish_versions
+ where shop_id='${S}' and publish_version=2;
+delete from public.operations_configuration_snapshots
+ where shop_id='${S}' and version=2;`, 'restore isolated source version fixture');
+const published = rpc(
+  `public.publish_catalog_draft_v1('${OWNER}'::uuid,'${draft.draftId}'::uuid,2,1)`,
+  'publish missing Category/Product through canonical Catalog authority',
+);
+if (!published.ok || published.publishVersion !== 2) {
+  throw new Error('Canonical publish refused missing entities: ' + JSON.stringify(published));
+}
+const identity = sql(`
+select c.id::text||','||p.id::text||','||p.category_id::text||','||
+ cb.master_category_id::text||','||pb.master_product_id::text
+from public.menu_categories c
+join public.products p on p.shop_id=c.shop_id and p.category_id=c.id
+join public.catalog_category_shop_bindings cb
+  on cb.shop_id=c.shop_id and cb.canonical_category_id=c.id
+join public.catalog_product_shop_overrides pb
+  on pb.shop_id=p.shop_id and pb.canonical_product_id=p.id
+where c.shop_id='${T}'`, 'published target local/master identity');
+if (identity !== [localCategoryId,localProductId,localCategoryId,MC,MP].join(',')) {
+  throw new Error('Target publication duplicated or rewrote shared master identity: '+identity);
+}
+const publishedSnapshot = JSON.parse(sql(`
+ select bundle_json::text from public.operations_configuration_snapshots
+ where shop_id='${T}' and version=2`, 'Operations target publication'));
+if (publishedSnapshot.snapshot.categories[0]?.id !== localCategoryId ||
+    publishedSnapshot.snapshot.products[0]?.id !== localProductId) {
+  throw new Error('Operations published configuration omitted staged Catalog entities');
+}
+const targetPublicMenu = rpc(
+  `public.read_catalog_public_v1('${T}'::uuid)`,
+  'published Menu consumer target projection',
+);
+if (
+  targetPublicMenu.shop?.id !== T ||
+  targetPublicMenu.categories.length !== 1 ||
+  targetPublicMenu.categories[0]?.id !== localCategoryId ||
+  targetPublicMenu.products.length !== 1 ||
+  targetPublicMenu.products[0]?.id !== localProductId ||
+  targetPublicMenu.products[0]?.category_id !== localCategoryId ||
+  targetPublicMenu.products[0]?.price_minor !== 12000 ||
+  Object.hasOwn(targetPublicMenu.products[0], 'masterProductId')
+) {
+  throw new Error('Target published Menu projection did not use local bound identities');
+}
+const sourcePublicMenu = rpc(
+  `public.read_catalog_public_v1('${S}'::uuid)`,
+  'source Menu projection after target publication',
+);
+if (sourcePublicMenu.shop?.id !== S ||
+    sourcePublicMenu.categories[0]?.id !== SC ||
+    sourcePublicMenu.products[0]?.id !== SP) {
+  throw new Error('Target publication rewrote or leaked source Menu identities');
+}
+if (sql(`select has_function_privilege(
+  'anon','public.read_catalog_public_v1(uuid)','EXECUTE')::text`)
+  !== 'true') {
+  throw new Error('Published Menu reader no longer accessible by public role');
+}
+const original = sql(`select count(*)::text||','||sum(price_minor)::text
+ from public.products where shop_id='${S}'`, 'source untouched');
+if (original !== '1,12000') throw new Error('Source live Product mutated during copy');
+if (sql(`select count(*) from public.recipe_lines where shop_id='${T}'`) !== '0') {
+  throw new Error('Catalog Copy copied unrelated recipe/stock history');
+}
+for (const role of ['anon','authenticated']) {
+  const permitted = sql(`select has_function_privilege(
+    '${role}',
+    'public.stage_admin_catalog_copy_created_entities_v1(uuid,uuid,uuid,uuid,bigint,bigint,bigint,uuid[],uuid[],text,text)',
+    'EXECUTE')`);
+  if (permitted !== 'f') throw new Error('Unsafe entity Stage EXECUTE grant '+role);
+}
+// A newly created source-master Product may have a recipe, but the target
+// must have an explicit same-business inventory master binding with compatible
+// active unit and tracking semantics BEFORE any draft-only Stage is allowed.
+const SP3='70000000-0000-4000-8000-000000000013';
+const MP3='50000000-0000-4000-8000-000000000013';
+const SI3='90000000-0000-4000-8000-000000000013';
+const MI3='91000000-0000-4000-8000-000000000013';
+sql(`
+ insert into public.products(
+ id,shop_id,category_id,slug,name,price_minor,active,sold_out,is_combo,sort_order
+ ) values ('${SP3}','${S}','${SC}','coffee-bread','Coffee Bread',16000,true,false,false,9);
+ insert into public.catalog_master_products(id,business_id,master_category_id,canonical_name)
+ values ('${MP3}','${B}','${MC}','Coffee Bread');
+ insert into public.catalog_product_shop_overrides(
+ business_id,master_product_id,shop_id,canonical_product_id,price_minor,visible,manual_sold_out
+ ) values ('${B}','${MP3}','${S}','${SP3}',16000,true,false);
+ insert into public.inventory_items(id,shop_id,name,unit_label,tracking_mode,active)
+ values ('${SI3}','${S}','Source flour','g','RECIPE_TRACKED',true);
+ insert into public.recipe_lines(shop_id,product_id,inventory_item_id,quantity_micros)
+ values ('${S}','${SP3}','${SI3}',2500000);
+ insert into public.catalog_master_inventory_items(
+ id,business_id,canonical_name,base_unit_label,tracking_mode)
+ values ('${MI3}','${B}','Flour','g','RECIPE_TRACKED');
+ `, 'new recipe-linked source master without any target inventory binding');
+const recipeSourceBundle=sql(
+  `select private.build_admin_catalog_bundle_v1('${S}'::uuid,2,now())::text`,
+  'source immutable published recipe version',
+);
+sql(`
+ insert into public.catalog_publish_versions(
+ business_id,shop_id,publish_version,operations_configuration_version,source_kind,bundle_json)
+ values ('${B}','${S}',2,2,'BASELINE',${quote(recipeSourceBundle)});
+ insert into public.operations_configuration_snapshots(shop_id,version,bundle_json)
+ values ('${S}',2,${quote(recipeSourceBundle)});
+ `, 'source recipe published version for new master');
+const recipeDraft=rpc(
+  `public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,2,
+    'Create new product with inventory-mapped recipe')`,
+  'recipe-linked target draft',
+);
+if(!recipeDraft.ok||!recipeDraft.draftId)
+  throw new Error('Cannot create recipe-linked target draft');
+const recipeArgs=`'${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,
+ '${recipeDraft.draftId}'::uuid,2::bigint,2::bigint,1::bigint`;
+const recipeMissing=rpc(
+  `public.preview_admin_catalog_missing_entities_v1(${recipeArgs})`,
+  'new Product existing Category recipe creation preview',
+);
+const newRecipeProduct=recipeMissing.products.find(p=>p.sourceProductId===SP3);
+if(!recipeMissing.ok||newRecipeProduct?.status!=='CREATE_REQUIRED')
+  throw new Error('New recipe Product was not identified for creation');
+const recipeStage=(cmd)=>`public.stage_admin_catalog_copy_created_entities_v1(
+ ${recipeArgs},array[]::uuid[],array['${SP3}'::uuid],
+ '${recipeMissing.creationFingerprint}','${cmd}')`;
+const unboundRecipe=rpc(recipeStage('recipe-unbound'), 'no target inventory binding');
+if(unboundRecipe.ok!==false||
+   unboundRecipe.code!=='catalog_copy_missing_target_dependencies') {
+ throw new Error('Unbound inventory Recipe was staged instead of fail closed: '+
+  JSON.stringify(unboundRecipe));
+}
+sql(`
+ insert into public.catalog_inventory_item_shop_bindings(
+ business_id,master_inventory_item_id,shop_id,inventory_item_id)
+ values ('${B}','${MI3}','${S}','${SI3}'),
+        ('${B}','${MI3}','${T}','${TI3}');
+ `, 'explicit source and target inventory business master mapping');
+// Binding alone is insufficient: a currently inactive target recipe item
+// must fail closed even if the published snapshot was previously active.
+sql(`update public.inventory_items set active=false where id='${TI3}'`,
+ 'deactivate target recipe item after master mapping');
+const inactiveRecipe=rpc(
+ recipeStage('recipe-inactive'), 'inactive recipe item target Stage refusal');
+if(inactiveRecipe.ok!==false ||
+   inactiveRecipe.code!=='catalog_copy_incompatible_inventory_units') {
+ throw new Error('Inactive target inventory was copied into new Product recipe: '+
+   JSON.stringify(inactiveRecipe));
+}
+sql(`update public.inventory_items set active=true where id='${TI3}'`,
+ 'restore target inventory fixture');
+const stagedRecipe=rpc(recipeStage('recipe-accepted'), 'draft-only inventory mapped recipe Stage');
+if(!stagedRecipe.ok||stagedRecipe.createdProducts!==1||stagedRecipe.draftRevision!==2)
+ throw new Error('Mapped recipe new Product not staged: '+JSON.stringify(stagedRecipe));
+const recipeLocal=newRecipeProduct.proposedTargetProductId;
+const stagedRecipeBundle=JSON.parse(sql(
+ `select working_bundle_json::text from public.catalog_drafts
+ where id='${recipeDraft.draftId}'`));
+const translated=stagedRecipeBundle.snapshot.recipeLines;
+if(translated?.length!==1||translated[0]?.productId!==recipeLocal||
+ translated[0]?.inventoryItemId!==TI3||translated[0]?.quantityMicros!==2500000||
+ translated[0]?.shopId!==T)
+ throw new Error('Draft Recipe lost/mis-mapped master IDs or microunits: '+JSON.stringify(translated));
+if(sql(`select count(*) from public.recipe_lines where shop_id='${T}'`)!=='0')
+ throw new Error('Recipe Stage mutated live target recipe before Publish');
+const recipePublished=rpc(
+ `public.publish_catalog_draft_v1(
+ '${OWNER}'::uuid,'${recipeDraft.draftId}'::uuid,2,2)`,
+ 'publish recipe-linked new Product through canonical authority');
+if(!recipePublished.ok||recipePublished.publishVersion!==3)
+ throw new Error('Recipe Product Publish failed: '+JSON.stringify(recipePublished));
+const liveRecipe=sql(`
+ select r.product_id::text||','||r.inventory_item_id::text||','||
+ r.quantity_micros::text||','||p.category_id::text||','||pb.master_product_id::text
+ from public.recipe_lines r
+ join public.products p on p.shop_id=r.shop_id and p.id=r.product_id
+ join public.catalog_product_shop_overrides pb
+   on pb.shop_id=p.shop_id and pb.canonical_product_id=p.id
+ where r.shop_id='${T}'`, 'canonical inventory recipe/Product master identity');
+if(liveRecipe!==[recipeLocal,TI3,'2500000',localCategoryId,MP3].join(',')) {
+  throw new Error('Published recipe-linked new Product lost master mapping: '+liveRecipe);
+}
+if(sql(`select count(*) from public.inventory_movements
+ where shop_id='${T}'`)!=='0')
+ throw new Error('Recipe setup generated stock movement or COGS before sale');
+
+// New Combo Product creation must translate source Combo→Beverage links
+// using the existing same-business Product master. The copied option must
+// point at the target-local beverage ID, never the source ID or display name.
+const SP4='70000000-0000-4000-8000-000000000015';
+const MP4='50000000-0000-4000-8000-000000000015';
+sql(`
+ insert into public.products(
+ id,shop_id,category_id,slug,name,price_minor,active,sold_out,is_combo,sort_order)
+ values ('${SP4}','${S}','${SC}','coffee-combo','Coffee combo',19000,true,false,true,10);
+ insert into public.catalog_master_products(id,business_id,master_category_id,canonical_name)
+ values ('${MP4}','${B}','${MC}','Coffee combo');
+ insert into public.catalog_product_shop_overrides(
+ business_id,master_product_id,shop_id,canonical_product_id,price_minor,visible,manual_sold_out)
+ values ('${B}','${MP4}','${S}','${SP4}',19000,true,false);
+ insert into public.combo_beverage_options(
+ shop_id,combo_product_id,beverage_product_id,sort_order)
+ values ('${S}','${SP4}','${SP}',4);
+ `, 'source Combo Product with mapped beverage dependency');
+const comboSourceBundle=sql(
+ `select private.build_admin_catalog_bundle_v1('${S}'::uuid,3,now())::text`,
+ 'source Combo publication');
+sql(`
+ insert into public.catalog_publish_versions(
+ business_id,shop_id,publish_version,operations_configuration_version,source_kind,bundle_json)
+ values ('${B}','${S}',3,3,'BASELINE',${quote(comboSourceBundle)});
+ insert into public.operations_configuration_snapshots(shop_id,version,bundle_json)
+ values ('${S}',3,${quote(comboSourceBundle)});
+ `, 'source Combo product immutable publication');
+const comboDraft=rpc(
+ `public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,3,
+  'Create Combo Product with master-mapped beverage')`,
+ 'target Combo draft');
+if(!comboDraft.ok||!comboDraft.draftId)
+ throw new Error('Could not create Combo target draft');
+const comboArgs=`'${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,
+ '${comboDraft.draftId}'::uuid,3::bigint,3::bigint,1::bigint`;
+const comboPreview=rpc(
+ `public.preview_admin_catalog_missing_entities_v1(${comboArgs})`,
+ 'missing Combo Product preview');
+const comboCandidate=comboPreview.products.find(x=>x.sourceProductId===SP4);
+if(!comboPreview.ok||comboCandidate?.status!=='CREATE_REQUIRED')
+ throw new Error('Missing source Combo master not presented for creation');
+const comboLocal=comboCandidate.proposedTargetProductId;
+// Even an identical beverage name is insufficient: without the target
+// business-master binding, the new Combo must fail closed.
+sql(`delete from public.catalog_product_shop_overrides
+ where business_id='${B}' and shop_id='${T}' and master_product_id='${MP}'`,
+ 'remove mapped target beverage master');
+const unboundComboPreview=rpc(
+ `public.preview_admin_catalog_missing_entities_v1(${comboArgs})`,
+ 'recompute fingerprint after missing target beverage');
+const unboundComboStage=rpc(
+ `public.stage_admin_catalog_copy_created_entities_v1(
+ ${comboArgs},array[]::uuid[],array['${SP4}'::uuid],
+ '${unboundComboPreview.creationFingerprint}','combo-beverage-unbound')`,
+ 'refuse new Combo without exact beverage master');
+if(unboundComboStage.ok!==false ||
+ unboundComboStage.code!=='catalog_copy_missing_target_dependencies')
+ throw new Error('Unmapped beverage was silently linked by name: '+
+  JSON.stringify(unboundComboStage));
+sql(`
+ insert into public.catalog_product_shop_overrides(
+ business_id,master_product_id,shop_id,canonical_product_id,price_minor,
+ visible,manual_sold_out)
+ values ('${B}','${MP}','${T}','${localProductId}',12000,true,false)
+ `, 'restore target beverage master binding');
+const comboStage=rpc(
+ `public.stage_admin_catalog_copy_created_entities_v1(
+ ${comboArgs},array[]::uuid[],array['${SP4}'::uuid],
+ '${comboPreview.creationFingerprint}','create-combo-master-1')`,
+ 'stage new Combo and mapped beverage option');
+if(!comboStage.ok||comboStage.createdProducts!==1)
+ throw new Error('Master-mapped new Combo Product not staged: '+JSON.stringify(comboStage));
+const comboCandidateBundle=JSON.parse(sql(`
+ select working_bundle_json::text from public.catalog_drafts
+ where id='${comboDraft.draftId}'`, 'staged Combo draft'));
+const options=comboCandidateBundle.snapshot.comboBeverageOptions;
+if(options.length!==1 || options[0].comboProductId!==comboLocal ||
+   options[0].beverageProductId!==localProductId ||
+   options[0].shopId!==T || options[0].sortOrder!==4)
+ throw new Error('Combo option did not map source beverage to target-local ID');
+if(sql(`select count(*) from public.combo_beverage_options where shop_id='${T}'`)!=='0')
+ throw new Error('New Combo Stage changed live target options before Publish');
+const comboPublished=rpc(
+ `public.publish_catalog_draft_v1(
+ '${OWNER}'::uuid,'${comboDraft.draftId}'::uuid,2,3)`,
+ 'publish new Combo via canonical Catalog authority');
+if(!comboPublished.ok||comboPublished.publishVersion!==4)
+ throw new Error('Publishing new Combo Product rejected: '+JSON.stringify(comboPublished));
+const comboLive=sql(`
+ select c.combo_product_id::text||','||c.beverage_product_id::text||','||
+        c.sort_order::text||','||p.is_combo::text||','||bind.master_product_id::text
+ from public.combo_beverage_options c
+ join public.products p on p.shop_id=c.shop_id and p.id=c.combo_product_id
+ join public.catalog_product_shop_overrides bind
+  on bind.shop_id=p.shop_id and bind.canonical_product_id=p.id
+ where c.shop_id='${T}'`);
+if(comboLive!==[comboLocal,localProductId,'4','true',MP4].join(','))
+ throw new Error('Published Combo Product lacks target-local master-mapped option: '+comboLive);
+// Prepare a target-only modifier through the SAME trusted Draft/Publish
+// pipeline used by Admin, not by silently cloning a source modifier row.
+const TM5='81000000-0000-4000-8000-000000000015';
+const targetModifierDraft=rpc(
+ `public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,4,
+ 'Publish target-local modifier definition')`,
+ 'create target modifier draft');
+if(!targetModifierDraft.ok||!targetModifierDraft.draftId)
+ throw new Error('Target modifier preparation draft missing');
+const targetModifierBundle=JSON.parse(sql(
+ `select working_bundle_json::text from public.catalog_drafts
+  where id='${targetModifierDraft.draftId}'`));
+targetModifierBundle.snapshot.modifiers.push({
+ shopId:T,id:TM5,name:'Target local condiment',
+ priceMinor:700,standaloneProductId:localProductId,active:true,sortOrder:8,
+});
+const savedTargetModifier=rpc(
+ `public.apply_catalog_draft_change_v1(
+ '${OWNER}'::uuid,'${targetModifierDraft.draftId}'::uuid,1,
+ jsonb_build_object('bundleJson',${quote(JSON.stringify(targetModifierBundle))}))`,
+ 'stage target local modifier through canonical draft');
+if(!savedTargetModifier.ok||savedTargetModifier.draftRevision!==2)
+ throw new Error('Target modifier cannot be prepared: '+JSON.stringify(savedTargetModifier));
+const publishedTargetModifier=rpc(
+ `public.publish_catalog_draft_v1(
+ '${OWNER}'::uuid,'${targetModifierDraft.draftId}'::uuid,2,4)`,
+ 'publish target local modifier');
+if(!publishedTargetModifier.ok||publishedTargetModifier.publishVersion!==5)
+ throw new Error('Target modifier failed canonical Publish');
+const SP5='70000000-0000-4000-8000-000000000016';
+const MP5='50000000-0000-4000-8000-000000000016';
+const SM5='81000000-0000-4000-8000-000000000016';
+sql(`
+ insert into public.products(
+ id,shop_id,category_id,slug,name,price_minor,active,sold_out,is_combo,sort_order)
+ values ('${SP5}','${S}','${SC}','coffee-spiced','Coffee spiced',17000,true,false,false,11);
+ insert into public.catalog_master_products(id,business_id,master_category_id,canonical_name)
+ values ('${MP5}','${B}','${MC}','Coffee spiced');
+ insert into public.catalog_product_shop_overrides(
+ business_id,master_product_id,shop_id,canonical_product_id,price_minor,visible,manual_sold_out)
+ values ('${B}','${MP5}','${S}','${SP5}',17000,true,false);
+ insert into public.modifiers(
+ id,shop_id,name,price_minor,standalone_product_id,active,sort_order)
+ values ('${SM5}','${S}','Source condiment',400,'${SP}',true,6);
+ insert into public.product_modifiers(shop_id,product_id,modifier_id,max_quantity,sort_order)
+ values ('${S}','${SP5}','${SM5}',2,7);
+ `, 'new source Product with master-anchored modifier dependency');
+const modifierSourceBundle=sql(
+ `select private.build_admin_catalog_bundle_v1('${S}'::uuid,4,now())::text`,
+ 'published source new Product with modifier');
+sql(`
+ insert into public.catalog_publish_versions(
+ business_id,shop_id,publish_version,operations_configuration_version,source_kind,bundle_json)
+ values ('${B}','${S}',4,4,'BASELINE',${quote(modifierSourceBundle)});
+ insert into public.operations_configuration_snapshots(shop_id,version,bundle_json)
+ values ('${S}',4,${quote(modifierSourceBundle)});
+ `, 'source immutable modifier publication');
+const modifierDraft=rpc(
+ `public.create_catalog_draft_v1('${OWNER}'::uuid,'${T}'::uuid,5,
+  'Create new Product and map existing target modifier')`,
+ 'new modifier-linked Product target draft');
+if(!modifierDraft.ok||!modifierDraft.draftId)
+ throw new Error('New modifier-linked Product draft missing');
+const modifierArgs=`'${OWNER}'::uuid,'${S}'::uuid,'${T}'::uuid,
+ '${modifierDraft.draftId}'::uuid,4::bigint,5::bigint,1::bigint`;
+const modifierPreview=rpc(
+ `public.preview_admin_catalog_missing_entities_v1(${modifierArgs})`,
+ 'source modifier-linked Product preview');
+const modifierCandidate=modifierPreview.products.find(x=>x.sourceProductId===SP5);
+if(!modifierPreview.ok||modifierCandidate?.status!=='CREATE_REQUIRED')
+ throw new Error('New modifier-linked source Product not in creation preview');
+const modifierLocal=modifierCandidate.proposedTargetProductId;
+// A target Modifier with a matching name cannot substitute for the
+// existing standalone Product business-master binding.
+sql(`delete from public.catalog_product_shop_overrides
+ where business_id='${B}' and shop_id='${T}' and master_product_id='${MP}'`,
+ 'remove target standalone Product master binding');
+const unboundModifierPreview=rpc(
+ `public.preview_admin_catalog_missing_entities_v1(${modifierArgs})`,
+ 'recompute missing standalone Product fingerprint');
+const unboundModifierStage=rpc(
+ `public.stage_admin_catalog_copy_created_entities_v1(
+ ${modifierArgs},array[]::uuid[],array['${SP5}'::uuid],
+ '${unboundModifierPreview.creationFingerprint}','modifier-standalone-unbound')`,
+ 'refuse new Product Modifier link without standalone master');
+if(unboundModifierStage.ok!==false ||
+ unboundModifierStage.code!=='catalog_copy_missing_target_dependencies')
+ throw new Error('Unmapped standalone Product silently resolved Modifier identity: '+
+  JSON.stringify(unboundModifierStage));
+sql(`
+ insert into public.catalog_product_shop_overrides(
+ business_id,master_product_id,shop_id,canonical_product_id,price_minor,
+ visible,manual_sold_out)
+ values ('${B}','${MP}','${T}','${localProductId}',12000,true,false)
+ `, 'restore target standalone Product master binding');
+const modifierStage=rpc(
+ `public.stage_admin_catalog_copy_created_entities_v1(
+ ${modifierArgs},array[]::uuid[],array['${SP5}'::uuid],
+ '${modifierPreview.creationFingerprint}','create-linked-product-1')`,
+ 'Stage new Product with existing master-mapped target Modifier');
+if(!modifierStage.ok||modifierStage.createdProducts!==1)
+ throw new Error('Mapped Modifier dependent Product Stage failed: '+
+   JSON.stringify(modifierStage));
+const modifierBundle=JSON.parse(sql(`
+ select working_bundle_json::text from public.catalog_drafts
+ where id='${modifierDraft.draftId}'`,'staged Modifier link target draft'));
+const mappedLinks=modifierBundle.snapshot.productModifierLinks;
+if(mappedLinks.length!==1||mappedLinks[0].productId!==modifierLocal||
+ mappedLinks[0].modifierId!==TM5||mappedLinks[0].shopId!==T||
+ mappedLinks[0].maxQuantity!==2||mappedLinks[0].sortOrder!==7)
+ throw new Error('Product Modifier mapped to source-local or ambiguous modifier identity');
+if(sql(`select count(*) from public.product_modifiers where shop_id='${T}'`)!=='0')
+ throw new Error('Modifier link Stage changed target live configuration');
+const modifierPublished=rpc(
+ `public.publish_catalog_draft_v1(
+ '${OWNER}'::uuid,'${modifierDraft.draftId}'::uuid,2,5)`,
+ 'Publish mapped Modifier linked new Product');
+if(!modifierPublished.ok||modifierPublished.publishVersion!==6)
+ throw new Error('Modifier linked new Product publication failed');
+const liveModifierLink=sql(`
+ select pm.product_id::text||','||pm.modifier_id::text||','||
+        pm.max_quantity::text||','||m.price_minor::text||','||bind.master_product_id::text
+ from public.product_modifiers pm
+ join public.modifiers m on m.shop_id=pm.shop_id and m.id=pm.modifier_id
+ join public.catalog_product_shop_overrides bind
+   on bind.shop_id=pm.shop_id and bind.canonical_product_id=pm.product_id
+ where pm.shop_id='${T}'`, 'published Modifier local identity');
+if(liveModifierLink!==[modifierLocal,TM5,'2','700',MP5].join(','))
+ throw new Error('Mapped Modifier Product changed target definition or master identity: '+
+  liveModifierLink);
+console.log('Missing Catalog Category/Product Stage/Publish master identity integration passed.');

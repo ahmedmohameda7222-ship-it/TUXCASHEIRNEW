@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 const shopId = '11111111-1111-4111-8111-111111111111';
 const businessDayId = '22222222-2222-4222-8222-222222222222';
 const cashAccountId = '33333333-3333-4333-8333-333333333333';
+const cashierWorkerId = '77777777-7777-4777-8777-777777777777';
 const bankAccountId = '44444444-4444-4444-8444-444444444444';
 const csrfToken = 'f'.repeat(64);
 const session = {
@@ -64,13 +65,28 @@ const workspace = {
   unmappedPaymentMethodCount: 0,
 };
 
-async function mockFinance(page: Page, dayStatus: 'OPEN' | 'CLOSED' = 'OPEN') {
+async function mockFinance(
+  page: Page,
+  dayStatus: 'OPEN' | 'CLOSED' = 'OPEN',
+  options: {
+    pendingSnapshot?: boolean;
+    pendingWithdrawal?: boolean;
+    pendingCashier?: boolean;
+  } = {},
+) {
   const postedCommands: Array<Record<string, unknown>> = [];
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(session),
+    });
+  });
+  await page.route('**/api/admin/reauth', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true }),
     });
   });
   await page.route('**/api/admin/finance**', async (route) => {
@@ -84,7 +100,17 @@ async function mockFinance(page: Page, dayStatus: 'OPEN' | 'CLOSED' = 'OPEN') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ ok: true, replayed: false, commandId: command.commandId }),
+        body: JSON.stringify(
+          (options.pendingSnapshot && command.type === 'finance.snapshot.adjust') ||
+            (options.pendingWithdrawal && command.type === 'finance.owner-withdrawal') ||
+            (options.pendingCashier && command.type === 'finance.cashier.reconcile')
+            ? {
+                ok: true,
+                state: 'PENDING_APPROVAL',
+                approvalRequestId: 'f0000000-0000-4000-8000-000000000004',
+              }
+            : { ok: true, replayed: false, commandId: command.commandId },
+        ),
       });
       return;
     }
@@ -126,9 +152,40 @@ async function mockFinance(page: Page, dayStatus: 'OPEN' | 'CLOSED' = 'OPEN') {
         financialFinalized: false,
       };
     } else if (view === 'day-history') {
-      data = { snapshots: [], adjustments: [] };
+      data = options.pendingSnapshot
+        ? {
+            snapshots: [
+              {
+                id: 'e0000000-0000-4000-8000-000000000001',
+                business_day_id: businessDayId,
+                finalized_at: '2026-10-08T16:00:00Z',
+                snapshot: {
+                  startedAt: '2026-10-08T06:00:00Z',
+                  netSalesMinor: 120000,
+                  estimatedOperatingProfitMinor: 70000,
+                },
+              },
+            ],
+            adjustments: [],
+          }
+        : { snapshots: [], adjustments: [] };
     } else if (view === 'cashiers') {
-      data = { workers: [], cashiers: [], reconciliations: [] };
+      data = options.pendingCashier
+        ? {
+            workers: [{ id: cashierWorkerId, display_name: 'Cashier #1' }],
+            cashiers: [
+              {
+                cashierWorkerId,
+                displayName: 'Cashier #1',
+                expectedMinor: 2000,
+                cashSalesExpectationMinor: 2000,
+                recordedCashMovementMinor: 0,
+                openingFloatRecorded: true,
+              },
+            ],
+            reconciliations: [],
+          }
+        : { workers: [], cashiers: [], reconciliations: [] };
     } else if (view === 'owner-summary') {
       data = { summaries: [] };
     }
@@ -171,6 +228,96 @@ test('Bank & Cash keeps tracked money distinct from profit and posts a transfer 
   expect(commands[0]?.commandId).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   );
+});
+
+test('cashier variance approval remains pending without falsely posting a count', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockFinance(page, 'CLOSED', { pendingCashier: true });
+  await page.goto('/finance/end-day');
+  await page.getByRole('button', { name: 'Record cashier count' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Cashier cash count' });
+  await dialog.getByLabel('Cashier', { exact: true }).selectOption(cashierWorkerId);
+  await dialog.getByLabel('Actual counted cash (EGP)').fill('25.00');
+  await dialog.getByLabel('Variance reason, if different').fill('Verified drawer difference');
+  await dialog.getByLabel('Requester PIN (if approval requires reauthentication)').fill('1234');
+  await dialog.getByRole('button', { name: 'Record count' }).click();
+  await expect(
+    dialog.getByRole('status').filter({ hasText: 'pending second-person approval' }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole('button', { name: 'Pending second-person approval' }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText('No cashier reconciliation has been posted for this day.'),
+  ).toBeVisible();
+  expect(commands).toHaveLength(1);
+  expect(commands[0]).toMatchObject({
+    type: 'finance.cashier.reconcile',
+    shopId,
+    businessDayId,
+    cashierWorkerId,
+    actualMinor: 2500,
+    reason: 'Verified drawer difference',
+    requesterPin: '1234',
+  });
+});
+
+test('owner withdrawal requests second-person approval without posting funds', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockFinance(page, 'OPEN', { pendingWithdrawal: true });
+  await page.goto('/finance');
+  await page.getByRole('button', { name: 'Money movement' }).click();
+  await page.getByLabel('Movement type').selectOption('OWNER_WITHDRAWAL');
+  await page.getByLabel('Account', { exact: true }).selectOption(cashAccountId);
+  await page.getByLabel('Amount (EGP)').fill('5.00');
+  await page.getByLabel('Reason').fill('Owner distribution');
+  await page.getByLabel('PIN re-authentication').fill('1234');
+  await page.getByRole('button', { name: 'Record movement' }).click();
+  await expect(
+    page.getByRole('dialog', { name: 'Record money movement' }).getByRole('status'),
+  ).toContainText('pending second-person approval');
+  await expect(page.getByText('Total tracked money')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Record movement' })).toBeDisabled();
+  expect(commands).toHaveLength(1);
+  expect(commands[0]).toMatchObject({
+    type: 'finance.owner-withdrawal',
+    shopId,
+    accountId: cashAccountId,
+    amountMinor: 500,
+    reason: 'Owner distribution',
+    requesterPin: '1234',
+  });
+});
+
+test('Finance Z correction shows pending approval without claiming a posted adjustment', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockFinance(page, 'CLOSED', { pendingSnapshot: true });
+  await page.goto('/finance/end-day');
+  await expect(page.getByRole('heading', { name: 'Financial Z history' })).toBeVisible();
+  await page.getByRole('button', { name: 'Append correction' }).first().click();
+  await page.getByLabel('Adjustment amount (EGP, signed)').fill('5.00');
+  await page.getByRole('textbox', { name: 'Reason', exact: true }).fill('Correct till value');
+  await page
+    .getByRole('dialog', { name: 'Append financial correction' })
+    .getByLabel('PIN confirmation')
+    .fill('1234');
+  await page.getByRole('button', { name: 'Append correction' }).last().click();
+
+  await expect(page.getByRole('status')).toContainText('pending second-person approval');
+  await expect(page.getByText('Posted adjustments: EGP 0.00')).toBeVisible();
+  expect(commands).toHaveLength(1);
+  expect(commands[0]).toMatchObject({
+    type: 'finance.snapshot.adjust',
+    shopId,
+    snapshotId: 'e0000000-0000-4000-8000-000000000001',
+    amountMinor: 500,
+    reason: 'Correct till value',
+    requesterPin: '1234',
+  });
 });
 
 test('an OPEN Operations Business Day exposes non-closing X and never a Financial Z button', async ({

@@ -11,6 +11,7 @@ import {
   type DraftLineId,
   type InventoryItemId,
   type InventoryMovementId,
+  type OrderId,
   type MenuCategoryId,
   type OperationsConfigurationSnapshot,
   type OrderDraft,
@@ -33,6 +34,7 @@ import { OperationsOrdersService } from './orders';
 import { OperationsOrdersBoardService } from './ordersBoard';
 
 const SHOP_ID = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
+const OTHER_SHOP_ID = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111112');
 const WORKER_ID = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222');
 const DAY_ID = parseEntityId<BusinessDayId>('33333333-3333-4333-8333-333333333333');
 const CATEGORY_ID = parseEntityId<MenuCategoryId>('44444444-4444-4444-8444-444444444444');
@@ -98,9 +100,9 @@ const CONFIGURATION: OperationsConfigurationSnapshot = {
   deliveryZones: [],
 };
 
-function draft(intentKey: string): OrderDraft {
+function draft(intentKey: string, shopId: ShopId = SHOP_ID, priceMinor = 10_000): OrderDraft {
   return {
-    shopId: SHOP_ID,
+    shopId,
     businessDayId: DAY_ID,
     draftScopeId: 'inventory-lifecycle',
     revision: 0,
@@ -112,7 +114,7 @@ function draft(intentKey: string): OrderDraft {
         id: parseEntityId<DraftLineId>('99999999-9999-4999-8999-999999999999'),
         productId: PRODUCT_ID,
         productName: 'Inventory Burger',
-        unitPriceMinor: moneyMinor(10_000),
+        unitPriceMinor: moneyMinor(priceMinor),
         quantity: 1,
         modifiers: [],
         comboBeverages: [],
@@ -135,12 +137,17 @@ function draft(intentKey: string): OrderDraft {
     payment: {
       mode: 'SINGLE',
       methodId: PAYMENT_ID,
-      cashReceivedMinor: moneyMinor(10_000),
+      cashReceivedMinor: moneyMinor(priceMinor),
     },
   };
 }
 
-async function fixture(initialStockMicros = 5_000_000) {
+async function fixture(
+  initialStockMicros = 5_000_000,
+  shopId: ShopId = SHOP_ID,
+  unitCostMinor = 0,
+  priceMinor = 10_000,
+) {
   const directory = await mkdtemp(join(tmpdir(), 'tux-order-inventory-lifecycle-'));
   temporaryDirectories.push(directory);
   const databasePath = join(directory, 'operations.sqlite3');
@@ -148,17 +155,17 @@ async function fixture(initialStockMicros = 5_000_000) {
   await database.initialize();
 
   await database.transaction(async (transaction) => {
-    await transaction.shops.put({ id: SHOP_ID, name: 'TUX', active: true });
+    await transaction.shops.put({ id: shopId, name: 'TUX', active: true });
     await transaction.workers.put({
       id: WORKER_ID,
-      shopId: SHOP_ID,
+      shopId,
       displayName: 'Worker',
       pinHash: 'test-only',
       active: true,
     });
     await transaction.businessDays.put({
       id: DAY_ID,
-      shopId: SHOP_ID,
+      shopId,
       status: 'OPEN',
       startedAt: AT,
       endedAt: null,
@@ -168,16 +175,28 @@ async function fixture(initialStockMicros = 5_000_000) {
     });
     await transaction.workerSessions.put({
       id: parseEntityId<WorkerSessionId>('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
-      shopId: SHOP_ID,
+      shopId,
       businessDayId: DAY_ID,
       workerId: WORKER_ID,
       startedAt: AT,
       endedAt: null,
     });
-    await transaction.configuration.put(CONFIGURATION);
+    await transaction.configuration.put({
+      ...CONFIGURATION,
+      shopId,
+      categories: CONFIGURATION.categories.map((item) => ({ ...item, shopId })),
+      products: CONFIGURATION.products.map((item) => ({
+        ...item,
+        shopId,
+        priceMinor: moneyMinor(priceMinor),
+      })),
+      recipeLines: CONFIGURATION.recipeLines.map((item) => ({ ...item, shopId })),
+      orderTypes: CONFIGURATION.orderTypes.map((item) => ({ ...item, shopId })),
+      paymentMethods: CONFIGURATION.paymentMethods.map((item) => ({ ...item, shopId })),
+    });
     await transaction.inventory.putItem({
       id: INVENTORY_ITEM_ID,
-      shopId: SHOP_ID,
+      shopId,
       name: 'Beef',
       unitLabel: 'g',
       trackingMode: 'RECIPE_TRACKED',
@@ -185,7 +204,7 @@ async function fixture(initialStockMicros = 5_000_000) {
     });
     await transaction.inventory.appendMovement({
       id: parseEntityId<InventoryMovementId>('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'),
-      shopId: SHOP_ID,
+      shopId,
       businessDayId: DAY_ID,
       itemId: INVENTORY_ITEM_ID,
       movementType: 'BULK_STOCK_RECEIVED',
@@ -196,6 +215,13 @@ async function fixture(initialStockMicros = 5_000_000) {
       createdAt: AT,
       compensatesMovementId: null,
     });
+    if (unitCostMinor > 0) {
+      await transaction.inventory.putWeightedUnitCost(
+        shopId,
+        INVENTORY_ITEM_ID,
+        moneyMinor(unitCostMinor),
+      );
+    }
   });
 
   const readModel = new SqliteOperatorSessionReadModel(databasePath);
@@ -359,6 +385,106 @@ describe('Operations order inventory lifecycle', () => {
       });
     } finally {
       await closeFixture(test);
+    }
+  });
+
+  it('isolates two worker-device shops across POS/ONLINE payment, recipe reservation and costed COGS', async () => {
+    // Separate offline Operations stores are required: each device must have exactly one active shop.
+    // This deliberately exercises the actual application placement and DONE transition services,
+    // not mock order snapshots or uncommitted catalog staging.
+    const shopA = await fixture(5_000_000, SHOP_ID, 125, 10_000);
+    const shopB = await fixture(650_000, OTHER_SHOP_ID, 275, 18_000);
+    try {
+      const alienDraft = await shopA.orders.placeOrder(
+        draft('12121212-1212-4212-8212-121212121212', OTHER_SHOP_ID, 18_000),
+      );
+      expect(alienDraft.ok).toBe(false);
+      if (!alienDraft.ok) {
+        expect(alienDraft.error.code).toBe('CONFLICT_ERROR');
+      }
+
+      // A POS worker and a B worker-confirmed ONLINE reservation can reuse the
+      // same checkout intent without leaking between independent shop scopes.
+      const intent = '13131313-1313-4313-8313-131313131313';
+      const pos = await shopA.orders.placeOrder(draft(intent));
+      const online = await shopB.orders.placeOrder(draft(intent, OTHER_SHOP_ID, 18_000), {
+        source: 'ONLINE',
+        orderId: parseEntityId<OrderId>('14141414-1414-4414-8414-141414141414'),
+      });
+      expect(pos.ok).toBe(true);
+      expect(online.ok).toBe(true);
+      if (!pos.ok || !online.ok) return;
+      expect(pos.value.order.source).toBe('POS');
+      expect(online.value.order.source).toBe('ONLINE');
+      expect(pos.value.order.shopId).toBe(SHOP_ID);
+      expect(online.value.order.shopId).toBe(OTHER_SHOP_ID);
+
+      for (const [scope, placed] of [
+        [shopA, pos],
+        [shopB, online],
+      ] as const) {
+        const reservations = await scope.database.transaction((tx) =>
+          tx.inventory.listMovementsForOrder(placed.value.order.id),
+        );
+        expect(reservations).toMatchObject([
+          { movementType: 'ORDER_RESERVATION', reservedDeltaMicros: 500_000 },
+        ]);
+      }
+
+      // Foreign order identifiers must not be executable on a different device/shop.
+      const foreignCompletion = await shopB.board.markDone(pos.value.order.id);
+      expect(foreignCompletion.ok).toBe(false);
+      const foreignMovements = await shopB.database.transaction((tx) =>
+        tx.inventory.listMovementsForOrder(pos.value.order.id),
+      );
+      expect(foreignMovements).toHaveLength(0);
+      expect(
+        await shopB.database.transaction((tx) => tx.inventory.getBalance(INVENTORY_ITEM_ID)),
+      ).toMatchObject({ onHandMicros: 650_000, reservedMicros: 500_000 });
+
+      const firstDone = await shopA.board.markDone(pos.value.order.id);
+      expect(firstDone.ok).toBe(true);
+      expect(
+        await shopB.database.transaction((tx) => tx.inventory.getBalance(INVENTORY_ITEM_ID)),
+      ).toMatchObject({ onHandMicros: 650_000, reservedMicros: 500_000 });
+
+      const secondDone = await shopB.board.markDone(online.value.order.id);
+      expect(secondDone.ok).toBe(true);
+      const secondDoneAgain = await shopB.board.markDone(online.value.order.id);
+      expect(secondDoneAgain.ok).toBe(false);
+
+      const a = await shopA.database.transaction(async (tx) => ({
+        stock: await tx.inventory.getBalance(INVENTORY_ITEM_ID),
+        movements: await tx.inventory.listMovementsForOrder(pos.value.order.id),
+      }));
+      const b = await shopB.database.transaction(async (tx) => ({
+        stock: await tx.inventory.getBalance(INVENTORY_ITEM_ID),
+        movements: await tx.inventory.listMovementsForOrder(online.value.order.id),
+      }));
+      expect(a.stock).toMatchObject({ onHandMicros: 4_500_000, reservedMicros: 0 });
+      expect(b.stock).toMatchObject({ onHandMicros: 150_000, reservedMicros: 0 });
+      expect(a.movements.map((move) => move.movementType)).toEqual([
+        'ORDER_RESERVATION',
+        'ORDER_CONSUMPTION',
+      ]);
+      expect(b.movements.map((move) => move.movementType)).toEqual([
+        'ORDER_RESERVATION',
+        'ORDER_CONSUMPTION',
+      ]);
+      expect(a.movements[1]).toMatchObject({
+        quantityDeltaMicros: -500_000,
+        unitCostMinor: 125,
+      });
+      expect(b.movements[1]).toMatchObject({
+        quantityDeltaMicros: -500_000,
+        unitCostMinor: 275,
+      });
+
+      // One shop's sold recipe and cost state cannot change the other shop.
+      expect(a.stock.onHandMicros - b.stock.onHandMicros).toBe(4_350_000);
+    } finally {
+      await closeFixture(shopA);
+      await closeFixture(shopB);
     }
   });
 });

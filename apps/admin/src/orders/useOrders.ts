@@ -75,6 +75,7 @@ export function useOrders(
   shopId: string | undefined,
   selectedOrderId: string | null,
   filters: OrderSearchFilters,
+  searchEnabled = true,
 ) {
   const session = useAdminSession();
   const queryClient = useQueryClient();
@@ -86,7 +87,7 @@ export function useOrders(
 
   const searchQuery = useInfiniteQuery({
     queryKey: shopId ? listKey(shopId, filters) : ['admin', 'orders', 'no-shop'],
-    enabled: Boolean(shopId),
+    enabled: Boolean(shopId) && searchEnabled,
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
       if (!shopId) throw new OrdersUiError('concrete_shop_required');

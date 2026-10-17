@@ -1,5 +1,6 @@
 import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
 
+import { PaymentZoneRulesPanel } from './PaymentZoneRulesPanel';
 import { SettingOverrideEditor } from './SettingOverrideEditor';
 import {
   formatBasisPointsAsPercent,
@@ -7,16 +8,22 @@ import {
   parseEgpToMinor,
   parsePercentToBasisPoints,
 } from './settingsModel';
-import type { SettingOverrideUpdateDraft } from './useSettings';
+import type { SettingOverrideUpdateDraft, SettingRestoreDraft } from './useSettings';
 
 export function CheckoutPage({
   workspace,
   onUpdate,
   updating,
+  scope = 'shop',
+  onRestore,
+  canManagePaymentZones = false,
 }: {
   workspace: AdminSettingsWorkspace;
   onUpdate(draft: SettingOverrideUpdateDraft): void | Promise<void>;
   updating: boolean;
+  scope?: 'shop' | 'business';
+  canManagePaymentZones?: boolean;
+  onRestore?: ((draft: SettingRestoreDraft) => void | Promise<void>) | undefined;
 }) {
   return (
     <section className="admin-settings-section" aria-labelledby="settings-checkout-title">
@@ -44,6 +51,8 @@ export function CheckoutPage({
           parseInput={parseEgpToMinor}
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
+          onRestore={onRestore}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -58,6 +67,8 @@ export function CheckoutPage({
           parseInput={parsePercentToBasisPoints}
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
+          onRestore={onRestore}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -73,6 +84,8 @@ export function CheckoutPage({
           help="Used for future order totals after settings are published."
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
+          onRestore={onRestore}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -81,6 +94,8 @@ export function CheckoutPage({
           kind="boolean"
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
+          onRestore={onRestore}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -90,6 +105,8 @@ export function CheckoutPage({
           help="Applies to future orders; existing orders keep their original total."
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
+          onRestore={onRestore}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -99,6 +116,8 @@ export function CheckoutPage({
           help="When off, delivery orders use the configured zone fee."
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
+          onRestore={onRestore}
         />
       </div>
 
@@ -120,6 +139,9 @@ export function CheckoutPage({
           </div>
         )}
       </div>
+      {scope === 'shop' && canManagePaymentZones ? (
+        <PaymentZoneRulesPanel workspace={workspace} />
+      ) : null}
     </section>
   );
 }

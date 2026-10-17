@@ -48,6 +48,16 @@ export function InventoryItemPage({
         {actions ? <div className="admin-inventory-actions">{actions}</div> : null}
       </header>
 
+      <dl className="admin-definition-grid">
+        <div>
+          <dt>Base unit</dt>
+          <dd>{item.unitLabel}</dd>
+        </div>
+        <div>
+          <dt>Tracking mode</dt>
+          <dd>{item.trackingMode === 'RECIPE_TRACKED' ? 'Recipe tracked' : 'Bulk / manual'}</dd>
+        </div>
+      </dl>
       <dl className="inventory-balance-grid">
         <div>
           <dt>On Hand</dt>

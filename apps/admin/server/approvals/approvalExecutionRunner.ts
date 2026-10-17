@@ -1,6 +1,11 @@
 import type { AdminOrderFinancialMutationResult } from '@tux/admin-contracts';
 
 import { getAdminServerEnv } from '../env.js';
+import type { AdminInventoryCommandResult } from '@tux/admin-contracts';
+import {
+  createInventoryAdjustmentApprovalExecutionEntries,
+  type ApprovedInventoryAdjustmentExecutionInput,
+} from '../inventory/inventoryApproval.js';
 import {
   createOrderApprovalExecutionEntries,
   type ApprovedRefundExecutionInput,
@@ -11,6 +16,51 @@ import {
   createSupabaseStaffApprovalExecutionDependencies,
 } from '../staff/staffApproval.js';
 import { AdminSupabaseClient } from '../supabaseAdmin.js';
+import {
+  createCashierReconciliationApprovalExecutionEntries,
+  type ApprovedCashierReconciliationInput,
+  type CashierReconciliationMutationResult,
+} from './financeCashierReconciliationApproval.js';
+import {
+  createOwnerWithdrawalApprovalExecutionEntries,
+  type ApprovedOwnerWithdrawalInput,
+  type OwnerWithdrawalMutationResult,
+} from './financeOwnerWithdrawalApproval.js';
+import {
+  createFinanceSnapshotApprovalExecutionEntries,
+  type ApprovedFinanceSnapshotExecutionInput,
+  type ApprovedFinanceSnapshotMutationResult,
+} from './financeSnapshotApproval.js';
+import {
+  createCatalogPricePublishApprovalExecutionEntries,
+  type ApprovedCatalogPricePublish,
+} from '../catalog/catalogPricePublishApproval.js';
+import type { CatalogPublishResult } from '@tux/admin-contracts';
+import {
+  createSettingsCheckoutRateApprovalExecutionEntries,
+  type ApprovedSettingsCheckoutRatePublish,
+} from './settingsCheckoutRatePublishApproval.js';
+import type { SettingsPublishResult } from '@tux/admin-contracts';
+import {
+  createSettingsPaymentZoneApprovalExecutionEntries,
+  type ApprovedSettingsPaymentZoneChange,
+  type SettingsPaymentZoneMutationResult,
+} from './settingsPaymentZoneApproval.js';
+import {
+  createPaymentMethodCreateApprovalExecutionEntries,
+  type ApprovedPaymentMethodCreate,
+  type PaymentMethodCreateMutationResult,
+} from './settingsPaymentMethodCreateApproval.js';
+import {
+  createSettingsPaymentMethodApprovalExecutionEntries,
+  type ApprovedSettingsPaymentMethodUpdate,
+  type SettingsPaymentMethodMutationResult,
+} from './settingsPaymentMethodApproval.js';
+import {
+  createShopLifecycleApprovalExecutionEntries,
+  type ApprovedShopLifecycleInput,
+  type ApprovedShopLifecycleMutationResult,
+} from './shopLifecycleApproval.js';
 import {
   createApprovalExecutionRegistry,
   createApprovalExecutionService,
@@ -110,9 +160,213 @@ export async function runProductionApprovalExecutionRunner(): Promise<ApprovalEx
   const persistence = createSupabaseApprovalExecutionDependencies(client);
   const registry = createApprovalExecutionRegistry([
     ...createOrderApprovalExecutionEntries(createOrderApprovalPersistence(client)),
+    ...createInventoryAdjustmentApprovalExecutionEntries({
+      executeAdjustment(input: ApprovedInventoryAdjustmentExecutionInput) {
+        return client.rpc<AdminInventoryCommandResult>(
+          'execute_approved_admin_inventory_adjustment_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_inventory_item_id: input.inventoryItemId,
+            p_quantity_delta_micros: input.quantityDeltaMicros,
+            p_reason_code_id: input.reasonCodeId,
+            p_note: input.note,
+            p_command_id: input.originalCommandId,
+            p_emergency_negative_override: input.emergencyNegativeOverride,
+            p_expected_definition_version: input.expectedDefinitionVersion,
+            p_expected_movement_count: input.expectedMovementCount,
+          },
+        );
+      },
+    }),
     ...createStaffApprovalExecutionEntries(
       createSupabaseStaffApprovalExecutionDependencies(client),
     ),
+    ...createCashierReconciliationApprovalExecutionEntries({
+      executeReconciliation(input: ApprovedCashierReconciliationInput) {
+        return client.rpc<CashierReconciliationMutationResult>(
+          'execute_approved_admin_cashier_reconciliation_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_business_day_id: input.businessDayId,
+            p_cashier_worker_id: input.cashierWorkerId,
+            p_actual_minor: input.actualMinor,
+            p_expected_minor: input.expectedMinor,
+            p_reason: input.reason,
+            p_original_command_id: input.commandId,
+            p_approval_command_id: input.approvalCommandId,
+          },
+        );
+      },
+    }),
+    ...createOwnerWithdrawalApprovalExecutionEntries({
+      executeWithdrawal(input: ApprovedOwnerWithdrawalInput) {
+        return client.rpc<OwnerWithdrawalMutationResult>(
+          'execute_approved_admin_owner_withdrawal_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_account_id: input.accountId,
+            p_amount_minor: input.amountMinor,
+            p_reason: input.reason,
+            p_original_command_id: input.commandId,
+            p_approval_command_id: input.approvalCommandId,
+          },
+        );
+      },
+    }),
+    ...createFinanceSnapshotApprovalExecutionEntries({
+      executeAdjustment(input: ApprovedFinanceSnapshotExecutionInput) {
+        return client.rpc<ApprovedFinanceSnapshotMutationResult>(
+          'execute_approved_admin_finance_snapshot_adjustment_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_snapshot_id: input.snapshotId,
+            p_amount_minor: input.amountMinor,
+            p_reason: input.reason,
+            p_original_command_id: input.commandId,
+            p_expected_adjustment_count: input.expectedAdjustmentCount,
+            p_command_id: input.approvalCommandId,
+          },
+        );
+      },
+    }),
+    ...createCatalogPricePublishApprovalExecutionEntries({
+      publish(input: ApprovedCatalogPricePublish) {
+        return client.rpc<CatalogPublishResult>('execute_approved_admin_catalog_price_publish_v1', {
+          p_approval_request_id: input.approvalRequestId,
+          p_business_id: input.businessId,
+          p_shop_id: input.shopId,
+          p_requester_employee_id: input.requesterEmployeeId,
+          p_approver_employee_id: input.approverEmployeeId,
+          p_draft_id: input.draftId,
+          p_expected_draft_revision: input.expectedDraftRevision,
+          p_expected_publish_version: input.expectedVersion,
+          p_max_price_delta_minor: input.maxPriceDeltaMinor,
+          p_candidate_fingerprint: input.candidateFingerprint,
+          p_command_id: input.approvalCommandId,
+        });
+      },
+    }),
+    ...createSettingsCheckoutRateApprovalExecutionEntries({
+      publish(input: ApprovedSettingsCheckoutRatePublish) {
+        return client.rpc<SettingsPublishResult>(
+          'execute_approved_admin_checkout_rate_publish_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_expected_settings_version: input.expectedSettingsVersion,
+            p_payload_fingerprint: input.payloadFingerprint,
+            p_command_id: input.approvalCommandId,
+          },
+        );
+      },
+    }),
+    ...createSettingsPaymentZoneApprovalExecutionEntries({
+      executeChange(input: ApprovedSettingsPaymentZoneChange) {
+        return client.rpc<SettingsPaymentZoneMutationResult>(
+          'execute_approved_admin_payment_zone_rule_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_payment_method_id: input.paymentMethodId,
+            p_delivery_zone_id: input.deliveryZoneId,
+            p_allowed: input.allowed,
+            p_expected_allowed: input.expectedAllowed,
+            p_expected_settings_version: input.expectedSettingsVersion,
+            p_command_id: input.approvalCommandId,
+          },
+        );
+      },
+    }),
+    ...createPaymentMethodCreateApprovalExecutionEntries({
+      executeCreate(input: ApprovedPaymentMethodCreate) {
+        return client.rpc<PaymentMethodCreateMutationResult>(
+          'execute_approved_admin_payment_method_create_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_original_command_id: input.commandId,
+            p_display_name: input.displayName,
+            p_logic_type: input.logicType,
+            p_active: input.active,
+            p_sort_order: input.sortOrder,
+            p_channel: input.channel,
+            p_requires_reference: input.requiresReference,
+            p_manual_confirmation_required: input.manualConfirmationRequired,
+            p_refund_allowed: input.refundAllowed,
+            p_expected_settings_version: input.expectedSettingsVersion,
+            p_approval_command_id: input.approvalCommandId,
+          },
+        );
+      },
+    }),
+    ...createSettingsPaymentMethodApprovalExecutionEntries({
+      executeUpdate(input: ApprovedSettingsPaymentMethodUpdate) {
+        return client.rpc<SettingsPaymentMethodMutationResult>(
+          'execute_approved_admin_payment_method_update_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_payment_method_id: input.paymentMethodId,
+            p_display_name: input.displayName,
+            p_active: input.active,
+            p_sort_order: input.sortOrder,
+            p_channel: input.channel,
+            p_requires_reference: input.requiresReference,
+            p_manual_confirmation_required: input.manualConfirmationRequired,
+            p_refund_allowed: input.refundAllowed,
+            p_expected_settings_version: input.expectedSettingsVersion,
+            p_expected_edit_version: input.expectedEditVersion,
+            p_command_id: input.approvalCommandId,
+          },
+        );
+      },
+    }),
+    ...createShopLifecycleApprovalExecutionEntries({
+      executeLifecycle(input: ApprovedShopLifecycleInput) {
+        return client.rpc<ApprovedShopLifecycleMutationResult>(
+          'execute_approved_admin_shop_lifecycle_v1',
+          {
+            p_approval_request_id: input.approvalRequestId,
+            p_business_id: input.businessId,
+            p_shop_id: input.shopId,
+            p_requester_employee_id: input.requesterEmployeeId,
+            p_approver_employee_id: input.approverEmployeeId,
+            p_expected_lifecycle_revision: input.expectedLifecycleRevision,
+            p_expected_state: input.expectedState,
+            p_target_state: input.targetState,
+            p_command_id: input.originalCommandId,
+          },
+        );
+      },
+    }),
   ]);
   const service = createApprovalExecutionService({
     ...persistence,

@@ -15,6 +15,9 @@ import { readAdminSessionToken } from '../session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../supabaseAdmin.js';
 import { adminRequestOperation } from '../observability.js';
 import { maskOwnerSummaryForPrincipal } from './ownerSummaryAuthorization.js';
+import { executeFinanceSnapshotCommand } from './financeSnapshotApprovalRoute.js';
+import { executeOwnerWithdrawalCommand } from './financeOwnerWithdrawalApprovalRoute.js';
+import { executeCashierReconciliationCommand } from './financeCashierReconciliationApprovalRoute.js';
 
 const uuid = z.string().uuid();
 const commandId = uuid;
@@ -68,6 +71,7 @@ const operationSchema = z.discriminatedUnion('type', [
       amountMinor: minor,
       reason,
       commandId,
+      requesterPin: z.string().min(1).max(64).optional(),
     })
     .strict(),
   z
@@ -107,6 +111,7 @@ const operationSchema = z.discriminatedUnion('type', [
       actualMinor: z.number().int().safe().nonnegative(),
       reason: z.string().trim().max(500).nullable(),
       commandId,
+      requesterPin: z.string().min(1).max(64).optional(),
     })
     .strict(),
   z
@@ -167,6 +172,7 @@ const operationSchema = z.discriminatedUnion('type', [
       amountMinor: signedMinor,
       reason,
       commandId,
+      requesterPin: z.string().min(1).max(64).optional(),
     })
     .strict(),
 ]);
@@ -521,16 +527,10 @@ export async function handleAdvancedFinance(
         p_reason: command.reason,
         p_command_id: command.commandId,
       });
+    } else if (command.type === 'finance.owner-withdrawal') {
+      result = await executeOwnerWithdrawalCommand(client, context, command, request);
     } else if (command.type === 'finance.cashier.reconcile') {
-      result = await client.rpc('finance_reconcile_cashier_v1', {
-        p_actor_employee_id: principal.employeeId,
-        p_shop_id: shopId,
-        p_business_day_id: command.businessDayId,
-        p_cashier_worker_id: command.cashierWorkerId,
-        p_actual_minor: command.actualMinor,
-        p_reason: command.reason,
-        p_command_id: command.commandId,
-      });
+      result = await executeCashierReconciliationCommand(client, context, command, request);
     } else if (command.type === 'finance.day.finalize') {
       result = await client.rpc('finance_finalize_day_v1', {
         p_actor_employee_id: principal.employeeId,
@@ -539,14 +539,7 @@ export async function handleAdvancedFinance(
         p_command_id: command.commandId,
       });
     } else if (command.type === 'finance.snapshot.adjust') {
-      result = await client.rpc('finance_adjust_snapshot_v1', {
-        p_actor_employee_id: principal.employeeId,
-        p_shop_id: shopId,
-        p_snapshot_id: command.snapshotId,
-        p_amount_minor: command.amountMinor,
-        p_reason: command.reason,
-        p_command_id: command.commandId,
-      });
+      result = await executeFinanceSnapshotCommand(client, context, command, request);
     } else {
       const actionMap = {
         'finance.transfer': 'TRANSFER',
@@ -557,7 +550,7 @@ export async function handleAdvancedFinance(
         'finance.settlement.record': 'SETTLEMENT',
       } as const;
       const payload =
-        command.type === 'finance.owner-contribution' || command.type === 'finance.owner-withdrawal'
+        command.type === 'finance.owner-contribution'
           ? {
               fromAccountId: command.accountId,
               amountMinor: command.amountMinor,

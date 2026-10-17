@@ -28,6 +28,38 @@ describe('Admin settings API contract', () => {
     ).toBe(true);
   });
 
+  it('requires version-fenced ACTIVE/SUSPENDED shop lifecycle transitions', () => {
+    const input = {
+      type: 'shop.lifecycle.update',
+      shopId,
+      expectedState: 'ACTIVE',
+      targetState: 'SUSPENDED',
+      expectedLifecycleRevision: 1,
+    };
+    expect(settingsCommandSchema.safeParse(input).success).toBe(true);
+    expect(
+      settingsCommandSchema.safeParse({
+        ...input,
+        expectedState: 'SUSPENDED',
+        targetState: 'ACTIVE',
+      }).success,
+    ).toBe(true);
+    // Shop archive must use the same revision-fenced, optionally approved lifecycle command.
+    expect(settingsCommandSchema.safeParse({ ...input, targetState: 'ARCHIVED' }).success).toBe(
+      true,
+    );
+    expect(settingsCommandSchema.safeParse({ ...input, targetState: 'ACTIVE' }).success).toBe(
+      false,
+    );
+    expect(
+      settingsCommandSchema.safeParse({ ...input, expectedLifecycleRevision: 0 }).success,
+    ).toBe(false);
+    expect(
+      settingsCommandSchema.safeParse({ ...input, expectedLifecycleRevision: null }).success,
+    ).toBe(false);
+    expect(settingsCommandSchema.safeParse({ ...input, businessId: shopId }).success).toBe(false);
+  });
+
   it('accepts strict business-default and shop-override writes', () => {
     expect(
       settingsCommandSchema.safeParse({
@@ -56,6 +88,69 @@ describe('Admin settings API contract', () => {
         expectedVersion: null,
       }).success,
     ).toBe(true);
+  });
+
+  it('accepts only a version-checked known-key inheritance restore', () => {
+    expect(
+      settingsCommandSchema.safeParse({
+        type: 'setting.override.restore',
+        shopId,
+        settingKey: 'receipt.orderPrefix',
+        expectedVersion: 4,
+      }).success,
+    ).toBe(true);
+    expect(
+      settingsCommandSchema.safeParse({
+        type: 'setting.override.restore',
+        shopId,
+        settingKey: 'receipt.orderPrefix',
+        expectedVersion: null,
+      }).success,
+    ).toBe(false);
+    expect(
+      settingsCommandSchema.safeParse({
+        type: 'setting.override.restore',
+        shopId,
+        settingKey: 'checkout.unsupportedFlag',
+        expectedVersion: 4,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts only safe payment-method creation fields with an idempotent command', () => {
+    const command = {
+      type: 'payment-method.create',
+      shopId,
+      displayName: 'Cash on Delivery',
+      logicType: 'CASH',
+      active: true,
+      sortOrder: 20,
+      channel: 'POS',
+      requiresReference: false,
+      manualConfirmationRequired: false,
+      refundAllowed: false,
+      expectedSettingsVersion: 4,
+      commandId: 'pm-command-1',
+    };
+    expect(settingsCommandSchema.safeParse(command).success).toBe(true);
+    expect(settingsCommandSchema.safeParse({ ...command, logicType: 'CUSTOM' }).success).toBe(
+      false,
+    );
+    expect(settingsCommandSchema.safeParse({ ...command, refundAllowed: 'false' }).success).toBe(
+      false,
+    );
+    const missingRefundPolicy: Partial<typeof command> = { ...command };
+    delete missingRefundPolicy.refundAllowed;
+    expect(settingsCommandSchema.safeParse(missingRefundPolicy).success).toBe(false);
+    expect(
+      settingsCommandSchema.safeParse({ ...command, requiresReconciliation: false }).success,
+    ).toBe(false);
+    expect(
+      settingsCommandSchema.safeParse({ ...command, integrationReference: 'terminal-1' }).success,
+    ).toBe(false);
+    expect(
+      settingsCommandSchema.safeParse({ ...command, expectedSettingsVersion: -1 }).success,
+    ).toBe(false);
   });
 
   it('rejects unknown setting keys and key-specific malformed values', () => {

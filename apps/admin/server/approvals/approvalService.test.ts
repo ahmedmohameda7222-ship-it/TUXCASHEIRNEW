@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AdminSupabaseClient } from '../supabaseAdmin';
 import {
   approveRequest,
+  evaluateApprovalRequirement,
   createApprovalCommandRegistry,
   createSupabaseApprovalServiceDependencies,
   requestApproval,
@@ -79,6 +80,97 @@ function dependencies(
 }
 
 describe('approvalService', () => {
+  it('requires a measured amount before a monetary threshold can match', () => {
+    const rule = { ...approvalRule, thresholdContext: { minimumMinor: 500 } };
+    const context = { businessId: 'business-1', shopId: 'shop-1', actionType: rule.actionType };
+    expect(evaluateApprovalRequirement(context, [rule]).required).toBe(false);
+    expect(evaluateApprovalRequirement({ ...context, amountMinor: 499 }, [rule]).required).toBe(
+      false,
+    );
+    expect(evaluateApprovalRequirement({ ...context, amountMinor: 500 }, [rule]).required).toBe(
+      true,
+    );
+  });
+
+  it('requires measured quantity and respects signed threshold boundaries', () => {
+    const rule = { ...approvalRule, thresholdContext: { minimumQuantityImpact: 3 } };
+    const context = { businessId: 'business-1', shopId: 'shop-1', actionType: rule.actionType };
+    expect(evaluateApprovalRequirement(context, [rule]).required).toBe(false);
+    expect(evaluateApprovalRequirement({ ...context, quantityImpact: -2 }, [rule]).required).toBe(
+      false,
+    );
+    expect(evaluateApprovalRequirement({ ...context, quantityImpact: -3 }, [rule]).required).toBe(
+      true,
+    );
+    expect(evaluateApprovalRequirement({ ...context, quantityImpact: 4 }, [rule]).required).toBe(
+      true,
+    );
+    expect(evaluateApprovalRequirement(context, [{ ...rule, active: false }]).required).toBe(false);
+    expect(evaluateApprovalRequirement(context, [{ ...rule, thresholdContext: {} }]).required).toBe(
+      true,
+    );
+  });
+
+  it('handles zero and nonfinite measured amounts and matches values strictly above the minimum', () => {
+    const rule = { ...approvalRule, thresholdContext: { minimumMinor: 500 } };
+    const context = { businessId: 'business-1', shopId: 'shop-1', actionType: rule.actionType };
+    expect(evaluateApprovalRequirement({ ...context, amountMinor: 0 }, [rule]).required).toBe(
+      false,
+    );
+    expect(evaluateApprovalRequirement({ ...context, amountMinor: 501 }, [rule]).required).toBe(
+      true,
+    );
+    expect(
+      evaluateApprovalRequirement({ ...context, amountMinor: Number.POSITIVE_INFINITY }, [rule])
+        .required,
+    ).toBe(false);
+    expect(
+      evaluateApprovalRequirement({ ...context, amountMinor: Number.NaN }, [rule]).required,
+    ).toBe(false);
+  });
+
+  it('isolates business rules and prioritizes a matching shop-specific rule', () => {
+    const globalRule = { ...approvalRule, id: 'business-rule', shopId: null };
+    const shopRule = { ...approvalRule, id: 'shop-rule', shopId: 'shop-1' };
+    const rules = [globalRule, shopRule];
+    const context = {
+      businessId: 'business-1',
+      shopId: 'shop-1',
+      actionType: approvalRule.actionType,
+    };
+    expect(evaluateApprovalRequirement(context, rules)).toMatchObject({
+      required: true,
+      ruleId: 'shop-rule',
+    });
+    expect(evaluateApprovalRequirement({ ...context, shopId: 'shop-2' }, rules)).toMatchObject({
+      required: true,
+      ruleId: 'business-rule',
+    });
+    expect(
+      evaluateApprovalRequirement({ ...context, businessId: 'another-business' }, rules).required,
+    ).toBe(false);
+  });
+
+  it('rejects malformed persisted approval thresholds rather than silently treating them as unconditional', () => {
+    const context = {
+      businessId: 'business-1',
+      shopId: 'shop-1',
+      actionType: approvalRule.actionType,
+    };
+    for (const thresholdContext of [
+      { minimumMinor: '500' },
+      { minimumMinor: -1 },
+      { minimumMinor: Number.NaN },
+      { minimumQuantityImpact: 0 },
+      { minimumMinor: 500, minimumQuantityImpact: 2 },
+      { unsupportedLegacyThreshold: 500 },
+    ]) {
+      expect(() =>
+        evaluateApprovalRequirement(context, [{ ...approvalRule, thresholdContext }]),
+      ).toThrow('approval_threshold_context_invalid');
+    }
+  });
+
   it('rejects requester self-approval even with a valid PIN', async () => {
     const deps = dependencies();
 

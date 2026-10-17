@@ -91,6 +91,27 @@ export function usePurchasing(shopId: string | undefined) {
     onSuccess: invalidate,
   });
 
+  const manageSupplier = useMutation({
+    mutationFn: async (input: {
+      type: 'supplier.update' | 'supplier.archive' | 'supplier.restore';
+      supplierId: string;
+      expectedVersion: number;
+      payload: {
+        name?: string;
+        contactName?: string | null;
+        phone?: string | null;
+        email?: string | null;
+      };
+    }) => {
+      return postRetained(input.type, input, (commandId) => ({
+        ...input,
+        shopId: shopId!,
+        commandId,
+      }));
+    },
+    onSuccess: invalidate,
+  });
+
   const createPurchaseOrder = useMutation({
     mutationFn: async (input: {
       supplierId: string;
@@ -122,6 +143,39 @@ export function usePurchasing(shopId: string | undefined) {
     }) => {
       if (!shopId) throw new PurchasingUiError('concrete_shop_required');
       return post({ type: 'po.update', shopId, ...input });
+    },
+    onSuccess: invalidate,
+  });
+
+  const replaceDraftPurchaseOrderLines = useMutation({
+    mutationFn: async (input: {
+      purchaseOrderId: string;
+      expectedVersion: number;
+      lines: readonly {
+        inventoryItemId: string;
+        purchaseUnitLabel: string;
+        orderedPurchaseUnitsMicros: number;
+        expectedPurchaseUnitCostMinor: number;
+      }[];
+    }) => {
+      return postRetained('po.lines.replace', input, (commandId) => ({
+        type: 'po.lines.replace',
+        shopId: shopId!,
+        ...input,
+        commandId,
+      }));
+    },
+    onSuccess: invalidate,
+  });
+
+  const cancelPurchaseOrder = useMutation({
+    mutationFn: async (input: { purchaseOrderId: string; expectedVersion: number }) => {
+      return postRetained('po.cancel', input, (commandId) => ({
+        type: 'po.cancel',
+        shopId: shopId!,
+        ...input,
+        commandId,
+      }));
     },
     onSuccess: invalidate,
   });
@@ -180,8 +234,11 @@ export function usePurchasing(shopId: string | undefined) {
   return {
     workspace,
     createSupplier,
+    manageSupplier,
     createPurchaseOrder,
     updatePurchaseOrder,
+    replaceDraftPurchaseOrderLines,
+    cancelPurchaseOrder,
     orderPurchaseOrder,
     receivePurchase,
     returnPurchase,

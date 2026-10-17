@@ -6,7 +6,8 @@ import {
   loadAdminSession,
   requireSessionCsrf,
 } from '../../server/adminAuthService.js';
-import { AdminAuthorizationError } from '../../server/authorization.js';
+import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
+import { executeCatalogPricePublish } from '../../server/catalog/catalogPricePublishRoute.js';
 import { resumeCatalogDraft } from '../../server/catalog/catalogDraftResume.js';
 import {
   CatalogServiceError,
@@ -43,6 +44,58 @@ const bundleChangeSchema = z
   })
   .strict();
 
+const catalogCopyBaseSchema = z.object({
+  sourceShopId: uuidSchema,
+  targetShopId: uuidSchema,
+  targetDraftId: uuidSchema,
+  expectedSourcePublishVersion: z.number().int().positive(),
+  expectedTargetPublishVersion: z.number().int().nonnegative(),
+  expectedTargetDraftRevision: z.number().int().positive(),
+  selectedDomains: z
+    .array(
+      z.enum([
+        'productPrices',
+        'productAvailability',
+        'categoryOrder',
+        'categoryAvailability',
+        'productOrder',
+        'productCategoryAssignments',
+        'comboBeverageOptions',
+        'productModifierLinks',
+        'modifierDefinitions',
+        'recipeLines',
+      ]),
+    )
+    .min(1)
+    .max(10)
+    .refine((domains) => new Set(domains).size === domains.length),
+});
+
+export const catalogCopySchema = z.discriminatedUnion('type', [
+  catalogCopyBaseSchema
+    .omit({ selectedDomains: true })
+    .extend({ type: z.literal('catalog-copy.missing-preview') })
+    .strict(),
+  catalogCopyBaseSchema
+    .omit({ selectedDomains: true })
+    .extend({
+      type: z.literal('catalog-copy.stage-created-entities'),
+      selectedSourceCategoryIds: z.array(uuidSchema).max(100),
+      selectedSourceProductIds: z.array(uuidSchema).max(200),
+      creationFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+      commandId: z.string().trim().min(1).max(128),
+    })
+    .strict(),
+  catalogCopyBaseSchema.extend({ type: z.literal('catalog-copy.preview') }).strict(),
+  catalogCopyBaseSchema
+    .extend({
+      type: z.literal('catalog-copy.apply'),
+      previewFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+      commandId: z.string().trim().min(1).max(160),
+    })
+    .strict(),
+]);
+
 export const catalogViewSchema = z.enum(['workspace', 'publishing', 'recurring-availability']);
 
 export const catalogCommandSchema = z.discriminatedUnion('type', [
@@ -78,6 +131,7 @@ export const catalogCommandSchema = z.discriminatedUnion('type', [
       shopId: uuidSchema,
       expectedDraftRevision: z.number().int().positive(),
       expectedVersion: z.number().int().nonnegative(),
+      requesterPin: z.string().min(1).max(64).optional(),
     })
     .strict(),
   z
@@ -221,7 +275,120 @@ export default async function handler(
     }
 
     if (!requireSameOrigin(request, response)) return;
-    const parsed = catalogCommandSchema.safeParse(await readJsonObject(request));
+    const rawCommand = await readJsonObject(request);
+    if (
+      typeof rawCommand === 'object' &&
+      rawCommand !== null &&
+      'type' in rawCommand &&
+      (rawCommand.type === 'catalog-copy.preview' ||
+        rawCommand.type === 'catalog-copy.apply' ||
+        rawCommand.type === 'catalog-copy.missing-preview' ||
+        rawCommand.type === 'catalog-copy.stage-created-entities')
+    ) {
+      const copy = catalogCopySchema.safeParse(rawCommand);
+      if (!copy.success || copy.data.sourceShopId === copy.data.targetShopId) {
+        sendJson(response, 400, { error: 'invalid_catalog_copy_request' });
+        return;
+      }
+      const principal = await loadPrincipal(request, client, true);
+      requirePermission(principal, 'catalog.view', copy.data.sourceShopId);
+      requirePermission(principal, 'catalog.edit', copy.data.targetShopId);
+      if (copy.data.type === 'catalog-copy.missing-preview') {
+        const result = await client.rpc<Readonly<Record<string, unknown>>>(
+          'preview_admin_catalog_missing_entities_v1',
+          {
+            p_employee_id: principal.employeeId,
+            p_source_shop_id: copy.data.sourceShopId,
+            p_target_shop_id: copy.data.targetShopId,
+            p_target_draft_id: copy.data.targetDraftId,
+            p_source_publish_version: copy.data.expectedSourcePublishVersion,
+            p_target_publish_version: copy.data.expectedTargetPublishVersion,
+            p_target_draft_revision: copy.data.expectedTargetDraftRevision,
+          },
+        );
+        if (result['ok'] !== true && result['ok'] !== false) {
+          sendJson(response, 502, { error: 'backend_contract_invalid' });
+          return;
+        }
+        sendJson(response, result['ok'] === true ? 200 : 409, result);
+        return;
+      }
+      if (copy.data.type === 'catalog-copy.stage-created-entities') {
+        const categories = copy.data.selectedSourceCategoryIds;
+        const products = copy.data.selectedSourceProductIds;
+        if (
+          categories.length + products.length === 0 ||
+          new Set(categories).size !== categories.length ||
+          new Set(products).size !== products.length
+        ) {
+          sendJson(response, 400, { error: 'invalid_catalog_copy_selection' });
+          return;
+        }
+        if (products.length > 0) {
+          requirePermission(principal, 'catalog.pricing', copy.data.targetShopId);
+        }
+        const result = await client.rpc<Readonly<Record<string, unknown>>>(
+          'stage_admin_catalog_copy_created_entities_v1',
+          {
+            p_employee_id: principal.employeeId,
+            p_source_shop_id: copy.data.sourceShopId,
+            p_target_shop_id: copy.data.targetShopId,
+            p_target_draft_id: copy.data.targetDraftId,
+            p_source_publish_version: copy.data.expectedSourcePublishVersion,
+            p_target_publish_version: copy.data.expectedTargetPublishVersion,
+            p_target_draft_revision: copy.data.expectedTargetDraftRevision,
+            p_source_category_ids: categories,
+            p_source_product_ids: products,
+            p_creation_fingerprint: copy.data.creationFingerprint,
+            p_command_id: copy.data.commandId,
+          },
+        );
+        if (result['ok'] !== true && result['ok'] !== false) {
+          sendJson(response, 502, { error: 'backend_contract_invalid' });
+          return;
+        }
+        sendJson(response, result['ok'] === true ? 200 : 409, result);
+        return;
+      }
+      if (copy.data.selectedDomains.includes('recipeLines')) {
+        requirePermission(principal, 'inventory.view', copy.data.sourceShopId);
+        requirePermission(principal, 'inventory.adjust', copy.data.targetShopId);
+      }
+      if (
+        copy.data.selectedDomains.includes('productPrices') ||
+        copy.data.selectedDomains.includes('modifierDefinitions')
+      ) {
+        requirePermission(principal, 'catalog.pricing', copy.data.targetShopId);
+      }
+      const result = await client.rpc<Readonly<Record<string, unknown>>>(
+        copy.data.type === 'catalog-copy.preview'
+          ? 'preview_admin_catalog_shop_copy_v1'
+          : 'apply_admin_catalog_shop_copy_v1',
+        {
+          p_employee_id: principal.employeeId,
+          p_source_shop_id: copy.data.sourceShopId,
+          p_target_shop_id: copy.data.targetShopId,
+          p_target_draft_id: copy.data.targetDraftId,
+          p_source_publish_version: copy.data.expectedSourcePublishVersion,
+          p_target_publish_version: copy.data.expectedTargetPublishVersion,
+          p_target_draft_revision: copy.data.expectedTargetDraftRevision,
+          p_domains: copy.data.selectedDomains,
+          ...(copy.data.type === 'catalog-copy.apply'
+            ? {
+                p_preview_fingerprint: copy.data.previewFingerprint,
+                p_command_id: copy.data.commandId,
+              }
+            : {}),
+        },
+      );
+      if (result['ok'] !== true && result['ok'] !== false) {
+        sendJson(response, 502, { error: 'backend_contract_invalid' });
+        return;
+      }
+      sendJson(response, result['ok'] === true ? 200 : 409, result);
+      return;
+    }
+    const parsed = catalogCommandSchema.safeParse(rawCommand);
     if (!parsed.success) {
       sendJson(response, 400, { error: 'invalid_catalog_request' });
       return;
@@ -240,9 +407,15 @@ export default async function handler(
       case 'draft.save':
         sendJson(response, 200, { ...(await service.saveCatalogDraftChange(command, principal)) });
         return;
-      case 'draft.publish':
-        sendJson(response, 200, { ...(await service.publishCatalogDraft(command, principal)) });
+      case 'draft.publish': {
+        const token = readAdminSessionToken(firstHeader(request.headers.cookie));
+        if (!token) throw new AdminAuthError('session_required', 401);
+        const context = await loadAdminSession(token, client);
+        sendJson(response, 200, {
+          ...(await executeCatalogPricePublish(client, context, command, request)),
+        });
         return;
+      }
       case 'availability.set':
         sendJson(response, 200, {
           ...(await service.setImmediateAvailability(command, principal)),

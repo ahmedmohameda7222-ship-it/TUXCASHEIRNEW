@@ -7,6 +7,7 @@ import { PageScaffold } from '../components/layout/PageScaffold';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import './catalog.css';
 import { createCatalogProductSlug } from './catalogProductSlug';
+import { CatalogDefinitionsEditor } from './CatalogDefinitionsEditor';
 import { ProductInspector } from './ProductInspector';
 import { ProductList, type CatalogStatusFilter } from './ProductList';
 import { CatalogUiError, useCatalog } from './useCatalog';
@@ -68,12 +69,13 @@ export function CatalogPage() {
   const [categoryId, setCategoryId] = useState('');
   const [newProductCategoryId, setNewProductCategoryId] = useState('');
   const [unsavedProduct, setUnsavedProduct] = useState<CatalogProductDetail | null>(null);
+  const [definitionsOpen, setDefinitionsOpen] = useState(false);
   const selectedProductId = unsavedProduct?.id ?? detailIdFromPath(location, '/catalog/products');
   const mobileEditing = selectedProductId !== null;
 
   const canEdit = permission(principal, 'catalog.edit');
   const canPrice = permission(principal, 'catalog.pricing');
-  const categories = catalog.workspaceQuery.data?.categories ?? [];
+  const categories = catalog.categories;
   const activeCategories = categories.filter((category) => category.active);
   const firstActiveCategory = activeCategories[0];
 
@@ -94,13 +96,17 @@ export function CatalogPage() {
   const actionError = mutationMessage(
     catalog.resumeDraft.error ??
       catalog.prepareProductDraft.error ??
+      catalog.prepareDefinitionsDraft.error ??
       catalog.saveProduct.error ??
+      catalog.saveDefinitions.error ??
       catalog.setAvailability.error,
   );
   const busy =
     catalog.resumeDraft.isPending ||
     catalog.prepareProductDraft.isPending ||
+    catalog.prepareDefinitionsDraft.isPending ||
     catalog.saveProduct.isPending ||
+    catalog.saveDefinitions.isPending ||
     catalog.setAvailability.isPending;
 
   function openProduct(productId: string) {
@@ -185,6 +191,29 @@ export function CatalogPage() {
       description="Manage products, prices, availability, and changes waiting to be published."
       primaryAction={
         <div className="admin-catalog-new-product-controls">
+          {canEdit ? (
+            <button
+              className="admin-secondary-button"
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                if (definitionsOpen) {
+                  setDefinitionsOpen(false);
+                  return;
+                }
+                void catalog.prepareDefinitionsDraft
+                  .mutateAsync()
+                  .then(() => {
+                    setUnsavedProduct(null);
+                    navigate('/catalog/products');
+                    setDefinitionsOpen(true);
+                  })
+                  .catch(() => undefined);
+              }}
+            >
+              {definitionsOpen ? 'Back to products' : 'Manage categories & extras'}
+            </button>
+          ) : null}
           <label>
             <span>New product category</span>
             <select
@@ -265,55 +294,70 @@ export function CatalogPage() {
         </div>
       ) : null}
 
-      <div className={mobileEditing ? 'admin-catalog-layout is-editing' : 'admin-catalog-layout'}>
-        <div className="admin-catalog-layout__list">
-          <ProductList
-            products={catalog.products}
-            categories={categories}
-            selectedProductId={selectedProduct?.id ?? null}
-            search={search}
-            status={status}
-            categoryId={categoryId}
-            onSearchChange={setSearch}
-            onStatusChange={setStatus}
-            onCategoryChange={handleCategoryFilterChange}
-            onSelectProduct={openProduct}
-          />
-        </div>
-
-        <div className="admin-catalog-layout__editor">
-          {selectedProduct ? (
-            <ProductInspector
-              product={selectedProduct}
-              canEdit={canEdit}
-              canPrice={canPrice}
-              busy={busy}
-              draftRevision={catalog.activeDraft?.draftRevision ?? null}
-              advancedBundle={catalog.activeDraft?.bundleJson ?? null}
-              onClose={closeEditor}
-              onRequestAdvanced={async () => {
-                await catalog.prepareProductDraft.mutateAsync(selectedProduct);
-              }}
-              onSaveDraft={async (draft) => {
-                await catalog.saveProduct.mutateAsync(draft);
-                setUnsavedProduct(null);
-                navigate(detailPath('/catalog/products', draft.product.id), { replace: true });
-              }}
-              onSetAvailability={async (soldOut) => {
-                await catalog.setAvailability.mutateAsync({
-                  productId: selectedProduct.id,
-                  soldOut,
-                });
-              }}
+      {definitionsOpen ? (
+        <CatalogDefinitionsEditor
+          shopId={shopId}
+          categories={categories}
+          modifiers={catalog.modifiers}
+          canEdit={canEdit}
+          canPrice={canPrice}
+          pending={busy}
+          onSave={async (input) => {
+            await catalog.saveDefinitions.mutateAsync(input);
+          }}
+        />
+      ) : (
+        <div className={mobileEditing ? 'admin-catalog-layout is-editing' : 'admin-catalog-layout'}>
+          <div className="admin-catalog-layout__list">
+            <ProductList
+              products={catalog.products}
+              categories={categories}
+              selectedProductId={selectedProduct?.id ?? null}
+              search={search}
+              status={status}
+              categoryId={categoryId}
+              onSearchChange={setSearch}
+              onStatusChange={setStatus}
+              onCategoryChange={handleCategoryFilterChange}
+              onSelectProduct={openProduct}
             />
-          ) : (
-            <div className="admin-catalog-empty-inspector">
-              <strong>No product selected.</strong>
-              <span>Select a product from the list to inspect or edit it.</span>
-            </div>
-          )}
+          </div>
+
+          <div className="admin-catalog-layout__editor">
+            {selectedProduct ? (
+              <ProductInspector
+                product={selectedProduct}
+                categories={categories}
+                canEdit={canEdit}
+                canPrice={canPrice}
+                busy={busy}
+                draftRevision={catalog.activeDraft?.draftRevision ?? null}
+                advancedBundle={catalog.activeDraft?.bundleJson ?? null}
+                onClose={closeEditor}
+                onRequestAdvanced={async () => {
+                  await catalog.prepareProductDraft.mutateAsync(selectedProduct);
+                }}
+                onSaveDraft={async (draft) => {
+                  await catalog.saveProduct.mutateAsync(draft);
+                  setUnsavedProduct(null);
+                  navigate(detailPath('/catalog/products', draft.product.id), { replace: true });
+                }}
+                onSetAvailability={async (soldOut) => {
+                  await catalog.setAvailability.mutateAsync({
+                    productId: selectedProduct.id,
+                    soldOut,
+                  });
+                }}
+              />
+            ) : (
+              <div className="admin-catalog-empty-inspector">
+                <strong>No product selected.</strong>
+                <span>Select a product from the list to inspect or edit it.</span>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </PageScaffold>
   );
 }

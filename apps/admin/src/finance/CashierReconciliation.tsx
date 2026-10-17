@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
 import { InlineError } from '../components/feedback/AdminStates';
 import { AdminDialog } from '../components/overlay/AdminDialog';
@@ -17,9 +17,12 @@ export function CashierReconciliation({
   onClose(): void;
 }) {
   const finance = useFinanceOperations(shopId, businessDayId, ['cashiers']);
+  const cashierSelectId = useId();
   const [workerId, setWorkerId] = useState('');
   const [actual, setActual] = useState('');
   const [reason, setReason] = useState('');
+  const [requesterPin, setRequesterPin] = useState('');
+  const [approvalPending, setApprovalPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const workers = finance.cashierQuery.data?.workers ?? [];
   const posted = finance.cashierQuery.data?.reconciliations ?? [];
@@ -38,6 +41,7 @@ export function CashierReconciliation({
       if (actualMinor < 0) throw new Error('Actual cash cannot be negative.');
       finance.command.mutate(
         {
+          ...(requesterPin.trim() ? { reauthPin: requesterPin.trim() } : {}),
           draft: {
             type: 'finance.cashier.reconcile',
             shopId,
@@ -48,7 +52,14 @@ export function CashierReconciliation({
           },
         },
         {
-          onSuccess: () => {
+          onSuccess: (result) => {
+            setRequesterPin('');
+            if (result['state'] === 'PENDING_APPROVAL') {
+              setApprovalPending(true);
+              setError(null);
+              return;
+            }
+            setApprovalPending(false);
             onClose();
             setWorkerId('');
             setActual('');
@@ -78,26 +89,28 @@ export function CashierReconciliation({
           <button
             type="button"
             className="admin-primary-button"
-            disabled={finance.command.isPending || remaining.length === 0}
+            disabled={finance.command.isPending || remaining.length === 0 || approvalPending}
             onClick={submit}
           >
-            {finance.command.isPending ? 'Recording…' : 'Record count'}
+            {finance.command.isPending
+              ? 'Submitting…'
+              : approvalPending
+                ? 'Pending second-person approval'
+                : 'Record count'}
           </button>
         </>
       }
     >
       <div className="tux-finance-form">
-        <label>
-          Cashier
-          <select value={workerId} onChange={(e) => setWorkerId(e.target.value)}>
-            <option value="">Choose cashier</option>
-            {remaining.map((worker) => (
-              <option key={worker.id} value={worker.id}>
-                {worker.display_name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <label htmlFor={cashierSelectId}>Cashier</label>
+        <select id={cashierSelectId} value={workerId} onChange={(e) => setWorkerId(e.target.value)}>
+          <option value="">Choose cashier</option>
+          {remaining.map((worker) => (
+            <option key={worker.id} value={worker.id}>
+              {worker.display_name}
+            </option>
+          ))}
+        </select>
         {selectedCashier ? (
           <div className="tux-finance-attention" role="status">
             <p>
@@ -134,6 +147,21 @@ export function CashierReconciliation({
             onChange={(e) => setReason(e.target.value)}
           />
         </label>
+        <label>
+          Requester PIN (if approval requires reauthentication)
+          <input
+            type="password"
+            autoComplete="off"
+            maxLength={64}
+            value={requesterPin}
+            onChange={(event) => setRequesterPin(event.currentTarget.value)}
+          />
+        </label>
+        {approvalPending ? (
+          <p role="status">
+            Cashier reconciliation pending second-person approval. No cash count has been posted.
+          </p>
+        ) : null}
         {error ? <InlineError>{error}</InlineError> : null}
         {finance.command.error ? (
           <InlineError>

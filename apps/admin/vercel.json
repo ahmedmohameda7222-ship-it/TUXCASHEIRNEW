@@ -15,6 +15,22 @@
       "handle": "filesystem"
     },
     {
+      "src": "/api/admin/shop-create",
+      "dest": "/api/admin/settings?__adminResource=shop-create"
+    },
+    {
+      "src": "/api/admin/shop-copy-preview",
+      "dest": "/api/admin/settings?__adminResource=shop-copy-preview"
+    },
+    {
+      "src": "/api/admin/payment-zone-rules",
+      "dest": "/api/admin/settings?__adminResource=payment-zone-rules"
+    },
+    {
+      "src": "/api/admin/approval-rules",
+      "dest": "/api/admin/approvals?__adminResource=approval-rules"
+    },
+    {
       "src": "/api/admin/customers",
       "dest": "/api/admin/orders?__adminResource=customers"
     },

@@ -4,6 +4,36 @@ import type { AdminSupabaseClient } from '../supabaseAdmin';
 import { createPurchasingStore } from '../../api/admin/purchasing';
 
 describe('Admin purchasing workspace pagination', () => {
+  it('paginates active purchase-unit conversions beyond the PostgREST row cap', async () => {
+    const conversions = Array.from({ length: 1_205 }, (_, index) => ({
+      inventory_item_id: 'item-1',
+      purchase_unit_label: `package-${index}`,
+      base_micros_per_purchase_unit: 1_000_000 * (index + 1),
+    }));
+    const offsets: string[] = [];
+    const select = vi.fn(async (table: string, query: URLSearchParams) => {
+      if (table === 'inventory_unit_conversions') {
+        offsets.push(query.get('offset') ?? 'missing');
+        const offset = Number(query.get('offset') ?? '0');
+        const limit = Math.min(Number(query.get('limit') ?? '1000'), 1000);
+        return conversions.slice(offset, offset + limit);
+      }
+      if (table === 'inventory_items') {
+        return Number(query.get('offset') ?? '0') === 0
+          ? [{ id: 'item-1', name: 'Bread', unit_label: 'piece', active: true }]
+          : [];
+      }
+      if (table === 'suppliers' || table === 'purchase_orders' || table === 'purchase_order_lines')
+        return [];
+      throw new Error('unexpected table: ' + table);
+    });
+    const workspace = await createPurchasingStore({
+      select,
+    } as unknown as AdminSupabaseClient).loadWorkspace('shop-a', 'business-1');
+    expect(workspace.inventoryItems[0]?.purchaseUnits).toHaveLength(1_206);
+    expect(offsets).toEqual(['0', '1000', '1205']);
+  });
+
   it('keeps actionable purchase orders accessible beyond the 500-row history window', async () => {
     const recent = Array.from({ length: 500 }, (_, index) => ({
       id: `recent-${index}`,
@@ -41,10 +71,12 @@ describe('Admin purchasing workspace pagination', () => {
                 phone: null,
                 email: null,
                 active: true,
+                version: 1,
               },
             ]
           : [];
       }
+      if (table === 'inventory_unit_conversions') return [];
       if (table === 'inventory_items') return [];
       if (table === 'purchase_orders') {
         if (query.get('status') === 'in.(DRAFT,ORDERED,PARTIALLY_RECEIVED,RECEIVED)') {
@@ -90,6 +122,7 @@ describe('Admin purchasing workspace pagination', () => {
     };
     const select = vi.fn(async (table: string, query: URLSearchParams) => {
       if (table === 'suppliers') return [];
+      if (table === 'inventory_unit_conversions') return [];
       if (table === 'inventory_items') return [];
       if (table === 'purchase_orders') {
         const status = query.get('status');
@@ -140,6 +173,7 @@ describe('Admin purchasing workspace pagination', () => {
       phone: null,
       email: null,
       active: true,
+      version: 1,
     }));
     const supplierQueries: URLSearchParams[] = [];
     const select = vi.fn(async (table: string, query: URLSearchParams) => {
@@ -149,8 +183,10 @@ describe('Admin purchasing workspace pagination', () => {
         const requested = Number(query.get('limit') ?? '10000');
         return suppliers.slice(offset, offset + Math.min(requested, 1_000));
       }
+      if (table === 'inventory_unit_conversions') return [];
       if (table === 'purchase_orders') return [];
       if (table === 'purchase_order_lines') return [];
+      if (table === 'inventory_unit_conversions') return [];
       if (table === 'inventory_items') return [];
       throw new Error('unexpected table: ' + table);
     });
@@ -209,6 +245,7 @@ describe('Admin purchasing workspace pagination', () => {
             ]
           : [];
       }
+      if (table === 'inventory_unit_conversions') return [];
       if (table === 'inventory_items') {
         if (query.get('active') === 'eq.true') return [];
         expect(query.get('shop_id')).toBe('eq.shop-a');
@@ -242,8 +279,10 @@ describe('Admin purchasing workspace pagination', () => {
     const itemQueries: URLSearchParams[] = [];
     const select = vi.fn(async (table: string, query: URLSearchParams) => {
       if (table === 'suppliers') return [];
+      if (table === 'inventory_unit_conversions') return [];
       if (table === 'purchase_orders') return [];
       if (table === 'purchase_order_lines') return [];
+      if (table === 'inventory_unit_conversions') return [];
       if (table === 'inventory_items') {
         itemQueries.push(query);
         const offset = Number(query.get('offset') ?? '0');

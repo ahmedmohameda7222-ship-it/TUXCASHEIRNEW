@@ -39,7 +39,8 @@ function render(
   detail: EmployeeDetail,
   canManage = true,
   workers: readonly StaffWorkerChoice[] = [],
-  section: 'profile' | 'attendance' | 'pay' = 'profile',
+  section: 'profile' | 'attendance' | 'pay' | 'permissions' = 'profile',
+  canProvisionWorker = false,
 ) {
   return renderToStaticMarkup(
     <EmployeeDetailPage
@@ -48,6 +49,7 @@ function render(
       onSectionChange={() => undefined}
       shopId={SHOP_ID}
       canManage={canManage}
+      canProvisionWorker={canProvisionWorker}
       canPay
       financeAccounts={[]}
       workers={workers}
@@ -145,6 +147,14 @@ describe('EmployeeDetailPage', () => {
     expect(html).toContain('Access &amp; Permissions');
     expect(html).not.toContain('Complete Operations setup');
   });
+  it('exposes first-worker provisioning only to authorized administrators when no eligible worker exists', () => {
+    const enabled = render(employee(), true, [], 'permissions', true);
+    expect(enabled).toContain('Provision and link Operations worker');
+    expect(enabled).toContain('reset it first');
+    const manager = render(employee(), true, [], 'permissions', false);
+    expect(manager).not.toContain('Provision and link Operations worker');
+  });
+
   it('displays the URL-selected Attendance and Pay tab for an exact employee', () => {
     const attendance = render(employee(), true, [], 'attendance');
     const pay = render(employee(), true, [], 'pay');

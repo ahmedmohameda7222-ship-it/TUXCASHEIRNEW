@@ -9,6 +9,8 @@ import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { AdjustStockSheet } from './AdjustStockSheet';
 import { InventoryItemPage } from './InventoryItemPage';
+import { InventoryDefinitionEditor } from './InventoryDefinitionEditor';
+import { InventoryMasterBindingPanel } from './InventoryMasterBindingPanel';
 import { RecordWasteSheet } from './RecordWasteSheet';
 import { ReorderSuggestionsPage } from './ReorderSuggestionsPage';
 import { StocktakePage } from './StocktakePage';
@@ -41,6 +43,8 @@ function latestMutationError(
 function mutationErrorMessage(error: unknown): string | null {
   if (error === null || error === undefined) return null;
   const code = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  if (code.includes('inventory_master_unit_locked'))
+    return 'This ingredient has a business-wide recipe master binding. Its base unit and tracking mode cannot change.';
   if (code.includes('insufficient_stock'))
     return 'There is not enough available stock for this action.';
   if (code.includes('conflict'))
@@ -51,7 +55,13 @@ function mutationErrorMessage(error: unknown): string | null {
 }
 
 type WorkspaceMode =
-  'detail' | 'stocktake-select' | 'stocktake' | 'transfer' | 'reorder' | 'variance';
+  | 'detail'
+  | 'stocktake-select'
+  | 'stocktake'
+  | 'transfer'
+  | 'reorder'
+  | 'variance'
+  | 'master-bindings';
 type ItemAction = 'adjust' | 'waste' | null;
 
 export function InventoryPage() {
@@ -62,6 +72,9 @@ export function InventoryPage() {
   const inventory = useInventory(shopId, selectedItemId);
   const [mode, setMode] = useState<WorkspaceMode>('detail');
   const [itemAction, setItemAction] = useState<ItemAction>(null);
+  const [adjustmentApprovalPending, setAdjustmentApprovalPending] = useState(false);
+  const [definitionItemId, setDefinitionItemId] = useState<string | null>(null);
+  const [definitionOpen, setDefinitionOpen] = useState(false);
   const [stocktakeSnapshot, setStocktakeSnapshot] = useState<AdminStocktakeSnapshot | null>(null);
 
   const workspace = inventory.workspaceQuery.data;
@@ -73,6 +86,7 @@ export function InventoryPage() {
     inventory.updateReplenishment,
     inventory.sendTransfer,
     inventory.receiveTransfer,
+    inventory.manageDefinition,
   ]);
   const mutationErrorText = mutationErrorMessage(mutationError);
   const items = workspace?.items ?? [];
@@ -124,6 +138,12 @@ export function InventoryPage() {
   const canStocktake = principal.permissions.includes('inventory.stocktake');
   const canTransfer = principal.permissions.includes('inventory.transfer');
   const canManageReplenishment = principal.permissions.includes('purchasing.manage');
+  const canManageDefinitions = principal.permissions.includes('purchasing.manage');
+  const canManageMasterBindings =
+    (principal.role === 'OWNER' || principal.role === 'ADMIN') &&
+    principal.permissions.includes('inventory.view') &&
+    principal.permissions.includes('inventory.adjust') &&
+    principal.permissions.includes('catalog.edit');
   const canOverrideNegative =
     principal.role === 'OWNER' && principal.permissions.includes('inventory.override_negative');
 
@@ -179,6 +199,20 @@ export function InventoryPage() {
       description="Review availability, stock counts, waste and transfers for this shop."
       primaryAction={
         <div className="admin-inventory-page-actions">
+          {canManageDefinitions ? (
+            <button
+              className="admin-primary-button"
+              type="button"
+              onClick={() => {
+                setDefinitionItemId(null);
+                setDefinitionOpen(true);
+                setMode('detail');
+                navigate('/inventory');
+              }}
+            >
+              Add inventory item
+            </button>
+          ) : null}
           {canStocktake ? (
             <button
               className="admin-primary-button"
@@ -220,6 +254,15 @@ export function InventoryPage() {
               >
                 Variance &amp; margins
               </button>
+              {canManageMasterBindings ? (
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  onClick={() => openWorkflow('master-bindings')}
+                >
+                  Manage recipe master bindings
+                </button>
+              ) : null}
               {canStocktake && canTransfer ? (
                 <button
                   className="admin-secondary-button"
@@ -234,12 +277,34 @@ export function InventoryPage() {
         </div>
       }
     >
+      {adjustmentApprovalPending ? (
+        <p className="admin-inventory-note" role="status">
+          Stock adjustment submitted for approval. No inventory movement is posted until approval
+          and trusted execution complete.
+        </p>
+      ) : null}
       {mutationErrorText ? (
         <p className="admin-inventory-note" role="alert">
           {mutationErrorText}
         </p>
       ) : null}
-      {mode === 'stocktake-select' ? (
+      {definitionOpen && canManageDefinitions ? (
+        <InventoryDefinitionEditor
+          item={items.find((item) => item.id === definitionItemId) ?? null}
+          pending={inventory.manageDefinition.isPending}
+          onClose={() => setDefinitionOpen(false)}
+          onCommand={(input, onSuccess) =>
+            inventory.manageDefinition.mutate(input, {
+              onSuccess: (result) => {
+                if (!result.ok) return;
+                onSuccess(result.entityId);
+                if (input.type === 'item.create' && result.entityId)
+                  navigate(detailPath('/inventory', result.entityId));
+              },
+            })
+          }
+        />
+      ) : mode === 'stocktake-select' ? (
         <section
           className="admin-inventory-workflow"
           aria-labelledby="inventory-stocktake-batch-title"
@@ -285,6 +350,12 @@ export function InventoryPage() {
             })}
           </div>
         </section>
+      ) : mode === 'master-bindings' && canManageMasterBindings ? (
+        <InventoryMasterBindingPanel
+          shopId={shopId}
+          items={items}
+          onBack={() => setMode('detail')}
+        />
       ) : mode === 'reorder' ? (
         <ReorderSuggestionsPage
           suggestions={workspace.intelligence.reorderSuggestions}
@@ -399,22 +470,38 @@ export function InventoryPage() {
                 <InventoryItemPage
                   item={selectedItem}
                   actions={
-                    canAdjust && selectedItem.active ? (
+                    canManageDefinitions || (canAdjust && selectedItem.active) ? (
                       <>
-                        <button
-                          className="admin-secondary-button"
-                          type="button"
-                          onClick={() => setItemAction('adjust')}
-                        >
-                          Adjust stock
-                        </button>
-                        <button
-                          className="admin-secondary-button"
-                          type="button"
-                          onClick={() => setItemAction('waste')}
-                        >
-                          Record waste
-                        </button>
+                        {canManageDefinitions ? (
+                          <button
+                            className="admin-secondary-button"
+                            type="button"
+                            onClick={() => {
+                              setDefinitionItemId(selectedItem.id);
+                              setDefinitionOpen(true);
+                            }}
+                          >
+                            Edit item
+                          </button>
+                        ) : null}
+                        {canAdjust && selectedItem.active ? (
+                          <button
+                            className="admin-secondary-button"
+                            type="button"
+                            onClick={() => setItemAction('adjust')}
+                          >
+                            Adjust stock
+                          </button>
+                        ) : null}
+                        {canAdjust && selectedItem.active ? (
+                          <button
+                            className="admin-secondary-button"
+                            type="button"
+                            onClick={() => setItemAction('waste')}
+                          >
+                            Record waste
+                          </button>
+                        ) : null}
                       </>
                     ) : undefined
                   }
@@ -429,7 +516,14 @@ export function InventoryPage() {
                     onSubmit={(input) =>
                       inventory.adjustStock.mutate(
                         { inventoryItemId: selectedItem.id, ...input },
-                        { onSuccess: () => setItemAction(null) },
+                        {
+                          onSuccess: (result) => {
+                            setAdjustmentApprovalPending(
+                              result.ok && result.state === 'PENDING_APPROVAL',
+                            );
+                            setItemAction(null);
+                          },
+                        },
                       )
                     }
                   />

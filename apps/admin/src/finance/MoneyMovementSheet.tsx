@@ -33,12 +33,14 @@ export function MoneyMovementSheet({
   const [reason, setReason] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [approvalPending, setApprovalPending] = useState(false);
   const operations = useFinanceOperations(shopId, undefined, []);
   const active = accounts.filter(
     (account) => account.active && (canManageCapital || account.shopId !== null),
   );
   function submit() {
     try {
+      if (approvalPending) return;
       if (!canManageCapital && action.startsWith('OWNER_')) {
         throw new Error('Owner capital movements require owner or administrator access.');
       }
@@ -71,7 +73,14 @@ export function MoneyMovementSheet({
           ...(action === 'OWNER_WITHDRAWAL' ? { reauthPin: pin } : {}),
         },
         {
-          onSuccess: () => {
+          onSuccess: (result) => {
+            if (result['state'] === 'PENDING_APPROVAL') {
+              setError(null);
+              setPin('');
+              setApprovalPending(true);
+              return;
+            }
+            setApprovalPending(false);
             setError(null);
             setAmount('');
             setReason('');
@@ -90,6 +99,7 @@ export function MoneyMovementSheet({
       onOpenChange={(next) => {
         if (!next) {
           setPin('');
+          setApprovalPending(false);
           onClose();
         }
       }}
@@ -102,14 +112,17 @@ export function MoneyMovementSheet({
             type="button"
             className="admin-secondary-button"
             disabled={operations.command.isPending}
-            onClick={onClose}
+            onClick={() => {
+              setApprovalPending(false);
+              onClose();
+            }}
           >
             Cancel
           </button>
           <button
             type="button"
             className="admin-primary-button"
-            disabled={operations.command.isPending}
+            disabled={operations.command.isPending || approvalPending}
             onClick={submit}
           >
             {operations.command.isPending ? 'Posting…' : 'Record movement'}
@@ -134,7 +147,15 @@ export function MoneyMovementSheet({
           {action === 'OWNER_WITHDRAWAL' || action === 'OWNER_CONTRIBUTION'
             ? 'Account'
             : 'From account'}
-          <select value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)}>
+          <select
+            aria-label={
+              action === 'OWNER_WITHDRAWAL' || action === 'OWNER_CONTRIBUTION'
+                ? 'Account'
+                : 'From account'
+            }
+            value={fromAccountId}
+            onChange={(e) => setFromAccountId(e.target.value)}
+          >
             <option value="">Choose an account</option>
             {active
               .filter((account) => action !== 'BANK_DEPOSIT' || account.accountType === 'CASH')
@@ -193,6 +214,12 @@ export function MoneyMovementSheet({
               onChange={(e) => setPin(e.target.value)}
             />
           </label>
+        ) : null}
+        {approvalPending ? (
+          <p role="status" className="admin-field__help">
+            Owner withdrawal pending second-person approval. No funds have moved. Review the request
+            in Approvals.
+          </p>
         ) : null}
         {error ? <InlineError>{error}</InlineError> : null}
         {operations.command.error ? (

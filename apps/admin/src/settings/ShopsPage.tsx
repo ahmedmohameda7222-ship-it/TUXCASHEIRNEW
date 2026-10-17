@@ -6,10 +6,12 @@ import type {
 } from '@tux/admin-contracts';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
+import { ConfirmationDialog } from '../components/overlay/AdminDialog';
 import { SettingsSchedulePanel } from './SettingsSchedulePanel';
 import type {
   ShopIdentityUpdateDraft,
   ShopSpecialHoursUpdateDraft,
+  ShopLifecycleUpdateDraft,
   ShopWeeklyHoursUpdateDraft,
 } from './useSettings';
 
@@ -488,6 +490,11 @@ export function ShopsPage({
   onUpsertWeeklyHours,
   onUpsertSpecialHours,
   onDeleteOrArchive,
+  canAssignStaff = false,
+  canManageLifecycle = false,
+  onUpdateLifecycle,
+  lifecycleUpdating = false,
+  lifecycleApprovalPending = false,
   busy = false,
 }: {
   workspace: AdminSettingsWorkspace;
@@ -496,9 +503,16 @@ export function ShopsPage({
   onUpsertWeeklyHours?: (draft: ShopWeeklyHoursUpdateDraft) => void | Promise<void>;
   onUpsertSpecialHours?: (draft: ShopSpecialHoursUpdateDraft) => void | Promise<void>;
   onDeleteOrArchive?: () => void;
+  canAssignStaff?: boolean;
+  canManageLifecycle?: boolean;
+  onUpdateLifecycle?: ((draft: ShopLifecycleUpdateDraft) => void | Promise<void>) | undefined;
+  lifecycleUpdating?: boolean;
+  lifecycleApprovalPending?: boolean;
   busy?: boolean;
 }) {
   const shop = workspace.shop;
+  const [lifecyclePin, setLifecyclePin] = useState('');
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const [identity, setIdentity] = useState<IdentityForm>({
     name: shop.name,
     address: shop.address ?? '',
@@ -532,7 +546,8 @@ export function ShopsPage({
     });
   }, [shop.address, shop.contactPhone, shop.latitude, shop.longitude, shop.name]);
 
-  const operationalStateDisabled = busy || !onUpdateOperationalState;
+  const operationalStateDisabled =
+    busy || shop.lifecycleState !== 'ACTIVE' || !onUpdateOperationalState;
 
   async function saveIdentity(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -594,6 +609,96 @@ export function ShopsPage({
         </div>
         <span className="admin-status-pill">{shop.lifecycleState}</span>
       </div>
+
+      {canAssignStaff ? (
+        <div className="admin-settings-card">
+          <strong>Staff assignments</strong>
+          <p className="admin-field__help">
+            Assign employees to this shop through the existing Staff management workflow.
+          </p>
+          <a className="admin-secondary-button" href="/staff">
+            Manage staff assignments
+          </a>
+        </div>
+      ) : null}
+
+      {canManageLifecycle &&
+      shop.lifecycleState !== 'ARCHIVED' &&
+      typeof shop.lifecycleRevision === 'number' &&
+      onUpdateLifecycle ? (
+        <div className="admin-settings-card">
+          <strong>Shop lifecycle</strong>
+          <p className="admin-field__help">
+            Suspending stops new intake. Reactivation leaves online orders paused and the shop
+            temporarily closed until separately reopened.
+          </p>
+          {lifecycleApprovalPending ? (
+            <p role="status" className="admin-field__help">
+              Lifecycle change is pending second-person approval. The shop has not changed state.
+            </p>
+          ) : null}
+          <label className="admin-field">
+            <span>Requester PIN (only when the approval rule requires reauthentication)</span>
+            <input
+              type="password"
+              autoComplete="off"
+              maxLength={64}
+              value={lifecyclePin}
+              disabled={busy || lifecycleUpdating}
+              onChange={(event) => setLifecyclePin(event.currentTarget.value)}
+            />
+          </label>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={busy || lifecycleUpdating}
+            onClick={() => {
+              if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined)
+                return;
+              const requesterPin = lifecyclePin.trim();
+              setLifecyclePin('');
+              void onUpdateLifecycle({
+                expectedState: shop.lifecycleState,
+                targetState: shop.lifecycleState === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE',
+                expectedLifecycleRevision: shop.lifecycleRevision,
+                ...(requesterPin === '' ? {} : { requesterPin }),
+              });
+            }}
+          >
+            {shop.lifecycleState === 'ACTIVE' ? 'Suspend shop' : 'Reactivate shop'}
+          </button>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={busy || lifecycleUpdating}
+            onClick={() => setArchiveConfirmOpen(true)}
+          >
+            Archive shop
+          </button>
+          <ConfirmationDialog
+            open={archiveConfirmOpen}
+            title={`Archive ${shop.name}?`}
+            description="This closes the shop to new operations and preserves its history. A configured approval rule requires a distinct authorized approver."
+            confirmLabel="Archive shop"
+            destructive
+            pending={lifecycleUpdating}
+            onOpenChange={setArchiveConfirmOpen}
+            onConfirm={async () => {
+              if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined)
+                return;
+              const requesterPin = lifecyclePin.trim();
+              setLifecyclePin('');
+              await onUpdateLifecycle({
+                expectedState: shop.lifecycleState,
+                targetState: 'ARCHIVED',
+                expectedLifecycleRevision: shop.lifecycleRevision,
+                ...(requesterPin === '' ? {} : { requesterPin }),
+              });
+              setArchiveConfirmOpen(false);
+            }}
+          />
+        </div>
+      ) : null}
 
       <form className="admin-settings-card" onSubmit={(event) => void saveIdentity(event)}>
         <div className="admin-settings-grid">
@@ -899,8 +1004,10 @@ export function ShopsPage({
       {onDeleteOrArchive ? (
         <div className="admin-settings-danger-zone">
           <div>
-            <strong>Archive shop</strong>
-            <span>Used shops are archived instead of deleting historical authority.</span>
+            <strong>Delete unused shop</strong>
+            <span>
+              Used shops must be archived through the approval-aware lifecycle control above.
+            </span>
           </div>
           <button
             className="admin-secondary-button"
@@ -908,7 +1015,7 @@ export function ShopsPage({
             disabled={busy}
             onClick={onDeleteOrArchive}
           >
-            Archive / delete unused shop
+            Delete unused shop
           </button>
         </div>
       ) : null}

@@ -9,6 +9,7 @@ import {
   type SettingsSection,
 } from './SettingsPage';
 import { ReceiptsPage } from './ReceiptsPage';
+import { ShopsPage } from './ShopsPage';
 import { ReasonCodesPage } from './ReasonCodesPage';
 
 const workspace: AdminSettingsWorkspace = {
@@ -115,11 +116,12 @@ const workspace: AdminSettingsWorkspace = {
 
 const noop = vi.fn();
 
-function renderSection(section: SettingsSection): string {
+function renderSection(section: SettingsSection, canManageShopLifecycle = true): string {
   return renderToStaticMarkup(
     <SettingsWorkspaceView
       workspace={workspace}
       section={section}
+      canManageShopLifecycle={canManageShopLifecycle}
       onSectionChange={noop}
       onPublish={noop}
       publishing={false}
@@ -135,8 +137,10 @@ function renderSection(section: SettingsSection): string {
       settingOverrideUpdating={false}
       onUpsertReasonCode={noop}
       reasonCodeUpdating={false}
+      onCreateOrderType={noop}
       onUpdateOrderType={noop}
       orderTypeUpdating={false}
+      onCreatePaymentMethod={noop}
       onUpdatePaymentMethod={noop}
       paymentMethodUpdating={false}
     />,
@@ -175,6 +179,11 @@ describe('Settings workspace', () => {
     expect(html).toContain('Emergency shop controls publish immediately');
   });
 
+  it('hides unused-shop deletion for users without shops.manage', () => {
+    const html = renderSection('shop', false);
+    expect(html).not.toContain('Delete unused shop');
+  });
+
   it('shows editable receipt settings with business-facing source labels', () => {
     const html = renderToStaticMarkup(
       <ReceiptsPage workspace={workspace} onUpdate={noop} updating={false} />,
@@ -197,6 +206,28 @@ describe('Settings workspace', () => {
     expect(html).not.toContain('v4');
   });
 
+  it('disables operational intake toggles while a shop is suspended', () => {
+    const suspended = {
+      ...workspace,
+      shop: {
+        ...workspace.shop,
+        lifecycleState: 'SUSPENDED' as const,
+        active: false,
+        temporaryClosed: true,
+        onlineOrdersPaused: true,
+      },
+    };
+    const suspendedHtml = renderToStaticMarkup(
+      <ShopsPage workspace={suspended} onUpdateOperationalState={noop} busy={false} />,
+    );
+    expect(suspendedHtml.match(/<input[^>]*type="checkbox"[^>]*disabled=""/g)).toHaveLength(2);
+
+    const activeHtml = renderToStaticMarkup(
+      <ShopsPage workspace={workspace} onUpdateOperationalState={noop} busy={false} />,
+    );
+    expect(activeHtml.match(/<input[^>]*type="checkbox"[^>]*disabled=""/g)).toBeNull();
+  });
+
   it('renders real shop, fulfillment, payment and editable checkout configuration', () => {
     const shop = renderSection('shop');
     expect(shop).toContain('+201000000000');
@@ -205,7 +236,22 @@ describe('Settings workspace', () => {
     expect(shop).toContain('23:00');
     expect(shop).toContain('Temporarily close shop');
     expect(shop).toContain('Pause online orders');
-    expect(shop).toContain('Archive / delete unused shop');
+    expect(shop).toContain('Delete unused shop');
+    const lifecycleShop = renderToStaticMarkup(
+      <ShopsPage
+        workspace={{
+          ...workspace,
+          shop: { ...workspace.shop, lifecycleRevision: 4 },
+        }}
+        onUpdateOperationalState={noop}
+        canManageLifecycle
+        onUpdateLifecycle={noop}
+        onDeleteOrArchive={noop}
+        busy={false}
+      />,
+    );
+    expect(lifecycleShop).toContain('Archive shop');
+    expect(lifecycleShop).toContain('Delete unused shop');
 
     const orderTypes = renderSection('order-types');
     expect(orderTypes).toContain('Take Away');
@@ -213,6 +259,7 @@ describe('Settings workspace', () => {
     expect(orderTypes).toContain('Delivery');
     expect(orderTypes).not.toContain('sort 20');
     expect(orderTypes).toContain('Edit Take Away');
+    expect(orderTypes).toContain('Add order type');
 
     const payments = renderSection('payments');
     expect(payments).toContain('Cash');

@@ -1,3 +1,4 @@
+import handleApprovalRulesRoute from '../../server/approvals/approvalRulesRoute.js';
 import type { AdminApprovalActor, AdminApprovalStatus } from '@tux/admin-contracts';
 import { z } from 'zod';
 
@@ -140,6 +141,12 @@ export default async function handler(
   request: AdminRequest,
   response: AdminResponse,
 ): Promise<void> {
+  if (
+    new URL(request.url ?? '/', 'http://admin.local').searchParams.get('__adminResource') ===
+    'approval-rules'
+  ) {
+    return handleApprovalRulesRoute(request, response);
+  }
   if (request.method !== 'GET' && request.method !== 'POST') {
     response.setHeader('allow', 'GET, POST');
     sendJson(response, 405, { error: 'method_not_allowed' });

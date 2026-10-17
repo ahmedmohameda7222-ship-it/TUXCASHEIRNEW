@@ -37,9 +37,77 @@ const dateSchema = z
   .regex(/^\d{4}-\d{2}-\d{2}$/)
   .nullable();
 const microsSchema = z.number().int().safe().positive();
-const moneySchema = z.number().finite().nonnegative();
+const moneySchema = z.number().int().safe().nonnegative();
 
 const commandSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('po.lines.replace'),
+      shopId: uuidSchema,
+      purchaseOrderId: uuidSchema,
+      expectedVersion: z.number().int().positive(),
+      commandId: commandIdSchema,
+      lines: z
+        .array(
+          z
+            .object({
+              inventoryItemId: uuidSchema,
+              purchaseUnitLabel: z.string().trim().min(1).max(120),
+              orderedPurchaseUnitsMicros: microsSchema,
+              expectedPurchaseUnitCostMinor: moneySchema,
+            })
+            .strict(),
+        )
+        .min(1)
+        .max(500),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('supplier.update'),
+      shopId: uuidSchema,
+      supplierId: uuidSchema,
+      expectedVersion: z.number().int().positive(),
+      commandId: commandIdSchema,
+      payload: z
+        .object({
+          name: z.string().trim().min(1).max(160),
+          contactName: nullableText,
+          phone: nullableText,
+          email: z.string().trim().email().max(240).nullable(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('supplier.archive'),
+      shopId: uuidSchema,
+      supplierId: uuidSchema,
+      expectedVersion: z.number().int().positive(),
+      commandId: commandIdSchema,
+      payload: z.object({}).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('supplier.restore'),
+      shopId: uuidSchema,
+      supplierId: uuidSchema,
+      expectedVersion: z.number().int().positive(),
+      commandId: commandIdSchema,
+      payload: z.object({}).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('po.cancel'),
+      shopId: uuidSchema,
+      purchaseOrderId: uuidSchema,
+      expectedVersion: z.number().int().positive(),
+      commandId: commandIdSchema,
+    })
+    .strict(),
   z
     .object({
       type: z.literal('supplier.create'),
@@ -144,6 +212,7 @@ type SupplierRow = {
   phone: string | null;
   email: string | null;
   active: boolean;
+  version: number | string;
 };
 
 type PurchaseOrderRow = {
@@ -180,6 +249,12 @@ type InventoryItemRow = {
   name: string;
   unit_label: string;
   active: boolean;
+};
+
+type PurchaseConversionRow = {
+  inventory_item_id: string;
+  purchase_unit_label: string;
+  base_micros_per_purchase_unit: number | string;
 };
 
 function safeInteger(value: number | string): number {
@@ -256,7 +331,7 @@ async function loadSupplierRows(
     const page = await client.select<SupplierRow[]>(
       'suppliers',
       new URLSearchParams({
-        select: 'id,business_id,name,contact_name,phone,email,active',
+        select: 'id,business_id,name,contact_name,phone,email,active,version',
         business_id: `eq.${businessId}`,
         order: 'name.asc,id.asc',
         limit: String(SUPPLIER_PAGE_SIZE),
@@ -283,6 +358,30 @@ async function loadPurchasableInventoryItems(
         shop_id: `eq.${shopId}`,
         active: 'eq.true',
         order: 'name.asc,id.asc',
+        limit: String(PURCHASABLE_ITEM_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
+    offset += page.length;
+  }
+}
+
+async function loadActivePurchaseUnitConversions(
+  client: AdminSupabaseClient,
+  shopId: string,
+): Promise<PurchaseConversionRow[]> {
+  const rows: PurchaseConversionRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.select<PurchaseConversionRow[]>(
+      'inventory_unit_conversions',
+      new URLSearchParams({
+        select: 'inventory_item_id,purchase_unit_label,base_micros_per_purchase_unit',
+        shop_id: `eq.${shopId}`,
+        active: 'eq.true',
+        order: 'inventory_item_id.asc,purchase_unit_label.asc',
         limit: String(PURCHASABLE_ITEM_PAGE_SIZE),
         offset: String(offset),
       }),
@@ -354,23 +453,29 @@ async function loadPurchaseOrderLines(
 export function createPurchasingStore(client: AdminSupabaseClient): PurchasingStore {
   return {
     async loadWorkspace(shopId, businessId): Promise<AdminPurchasingWorkspace> {
-      const [supplierRows, recentPurchaseOrderRows, actionablePurchaseOrderRows, inventoryRows] =
-        await Promise.all([
-          loadSupplierRows(client, businessId),
-          client.select<PurchaseOrderRow[]>(
-            'purchase_orders',
-            new URLSearchParams({
-              select:
-                'id,shop_id,supplier_id,status,reference,expected_delivery_date,version,ordered_at,created_at,updated_at',
-              business_id: `eq.${businessId}`,
-              shop_id: `eq.${shopId}`,
-              order: 'created_at.desc,id.desc',
-              limit: String(PURCHASE_ORDER_HISTORY_LIMIT),
-            }),
-          ),
-          loadActionablePurchaseOrders(client, businessId, shopId),
-          loadPurchasableInventoryItems(client, shopId),
-        ]);
+      const [
+        supplierRows,
+        recentPurchaseOrderRows,
+        actionablePurchaseOrderRows,
+        inventoryRows,
+        conversionRows,
+      ] = await Promise.all([
+        loadSupplierRows(client, businessId),
+        client.select<PurchaseOrderRow[]>(
+          'purchase_orders',
+          new URLSearchParams({
+            select:
+              'id,shop_id,supplier_id,status,reference,expected_delivery_date,version,ordered_at,created_at,updated_at',
+            business_id: `eq.${businessId}`,
+            shop_id: `eq.${shopId}`,
+            order: 'created_at.desc,id.desc',
+            limit: String(PURCHASE_ORDER_HISTORY_LIMIT),
+          }),
+        ),
+        loadActionablePurchaseOrders(client, businessId, shopId),
+        loadPurchasableInventoryItems(client, shopId),
+        loadActivePurchaseUnitConversions(client, shopId),
+      ]);
 
       const purchaseOrdersById = new Map<string, PurchaseOrderRow>();
       for (const row of [...recentPurchaseOrderRows, ...actionablePurchaseOrderRows]) {
@@ -400,6 +505,7 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
         phone: row.phone,
         email: row.email,
         active: row.active,
+        version: safeInteger(row.version),
       }));
       const supplierNames = new Map(suppliers.map((supplier) => [supplier.id, supplier.name]));
       const itemNames = new Map(
@@ -418,11 +524,28 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
       return {
         shopId,
         suppliers,
-        inventoryItems: inventoryRows.map((row) => ({
-          id: row.id,
-          name: row.name,
-          unitLabel: row.unit_label,
-        })),
+        inventoryItems: inventoryRows.map((row) => {
+          const units = new Map<string, { label: string; baseMicrosPerPurchaseUnit: number }>();
+          units.set(row.unit_label.trim().toLowerCase(), {
+            label: row.unit_label,
+            baseMicrosPerPurchaseUnit: 1_000_000,
+          });
+          for (const conversion of conversionRows) {
+            if (conversion.inventory_item_id !== row.id) continue;
+            const key = conversion.purchase_unit_label.trim().toLowerCase();
+            if (!units.has(key))
+              units.set(key, {
+                label: conversion.purchase_unit_label,
+                baseMicrosPerPurchaseUnit: safeInteger(conversion.base_micros_per_purchase_unit),
+              });
+          }
+          return {
+            id: row.id,
+            name: row.name,
+            unitLabel: row.unit_label,
+            purchaseUnits: [...units.values()],
+          };
+        }),
         purchaseOrders: purchaseOrderRows.map((row) => ({
           id: row.id,
           shopId: row.shop_id,
@@ -474,6 +597,18 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
       });
     },
 
+    manageSupplier(input) {
+      return client.rpc<PurchasingCommandResult>('manage_supplier_v1', {
+        p_employee_id: input.employeeId,
+        p_shop_id: input.shopId,
+        p_supplier_id: input.supplierId,
+        p_expected_version: input.expectedVersion,
+        p_action: input.type,
+        p_payload: input.payload,
+        p_command_id: input.commandId,
+      });
+    },
+
     createPurchaseOrder(input) {
       return client.rpc<PurchasingCommandResult>('create_purchase_order_v1', {
         p_employee_id: input.employeeId,
@@ -495,6 +630,27 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
         p_expected_version: input.expectedVersion,
         p_reference: input.reference,
         p_expected_delivery_date: input.expectedDeliveryDate,
+      });
+    },
+
+    replaceDraftPurchaseOrderLines(input) {
+      return client.rpc<PurchasingCommandResult>('replace_draft_purchase_order_lines_v1', {
+        p_employee_id: input.employeeId,
+        p_shop_id: input.shopId,
+        p_purchase_order_id: input.purchaseOrderId,
+        p_expected_version: input.expectedVersion,
+        p_lines: input.lines,
+        p_command_id: input.commandId,
+      });
+    },
+
+    cancelPurchaseOrder(input) {
+      return client.rpc<PurchasingCommandResult>('cancel_purchase_order_v1', {
+        p_employee_id: input.employeeId,
+        p_shop_id: input.shopId,
+        p_purchase_order_id: input.purchaseOrderId,
+        p_expected_version: input.expectedVersion,
+        p_command_id: input.commandId,
       });
     },
 
@@ -605,11 +761,22 @@ export default async function handler(
       case 'supplier.create':
         result = await service.createSupplier(command, context.principal);
         break;
+      case 'supplier.update':
+      case 'supplier.archive':
+      case 'supplier.restore':
+        result = await service.manageSupplier(command, context.principal);
+        break;
       case 'po.create':
         result = await service.createPurchaseOrder(command, context.principal);
         break;
       case 'po.update':
         result = await service.updatePurchaseOrder(command, context.principal);
+        break;
+      case 'po.lines.replace':
+        result = await service.replaceDraftPurchaseOrderLines(command, context.principal);
+        break;
+      case 'po.cancel':
+        result = await service.cancelPurchaseOrder(command, context.principal);
         break;
       case 'po.order':
         result = await service.orderPurchaseOrder(command, context.principal);

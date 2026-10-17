@@ -1,5 +1,7 @@
+import { AUTOMATIC_CUSTOMER_SEGMENTS } from '@tux/admin-contracts';
 import type {
   AdminPromotion,
+  AdminCustomerSegment,
   AdminPromotionChannel,
   AdminPromotionKind,
   AdminPromotionStackingPolicy,
@@ -55,6 +57,7 @@ export function PromotionEditor({
   const [appliesTo, setAppliesTo] = useState<AppliesTo>('all');
   const [productIds, setProductIds] = useState<string[]>([]);
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  const [targetSegments, setTargetSegments] = useState<AdminCustomerSegment[]>([]);
   const [totalUsageLimit, setTotalUsageLimit] = useState('');
   const [perCustomerUsageLimit, setPerCustomerUsageLimit] = useState('');
   const [stackingPolicy, setStackingPolicy] =
@@ -78,6 +81,7 @@ export function PromotionEditor({
     setChannel(promotion?.channel ?? 'BOTH');
     setProductIds([...(promotion?.productIds ?? [])]);
     setCategoryIds([...(promotion?.categoryIds ?? [])]);
+    setTargetSegments([...(promotion?.targetSegments ?? [])]);
     setAppliesTo(
       promotion?.productIds.length
         ? 'products'
@@ -114,6 +118,7 @@ export function PromotionEditor({
       totalUsageLimit: optionalPositiveInteger(totalUsageLimit),
       perCustomerUsageLimit: optionalPositiveInteger(perCustomerUsageLimit),
       stackingPolicy,
+      targetSegments,
     });
   }
 
@@ -258,6 +263,28 @@ export function PromotionEditor({
           </fieldset>
         ) : null}
 
+        <fieldset className="admin-choice-list">
+          <legend>Target customer segments</legend>
+          <p className="admin-field-help">
+            Select no segments to make the promotion available to all eligible customers. Restricted
+            offers require a recognized customer during checkout.
+          </p>
+          {AUTOMATIC_CUSTOMER_SEGMENTS.map((segment) => (
+            <label key={segment}>
+              <input
+                type="checkbox"
+                checked={targetSegments.includes(segment)}
+                onChange={(event) =>
+                  setTargetSegments(
+                    (current) =>
+                      toggle(current, segment, event.target.checked) as AdminCustomerSegment[],
+                  )
+                }
+              />
+              {segment}
+            </label>
+          ))}
+        </fieldset>
         <label className="admin-field">
           <span>Total uses (optional)</span>
           <input

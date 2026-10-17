@@ -12,12 +12,15 @@ import type {
   AdminWeeklyHoursConfiguration,
   CanonicalSettingsRowEditResult,
   OrderTypeEditInput,
+  OrderTypeCreateInput,
   PaymentMethodChannel,
+  PaymentMethodCreateInput,
   PaymentMethodEditInput,
   ReasonCodeWriteInput,
   ReasonCodeWriteResult,
   ResolvedSetting,
   SettingWriteInput,
+  SettingRestoreInput,
   SettingWriteResult,
   SettingsChannelContext,
   SettingsPublishResult,
@@ -71,11 +74,20 @@ export interface SettingsStore {
     value: unknown;
     expectedVersion: number | null;
   }): Promise<SettingWriteResult>;
+  restoreShopOverride(
+    input: { employeeId: string } & SettingRestoreInput,
+  ): Promise<SettingWriteResult>;
   upsertReasonCode(
     input: { employeeId: string } & ReasonCodeWriteInput,
   ): Promise<ReasonCodeWriteResult>;
+  createOrderType(
+    input: { employeeId: string } & OrderTypeCreateInput,
+  ): Promise<CanonicalSettingsRowEditResult>;
   updateOrderType(
     input: { employeeId: string } & OrderTypeEditInput,
+  ): Promise<CanonicalSettingsRowEditResult>;
+  createPaymentMethod(
+    input: { employeeId: string } & PaymentMethodCreateInput,
   ): Promise<CanonicalSettingsRowEditResult>;
   updatePaymentMethod(
     input: { employeeId: string } & PaymentMethodEditInput,
@@ -86,6 +98,7 @@ type ShopRow = {
   id: string;
   name: string;
   lifecycle_state: string;
+  lifecycle_revision?: number | string;
   active: boolean;
   address_text: string | null;
   contact_phone: string | null;
@@ -241,6 +254,9 @@ function mapShop(row: ShopRow): AdminShopSettingsSummary {
     id: row.id,
     name: row.name,
     lifecycleState: readLifecycle(row.lifecycle_state),
+    ...(row.lifecycle_revision === undefined
+      ? {}
+      : { lifecycleRevision: safeInteger(row.lifecycle_revision, 1) }),
     active: row.active,
     address: row.address_text,
     contactPhone: row.contact_phone,
@@ -492,6 +508,14 @@ export function createSettingsService(store: SettingsStore) {
       return store.upsertShopOverride({ employeeId: principal.employeeId, ...input });
     },
 
+    async restoreShopOverride(
+      input: SettingRestoreInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<SettingWriteResult> {
+      requirePermission(principal, 'settings.manage', input.shopId);
+      return store.restoreShopOverride({ employeeId: principal.employeeId, ...input });
+    },
+
     async upsertReasonCode(
       input: ReasonCodeWriteInput,
       principal: AdminSessionPrincipal,
@@ -500,12 +524,28 @@ export function createSettingsService(store: SettingsStore) {
       return store.upsertReasonCode({ employeeId: principal.employeeId, ...input });
     },
 
+    async createOrderType(
+      input: OrderTypeCreateInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<CanonicalSettingsRowEditResult> {
+      requirePermission(principal, 'settings.manage', input.shopId);
+      return store.createOrderType({ employeeId: principal.employeeId, ...input });
+    },
+
     async updateOrderType(
       input: OrderTypeEditInput,
       principal: AdminSessionPrincipal,
     ): Promise<CanonicalSettingsRowEditResult> {
       requirePermission(principal, 'settings.manage', input.shopId);
       return store.updateOrderType({ employeeId: principal.employeeId, ...input });
+    },
+
+    async createPaymentMethod(
+      input: PaymentMethodCreateInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<CanonicalSettingsRowEditResult> {
+      requirePermission(principal, 'settings.manage', input.shopId);
+      return store.createPaymentMethod({ employeeId: principal.employeeId, ...input });
     },
 
     async updatePaymentMethod(
@@ -573,7 +613,7 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
           'shops',
           new URLSearchParams({
             select:
-              'id,name,lifecycle_state,active,address_text,contact_phone,latitude,longitude,timezone,temporary_closed,online_orders_paused',
+              'id,name,lifecycle_state,lifecycle_revision,active,address_text,contact_phone,latitude,longitude,timezone,temporary_closed,online_orders_paused',
             id: `eq.${shopId}`,
             limit: '1',
           }),
@@ -718,6 +758,16 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
       return parseSettingWriteResult(result);
     },
 
+    async restoreShopOverride({ employeeId, shopId, settingKey, expectedVersion }) {
+      const result = await client.rpc<unknown>('restore_shop_setting_override_v1', {
+        p_employee_id: employeeId,
+        p_shop_id: shopId,
+        p_setting_key: settingKey,
+        p_expected_version: expectedVersion,
+      });
+      return parseSettingWriteResult(result);
+    },
+
     async upsertReasonCode({
       employeeId,
       shopId,
@@ -741,6 +791,29 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
       return parseReasonCodeWriteResult(result);
     },
 
+    async createOrderType({
+      employeeId,
+      shopId,
+      name,
+      behavior,
+      active,
+      sortOrder,
+      expectedSettingsVersion,
+      commandId,
+    }) {
+      const result = await client.rpc<unknown>('create_admin_order_type_v1', {
+        p_employee_id: employeeId,
+        p_shop_id: shopId,
+        p_name: name,
+        p_behavior: behavior,
+        p_active: active,
+        p_sort_order: sortOrder,
+        p_expected_settings_version: expectedSettingsVersion,
+        p_command_id: commandId,
+      });
+      return parseCanonicalSettingsRowEditResult(result);
+    },
+
     async updateOrderType({
       employeeId,
       shopId,
@@ -762,6 +835,37 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
         p_sort_order: sortOrder,
         p_expected_settings_version: expectedSettingsVersion,
         p_expected_edit_version: expectedEditVersion,
+      });
+      return parseCanonicalSettingsRowEditResult(result);
+    },
+
+    async createPaymentMethod({
+      employeeId,
+      shopId,
+      displayName,
+      logicType,
+      active,
+      sortOrder,
+      channel,
+      requiresReference,
+      manualConfirmationRequired,
+      refundAllowed,
+      expectedSettingsVersion,
+      commandId,
+    }) {
+      const result = await client.rpc<unknown>('create_admin_payment_method_v2', {
+        p_employee_id: employeeId,
+        p_shop_id: shopId,
+        p_display_name: displayName,
+        p_logic_type: logicType,
+        p_active: active,
+        p_sort_order: sortOrder,
+        p_channel: channel,
+        p_requires_reference: requiresReference,
+        p_manual_confirmation_required: manualConfirmationRequired,
+        p_refund_allowed: refundAllowed,
+        p_expected_settings_version: expectedSettingsVersion,
+        p_command_id: commandId,
       });
       return parseCanonicalSettingsRowEditResult(result);
     },

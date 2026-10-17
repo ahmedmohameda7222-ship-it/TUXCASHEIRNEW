@@ -62,6 +62,7 @@ export function projectPublishedCheckoutAuthority(
       behavior: orderType.behavior,
       active: orderType.active,
     })),
+    paymentMethodZoneRules: settings?.paymentMethodZoneRules ?? [],
     paymentMethods: snapshot.paymentMethods.map((paymentMethod) => ({
       id: paymentMethod.id,
       displayName: paymentMethod.displayName,

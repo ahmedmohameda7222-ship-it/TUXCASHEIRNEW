@@ -2,7 +2,7 @@ import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
 
 import { SettingOverrideEditor } from './SettingOverrideEditor';
 import { displaySettingValue, resolveWorkspaceSetting, settingSourceLabel } from './settingsModel';
-import type { SettingOverrideUpdateDraft } from './useSettings';
+import type { SettingOverrideUpdateDraft, SettingRestoreDraft } from './useSettings';
 
 const RECEIPT_SEQUENCE_MAX = 2_147_483_647;
 
@@ -10,10 +10,14 @@ export function ReceiptsPage({
   workspace,
   onUpdate,
   updating,
+  scope = 'shop',
+  onRestore,
 }: {
   workspace: AdminSettingsWorkspace;
   onUpdate(draft: SettingOverrideUpdateDraft): void | Promise<void>;
   updating: boolean;
+  scope?: 'shop' | 'business';
+  onRestore?: ((draft: SettingRestoreDraft) => void | Promise<void>) | undefined;
 }) {
   const resetPolicy = resolveWorkspaceSetting(workspace, 'receipt.sequenceResetPolicy');
 
@@ -37,6 +41,8 @@ export function ReceiptsPage({
           kind="text"
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
+          onRestore={onRestore}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -45,6 +51,8 @@ export function ReceiptsPage({
           kind="text"
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
+          onRestore={onRestore}
         />
         <SettingOverrideEditor
           workspace={workspace}
@@ -56,6 +64,8 @@ export function ReceiptsPage({
           help="A new starting number takes effect at the next business-day boundary."
           updating={updating}
           onUpdate={onUpdate}
+          scope={scope}
+          onRestore={onRestore}
         />
         <article
           className="admin-catalog-editor__section is-compact"

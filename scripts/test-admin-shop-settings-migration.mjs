@@ -158,22 +158,33 @@ begin
     raise exception 'stale order type row edit was not rejected: %', v_order_edit;
   end if;
 
-  -- refundAllowed is canonical but not editable until the trusted refund boundary enforces it.
+  -- Refund eligibility now snapshots at payment creation and is version-fenced for future payments.
   v_payment_edit := public.update_admin_payment_method_v1(
     '${employeeId}', '${shopId}', '${paymentMethodId}', 'Front Cash', true, 1,
     'BOTH', true, true, false, 0, 1
   );
-  if v_payment_edit ->> 'code' <> 'refund_policy_not_editable_until_enforced' then
-    raise exception 'unenforced refund policy mutation was not rejected: %', v_payment_edit;
+  if coalesce((v_payment_edit ->> 'ok')::boolean, false) is not true
+     or (v_payment_edit ->> 'editVersion')::bigint <> 2 then
+    raise exception 'trusted refund policy edit did not succeed: %', v_payment_edit;
   end if;
 
+  -- A stale client must never restore an older policy with the consumed edit version.
   v_payment_edit := public.update_admin_payment_method_v1(
     '${employeeId}', '${shopId}', '${paymentMethodId}', 'Front Cash', true, 1,
     'BOTH', true, true, true, 0, 1
   );
+  if v_payment_edit ->> 'code' is distinct from 'stale_edit_version'
+     or (v_payment_edit ->> 'currentVersion')::bigint <> 2 then
+    raise exception 'stale refund policy edit was not rejected: %', v_payment_edit;
+  end if;
+
+  v_payment_edit := public.update_admin_payment_method_v1(
+    '${employeeId}', '${shopId}', '${paymentMethodId}', 'Front Cash', true, 1,
+    'BOTH', true, true, true, 0, 2
+  );
   if coalesce((v_payment_edit ->> 'ok')::boolean, false) is not true
-     or (v_payment_edit ->> 'editVersion')::bigint <> 2 then
-    raise exception 'payment method edit failed while preserving refund policy: %', v_payment_edit;
+     or (v_payment_edit ->> 'editVersion')::bigint <> 3 then
+    raise exception 'versioned refund policy restoration failed: %', v_payment_edit;
   end if;
 
   select p.logic_type, p.requires_reconciliation, p.refund_allowed
@@ -273,15 +284,17 @@ begin
     raise exception 'reason family constraint accepted an unreviewed family';
   end if;
 
+  -- Used shops may only be archived via the version-fenced lifecycle
+  -- approval runner. The legacy settings delete RPC must fail closed.
   v_archive := public.delete_or_archive_shop_v1('${employeeId}', '${shopId}');
-  if v_archive ->> 'action' <> 'ARCHIVED' then
-    raise exception 'used shop was not archived: %', v_archive;
+  if v_archive ->> 'code' <> 'shop_archive_use_lifecycle_command' then
+    raise exception 'used shop bypassed approved archive lifecycle: %', v_archive;
   end if;
   if not exists (
     select 1 from public.shops s
-    where s.id = '${shopId}' and s.lifecycle_state = 'ARCHIVED' and s.active = false
+    where s.id = '${shopId}' and s.lifecycle_state = 'ACTIVE' and s.active = true
   ) then
-    raise exception 'archived shop canonical row was not retained';
+    raise exception 'used shop changed state despite denied legacy archive';
   end if;
 
   v_delete := public.delete_or_archive_shop_v1('${employeeId}', '${unusedShopId}');

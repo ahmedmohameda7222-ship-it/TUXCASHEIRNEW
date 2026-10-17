@@ -45,9 +45,40 @@ export interface AdminInventoryItem extends InventoryBalance {
   readonly unitLabel: string;
   readonly trackingMode: string;
   readonly active: boolean;
+  readonly definitionVersion: number;
+  readonly lowStockThresholdMicros: number | null;
+  readonly conversions: readonly AdminInventoryUnitConversion[];
   readonly weightedUnitCostMinor: number;
   readonly history: readonly AdminInventoryMovement[];
 }
+
+export interface AdminInventoryUnitConversion {
+  readonly id: string;
+  readonly inventoryItemId: string;
+  readonly purchaseUnitLabel: string;
+  readonly baseMicrosPerPurchaseUnit: number;
+  readonly active: boolean;
+  readonly definitionVersion: number;
+}
+
+export type InventoryDefinitionAction =
+  | 'item.create'
+  | 'item.update'
+  | 'item.archive'
+  | 'item.restore'
+  | 'conversion.create'
+  | 'conversion.update'
+  | 'conversion.archive'
+  | 'conversion.restore';
+
+export type AdminInventoryDefinitionCommand = {
+  readonly type: InventoryDefinitionAction;
+  readonly shopId: string;
+  readonly entityId: string | null;
+  readonly expectedVersion: number | null;
+  readonly payload: Record<string, unknown>;
+  readonly commandId: string;
+};
 
 export interface AdminInventoryTransferLine {
   readonly inventoryItemId: string;
@@ -141,6 +172,7 @@ export interface AdminStocktakeSnapshot {
 }
 
 export type AdminInventoryCommand =
+  | AdminInventoryDefinitionCommand
   | {
       readonly type: 'adjust';
       readonly shopId: string;
@@ -149,6 +181,7 @@ export type AdminInventoryCommand =
       readonly reasonCodeId: string;
       readonly note: string | null;
       readonly emergencyNegativeOverride: boolean;
+      readonly requesterPin?: string;
       readonly commandId: string;
     }
   | {
@@ -159,6 +192,7 @@ export type AdminInventoryCommand =
       readonly reasonCodeId: string;
       readonly note: string | null;
       readonly emergencyNegativeOverride: boolean;
+      readonly requesterPin?: string;
       readonly commandId: string;
     }
   | {
@@ -211,13 +245,18 @@ export type AdminInventoryCommandResult =
       readonly ok: true;
       readonly idempotentReplay?: boolean;
       readonly movementId?: string;
+      readonly state?: 'PENDING_APPROVAL';
+      readonly approvalRequestId?: string;
       readonly stocktakeId?: string;
       readonly lines?: readonly AdminStocktakeSnapshotLine[];
       readonly transferId?: string;
+      readonly entityId?: string;
+      readonly version?: number;
     }
   | {
       readonly ok: false;
       readonly code: string;
       readonly inventoryItemId?: string;
       readonly availableMicros?: number;
+      readonly currentVersion?: number;
     };

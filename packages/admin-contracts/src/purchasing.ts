@@ -16,6 +16,7 @@ export type AdminSupplier = {
   readonly phone: string | null;
   readonly email: string | null;
   readonly active: boolean;
+  readonly version?: number;
 };
 
 export type AdminSupplierInventoryItem = {
@@ -65,6 +66,10 @@ export type AdminPurchasingInventoryItem = {
   readonly id: string;
   readonly name: string;
   readonly unitLabel: string;
+  readonly purchaseUnits: readonly {
+    readonly label: string;
+    readonly baseMicrosPerPurchaseUnit: number;
+  }[];
 };
 
 export type AdminPurchasingWorkspace = {
@@ -81,6 +86,20 @@ export type CreateSupplierInput = {
   readonly contactName: string | null;
   readonly phone: string | null;
   readonly email: string | null;
+};
+
+export type ManageSupplierInput = {
+  readonly shopId: string;
+  readonly supplierId: string;
+  readonly expectedVersion: number;
+  readonly type: 'supplier.update' | 'supplier.archive' | 'supplier.restore';
+  readonly payload: {
+    readonly name?: string;
+    readonly contactName?: string | null;
+    readonly phone?: string | null;
+    readonly email?: string | null;
+  };
+  readonly commandId: string;
 };
 
 export type CreatePurchaseOrderInput = {
@@ -103,6 +122,21 @@ export type UpdatePurchaseOrderInput = {
   readonly expectedVersion: number;
   readonly reference: string | null;
   readonly expectedDeliveryDate: string | null;
+};
+
+export type ReplaceDraftPurchaseOrderLinesInput = {
+  readonly shopId: string;
+  readonly purchaseOrderId: string;
+  readonly expectedVersion: number;
+  readonly commandId: string;
+  readonly lines: CreatePurchaseOrderInput['lines'];
+};
+
+export type CancelPurchaseOrderInput = {
+  readonly shopId: string;
+  readonly purchaseOrderId: string;
+  readonly expectedVersion: number;
+  readonly commandId: string;
 };
 
 export type ReceivePurchaseInput = {

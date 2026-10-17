@@ -299,6 +299,12 @@ export interface StaffStore {
   linkEmployeeWorker(
     input: LinkEmployeeWorkerInput & { actorEmployeeId: string },
   ): Promise<StaffCommandResult>;
+  provisionEmployeeWorker(input: {
+    employeeId: string;
+    shopId: string;
+    commandId: string;
+    actorEmployeeId: string;
+  }): Promise<StaffCommandResult>;
   setEmployeeRole(
     input: SetEmployeeRoleInput & { actorEmployeeId: string },
   ): Promise<StaffCommandResult>;
@@ -761,6 +767,15 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
         p_employee_id: input.employeeId,
         p_shop_id: input.shopId,
         p_worker_id: input.workerId,
+        p_command_id: input.commandId,
+      });
+    },
+
+    provisionEmployeeWorker(input) {
+      return client.rpc<StaffCommandResult>('provision_employee_operations_worker_v1', {
+        p_actor_employee_id: input.actorEmployeeId,
+        p_employee_id: input.employeeId,
+        p_shop_id: input.shopId,
         p_command_id: input.commandId,
       });
     },

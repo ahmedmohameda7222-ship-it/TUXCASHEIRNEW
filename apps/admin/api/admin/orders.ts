@@ -758,6 +758,15 @@ function sendMutationResult(
   sendJson(response, 400, result);
 }
 
+export function classifyOrderRefundDatabaseError(
+  responseBody: string,
+): { status: 409; error: 'payment_refund_not_allowed' } | null {
+  if (responseBody.includes('TUX_ADMIN_PAYMENT_REFUND_NOT_ALLOWED')) {
+    return { status: 409, error: 'payment_refund_not_allowed' };
+  }
+  return null;
+}
+
 function handleFailure(response: AdminResponse, error: unknown): void {
   if (error instanceof AdminAuthError) {
     sendJson(response, error.status, { error: error.code });
@@ -772,6 +781,11 @@ function handleFailure(response: AdminResponse, error: unknown): void {
     return;
   }
   if (error instanceof AdminSupabaseError) {
+    const refundPolicyFailure = classifyOrderRefundDatabaseError(error.responseBody);
+    if (refundPolicyFailure) {
+      sendJson(response, refundPolicyFailure.status, { error: refundPolicyFailure.error });
+      return;
+    }
     if (error.responseBody.includes('TUX_ADMIN_ORDER_PERMISSION_REQUIRED')) {
       sendJson(response, 403, { error: 'permission_forbidden' });
       return;

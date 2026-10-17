@@ -8,6 +8,11 @@ on:
     paths:
       - 'supabase/migrations/**'
       - 'scripts/test-admin-approvals-audit-migration.mjs'
+      - 'scripts/test-admin-shop-lifecycle-approvals-postgres.mjs'
+      - 'scripts/test-admin-payment-method-approval-postgres.mjs'
+      - 'scripts/test-admin-finance-snapshot-approval-postgres.mjs'
+      - 'scripts/test-admin-finance-owner-withdrawal-approval-postgres.mjs'
+      - 'scripts/test-admin-finance-cashier-reconciliation-approval-postgres.mjs'
       - 'scripts/test-admin-approvals-audit-review-hardening*.mjs'
       - 'apps/admin/server/approvals/**'
       - 'apps/admin/server/audit/**'
@@ -28,6 +33,11 @@ on:
     paths:
       - 'supabase/migrations/**'
       - 'scripts/test-admin-approvals-audit-migration.mjs'
+      - 'scripts/test-admin-shop-lifecycle-approvals-postgres.mjs'
+      - 'scripts/test-admin-payment-method-approval-postgres.mjs'
+      - 'scripts/test-admin-finance-snapshot-approval-postgres.mjs'
+      - 'scripts/test-admin-finance-owner-withdrawal-approval-postgres.mjs'
+      - 'scripts/test-admin-finance-cashier-reconciliation-approval-postgres.mjs'
       - 'scripts/test-admin-approvals-audit-review-hardening*.mjs'
       - 'apps/admin/server/approvals/**'
       - 'apps/admin/server/audit/**'
@@ -76,10 +86,26 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Preview Finance Snapshot approval formatting
+        run: |
+          for file in apps/admin/server/approvals/financeSnapshotApproval.ts apps/admin/server/approvals/financeSnapshotApproval.test.ts; do
+            echo "FINANCE_PRETTIER_BEGIN_${file}"
+            npx prettier "$file" | base64 -w0
+            echo
+            echo "FINANCE_PRETTIER_END_${file}"
+          done
       - name: Plan 3 approval and audit services
         run: >-
           npx vitest run
           apps/admin/server/approvals/approvalService.test.ts
+          apps/admin/server/approvals/shopLifecycleApproval.test.ts
+          apps/admin/server/approvals/settingsPaymentMethodApproval.test.ts
+          apps/admin/server/approvals/settingsPaymentMethodCreateApproval.test.ts
+          apps/admin/server/approvals/settingsPaymentZoneApproval.test.ts
+          apps/admin/server/approvals/settingsCheckoutRatePublishApproval.test.ts
+          apps/admin/server/approvals/financeSnapshotApproval.test.ts
+          apps/admin/server/approvals/financeOwnerWithdrawalApproval.test.ts
+          apps/admin/server/approvals/financeCashierReconciliationApproval.test.ts
           apps/admin/server/approvals/approvalReadService.test.ts
           apps/admin/server/approvals/approvalPinRateLimit.test.ts
           apps/admin/server/approvals/approvalExecutionService.test.ts
@@ -183,3 +209,13 @@ jobs:
         run: node scripts/test-admin-approvals-audit-review-hardening-round10.mjs
       - name: Plan 3 review round-13 PostgreSQL behavior
         run: node scripts/test-admin-approvals-audit-review-hardening-round13.mjs
+      - name: Shop lifecycle approved execution PostgreSQL behavior
+        run: node scripts/test-admin-shop-lifecycle-approvals-postgres.mjs
+      - name: Payment method and payment-zone second-person approval PostgreSQL behavior
+        run: node scripts/test-admin-payment-method-approval-postgres.mjs
+      - name: Finance snapshot second-person approval PostgreSQL behavior
+        run: node scripts/test-admin-finance-snapshot-approval-postgres.mjs
+      - name: Owner withdrawal second-person approval PostgreSQL behavior
+        run: node scripts/test-admin-finance-owner-withdrawal-approval-postgres.mjs
+      - name: Cashier reconciliation second-person approval PostgreSQL behavior
+        run: node scripts/test-admin-finance-cashier-reconciliation-approval-postgres.mjs

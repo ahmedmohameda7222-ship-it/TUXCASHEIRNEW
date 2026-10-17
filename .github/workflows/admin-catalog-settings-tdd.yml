@@ -339,5 +339,9 @@ jobs:
         run: node scripts/test-admin-settings-schema-hardening.mjs
       - name: Public catalog ordering projection PostgreSQL behavior
         run: node scripts/test-catalog-public-ordering-projection.mjs
+      - name: Selective master-mapped Catalog Copy PostgreSQL behavior
+        run: node scripts/test-admin-catalog-copy-postgres.mjs
+      - name: Target-local Category and Product master-identity creation
+        run: node scripts/test-admin-catalog-copy-new-master-stage-postgres.mjs
       - name: Canonical catalog architecture regression
         run: npm run test:catalog-architecture

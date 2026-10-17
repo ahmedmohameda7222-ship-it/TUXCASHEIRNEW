@@ -28,6 +28,7 @@ export function AdjustStockSheet({
     reasonCodeId: string;
     note: string | null;
     emergencyNegativeOverride: boolean;
+    requesterPin?: string;
   }): void;
 }) {
   const options = useMemo(
@@ -38,6 +39,7 @@ export function AdjustStockSheet({
   const [reasonCodeId, setReasonCodeId] = useState(options[0]?.id ?? '');
   const [note, setNote] = useState('');
   const [override, setOverride] = useState(false);
+  const [requesterPin, setRequesterPin] = useState('');
   const micros = toMicros(quantity);
 
   return (
@@ -88,6 +90,17 @@ export function AdjustStockSheet({
           <span>Allow stock to go below zero</span>
         </label>
       ) : null}
+      <label className="admin-field">
+        <span>Approval PIN (only if required by your shop's policy)</span>
+        <input
+          type="password"
+          autoComplete="off"
+          aria-label="Approval PIN"
+          value={requesterPin}
+          onChange={(event) => setRequesterPin(event.target.value)}
+        />
+        <small>The PIN is submitted only to verify your approval request.</small>
+      </label>
       <button
         className="admin-primary-button"
         type="button"
@@ -101,6 +114,7 @@ export function AdjustStockSheet({
             reasonCodeId,
             note: note.trim() || null,
             emergencyNegativeOverride: override,
+            ...(requesterPin ? { requesterPin } : {}),
           });
         }}
       >

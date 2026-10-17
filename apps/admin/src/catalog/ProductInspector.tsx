@@ -1,9 +1,14 @@
-import type { CatalogJsonObject, CatalogProductDetail } from '@tux/admin-contracts';
+import type {
+  CatalogCategorySummary,
+  CatalogJsonObject,
+  CatalogProductDetail,
+} from '@tux/admin-contracts';
 
 import { ProductEditor, type ProductEditorDraft } from './ProductEditor';
 
 export function ProductInspector({
   product,
+  categories = [],
   canEdit,
   canPrice,
   busy,
@@ -15,6 +20,7 @@ export function ProductInspector({
   onSetAvailability,
 }: {
   product: CatalogProductDetail;
+  categories?: readonly CatalogCategorySummary[];
   canEdit: boolean;
   canPrice: boolean;
   busy: boolean;
@@ -43,8 +49,9 @@ export function ProductInspector({
         )}
       </header>
       <ProductEditor
-        key={`${product.id}:${product.name}:${product.description}:${product.priceMinor}:${product.imageKey}:${product.bestSeller}:${product.soldOut}:${product.active}`}
+        key={`${product.id}:${product.name}:${product.description}:${product.priceMinor}:${product.imageKey}:${product.bestSeller}:${product.soldOut}:${product.active}:${product.categoryId}:${product.isCombo}:${product.sortOrder}`}
         product={product}
+        categories={categories}
         canEdit={canEdit}
         canPrice={canPrice}
         busy={busy}

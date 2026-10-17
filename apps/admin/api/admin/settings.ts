@@ -1,3 +1,6 @@
+import handleShopCreateRoute from '../../server/settings/shopCreateRoute.js';
+import handleShopCopyPreviewRoute from '../../server/settings/shopCopyPreviewRoute.js';
+import handlePaymentZoneRulesRoute from '../../server/settings/paymentZoneRulesRoute.js';
 import type { AdminSessionPrincipal, SettingsCommand } from '@tux/admin-contracts';
 import { z } from 'zod';
 
@@ -7,6 +10,7 @@ import {
   requireSessionCsrf,
 } from '../../server/adminAuthService.js';
 import { AdminAuthorizationError } from '../../server/authorization.js';
+import { executeShopLifecycleSettingsCommand } from '../../server/settings/shopLifecycleApprovalRoute.js';
 import { getAdminServerEnv } from '../../server/env.js';
 import {
   firstHeader,
@@ -31,6 +35,10 @@ import {
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
 
 const POSTGRES_INTEGER_MAX = 2_147_483_647;
+import { executeSettingsPaymentMethodCreate } from '../../server/settings/settingsPaymentMethodCreateRoute.js';
+import { executeSettingsPaymentMethodCommand } from '../../server/settings/settingsPaymentMethodApprovalRoute.js';
+import { executeSettingsCheckoutRatePublish } from '../../server/settings/settingsCheckoutRatePublishRoute.js';
+
 const uuidSchema = z.string().uuid();
 const expectedRowVersionSchema = z.number().int().positive().nullable();
 const expectedSettingsVersionSchema = z.number().int().nonnegative();
@@ -40,6 +48,7 @@ const orderTypeNameSchema = z.string().trim().min(1).max(120);
 const paymentMethodNameSchema = z.string().trim().min(1).max(120);
 const orderBehaviorSchema = z.enum(['TAKE_AWAY', 'DINE_IN', 'DELIVERY', 'OTHER']);
 const paymentChannelSchema = z.enum(['POS', 'ONLINE', 'BOTH']);
+const paymentLogicTypeSchema = z.enum(['CASH', 'CARD', 'DIGITAL', 'OTHER']);
 const serviceKindSchema = z.enum(['OPEN', 'DELIVERY', 'ONLINE']);
 const localTimeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,6})?)?$/);
 const serviceDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -156,6 +165,7 @@ export const settingsCommandSchema = z.union([
       type: z.literal('settings.publish'),
       shopId: uuidSchema,
       expectedSettingsVersion: expectedSettingsVersionSchema,
+      requesterPin: z.string().min(1).max(64).optional(),
     })
     .strict(),
   z
@@ -167,6 +177,17 @@ export const settingsCommandSchema = z.union([
       expectedSettingsVersion: expectedSettingsVersionSchema,
     })
     .strict(),
+  z
+    .object({
+      type: z.literal('shop.lifecycle.update'),
+      shopId: uuidSchema,
+      expectedState: z.enum(['ACTIVE', 'SUSPENDED']),
+      targetState: z.enum(['ACTIVE', 'SUSPENDED', 'ARCHIVED']),
+      expectedLifecycleRevision: expectedEditVersionSchema,
+      requesterPin: z.string().min(1).max(64).optional(),
+    })
+    .strict()
+    .refine((input) => input.expectedState !== input.targetState),
   z
     .object({
       type: z.literal('shop.identity.update'),
@@ -286,7 +307,28 @@ export const settingsCommandSchema = z.union([
   z.object({ type: z.literal('shop.delete-or-archive'), shopId: uuidSchema }).strict(),
   settingWriteCommandSchema('setting.default.upsert'),
   settingWriteCommandSchema('setting.override.upsert'),
+  z
+    .object({
+      type: z.literal('setting.override.restore'),
+      shopId: uuidSchema,
+      settingKey: settingKeySchema,
+      expectedVersion: expectedEditVersionSchema,
+    })
+    .strict(),
   reasonCodeWriteCommandSchema,
+  z
+    .object({
+      type: z.literal('order-type.create'),
+      shopId: uuidSchema,
+      name: orderTypeNameSchema,
+      behavior: orderBehaviorSchema,
+      active: z.boolean(),
+      sortOrder: sortOrderSchema,
+      expectedSettingsVersion: expectedSettingsVersionSchema,
+      commandId: z.string().trim().min(1).max(160),
+      requesterPin: z.string().min(1).max(64).optional(),
+    })
+    .strict(),
   z
     .object({
       type: z.literal('order-type.update'),
@@ -298,6 +340,22 @@ export const settingsCommandSchema = z.union([
       sortOrder: sortOrderSchema,
       expectedSettingsVersion: expectedSettingsVersionSchema,
       expectedEditVersion: expectedEditVersionSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('payment-method.create'),
+      shopId: uuidSchema,
+      displayName: paymentMethodNameSchema,
+      logicType: paymentLogicTypeSchema,
+      active: z.boolean(),
+      sortOrder: sortOrderSchema,
+      channel: paymentChannelSchema,
+      requiresReference: z.boolean(),
+      manualConfirmationRequired: z.boolean(),
+      refundAllowed: z.boolean(),
+      expectedSettingsVersion: expectedSettingsVersionSchema,
+      commandId: z.string().trim().min(1).max(160),
     })
     .strict(),
   z
@@ -314,6 +372,7 @@ export const settingsCommandSchema = z.union([
       refundAllowed: z.boolean(),
       expectedSettingsVersion: expectedSettingsVersionSchema,
       expectedEditVersion: expectedEditVersionSchema,
+      requesterPin: z.string().min(1).max(64).optional(),
     })
     .strict(),
 ]);
@@ -364,6 +423,12 @@ export default async function handler(
   request: AdminRequest,
   response: AdminResponse,
 ): Promise<void> {
+  const resource = new URL(request.url ?? '/', 'http://admin.local').searchParams.get(
+    '__adminResource',
+  );
+  if (resource === 'shop-create') return handleShopCreateRoute(request, response);
+  if (resource === 'shop-copy-preview') return handleShopCopyPreviewRoute(request, response);
+  if (resource === 'payment-zone-rules') return handlePaymentZoneRulesRoute(request, response);
   if (request.method !== 'GET' && request.method !== 'POST') {
     response.setHeader('allow', 'GET, POST');
     sendJson(response, 405, { error: 'method_not_allowed' });
@@ -395,20 +460,30 @@ export default async function handler(
     const command = parsed.data as SettingsCommand;
 
     switch (command.type) {
-      case 'settings.publish':
+      case 'settings.publish': {
+        const sessionToken = readAdminSessionToken(firstHeader(request.headers.cookie));
+        if (!sessionToken) throw new AdminAuthError('session_required', 401);
+        const context = await loadAdminSession(sessionToken, client);
         sendJson(response, 200, {
-          ...(await service.publishSettings(
-            command.shopId,
-            command.expectedSettingsVersion,
-            principal,
-          )),
+          ...(await executeSettingsCheckoutRatePublish(client, context, command, request)),
         });
         return;
+      }
       case 'shop.operational-state.update':
         sendJson(response, 200, {
           ...(await updateShopOperationalState(client, command, principal)),
         });
         return;
+      case 'shop.lifecycle.update': {
+        // loadPrincipal already validated session CSRF for this POST.
+        const sessionToken = readAdminSessionToken(firstHeader(request.headers.cookie));
+        if (!sessionToken) throw new AdminAuthError('session_required', 401);
+        const context = await loadAdminSession(sessionToken, client);
+        sendJson(response, 200, {
+          ...(await executeShopLifecycleSettingsCommand(client, context, command, request)),
+        });
+        return;
+      }
       case 'shop.identity.update':
         sendJson(response, 200, { ...(await updateShopIdentity(client, command, principal)) });
         return;
@@ -429,15 +504,36 @@ export default async function handler(
       case 'setting.override.upsert':
         sendJson(response, 200, { ...(await service.upsertShopOverride(command, principal)) });
         return;
+      case 'setting.override.restore':
+        sendJson(response, 200, { ...(await service.restoreShopOverride(command, principal)) });
+        return;
       case 'reason-code.upsert':
         sendJson(response, 200, { ...(await service.upsertReasonCode(command, principal)) });
+        return;
+      case 'order-type.create':
+        sendJson(response, 200, { ...(await service.createOrderType(command, principal)) });
         return;
       case 'order-type.update':
         sendJson(response, 200, { ...(await service.updateOrderType(command, principal)) });
         return;
-      case 'payment-method.update':
-        sendJson(response, 200, { ...(await service.updatePaymentMethod(command, principal)) });
+      case 'payment-method.create': {
+        const sessionToken = readAdminSessionToken(firstHeader(request.headers.cookie));
+        if (!sessionToken) throw new AdminAuthError('session_required', 401);
+        const context = await loadAdminSession(sessionToken, client);
+        sendJson(response, 200, {
+          ...(await executeSettingsPaymentMethodCreate(client, context, command, request)),
+        });
         return;
+      }
+      case 'payment-method.update': {
+        const sessionToken = readAdminSessionToken(firstHeader(request.headers.cookie));
+        if (!sessionToken) throw new AdminAuthError('session_required', 401);
+        const context = await loadAdminSession(sessionToken, client);
+        sendJson(response, 200, {
+          ...(await executeSettingsPaymentMethodCommand(client, context, command, request)),
+        });
+        return;
+      }
     }
   } catch (error) {
     handleFailure(response, error);

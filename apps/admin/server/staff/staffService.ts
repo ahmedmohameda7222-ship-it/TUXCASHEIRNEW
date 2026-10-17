@@ -10,6 +10,7 @@ import type {
   DecideLeaveRequestInput,
   EmployeeDetail,
   LinkEmployeeWorkerInput,
+  ProvisionEmployeeWorkerInput,
   ReactivateEmployeeInput,
   ReactivateEmployeeWorkerInput,
   RecordStaffPaymentInput,
@@ -112,6 +113,14 @@ export function createStaffService(store: StaffStore) {
     ): Promise<StaffCommandResult> {
       requirePermission(principal, 'staff.manage', input.shopId);
       return store.linkEmployeeWorker(actorInput(input, principal));
+    },
+
+    provisionEmployeeWorker(
+      input: ProvisionEmployeeWorkerInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      requireBusinessWidePermission(principal, 'staff.manage', input.shopId);
+      return store.provisionEmployeeWorker(actorInput(input, principal));
     },
 
     setEmployeeRole(

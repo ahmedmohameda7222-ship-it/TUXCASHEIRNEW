@@ -57,7 +57,13 @@ test('real touch reorder persists, cancel restores, and mobile editor stays reac
   cards = menuEditProductCards(page);
   await touchDrag(cards.nth(1), cards.nth(0), page);
   await expect(menuEditProductCards(page).nth(0)).toContainText('Single Smashed Patty');
+  // Touch drop completion is asynchronous: wait for DnD cleanup before cancelling the draft.
+  await expect(page.locator('.menu-edit-product-card-dragging')).toHaveCount(0);
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Edit menu' })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
   await page.getByRole('button', { name: 'Edit menu' }).click();
   await expect.poll(() => menuLayoutDraftSnapshot(page)).toEqual(persistedDraft);
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();

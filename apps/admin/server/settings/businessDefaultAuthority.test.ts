@@ -33,8 +33,11 @@ function settingsStore(
     deleteOrArchiveShop: vi.fn(),
     upsertBusinessDefault,
     upsertShopOverride: vi.fn(),
+    restoreShopOverride: vi.fn(),
     upsertReasonCode: vi.fn(),
+    createOrderType: vi.fn(),
     updateOrderType: vi.fn(),
+    createPaymentMethod: vi.fn(),
     updatePaymentMethod: vi.fn(),
   } as SettingsStore;
 }

@@ -1,38 +1,70 @@
-import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
+import type {
+  AdminSettingsWorkspace,
+  PaymentMethodCreateResult,
+  PaymentMethodUpdateResult,
+  SettingsPublishApprovalResult,
+} from '@tux/admin-contracts';
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { ConfirmationDialog } from '../components/overlay/AdminDialog';
 import { useShopScope } from '../shops/ShopScopeProvider';
+import { BusinessDefaultsPage } from './BusinessDefaultsPage';
+import { CreateShopPanel } from './CreateShopPanel';
 import { CheckoutPage } from './CheckoutPage';
 import { OrderTypesPage } from './OrderTypesPage';
 import { PaymentsPage } from './PaymentsPage';
 import { ReasonCodesPage } from './ReasonCodesPage';
 import { ReceiptsPage } from './ReceiptsPage';
 import { SettingsScheduleActionProvider } from './SettingsSchedulePanel';
+import { ShopCopyPreviewPanel } from './ShopCopyPreviewPanel';
 import { ShopsPage } from './ShopsPage';
 import './settings.css';
 import {
   useSettings,
+  type OrderTypeCreateDraft,
   type OrderTypeUpdateDraft,
+  type PaymentMethodCreateDraft,
   type PaymentMethodUpdateDraft,
   type ReasonCodeUpdateDraft,
   type SettingOverrideUpdateDraft,
+  type SettingRestoreDraft,
   type ShopIdentityUpdateDraft,
+  type ShopLifecycleUpdateDraft,
   type ShopOperationalStateUpdateDraft,
   type ShopSpecialHoursUpdateDraft,
   type ShopWeeklyHoursUpdateDraft,
 } from './useSettings';
 
 export type SettingsSection =
-  'overview' | 'shop' | 'order-types' | 'payments' | 'checkout' | 'receipts' | 'reason-codes';
+  | 'overview'
+  | 'shop'
+  | 'business-defaults'
+  | 'order-types'
+  | 'payments'
+  | 'checkout'
+  | 'receipts'
+  | 'reason-codes';
 
 export type SettingsWorkspaceViewProps = {
   workspace: AdminSettingsWorkspace;
   section: SettingsSection;
+  canAssignStaff?: boolean;
+  canCreateShop?: boolean;
+  shopCopySourceIds?: readonly string[];
+  canManageShopLifecycle?: boolean;
+  onUpdateShopLifecycle?: (draft: ShopLifecycleUpdateDraft) => void | Promise<void>;
+  shopLifecycleUpdating?: boolean;
+  shopLifecycleApprovalPending?: boolean;
+  canManageBusinessDefaults?: boolean;
+  canManagePaymentZones?: boolean;
+  onUpdateBusinessDefault?: (draft: SettingOverrideUpdateDraft) => void | Promise<void>;
+  businessDefaultUpdating?: boolean;
   onSectionChange(section: SettingsSection): void;
-  onPublish(): void | Promise<void>;
+  onPublish(
+    requesterPin?: string,
+  ): void | SettingsPublishApprovalResult | Promise<void | SettingsPublishApprovalResult>;
   publishing: boolean;
   onUpdateOperationalState(draft: ShopOperationalStateUpdateDraft): void | Promise<void>;
   operationalStateUpdating: boolean;
@@ -43,17 +75,25 @@ export type SettingsWorkspaceViewProps = {
   onDeleteOrArchiveShop(): void | Promise<void>;
   deletingOrArchivingShop: boolean;
   onUpdateSettingOverride(draft: SettingOverrideUpdateDraft): void | Promise<void>;
+  onRestoreSettingOverride?: (draft: SettingRestoreDraft) => void | Promise<void>;
   settingOverrideUpdating: boolean;
   onUpsertReasonCode(draft: ReasonCodeUpdateDraft): void | Promise<void>;
   reasonCodeUpdating: boolean;
+  onCreateOrderType(draft: OrderTypeCreateDraft): void | Promise<void>;
   onUpdateOrderType(draft: OrderTypeUpdateDraft): void | Promise<void>;
   orderTypeUpdating: boolean;
-  onUpdatePaymentMethod(draft: PaymentMethodUpdateDraft): void | Promise<void>;
+  onCreatePaymentMethod(
+    draft: PaymentMethodCreateDraft,
+  ): void | PaymentMethodCreateResult | Promise<void | PaymentMethodCreateResult>;
+  onUpdatePaymentMethod(
+    draft: PaymentMethodUpdateDraft,
+  ): void | PaymentMethodUpdateResult | Promise<void | PaymentMethodUpdateResult>;
   paymentMethodUpdating: boolean;
 };
 
 const sections: readonly { id: SettingsSection; label: string }[] = [
   { id: 'shop', label: 'Shop' },
+  { id: 'business-defaults', label: 'Business defaults' },
   { id: 'order-types', label: 'Order types' },
   { id: 'payments', label: 'Payments' },
   { id: 'checkout', label: 'Checkout' },
@@ -63,6 +103,7 @@ const sections: readonly { id: SettingsSection; label: string }[] = [
 
 const settingsSectionIds = new Set<SettingsSection>([
   'shop',
+  'business-defaults',
   'order-types',
   'payments',
   'checkout',
@@ -139,14 +180,28 @@ function SectionContent(
     onUpsertWeeklyHours,
     onUpsertSpecialHours,
     shopManagementUpdating,
+    canAssignStaff,
+    canCreateShop,
+    shopCopySourceIds,
+    canManageShopLifecycle,
+    onUpdateShopLifecycle,
+    shopLifecycleUpdating,
+    shopLifecycleApprovalPending,
+    canManageBusinessDefaults,
+    canManagePaymentZones,
+    onUpdateBusinessDefault,
+    businessDefaultUpdating,
     onDeleteOrArchiveShop,
     deletingOrArchivingShop,
     onUpdateSettingOverride,
+    onRestoreSettingOverride,
     settingOverrideUpdating,
     onUpsertReasonCode,
     reasonCodeUpdating,
+    onCreateOrderType,
     onUpdateOrderType,
     orderTypeUpdating,
+    onCreatePaymentMethod,
     onUpdatePaymentMethod,
     paymentMethodUpdating,
   } = props;
@@ -155,21 +210,50 @@ function SectionContent(
       return <Overview workspace={workspace} />;
     case 'shop':
       return (
-        <ShopsPage
+        <>
+          {canCreateShop ? <CreateShopPanel contextShopId={workspace.shop.id} /> : null}
+          {shopCopySourceIds && shopCopySourceIds.length > 0 ? (
+            <ShopCopyPreviewPanel
+              key={`${workspace.shop.id}:${workspace.settingsVersion}`}
+              targetShopId={workspace.shop.id}
+              expectedTargetSettingsVersion={workspace.settingsVersion}
+              sourceShopIds={shopCopySourceIds}
+            />
+          ) : null}
+          <ShopsPage
+            workspace={workspace}
+            canAssignStaff={canAssignStaff === true}
+            canManageLifecycle={canManageShopLifecycle === true}
+            onUpdateLifecycle={onUpdateShopLifecycle}
+            lifecycleUpdating={shopLifecycleUpdating === true}
+            lifecycleApprovalPending={shopLifecycleApprovalPending === true}
+            onUpdateOperationalState={(draft) => void onUpdateOperationalState(draft)}
+            onUpdateIdentity={onUpdateShopIdentity}
+            onUpsertWeeklyHours={onUpsertWeeklyHours}
+            onUpsertSpecialHours={onUpsertSpecialHours}
+            {...(canManageShopLifecycle === true
+              ? { onDeleteOrArchive: () => void onDeleteOrArchiveShop() }
+              : {})}
+            busy={operationalStateUpdating || shopManagementUpdating || deletingOrArchivingShop}
+          />
+        </>
+      );
+    case 'business-defaults':
+      return canManageBusinessDefaults && onUpdateBusinessDefault ? (
+        <BusinessDefaultsPage
           workspace={workspace}
-          onUpdateOperationalState={(draft) => void onUpdateOperationalState(draft)}
-          onUpdateIdentity={onUpdateShopIdentity}
-          onUpsertWeeklyHours={onUpsertWeeklyHours}
-          onUpsertSpecialHours={onUpsertSpecialHours}
-          onDeleteOrArchive={() => void onDeleteOrArchiveShop()}
-          busy={operationalStateUpdating || shopManagementUpdating || deletingOrArchivingShop}
+          onUpdate={onUpdateBusinessDefault}
+          updating={businessDefaultUpdating === true}
         />
+      ) : (
+        <p role="alert">Business defaults require business-wide settings management access.</p>
       );
     case 'order-types':
       return (
         <OrderTypesPage
           workspace={workspace}
           onUpdate={onUpdateOrderType}
+          onCreate={onCreateOrderType}
           updating={orderTypeUpdating}
         />
       );
@@ -177,6 +261,7 @@ function SectionContent(
       return (
         <PaymentsPage
           workspace={workspace}
+          onCreate={onCreatePaymentMethod}
           onUpdate={onUpdatePaymentMethod}
           updating={paymentMethodUpdating}
         />
@@ -185,7 +270,9 @@ function SectionContent(
       return (
         <CheckoutPage
           workspace={workspace}
+          canManagePaymentZones={canManagePaymentZones === true}
           onUpdate={onUpdateSettingOverride}
+          onRestore={onRestoreSettingOverride}
           updating={settingOverrideUpdating}
         />
       );
@@ -194,6 +281,7 @@ function SectionContent(
         <ReceiptsPage
           workspace={workspace}
           onUpdate={onUpdateSettingOverride}
+          onRestore={onRestoreSettingOverride}
           updating={settingOverrideUpdating}
         />
       );
@@ -216,6 +304,24 @@ export function SettingsWorkspaceView({
   publishing,
   ...sectionProps
 }: SettingsWorkspaceViewProps) {
+  const [publishPin, setPublishPin] = useState('');
+  const [publishFeedback, setPublishFeedback] = useState<string | null>(null);
+  async function publish() {
+    setPublishFeedback(null);
+    try {
+      const result = await onPublish(publishPin || undefined);
+      setPublishPin('');
+      if (result && 'state' in result && result.state === 'PENDING_APPROVAL') {
+        setPublishFeedback(
+          'Checkout rate publication requested. A second person must approve before the settings are published.',
+        );
+      } else {
+        setPublishFeedback('Settings published.');
+      }
+    } catch (cause) {
+      setPublishFeedback(cause instanceof Error ? cause.message : 'Unable to publish settings.');
+    }
+  }
   return (
     <main className="admin-settings-workspace" data-settings-version={workspace.settingsVersion}>
       <header className="admin-settings-workspace__header">
@@ -225,14 +331,26 @@ export function SettingsWorkspaceView({
           <p className="admin-field__help">Shop settings and operational controls</p>
         </div>
         <div className="admin-settings-workspace__publish">
+          <label className="admin-field">
+            <span>Requester PIN (if required for approval)</span>
+            <input
+              type="password"
+              autoComplete="off"
+              maxLength={64}
+              value={publishPin}
+              disabled={publishing}
+              onChange={(event) => setPublishPin(event.currentTarget.value)}
+            />
+          </label>
           <button
             className="admin-primary-button"
             type="button"
             disabled={publishing}
-            onClick={() => void onPublish()}
+            onClick={() => void publish()}
           >
             {publishing ? 'Publishing…' : 'Publish settings'}
           </button>
+          {publishFeedback ? <p role="status">{publishFeedback}</p> : null}
           <p className="admin-field__help">
             Configuration edits publish here. Emergency shop controls publish immediately.
           </p>
@@ -246,16 +364,20 @@ export function SettingsWorkspaceView({
         >
           Overview
         </button>
-        {sections.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            aria-current={section === item.id ? 'page' : undefined}
-            onClick={() => onSectionChange(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
+        {sections
+          .filter(
+            (item) => item.id !== 'business-defaults' || sectionProps.canManageBusinessDefaults,
+          )
+          .map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-current={section === item.id ? 'page' : undefined}
+              onClick={() => onSectionChange(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
       </nav>
       <SectionContent section={section} workspace={workspace} {...sectionProps} />
     </main>
@@ -263,7 +385,7 @@ export function SettingsWorkspaceView({
 }
 
 export function SettingsPage() {
-  const { scope } = useShopScope();
+  const { scope, principal } = useShopScope();
   const [location, navigate] = useLocation();
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const section = settingsSectionForLocation(location);
@@ -298,6 +420,9 @@ export function SettingsPage() {
     );
   }
 
+  const canManageBusinessDefaults =
+    (principal.role === 'OWNER' || principal.role === 'ADMIN') &&
+    principal.permissions.includes('settings.manage');
   const workspace = {
     ...settings.workspaceQuery.data,
     shopConfigSchedules: settings.schedulesQuery.data?.schedules ?? [],
@@ -317,8 +442,35 @@ export function SettingsPage() {
         <SettingsWorkspaceView
           workspace={workspace}
           section={section}
+          canAssignStaff={
+            principal.permissions.includes('staff.manage') &&
+            principal.permissions.includes('staff.view')
+          }
+          canManageShopLifecycle={principal.permissions.includes('shops.manage')}
+          shopCopySourceIds={
+            principal.permissions.includes('settings.manage')
+              ? principal.shopIds.filter((id) => id !== workspace.shop.id)
+              : []
+          }
+          canCreateShop={
+            (principal.role === 'OWNER' || principal.role === 'ADMIN') &&
+            principal.permissions.includes('shops.manage')
+          }
+          onUpdateShopLifecycle={(draft) =>
+            settings.updateShopLifecycle.mutateAsync(draft).then(() => {})
+          }
+          shopLifecycleApprovalPending={
+            settings.updateShopLifecycle.data?.ok === true &&
+            'state' in settings.updateShopLifecycle.data &&
+            settings.updateShopLifecycle.data.state === 'PENDING_APPROVAL'
+          }
+          shopLifecycleUpdating={settings.updateShopLifecycle.isPending}
+          canManageBusinessDefaults={canManageBusinessDefaults}
+          canManagePaymentZones={principal.permissions.includes('settings.manage')}
+          onUpdateBusinessDefault={(draft) => settings.updateBusinessDefault.mutateAsync(draft)}
+          businessDefaultUpdating={settings.updateBusinessDefault.isPending}
           onSectionChange={(nextSection) => navigate(settingsLocationForSection(nextSection))}
-          onPublish={() => settings.publish.mutateAsync()}
+          onPublish={(pin) => settings.publish.mutateAsync(pin)}
           publishing={settings.publish.isPending}
           onUpdateOperationalState={(draft) => settings.updateOperationalState.mutateAsync(draft)}
           operationalStateUpdating={settings.updateOperationalState.isPending}
@@ -333,20 +485,27 @@ export function SettingsPage() {
           onDeleteOrArchiveShop={() => setArchiveConfirmOpen(true)}
           deletingOrArchivingShop={settings.deleteOrArchiveShop.isPending}
           onUpdateSettingOverride={(draft) => settings.updateSettingOverride.mutateAsync(draft)}
+          onRestoreSettingOverride={(draft) => settings.restoreSettingOverride.mutateAsync(draft)}
           settingOverrideUpdating={settings.updateSettingOverride.isPending}
           onUpsertReasonCode={(draft) => settings.upsertReasonCode.mutateAsync(draft)}
           reasonCodeUpdating={settings.upsertReasonCode.isPending}
+          onCreateOrderType={(draft) => settings.createOrderType.mutateAsync(draft)}
           onUpdateOrderType={(draft) => settings.updateOrderType.mutateAsync(draft)}
-          orderTypeUpdating={settings.updateOrderType.isPending}
+          orderTypeUpdating={
+            settings.updateOrderType.isPending || settings.createOrderType.isPending
+          }
+          onCreatePaymentMethod={(draft) => settings.createPaymentMethod.mutateAsync(draft)}
           onUpdatePaymentMethod={(draft) => settings.updatePaymentMethod.mutateAsync(draft)}
-          paymentMethodUpdating={settings.updatePaymentMethod.isPending}
+          paymentMethodUpdating={
+            settings.updatePaymentMethod.isPending || settings.createPaymentMethod.isPending
+          }
         />
       </SettingsScheduleActionProvider>
       <ConfirmationDialog
         open={archiveConfirmOpen}
-        title={`Archive ${workspace.shop.name}?`}
-        description="If this shop has business or configuration history, it will be archived: new operational activity will be disabled and historical records will remain. If the shop has no recorded usage or configuration, it may be deleted instead."
-        confirmLabel="Archive shop"
+        title={`Delete unused shop ${workspace.shop.name}?`}
+        description="Only unused shops can be deleted here. To archive a used shop, use the approval-aware Archive shop control in Shop lifecycle."
+        confirmLabel="Delete unused shop"
         destructive
         pending={settings.deleteOrArchiveShop.isPending}
         onOpenChange={setArchiveConfirmOpen}

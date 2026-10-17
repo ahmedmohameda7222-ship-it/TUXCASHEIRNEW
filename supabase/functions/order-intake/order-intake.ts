@@ -155,6 +155,11 @@ export interface OnlineOrderPublishedCheckoutAuthority {
   specialHours?: readonly OnlineOrderPublishedSpecialHours[];
   orderTypes: readonly OnlineOrderPublishedOrderType[];
   paymentMethods: readonly OnlineOrderPublishedPaymentMethod[];
+  paymentMethodZoneRules?: readonly {
+    paymentMethodId: string;
+    deliveryZoneId: string;
+    allowed: boolean;
+  }[];
 }
 
 export interface OnlineOrderIntakeStore {
@@ -667,6 +672,7 @@ function publishedCheckoutPolicyError(
   itemsSubtotalMinor: number,
   normalizedPhone: string | null,
   authority: OnlineOrderPublishedCheckoutAuthority,
+  deliveryZoneId: string | null = null,
 ): Response | null {
   if (authority.shopId !== request.shopId) {
     throw new Error('published checkout authority shop mismatch');
@@ -681,8 +687,7 @@ function publishedCheckoutPolicyError(
   if (!isPublishedOnlineOrderingOpenAt(authority, now)) {
     return errorResponse(409, ONLINE_ORDERING_OUTSIDE_HOURS);
   }
-  const fulfillmentServiceKind =
-    request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'OPEN';
+  const fulfillmentServiceKind = request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'OPEN';
   if (!isPublishedServiceKindOpenAt(authority, fulfillmentServiceKind, now)) {
     return errorResponse(409, 'fulfillment_outside_hours');
   }
@@ -703,7 +708,16 @@ function publishedCheckoutPolicyError(
     return errorResponse(409, 'minimum_order_not_met');
   }
 
-  const onlineMethods = authority.paymentMethods.filter(isOnlinePaymentMethod);
+  const onlineMethods = authority.paymentMethods.filter((method) => {
+    if (!isOnlinePaymentMethod(method)) return false;
+    if (deliveryZoneId === null) return true;
+    return !authority.paymentMethodZoneRules?.some(
+      (rule) =>
+        rule.paymentMethodId === method.id &&
+        rule.deliveryZoneId === deliveryZoneId &&
+        rule.allowed === false,
+    );
+  });
   const cashAvailable = onlineMethods.some((method) => method.logicType === 'CASH');
   const instaPayAvailable = onlineMethods.some(isPublishedInstaPayMethod);
   const paymentAvailable =
@@ -852,10 +866,7 @@ export async function handleOrderIntakeRequest(
           revalidated.zoneId !== resolved.zoneId ||
           !revalidated.fallbackUsed
         ) {
-          return errorResponse(
-            409,
-            revalidated.ok ? 'delivery_unavailable' : revalidated.code,
-          );
+          return errorResponse(409, revalidated.ok ? 'delivery_unavailable' : revalidated.code);
         }
         resolved = revalidated;
       }
@@ -865,6 +876,7 @@ export async function handleOrderIntakeRequest(
         finalTrusted.itemsSubtotalMinor,
         normalizedPhone,
         checkoutAuthority,
+        resolved.zoneId,
       );
       if (policyError) return policyError;
       deliveryRoute = resolved;

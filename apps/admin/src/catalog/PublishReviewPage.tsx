@@ -9,6 +9,7 @@ import type {
 
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { useShopScope } from '../shops/ShopScopeProvider';
+import { CatalogCopyPanel } from './CatalogCopyPanel';
 import { RecurringAvailabilityEditor } from './RecurringAvailabilityEditor';
 import { ScheduleEditor } from './ScheduleEditor';
 import { VersionHistory } from './VersionHistory';
@@ -118,6 +119,7 @@ export function PublishReviewPage() {
   const publishing = useCatalogPublishing(shopId);
   const recurring = useRecurringAvailability(shopId);
   const [notice, setNotice] = useState<string | null>(null);
+  const [requesterPin, setRequesterPin] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingRestoreVersion, setPendingRestoreVersion] = useState<number | null>(null);
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
@@ -161,12 +163,22 @@ export function PublishReviewPage() {
   async function publishNow() {
     if (!preview) return;
     await runAction(async () => {
-      await publishing.publishDraft.mutateAsync({
+      const result = await publishing.publishDraft.mutateAsync({
         draftId: preview.draftId,
         expectedDraftRevision: preview.draftRevision,
         expectedVersion: preview.currentPublishVersion,
+        ...(requesterPin.trim() ? { requesterPin: requesterPin.trim() } : {}),
       });
-      setNotice('Catalog published.');
+      setRequesterPin('');
+      if ('state' in result && result.state === 'PENDING_APPROVAL') {
+        setNotice(
+          'Catalog publication requested. A second person must approve before it goes live.',
+        );
+      } else if ('idempotentReplay' in result && result.idempotentReplay) {
+        setNotice('Catalog publication already processed. Refresh to inspect the live version.');
+      } else {
+        setNotice('Catalog published.');
+      }
     });
   }
 
@@ -254,6 +266,18 @@ export function PublishReviewPage() {
             <span className="admin-status-pill">Shop scoped</span>
           </div>
 
+          {canEditCatalog ? (
+            <CatalogCopyPanel
+              targetShopId={shopId}
+              targetPublishVersion={data.currentPublishVersion}
+              draft={
+                preview ? { draftId: preview.draftId, draftRevision: preview.draftRevision } : null
+              }
+              sourceShopIds={principal.shopIds.filter((id) => id !== shopId)}
+              canPrice={principal.permissions.includes('catalog.pricing')}
+            />
+          ) : null}
+
           <RecurringAvailabilityEditor
             workspace={recurring.recurringQuery.data}
             isLoading={recurring.recurringQuery.isLoading}
@@ -305,6 +329,17 @@ export function PublishReviewPage() {
                 <p className="admin-publish-card__copy">
                   Make these reviewed changes visible to customers and Operations.
                 </p>
+                <label className="admin-field">
+                  <span>Requester PIN (when required by approval policy)</span>
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    maxLength={64}
+                    value={requesterPin}
+                    disabled={!canPublish || publishing.publishDraft.isPending}
+                    onChange={(event) => setRequesterPin(event.currentTarget.value)}
+                  />
+                </label>
                 <button
                   className="admin-primary-button"
                   type="button"

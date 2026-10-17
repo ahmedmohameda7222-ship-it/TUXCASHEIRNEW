@@ -170,6 +170,8 @@ export type CatalogSaveDraftInput = {
 
 export type CatalogPublishDraftInput = {
   draftId: string;
+  /** Optional reauthentication, excluded from the approved catalog command payload. */
+  requesterPin?: string;
   shopId: string;
   expectedDraftRevision: number;
   expectedVersion: number;
@@ -267,6 +269,12 @@ export type CatalogDraftSaveResult =
       scheduleId?: string;
     };
 
+export type CatalogPublishApprovalResult =
+  | CatalogPublishResult
+  | { ok: true; state: 'PENDING_APPROVAL'; approvalRequestId: string }
+  | { ok: true; idempotentReplay: true }
+  | { ok: false; code: string; currentVersion?: number; currentDraftRevision?: number };
+
 export type CatalogPublishResult =
   | {
       ok: true;
@@ -280,6 +288,12 @@ export type CatalogPublishResult =
       code: 'draft_not_found' | 'draft_not_publishable' | 'stale_draft_revision';
       currentDraftRevision?: number;
     };
+
+/** Price-governed publish returns a request, not a live version, until approved. */
+export type CatalogPricePublishRequestResult =
+  | CatalogPublishResult
+  | { ok: true; state: 'PENDING_APPROVAL'; approvalRequestId: string }
+  | { ok: true; idempotentReplay: true };
 
 export type CatalogImmediateAvailabilityResult =
   | {

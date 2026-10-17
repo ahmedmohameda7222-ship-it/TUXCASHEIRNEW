@@ -6,18 +6,36 @@ import { AdminDialog } from '../components/overlay/AdminDialog';
 export function SuppliersPage({
   suppliers,
   canManage,
+  canManageLifecycle,
   pending,
   onCreate,
+  onManage,
 }: {
   suppliers: readonly AdminSupplier[];
   canManage: boolean;
+  canManageLifecycle: boolean;
   pending: boolean;
+  onManage(
+    input: {
+      type: 'supplier.update' | 'supplier.archive' | 'supplier.restore';
+      supplierId: string;
+      expectedVersion: number;
+      payload: {
+        name?: string;
+        contactName?: string | null;
+        phone?: string | null;
+        email?: string | null;
+      };
+    },
+    onSuccess: () => void,
+  ): void;
   onCreate(
     input: { name: string; contactName: string | null; phone: string | null; email: string | null },
     onSuccess: () => void,
   ): void;
 }) {
   const [open, setOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<AdminSupplier | null>(null);
   const [name, setName] = useState('');
   const [contactName, setContactName] = useState('');
   const [phone, setPhone] = useState('');
@@ -28,6 +46,15 @@ export function SuppliersPage({
       .filter(Boolean)
       .some((value) => value!.toLowerCase().includes(search.trim().toLowerCase())),
   );
+
+  function beginEdit(supplier: AdminSupplier) {
+    setEditingSupplier(supplier);
+    setName(supplier.name);
+    setContactName(supplier.contactName ?? '');
+    setPhone(supplier.phone ?? '');
+    setEmail(supplier.email ?? '');
+    setOpen(true);
+  }
 
   function clearDraft() {
     setName('');
@@ -41,7 +68,15 @@ export function SuppliersPage({
       <div className="admin-catalog-editor__section-heading">
         <h2 id="purchasing-suppliers-heading">Suppliers</h2>
         {canManage ? (
-          <button className="admin-secondary-button" type="button" onClick={() => setOpen(true)}>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={() => {
+              clearDraft();
+              setEditingSupplier(null);
+              setOpen(true);
+            }}
+          >
             Add supplier
           </button>
         ) : null}
@@ -60,6 +95,37 @@ export function SuppliersPage({
             <strong>{supplier.name}</strong>
             <span>{supplier.contactName ?? 'No contact name'}</span>
             <span>{supplier.phone ?? supplier.email ?? 'No contact details'}</span>
+            <span>{supplier.active ? 'Active' : 'Archived'}</span>
+            {canManageLifecycle && typeof supplier.version === 'number' ? (
+              <div className="admin-inventory-page-actions">
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  disabled={pending}
+                  onClick={() => beginEdit(supplier)}
+                >
+                  Edit {supplier.name}
+                </button>
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  disabled={pending}
+                  onClick={() =>
+                    onManage(
+                      {
+                        type: supplier.active ? 'supplier.archive' : 'supplier.restore',
+                        supplierId: supplier.id,
+                        expectedVersion: supplier.version!,
+                        payload: {},
+                      },
+                      () => undefined,
+                    )
+                  }
+                >
+                  {supplier.active ? 'Archive' : 'Restore'} {supplier.name}
+                </button>
+              </div>
+            ) : null}
           </article>
         ))}
       </div>
@@ -67,8 +133,12 @@ export function SuppliersPage({
         <AdminDialog
           open={open}
           variant="sheet"
-          title="Add supplier"
-          description="Create a supplier record for purchasing at this shop."
+          title={editingSupplier ? 'Edit supplier' : 'Add supplier'}
+          description={
+            editingSupplier
+              ? 'Update this business supplier without changing past purchase orders.'
+              : 'Create a supplier record for purchasing at this shop.'
+          }
           onOpenChange={(nextOpen) => {
             if (!pending) setOpen(nextOpen);
           }}
@@ -79,18 +149,34 @@ export function SuppliersPage({
               event.preventDefault();
               const trimmed = name.trim();
               if (!trimmed) return;
-              onCreate(
-                {
-                  name: trimmed,
-                  contactName: contactName.trim() || null,
-                  phone: phone.trim() || null,
-                  email: email.trim() || null,
-                },
-                () => {
-                  clearDraft();
-                  setOpen(false);
-                },
-              );
+              const payload = {
+                name: trimmed,
+                contactName: contactName.trim() || null,
+                phone: phone.trim() || null,
+                email: email.trim() || null,
+              };
+              const onSuccess = () => {
+                clearDraft();
+                setEditingSupplier(null);
+                setOpen(false);
+              };
+              if (
+                editingSupplier &&
+                canManageLifecycle &&
+                typeof editingSupplier.version === 'number'
+              ) {
+                onManage(
+                  {
+                    type: 'supplier.update',
+                    supplierId: editingSupplier.id,
+                    expectedVersion: editingSupplier.version,
+                    payload,
+                  },
+                  onSuccess,
+                );
+              } else if (!editingSupplier) {
+                onCreate(payload, onSuccess);
+              }
             }}
           >
             <label>
@@ -134,7 +220,7 @@ export function SuppliersPage({
                 type="submit"
                 disabled={pending || !name.trim()}
               >
-                {pending ? 'Adding…' : 'Add supplier'}
+                {pending ? 'Saving…' : editingSupplier ? 'Save supplier' : 'Add supplier'}
               </button>
             </div>
           </form>

@@ -198,6 +198,8 @@ jobs:
           sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Plan 4 inventory ledger PostgreSQL compatibility
         run: node scripts/test-admin-inventory-ledger-migration.mjs
+      - name: Trusted inventory approval PostgreSQL behavior
+        run: node scripts/test-admin-inventory-adjustment-approvals-postgres.mjs
 
   lifecycle-static:
     needs: ledger-static
