@@ -20,6 +20,21 @@ describe('operations-sync deployment dependency provenance', () => {
     );
     expect(imports['@tux/domain']).toBe(`${rawBase}${reviewedSha}/packages/domain/src/index.ts`);
 
+    // Raw GitHub serves TypeScript sources, not the compiled .js imports emitted by the
+    // workspace barrel. Map each .js specifier back to its immutable .ts source.
+    const domainPrefix = `${rawBase}${reviewedSha}/packages/domain/src/`;
+    const domainSourceAliases = Object.entries(imports).filter(
+      ([specifier, target]) =>
+        specifier.startsWith(domainPrefix) &&
+        !specifier.endsWith('.js') &&
+        target.startsWith(domainPrefix) &&
+        target.endsWith('.ts'),
+    );
+    expect(domainSourceAliases.length).toBeGreaterThan(20);
+    for (const [specifier, target] of domainSourceAliases) {
+      expect(imports[`${specifier}.js`]).toBe(target);
+    }
+
     for (const [specifier, target] of Object.entries(imports)) {
       if (specifier.startsWith(rawBase)) {
         expect(specifier).toContain(`/${reviewedSha}/`);
