@@ -497,3 +497,37 @@ The authorized project now has **168 applied migrations** including correction-r
 - `scripts/test-admin-catalog-publish-controls.mjs` now tests an isolated second business/shop Catalog Draft→Publish→Operations configuration snapshot. Shop B's staged product price becomes live only in B, while A's price, historical publish version, Operations snapshot version and product projection remain unchanged. It also executes a foreign-tenant Owner attempt to create a Shop B draft from Business A, requiring denial without creation. All fixture DML stays inside localhost-only PostgreSQL `BEGIN ... ROLLBACK`. `Admin Catalog Settings TDD` `catalog-control-postgres` job `117238924335`, step `Catalog publish controls PostgreSQL behavior`, **GREEN** at `6b0ed5c53d56b01ee17e7d2ff8385bb744448435`.
 - Read-only deployment readiness check: zero `tuxcasheirnew-admin` branch deployments on Vercel, newest 100 `tux-menu` PR branch previews all `CANCELED`; canonical Supabase has no development branch. Therefore no authenticated deployed two-shop Menu→Operations/POS/ONLINE→payment→stock/COGS end-to-end receipt exists. Isolated PostgreSQL coverage is necessary but not production-equivalent. Do not create a production fixture or claim the remaining acceptance gate completed.
 - No GitHub PR review threads/submitted independent reviews at this checkpoint. PR #119 remains DRAFT/UNMERGED. The permanent **13-workflow CI on the final ledger HEAD** still needs re-verification after this docs commit. Planner handoff must continue to say **CORRECTIONS/ACCEPTANCE STILL REQUIRED** until all approved gates are demonstrably satisfied.
+
+
+## Owner Development/Test Authorization — 2026-10-17 (post-merge)
+- TUX V2 is in DEVELOPMENT / TESTING; production-named Vercel and canonical Supabase project `awpdcsayuwbsruwvaosg` are being used for development acceptance.
+- The Owner states existing operational records are mock/test records; genuine Menu Items, categories, products, modifiers, pricing, recipes, and necessary identity relationships **must be preserved**.
+- Authorized: controlled Edge deployments, verified forward-only migrations, tagged QA fixtures and scoped cleanup, authenticated cross-app tests, new focused post-merge correction PRs and verified squash merges.
+- Not authorized without separate consent: irreversible corruption/destruction of genuine Menu Items, exposing secrets or PIN verifiers, external customer charges/payouts/refunds/WhatsApp, or weakening RLS and tenant isolation.
+- PR #119 squash merged into `main` at `f26b4eb040050226412668d84461dd4697d1069b`; pre-merge 13/13 workflows, post-merge 7/7 CI jobs, Vercel Admin/Menu/Operations READY on same SHA; canonical Supabase 202 applied migrations.
+- Supabase 7 previous Edge Function deployment snapshots (including all previously deployed source files and JWT settings) archived at `docs/superpowers/edge-recovery/2026-10-17/*.json` in this branch. Review snapshots before each batch. Function deploys are **not yet recorded as successful** by this entry.
+- QA must use isolated identifiers and commands, not direct order/finance table spoofing, and must preserve genuine Menu Items.
+
+
+## Edge parity deployment + controlled QA batch — 2026-10-17
+
+Canonical project: `awpdcsayuwbsruwvaosg`. GitHub source baseline: merged PR #119 main `f26b4eb040050226412668d84461dd4697d1069b`. All updates below were deployment-only; no source implementation changes or SQL migrations.
+
+| Function | Previous -> current | verify_jwt retained | Observed deployment state |
+|---|---|---|---|
+| worker-auth | 1 -> 2 | true | ACTIVE; 2/2 files exact |
+| catalog-public | 4 -> 5 | false | ACTIVE; 4/4 introspection files exact; extended dependency upload |
+| online-order-operations | 1 -> 2 | true | ACTIVE; 3/3 files exact |
+| catalog-admin | 3 -> 4 | true | ACTIVE; 4/4 files exact |
+| operations-sync | 3 -> 4 | true | ACTIVE; 2/2 files exact |
+| order-intake | 3 -> 4 | false | ACTIVE; 15/15 returned files exact; 20 files uploaded including dependencies |
+| device-bootstrap | remains 3 | false | DEPLOY BLOCKED by tool safety check; current deployed logic not replaced |
+
+Pre-deploy recovery copies of each of the seven originally drifted bundles are stored in the adjacent seven `.json` snapshots, with deployed files and previous `verify_jwt` settings.
+An initial worker-auth attempt was rejected because it reused the old absolute import map path; retry with explicit `import_map_path=deno.json` succeeded. The device-bootstrap deployment was blocked by tool safety checks; source code was not published.
+
+Controlled QA dataset: same existing test business, new closed `TUX_QA_20261017_SHOP_B` (`a331d74d-97f8-4c0b-8d6c-9eb833ee0ace`). Created through trusted `create_admin_shop_v1` using existing active OWNER staff authority. Idempotent replay produced `idempotentReplay=true`; conflicting command payload returned `idempotency_conflict`. Original catalog baseline remained 49 products and 7 categories, QA shop initially has zero products/categories, and temporaryClosed/onlineOrdersPaused are true.
+
+Created QA-only STAFF employee `01da13a2-d20d-4178-b735-2bf4ba4903ba` in QA shop using `create_employee_v1`; identical command replay returned `replayed=true`. Protected `provision_employee_operations_worker_v1` returned expected `employee_pin_setup_required`: no worker was provisioned and no PIN verifier was bypassed. These are **database command-path fixture/integration checks**, NOT authenticated browser E2E.
+
+Remaining: device-bootstrap deployment, complete HTTP/authenticated Menu/ONLINE/Operations E2E, actual worker PIN onboarding, recipe/inventory/COGS, approval second-person flow, finance/payout protections, role/cross-business tests. No genuine Menu Items were modified, no external payment action initiated. No QA fixture cleanup performed (retain isolated fixtures for continuation). Supabase Edge logs queried after deployments showed no function traffic in the inspected window; ACTIVE is not request-level proof.
