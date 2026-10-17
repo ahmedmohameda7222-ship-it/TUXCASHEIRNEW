@@ -36,7 +36,7 @@ describe('operations-sync deployment dependency provenance', () => {
     }
 
     const domainIndex = readFileSync(new URL('../../domain/src/index.ts', import.meta.url), 'utf8');
-    const exportedModules = [...domainIndex.matchAll(/from '\\.\\/([A-Za-z]+)\\.js'/g)];
+    const exportedModules = [...domainIndex.matchAll(/from '\.\/([A-Za-z]+)\.js'/g)];
     for (const match of exportedModules) {
       const moduleName = match[1];
       expect(imports[`${domainPrefix}${moduleName}.js`]).toBe(`${domainPrefix}${moduleName}.ts`);
