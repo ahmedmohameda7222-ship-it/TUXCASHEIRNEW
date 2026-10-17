@@ -18,9 +18,7 @@ describe('operations-sync deployment dependency provenance', () => {
     expect(imports['@tux/remote-materializer']).toBe(
       `${rawBase}${reviewedSha}/packages/sync/src/remoteMaterializer.ts`,
     );
-    expect(imports['@tux/domain']).toBe(
-      `${rawBase}${reviewedSha}/packages/domain/src/index.ts`,
-    );
+    expect(imports['@tux/domain']).toBe(`${rawBase}${reviewedSha}/packages/domain/src/index.ts`);
 
     for (const [specifier, target] of Object.entries(imports)) {
       if (specifier.startsWith(rawBase)) {
