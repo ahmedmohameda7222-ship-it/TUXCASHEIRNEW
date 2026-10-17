@@ -100,11 +100,7 @@ const CONFIGURATION: OperationsConfigurationSnapshot = {
   deliveryZones: [],
 };
 
-function draft(
-  intentKey: string,
-  shopId: ShopId = SHOP_ID,
-  priceMinor = 10_000,
-): OrderDraft {
+function draft(intentKey: string, shopId: ShopId = SHOP_ID, priceMinor = 10_000): OrderDraft {
   return {
     shopId,
     businessDayId: DAY_ID,
@@ -411,13 +407,10 @@ describe('Operations order inventory lifecycle', () => {
       // same checkout intent without leaking between independent shop scopes.
       const intent = '13131313-1313-4313-8313-131313131313';
       const pos = await shopA.orders.placeOrder(draft(intent));
-      const online = await shopB.orders.placeOrder(
-        draft(intent, OTHER_SHOP_ID, 18_000),
-        {
-          source: 'ONLINE',
-          orderId: parseEntityId<OrderId>('14141414-1414-4414-8414-141414141414'),
-        },
-      );
+      const online = await shopB.orders.placeOrder(draft(intent, OTHER_SHOP_ID, 18_000), {
+        source: 'ONLINE',
+        orderId: parseEntityId<OrderId>('14141414-1414-4414-8414-141414141414'),
+      });
       expect(pos.ok).toBe(true);
       expect(online.ok).toBe(true);
       if (!pos.ok || !online.ok) return;
@@ -441,9 +434,7 @@ describe('Operations order inventory lifecycle', () => {
       const firstDone = await shopA.board.markDone(pos.value.order.id);
       expect(firstDone.ok).toBe(true);
       expect(
-        await shopB.database.transaction((tx) =>
-          tx.inventory.getBalance(INVENTORY_ITEM_ID),
-        ),
+        await shopB.database.transaction((tx) => tx.inventory.getBalance(INVENTORY_ITEM_ID)),
       ).toMatchObject({ onHandMicros: 650_000, reservedMicros: 500_000 });
 
       const secondDone = await shopB.board.markDone(online.value.order.id);
