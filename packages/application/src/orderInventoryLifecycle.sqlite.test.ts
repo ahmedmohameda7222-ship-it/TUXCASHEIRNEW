@@ -431,6 +431,17 @@ describe('Operations order inventory lifecycle', () => {
         ]);
       }
 
+      // Foreign order identifiers must not be executable on a different device/shop.
+      const foreignCompletion = await shopB.board.markDone(pos.value.order.id);
+      expect(foreignCompletion.ok).toBe(false);
+      const foreignMovements = await shopB.database.transaction((tx) =>
+        tx.inventory.listMovementsForOrder(pos.value.order.id),
+      );
+      expect(foreignMovements).toHaveLength(0);
+      expect(
+        await shopB.database.transaction((tx) => tx.inventory.getBalance(INVENTORY_ITEM_ID)),
+      ).toMatchObject({ onHandMicros: 650_000, reservedMicros: 500_000 });
+
       const firstDone = await shopA.board.markDone(pos.value.order.id);
       expect(firstDone.ok).toBe(true);
       expect(
