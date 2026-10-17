@@ -7,31 +7,29 @@ const reviewedSha = 'f26b4eb040050226412668d84461dd4697d1069b';
 const rawBase = 'https://raw.githubusercontent.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/';
 
 describe('operations-sync deployment dependency provenance', () => {
-  it('pins the deployed materializer and its domain imports to the reviewed CAS-capable baseline', () => {
-    const importMap = JSON.parse(
-      readFileSync(
-        new URL('../../../supabase/functions/operations-sync/deno.json', import.meta.url),
-        'utf8',
-      ),
-    ) as { imports: Record<string, string> };
+  it('pins the deployed materializer and domain to the reviewed CAS-capable baseline', () => {
+    const mapUrl = new URL('../../../supabase/functions/operations-sync/deno.json', import.meta.url);
+    const rawJson = readFileSync(mapUrl, 'utf8');
+    const imports = (JSON.parse(rawJson) as { imports: Record<string, string> }).imports;
 
-    expect(importMap.imports['@tux/remote-materializer']).toBe(
+    expect(imports['@tux/remote-materializer']).toBe(
       `${rawBase}${reviewedSha}/packages/sync/src/remoteMaterializer.ts`,
     );
-    expect(importMap.imports['@tux/domain']).toBe(
+    expect(imports['@tux/domain']).toBe(
       `${rawBase}${reviewedSha}/packages/domain/src/index.ts`,
     );
 
-    for (const [specifier, target] of Object.entries(importMap.imports)) {
-      if (specifier.startsWith(rawBase) || target.startsWith(rawBase)) {
-        expect(specifier.includes(`/${reviewedSha}/`) || specifier === '@tux/domain' ||
-          specifier === '@tux/remote-materializer').toBe(true);
+    for (const [specifier, target] of Object.entries(imports)) {
+      if (specifier.startsWith(rawBase)) {
+        expect(specifier).toContain(`/${reviewedSha}/`);
+      }
+      if (target.startsWith(rawBase)) {
         expect(target).toContain(`/${reviewedSha}/`);
       }
     }
   });
 
-  it('requires the previous status and revision before committing an order lifecycle transition', () => {
+  it('requires the previous status and revision for order lifecycle changes', () => {
     const mutation: RemoteTableMutation = {
       table: 'orders',
       mode: 'UPDATE',
@@ -47,14 +45,12 @@ describe('operations-sync deployment dependency provenance', () => {
       },
     };
 
-    expect(shouldApplyRemoteMutation({ operational_revision: 0, status: 'ACTIVE' }, mutation)).toBe(
-      true,
-    );
-    expect(shouldApplyRemoteMutation({ operational_revision: 1, status: 'DONE' }, mutation)).toBe(
-      false,
-    );
-    expect(
-      shouldApplyRemoteMutation({ operational_revision: 0, status: 'CANCELLED' }, mutation),
-    ).toBe(false);
+    const valid = { operational_revision: 0, status: 'ACTIVE' };
+    const replayed = { operational_revision: 1, status: 'DONE' };
+    const wrongStatus = { operational_revision: 0, status: 'CANCELLED' };
+
+    expect(shouldApplyRemoteMutation(valid, mutation)).toBe(true);
+    expect(shouldApplyRemoteMutation(replayed, mutation)).toBe(false);
+    expect(shouldApplyRemoteMutation(wrongStatus, mutation)).toBe(false);
   });
 });
