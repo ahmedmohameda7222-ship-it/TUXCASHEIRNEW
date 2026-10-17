@@ -35,6 +35,13 @@ describe('operations-sync deployment dependency provenance', () => {
       expect(imports[`${specifier}.js`]).toBe(target);
     }
 
+    const domainIndex = readFileSync(new URL('../../domain/src/index.ts', import.meta.url), 'utf8');
+    const exportedModules = [...domainIndex.matchAll(/from '\\.\\/([A-Za-z]+)\\.js'/g)];
+    for (const match of exportedModules) {
+      const moduleName = match[1];
+      expect(imports[`${domainPrefix}${moduleName}.js`]).toBe(`${domainPrefix}${moduleName}.ts`);
+    }
+
     for (const [specifier, target] of Object.entries(imports)) {
       if (specifier.startsWith(rawBase)) {
         expect(specifier).toContain(`/${reviewedSha}/`);
