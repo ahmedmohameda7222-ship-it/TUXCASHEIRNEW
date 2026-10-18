@@ -55,12 +55,21 @@ export function isAdminPermission(value: string): value is AdminPermission {
   return (ADMIN_PERMISSIONS as readonly string[]).includes(value);
 }
 
+export type AdminShopIdentitySummary = {
+  id: string;
+  name: string;
+  active: boolean;
+  temporaryClosed: boolean;
+};
+
 export type AdminSessionPrincipal = {
   employeeId: string;
   businessId: string;
   role: AdminRole;
   permissions: AdminPermission[];
   shopIds: string[];
+  /** Display-only identities; shopIds remains the authorization authority. */
+  shopSummaries?: AdminShopIdentitySummary[];
 };
 
 export type ShopScope = { kind: 'shop'; shopId: string } | { kind: 'all-shops' };
