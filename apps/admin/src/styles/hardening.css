@@ -94,9 +94,16 @@
   font-weight: 650;
 }
 
+/* Native modal dialogs lose their UA auto margins under Tailwind Preflight.
+   Restore the dialog's own fixed, viewport-relative centering once for every
+   variant, rather than compensating from individual pages. */
 .admin-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
   width: min(calc(100% - 24px), 560px);
-  max-height: min(88vh, 760px);
+  max-width: calc(100% - 24px);
+  max-height: min(calc(100dvh - 24px), 760px);
   padding: 0;
   border: 0;
   border-radius: var(--tux-radius-lg);
@@ -111,6 +118,7 @@
 
 .admin-dialog__surface {
   display: grid;
+  min-width: 0;
   max-height: inherit;
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
@@ -139,6 +147,8 @@
 }
 
 .admin-dialog__body {
+  min-height: 0;
+  min-width: 0;
   overflow: auto;
 }
 
@@ -287,9 +297,11 @@
 @media (max-width: 47.99rem) {
   .admin-dialog--sheet {
     width: calc(100% - (2 * var(--tux-space-3)));
-    max-width: none;
-    max-height: calc(100dvh - var(--tux-space-6) - env(safe-area-inset-bottom));
-    margin: auto var(--tux-space-3) max(var(--tux-space-3), env(safe-area-inset-bottom));
+    max-width: calc(100% - (2 * var(--tux-space-3)));
+    max-height: calc(
+      100dvh - var(--tux-space-6) - env(safe-area-inset-top) -
+        env(safe-area-inset-bottom)
+    );
     border-radius: var(--tux-radius-lg);
   }
 }
@@ -327,7 +339,7 @@
 /* Wider multi-line purchasing workflow, with one contained scrolling surface. */
 .admin-dialog--wide {
   width: min(calc(100% - 32px), 960px);
-  max-height: min(92dvh, 920px);
+  max-height: min(calc(100dvh - 24px), 920px);
 }
 .admin-dialog__body {
   overscroll-behavior: contain;
@@ -335,6 +347,9 @@
 @media (max-width: 47.99rem) {
   .admin-dialog--sheet.admin-dialog--wide {
     width: calc(100% - (2 * var(--tux-space-3)));
-    max-height: calc(100dvh - var(--tux-space-6) - env(safe-area-inset-bottom));
+    max-height: calc(
+      100dvh - var(--tux-space-6) - env(safe-area-inset-top) -
+        env(safe-area-inset-bottom)
+    );
   }
 }
