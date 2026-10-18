@@ -239,3 +239,47 @@ test('stages audit filters until apply and discards an escaped draft', async ({ 
     .poll(() => requestedUrls.some((url) => url.includes('approvalStatus=APPROVED')))
     .toBe(true);
 });
+
+for (const viewport of [
+  { name: 'small-phone', width: 320, height: 720 },
+  { name: 'narrow-phone', width: 375, height: 844 },
+  { name: 'phone', width: 390, height: 844 },
+  { name: 'tablet', width: 768, height: 1024 },
+  { name: 'desktop-1280', width: 1280, height: 800 },
+  { name: 'desktop', width: 1440, height: 900 },
+]) {
+  test(`Audit filters dialog is centered and focus-safe at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await mockAdmin(page);
+    await page.goto('/audit');
+    const trigger = page.getByRole('button', { name: 'Filters', exact: true });
+    await trigger.click();
+    const dialog = page.getByRole('dialog', { name: 'Audit filters' });
+    await expect(dialog.getByLabel('Approval status')).toBeVisible();
+    const bounds = await dialog.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(Math.abs(bounds!.x + bounds!.width / 2 - viewport.width / 2)).toBeLessThan(4);
+    expect(bounds!.y).toBeGreaterThanOrEqual(8);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport.height - 8);
+    await page.screenshot({
+      path: `test-results/admin-stage1-audit-filters-${viewport.name}.png`,
+    });
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+}
+
+test('captures dark mode Audit filters with the shared modal surface', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockAdmin(page);
+  await page.goto('/audit');
+  await page.getByRole('button', { name: 'Filters', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Audit filters' })).toBeVisible();
+  await page.screenshot({
+    path: 'test-results/admin-stage1-audit-filters-dark-desktop.png',
+  });
+});
