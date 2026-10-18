@@ -197,7 +197,7 @@ export function SuppliersPage({
                 onChange={(event) => setContactName(event.currentTarget.value)}
               />
             </FormField>
-            <FormField id="supplier-phone" label="Phone">
+            <FormField id="supplier-phone" label="Phone" hint="Optional contact number">
               <input
                 id="supplier-phone"
                 type="tel"
