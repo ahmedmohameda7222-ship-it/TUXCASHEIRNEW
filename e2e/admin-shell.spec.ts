@@ -43,6 +43,11 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     await mockSession(page);
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await expect(page.locator('main#main-content')).toBeVisible();
+    const horizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    );
+    expect(horizontalOverflow).toBe(false);
     const mobile = page.locator('[data-admin-mobile-nav]');
     const desktop = page.locator('[data-admin-desktop-nav]');
     if (viewport.name === 'phone') {
@@ -69,5 +74,7 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
         expect(sidebarWidth).toBeGreaterThanOrEqual(200);
       }
     }
+    // CI artifact proves the actual rendered viewport at this exact PR head.
+    await page.screenshot({ path: `test-results/admin-stage1-shell-${viewport.name}.png`, fullPage: true });
   });
 }

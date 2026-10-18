@@ -51,10 +51,15 @@ export function ShopSwitcher() {
             : canReadNames && shopMetadata[index]?.isPending
               ? 'Loading shop name…'
               : `Shop · ${shopId.slice(0, 8)}`;
-          const status = shop && !shop.active ? ' · Inactive' : shop?.temporaryClosed ? ' · Temporarily closed' : '';
+          const status = shop && !shop.active
+            ? ' · Inactive'
+            : shop?.temporaryClosed
+              ? ' · Temporarily closed'
+              : '';
           return (
             <option key={shopId} value={shopId}>
-              {label}{status}
+              {label}
+              {status}
             </option>
           );
         })}
