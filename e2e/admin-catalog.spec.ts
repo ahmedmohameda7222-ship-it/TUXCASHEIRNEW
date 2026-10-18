@@ -279,7 +279,9 @@ test('switching shops requires explicit discard for a dirty product editor', asy
   await productName.fill('Unsaved operator edit');
 
   await shopSwitcher.selectOption(secondShopId);
-  const confirmation = page.getByRole('dialog', { name: 'Discard unsaved changes?' });
+  const confirmation = page.getByRole('dialog', {
+    name: 'Discard unsaved changes?',
+  });
   await expect(confirmation).toBeVisible();
   await expect(shopSwitcher).toHaveValue(shopId);
   await confirmation.getByRole('button', { name: 'Keep editing' }).click();
