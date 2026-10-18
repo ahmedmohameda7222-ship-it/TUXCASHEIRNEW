@@ -94,8 +94,14 @@ export function useShopScope() {
 // The guard is registered once; the ref keeps the latest dirty state without
 // re-registering on every keystroke.
 export function useUnsavedShopDraft(isDirty: boolean) {
-  const { registerUnsavedDraftGuard } = useShopScope();
+  // Editors also render standalone in isolated component tests. The guard is
+  // active only when the real authenticated shell provides shop context.
+  const context = useContext(ShopScopeContext);
+  const registerUnsavedDraftGuard = context?.registerUnsavedDraftGuard;
   const dirtyRef = useRef(isDirty);
   dirtyRef.current = isDirty;
-  useEffect(() => registerUnsavedDraftGuard(() => dirtyRef.current), [registerUnsavedDraftGuard]);
+  useEffect(() => {
+    if (!registerUnsavedDraftGuard) return;
+    return registerUnsavedDraftGuard(() => dirtyRef.current);
+  }, [registerUnsavedDraftGuard]);
 }
