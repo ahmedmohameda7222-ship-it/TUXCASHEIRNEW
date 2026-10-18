@@ -168,3 +168,38 @@ for (const viewport of [
     });
   });
 }
+
+for (const scheme of ['light', 'dark'] as const) {
+  test(`captures ${scheme} mode desktop and mobile shell with real labels`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await mockSession(page);
+    for (const viewport of [
+      { name: 'desktop', width: 1440, height: 900 },
+      { name: 'phone', width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.goto('/');
+      const shop = page.locator('.shop-switcher select');
+      await expect(shop.locator('option[value="shop-a"]')).toHaveText('TUX Maadi');
+      await expect(shop.locator('option[value="shop-b"]')).toContainText('TUX Zamalek');
+      await page.screenshot({
+        path: `test-results/admin-stage1-shell-${scheme}-${viewport.name}.png`,
+      });
+    }
+  });
+}
+
+test('200% page zoom keeps the Admin header and shop scope usable', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockSession(page);
+  await page.goto('/');
+  await page.evaluate(() => {
+    document.documentElement.style.zoom = '2';
+  });
+  await expect(page.locator('.shop-switcher select')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+  ).toBe(true);
+  await page.screenshot({ path: 'test-results/admin-stage1-zoom-200-percent-css.png' });
+});
