@@ -79,10 +79,17 @@ function requireMethod(
   return false;
 }
 
-async function loadRequestSession(request: AdminRequest, client: AdminSupabaseClient) {
+async function loadRequestSession(
+  request: AdminRequest,
+  client: AdminSupabaseClient,
+  includeShopSummaries = false,
+) {
   const token = readAdminSessionToken(firstHeader(request.headers.cookie));
   if (!token) throw new AdminAuthError('session_required', 401);
-  return { token, context: await loadAdminSession(token, client) };
+  return {
+    token,
+    context: await loadAdminSession(token, client, undefined, includeShopSummaries),
+  };
 }
 
 export async function handleAdminLogin(
@@ -122,7 +129,7 @@ export async function handleAdminSession(
   if (!requireMethod(request, response, 'GET')) return;
   try {
     const { client } = serverContext();
-    const { token, context } = await loadRequestSession(request, client);
+    const { token, context } = await loadRequestSession(request, client, true);
     const csrfToken = await restoreSessionCsrf(context, token, client);
     sendJson(response, 200, { principal: context.principal, csrfToken });
   } catch (error) {
