@@ -119,7 +119,12 @@ test('restricted multi-shop MANAGER sees only assigned identities', async ({ pag
           shopSummaries: [
             { id: 'shop-a', name: 'TUX Maadi', active: true, temporaryClosed: false },
             { id: 'shop-b', name: 'TUX Zamalek', active: false, temporaryClosed: false },
-            { id: 'shop-secret', name: 'Unauthorized Branch', active: true, temporaryClosed: false },
+            {
+              id: 'shop-secret',
+              name: 'Unauthorized Branch',
+              active: true,
+              temporaryClosed: false,
+            },
           ],
         },
       }),
@@ -134,9 +139,7 @@ test('restricted multi-shop MANAGER sees only assigned identities', async ({ pag
   const switcher = page.locator('.shop-switcher select');
   await expect(switcher.locator('option')).toHaveCount(2);
   await expect(switcher.locator('option[value="shop-a"]')).toHaveText('TUX Maadi');
-  await expect(switcher.locator('option[value="shop-b"]')).toHaveText(
-    'TUX Zamalek · Inactive',
-  );
+  await expect(switcher.locator('option[value="shop-b"]')).toHaveText('TUX Zamalek · Inactive');
   await expect(switcher).not.toContainText('Unauthorized Branch');
   expect(settingsReads).toEqual([]);
 });
@@ -198,8 +201,8 @@ test('200% page zoom keeps the Admin header and shop scope usable', async ({ pag
   });
   await expect(page.locator('.shop-switcher select')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
-  expect(
-    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-  ).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
   await page.screenshot({ path: 'test-results/admin-stage1-zoom-200-percent-css.png' });
 });

@@ -161,12 +161,14 @@ async function resolvePrincipal(
       shopSummaries = authorizedIds.flatMap((id) => {
         const row = validRows.get(id);
         return row
-          ? [{
-              id,
-              name: row.name,
-              active: row.active,
-              temporaryClosed: row.temporary_closed,
-            }]
+          ? [
+              {
+                id,
+                name: row.name,
+                active: row.active,
+                temporaryClosed: row.temporary_closed,
+              },
+            ]
           : [];
       });
     } catch {

@@ -299,8 +299,7 @@
     width: calc(100% - (2 * var(--tux-space-3)));
     max-width: calc(100% - (2 * var(--tux-space-3)));
     max-height: calc(
-      100dvh - var(--tux-space-6) - env(safe-area-inset-top) -
-        env(safe-area-inset-bottom)
+      100dvh - var(--tux-space-6) - env(safe-area-inset-top) - env(safe-area-inset-bottom)
     );
     border-radius: var(--tux-radius-lg);
   }
@@ -348,8 +347,7 @@
   .admin-dialog--sheet.admin-dialog--wide {
     width: calc(100% - (2 * var(--tux-space-3)));
     max-height: calc(
-      100dvh - var(--tux-space-6) - env(safe-area-inset-top) -
-        env(safe-area-inset-bottom)
+      100dvh - var(--tux-space-6) - env(safe-area-inset-top) - env(safe-area-inset-bottom)
     );
   }
 }

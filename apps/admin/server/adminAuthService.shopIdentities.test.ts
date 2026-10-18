@@ -11,17 +11,29 @@ function sessionClient(role: 'OWNER' | 'MANAGER', failNames = false) {
     async select(table: string, query: URLSearchParams) {
       calls.push({ table, query: query.toString() });
       if (table === 'admin_sessions') {
-        return [{
-          id: 'session-1', business_id: 'biz-1', employee_id: 'emp-1',
-          csrf_token_hash: 'b'.repeat(64), expires_at: '2099-01-01T00:00:00.000Z',
-          revoked_at: null, reauthenticated_at: null,
-        }];
+        return [
+          {
+            id: 'session-1',
+            business_id: 'biz-1',
+            employee_id: 'emp-1',
+            csrf_token_hash: 'b'.repeat(64),
+            expires_at: '2099-01-01T00:00:00.000Z',
+            revoked_at: null,
+            reauthenticated_at: null,
+          },
+        ];
       }
       if (table === 'business_employees') {
-        return [{
-          id: 'emp-1', business_id: 'biz-1', display_name: 'Manager',
-          role, pin_hash: 'hash', active: true,
-        }];
+        return [
+          {
+            id: 'emp-1',
+            business_id: 'biz-1',
+            display_name: 'Manager',
+            role,
+            pin_hash: 'hash',
+            active: true,
+          },
+        ];
       }
       if (table === 'business_shops') {
         return [{ shop_id: 'shop-a' }, { shop_id: 'shop-b' }];
@@ -65,9 +77,7 @@ describe('authorized shop identity projection', () => {
       );
       expect(calls.filter((call) => call.table === 'shops')).toHaveLength(1);
       expect(calls.find((call) => call.table === 'shops')?.query).toContain(
-        role === 'OWNER'
-          ? 'id=in.%28shop-a%2Cshop-b%29'
-          : 'id=in.%28shop-b%2Cshop-a%29',
+        role === 'OWNER' ? 'id=in.%28shop-a%2Cshop-b%29' : 'id=in.%28shop-b%2Cshop-a%29',
       );
       if (role === 'MANAGER') {
         expect(result.principal.permissions).not.toContain('settings.manage');

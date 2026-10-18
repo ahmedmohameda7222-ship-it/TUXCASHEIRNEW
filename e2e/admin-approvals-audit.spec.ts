@@ -248,9 +248,7 @@ for (const viewport of [
   { name: 'desktop-1280', width: 1280, height: 800 },
   { name: 'desktop', width: 1440, height: 900 },
 ]) {
-  test(`Audit filters dialog is centered and focus-safe at ${viewport.name}`, async ({
-    page,
-  }) => {
+  test(`Audit filters dialog is centered and focus-safe at ${viewport.name}`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await mockAdmin(page);
     await page.goto('/audit');

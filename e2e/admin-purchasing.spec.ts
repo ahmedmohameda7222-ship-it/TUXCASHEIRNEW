@@ -514,13 +514,15 @@ for (const viewport of [
     await expect(supplier.getByLabel('Supplier name')).toBeVisible();
     const supplierBounds = await supplier.boundingBox();
     expect(supplierBounds).not.toBeNull();
-    expect(Math.abs(supplierBounds!.x + supplierBounds!.width / 2 - viewport.width / 2))
-      .toBeLessThan(4);
+    expect(
+      Math.abs(supplierBounds!.x + supplierBounds!.width / 2 - viewport.width / 2),
+    ).toBeLessThan(4);
     expect(supplierBounds!.y).toBeGreaterThanOrEqual(8);
     expect(supplierBounds!.y + supplierBounds!.height).toBeLessThanOrEqual(viewport.height - 8);
     if (supplierBounds!.height < viewport.height * 0.8) {
-      expect(Math.abs(supplierBounds!.y + supplierBounds!.height / 2 - viewport.height / 2))
-        .toBeLessThan(8);
+      expect(
+        Math.abs(supplierBounds!.y + supplierBounds!.height / 2 - viewport.height / 2),
+      ).toBeLessThan(8);
     }
     await page.screenshot({
       path: `test-results/admin-stage1-supplier-${viewport.name}.png`,
