@@ -96,3 +96,43 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* The editable filter draft remains inside a scrollable sheet until Apply. */
+.admin-audit-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--tux-space-3);
+  margin-bottom: var(--tux-space-3);
+}
+.admin-audit-toolbar > .admin-field {
+  min-width: min(100%, 220px);
+}
+.admin-audit-applied-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tux-space-2);
+  margin-bottom: var(--tux-space-4);
+}
+.admin-audit-filter-chip {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 999px;
+  padding: 6px 11px;
+  background: var(--tux-surface-subtle);
+  color: var(--tux-text-secondary);
+  font-size: var(--tux-font-size-xs);
+}
+.admin-audit-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tux-space-2);
+}
+@media (max-width: 479px) {
+  .admin-audit-toolbar > .admin-field,
+  .admin-audit-filter-actions > button {
+    width: 100%;
+  }
+}

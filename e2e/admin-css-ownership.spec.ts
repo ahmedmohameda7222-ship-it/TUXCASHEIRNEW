@@ -35,7 +35,12 @@ async function mockAuth(page: Page) {
       body: JSON.stringify({
         rules: [],
         availableActions: [
-          { actionType: 'ORDER_RETURN', label: 'Order return', requesterPermission: 'orders.refund', thresholdKind: 'minimumQuantityImpact' },
+          {
+            actionType: 'ORDER_RETURN',
+            label: 'Order return',
+            requesterPermission: 'orders.refund',
+            thresholdKind: 'minimumQuantityImpact',
+          },
         ],
       }),
     }),

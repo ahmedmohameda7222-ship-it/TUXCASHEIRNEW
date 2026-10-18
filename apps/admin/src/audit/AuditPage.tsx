@@ -26,6 +26,15 @@ type AuditResponse = {
   nextCursor?: string | null;
 };
 
+type AdvancedAuditFilters = {
+  fromDate: string;
+  toDate: string;
+  shopId: string;
+  actorEmployeeId: string;
+  entityType: string;
+  approvalStatus: AdminApprovalStatus | '';
+};
+
 const APPROVAL_STATUSES: readonly AdminApprovalStatus[] = [
   'PENDING',
   'APPROVED',
@@ -121,6 +130,33 @@ export function AuditPage() {
   const [actionType, setActionType] = useState('');
   const [entityType, setEntityType] = useState('');
   const [approvalStatus, setApprovalStatus] = useState<AdminApprovalStatus | ''>('');
+  const [draftFilters, setDraftFilters] = useState<AdvancedAuditFilters>({
+    fromDate: '',
+    toDate: '',
+    shopId: '',
+    actorEmployeeId: '',
+    entityType: '',
+    approvalStatus: '',
+  });
+
+  const currentFilters = (): AdvancedAuditFilters => ({
+    fromDate,
+    toDate,
+    shopId,
+    actorEmployeeId,
+    entityType,
+    approvalStatus,
+  });
+
+  function applyAdvancedFilters() {
+    setFromDate(draftFilters.fromDate);
+    setToDate(draftFilters.toDate);
+    setShopId(draftFilters.shopId);
+    setActorEmployeeId(draftFilters.actorEmployeeId);
+    setEntityType(draftFilters.entityType);
+    setApprovalStatus(draftFilters.approvalStatus);
+    setFiltersOpen(false);
+  }
 
   const auditQuery = useInfiniteQuery({
     queryKey: [
@@ -202,8 +238,11 @@ export function AuditPage() {
         <input
           aria-label="From date"
           type="date"
-          value={fromDate}
-          onChange={(event) => setFromDate(event.currentTarget.value)}
+          value={draftFilters.fromDate}
+          onChange={(event) => {
+            const value = event.currentTarget.value;
+            setDraftFilters((current) => ({ ...current, fromDate: value }));
+          }}
         />
       </label>
       <label className="admin-field">
@@ -211,16 +250,22 @@ export function AuditPage() {
         <input
           aria-label="To date"
           type="date"
-          value={toDate}
-          onChange={(event) => setToDate(event.currentTarget.value)}
+          value={draftFilters.toDate}
+          onChange={(event) => {
+            const value = event.currentTarget.value;
+            setDraftFilters((current) => ({ ...current, toDate: value }));
+          }}
         />
       </label>
       <label className="admin-field">
         <span>Shop</span>
         <select
           aria-label="Shop"
-          value={shopId}
-          onChange={(event) => setShopId(event.currentTarget.value)}
+          value={draftFilters.shopId}
+          onChange={(event) => {
+            const value = event.currentTarget.value;
+            setDraftFilters((current) => ({ ...current, shopId: value }));
+          }}
         >
           <option value="">All authorized shops</option>
           {principal.shopIds.map((authorizedShopId, index) => (
@@ -234,8 +279,11 @@ export function AuditPage() {
         <span>Staff member</span>
         <select
           aria-label="Staff member"
-          value={actorEmployeeId}
-          onChange={(event) => setActorEmployeeId(event.currentTarget.value)}
+          value={draftFilters.actorEmployeeId}
+          onChange={(event) => {
+            const value = event.currentTarget.value;
+            setDraftFilters((current) => ({ ...current, actorEmployeeId: value }));
+          }}
         >
           <option value="">All human actors</option>
           {actorOptions.map((actor) => (
@@ -249,8 +297,11 @@ export function AuditPage() {
         <span>Activity type</span>
         <select
           aria-label="Activity type"
-          value={entityType}
-          onChange={(event) => setEntityType(event.currentTarget.value)}
+          value={draftFilters.entityType}
+          onChange={(event) => {
+            const value = event.currentTarget.value;
+            setDraftFilters((current) => ({ ...current, entityType: value }));
+          }}
         >
           <option value="">All activity types</option>
           {entityOptions.map((value) => (
@@ -264,10 +315,11 @@ export function AuditPage() {
         <span>Approval status</span>
         <select
           aria-label="Approval status"
-          value={approvalStatus}
-          onChange={(event) =>
-            setApprovalStatus(event.currentTarget.value as AdminApprovalStatus | '')
-          }
+          value={draftFilters.approvalStatus}
+          onChange={(event) => {
+            const value = event.currentTarget.value as AdminApprovalStatus | '';
+            setDraftFilters((current) => ({ ...current, approvalStatus: value }));
+          }}
         >
           <option value="">All approval statuses</option>
           {APPROVAL_STATUSES.map((status) => (
@@ -286,7 +338,7 @@ export function AuditPage() {
       title="Audit log"
       description="Business activity history with actor, shop, entity, reason and approval context."
     >
-      <div className="admin-inventory-page-actions">
+      <div className="admin-audit-toolbar">
         <label className="admin-field">
           <span>Action</span>
           <select
@@ -305,7 +357,10 @@ export function AuditPage() {
         <button
           className="admin-secondary-button"
           type="button"
-          onClick={() => setFiltersOpen(true)}
+          onClick={() => {
+            setDraftFilters(currentFilters());
+            setFiltersOpen(true);
+          }}
         >
           Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
         </button>
@@ -315,6 +370,25 @@ export function AuditPage() {
           </span>
         ) : null}
       </div>
+
+      {activeFilterCount > 0 ? (
+        <div className="admin-audit-applied-filters" aria-label="Applied audit filters">
+          {[
+            ['From', fromDate],
+            ['To', toDate],
+            ['Shop', shopId ? shopNames.get(shopId) ?? shopId : ''],
+            ['Actor', actorEmployeeId],
+            ['Activity', entityType ? auditLabel(entityType) : ''],
+            ['Approval', approvalStatus ? auditLabel(approvalStatus) : ''],
+          ].map(([label, value]) =>
+            value ? (
+              <span className="admin-audit-filter-chip" key={label}>
+                {label}: {value}
+              </span>
+            ) : null,
+          )}
+        </div>
+      ) : null}
 
       <ResponsiveMasterDetail
         listLabel="Audit events"
@@ -402,20 +476,25 @@ export function AuditPage() {
         variant="sheet"
         title="Audit filters"
         description="Narrow history without reducing the available audit filter capabilities."
-        onOpenChange={setFiltersOpen}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setDraftFilters(currentFilters());
+          setFiltersOpen(nextOpen);
+        }}
       >
         {filters}
-        <div className="admin-inventory-page-actions">
+        <div className="admin-audit-filter-actions">
           <button
             className="admin-secondary-button"
             type="button"
             onClick={() => {
-              setFromDate('');
-              setToDate('');
-              setShopId('');
-              setActorEmployeeId('');
-              setEntityType('');
-              setApprovalStatus('');
+              setDraftFilters({
+                fromDate: '',
+                toDate: '',
+                shopId: '',
+                actorEmployeeId: '',
+                entityType: '',
+                approvalStatus: '',
+              });
             }}
           >
             Clear advanced filters
@@ -423,7 +502,7 @@ export function AuditPage() {
           <button
             className="admin-primary-button"
             type="button"
-            onClick={() => setFiltersOpen(false)}
+            onClick={applyAdvancedFilters}
           >
             Show results
           </button>
