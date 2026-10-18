@@ -64,9 +64,7 @@ function DesktopSidebarView({ principal, currentPath }: Required<DesktopSidebarP
       </div>
       <nav className="admin-sidebar__nav" aria-label="Admin sections">
         {ADMIN_NAV_GROUPS.map((group) => {
-          const entries = routes.filter((route) =>
-            group.paths.some((path) => path === route.path),
-          );
+          const entries = routes.filter((route) => group.paths.some((path) => path === route.path));
           if (entries.length === 0) return null;
           return (
             <div className="admin-sidebar__group" key={group.label}>

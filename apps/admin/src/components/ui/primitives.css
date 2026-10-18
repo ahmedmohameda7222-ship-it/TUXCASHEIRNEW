@@ -22,7 +22,8 @@
   display: grid;
   gap: 6px;
 }
-.admin-field > span {
+.admin-field > span,
+.admin-field > label {
   color: var(--tux-text-secondary);
   font-size: 12px;
   font-weight: 700;

@@ -23,7 +23,9 @@ for (const [owner, regex] of [
 for (const [foreign, forbidden] of [
   ['approvals/ApprovalRulesPage.tsx', /admin-(?:settings-row|catalog-editor__section)\b/],
   ['settings/SettingsPage.tsx', /admin-catalog-editor__section\b/],
-  ['staff/StaffPage.tsx', /admin-inventory-list\b/],
+  ['staff/StaffPage.tsx', /admin-inventory-(?:list|row|page-actions)\b/],
+  ['purchasing/SuppliersPage.tsx', /admin-(?:catalog-editor__|inventory-)/],
+  ['purchasing/PurchaseOrdersPage.tsx', /admin-(?:catalog-editor__|inventory-)/],
 ]) {
   assert.doesNotMatch(read(foreign), forbidden, foreign + ' depends on an unrelated lazy stylesheet');
 }

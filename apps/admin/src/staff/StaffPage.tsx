@@ -159,8 +159,8 @@ export function StaffPage() {
               <button
                 className={
                   employee.id === selectedId
-                    ? 'admin-inventory-row is-selected'
-                    : 'admin-inventory-row'
+                    ? 'admin-record-row admin-record-row--button is-selected'
+                    : 'admin-record-row admin-record-row--button'
                 }
                 aria-current={employee.id === selectedId ? 'true' : undefined}
                 key={employee.id}
@@ -261,7 +261,7 @@ export function StaffPage() {
                 onChange={(event) => setNewEmployeePhone(event.target.value)}
               />
             </label>
-            <div className="admin-inventory-page-actions">
+            <div className="admin-inline-actions">
               <button
                 className="admin-secondary-button"
                 type="button"

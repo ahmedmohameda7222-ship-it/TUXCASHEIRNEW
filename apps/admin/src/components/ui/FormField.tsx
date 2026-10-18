@@ -22,8 +22,16 @@ export function FormField({
         {required ? <span aria-hidden="true"> *</span> : null}
       </label>
       {children}
-      {hint ? <p id={`${id}-hint`} className="admin-form-field__hint">{hint}</p> : null}
-      {error ? <p id={`${id}-error`} className="admin-form-field__error" role="alert">{error}</p> : null}
+      {hint ? (
+        <p id={`${id}-hint`} className="admin-form-field__hint">
+          {hint}
+        </p>
+      ) : null}
+      {error ? (
+        <p id={`${id}-error`} className="admin-form-field__error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
