@@ -6,6 +6,7 @@ const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const supplierId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const inactiveSupplierId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbc';
 const itemId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const secondItemId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccd';
 const poId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const lineId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const csrfToken = 'p'.repeat(64);
@@ -78,6 +79,12 @@ async function mockPurchasing(
             {
               id: itemId,
               name: 'Beef',
+              unitLabel: 'kg',
+              purchaseUnits: [{ label: 'case', baseMicrosPerPurchaseUnit }],
+            },
+            {
+              id: secondItemId,
+              name: 'Chicken',
               unitLabel: 'kg',
               purchaseUnits: [{ label: 'case', baseMicrosPerPurchaseUnit }],
             },
@@ -555,6 +562,7 @@ for (const width of [320, 390]) {
     await expect(dialog.getByLabel('Expected delivery')).toBeVisible();
     await dialog.getByRole('button', { name: 'Add line' }).click();
     await expect(dialog.locator('fieldset')).toHaveCount(2);
+    await dialog.locator('fieldset').nth(1).getByLabel('Inventory item').selectOption(secondItemId);
     for (const fieldset of await dialog.locator('fieldset').all()) {
       await fieldset.getByLabel('Quantity (purchase units)').fill('2');
       await fieldset.getByLabel('Expected cost per purchase unit (EGP)').fill('240');
@@ -575,8 +583,11 @@ for (const width of [320, 390]) {
     expect(fixture.commands[0]).toMatchObject({
       type: 'po.create',
       lines: [
-        expect.objectContaining({ orderedPurchaseUnitsMicros: 2_000_000 }),
-        expect.objectContaining({ orderedPurchaseUnitsMicros: 2_000_000 }),
+        expect.objectContaining({ inventoryItemId: itemId, orderedPurchaseUnitsMicros: 2_000_000 }),
+        expect.objectContaining({
+          inventoryItemId: secondItemId,
+          orderedPurchaseUnitsMicros: 2_000_000,
+        }),
       ],
     });
   });
