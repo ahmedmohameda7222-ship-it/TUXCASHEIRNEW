@@ -23,6 +23,10 @@ const ownerSession = {
       'audit.view',
     ],
     shopIds: ['shop-a', 'shop-b'],
+    shopSummaries: [
+      { id: 'shop-a', name: 'TUX Maadi', active: true, temporaryClosed: false },
+      { id: 'shop-b', name: 'TUX Zamalek', active: true, temporaryClosed: true },
+    ],
   },
   csrfToken: 'a'.repeat(64),
 };
@@ -82,25 +86,12 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
   });
 }
 
-test('uses actual authorized shop names while keeping UUID scope values', async ({ page }) => {
+test('OWNER sees authorized real shop names without Settings reads', async ({ page }) => {
   await mockSession(page);
-  const requestedShopIds: string[] = [];
-  await page.route('**/api/admin/settings?*', async (route) => {
-    const shopId = new URL(route.request().url()).searchParams.get('shopId');
-    expect(['shop-a', 'shop-b']).toContain(shopId);
-    requestedShopIds.push(shopId!);
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        shop: {
-          id: shopId,
-          name: shopId === 'shop-a' ? 'TUX Maadi' : 'TUX Zamalek',
-          active: true,
-          temporaryClosed: shopId === 'shop-b',
-        },
-      }),
-    });
+  const settingsReads: string[] = [];
+  await page.route('**/api/admin/settings?*', (route) => {
+    settingsReads.push(route.request().url());
+    return route.fulfill({ status: 403, body: '{}' });
   });
   await page.goto('/');
   const switcher = page.locator('.shop-switcher select');
@@ -108,12 +99,12 @@ test('uses actual authorized shop names while keeping UUID scope values', async 
   await expect(switcher.locator('option[value="shop-b"]')).toHaveText(
     'TUX Zamalek · Temporarily closed',
   );
-  expect(requestedShopIds.sort()).toEqual(['shop-a', 'shop-b']);
+  expect(settingsReads).toEqual([]);
   await switcher.selectOption('shop-b');
   await expect(switcher).toHaveValue('shop-b');
 });
 
-test('does not request shop metadata without settings read permission', async ({ page }) => {
+test('restricted multi-shop MANAGER sees only assigned identities', async ({ page }) => {
   await page.route('**/api/admin/session', (route) =>
     route.fulfill({
       status: 200,
@@ -124,21 +115,31 @@ test('does not request shop metadata without settings read permission', async ({
           ...ownerSession.principal,
           role: 'MANAGER',
           permissions: ['orders.view'],
+          shopIds: ['shop-b', 'shop-a'],
+          shopSummaries: [
+            { id: 'shop-a', name: 'TUX Maadi', active: true, temporaryClosed: false },
+            { id: 'shop-b', name: 'TUX Zamalek', active: false, temporaryClosed: false },
+            { id: 'shop-secret', name: 'Unauthorized Branch', active: true, temporaryClosed: false },
+          ],
         },
       }),
     }),
   );
-  const unauthorizedReads: string[] = [];
+  const settingsReads: string[] = [];
   await page.route('**/api/admin/settings?*', (route) => {
-    unauthorizedReads.push(route.request().url());
+    settingsReads.push(route.request().url());
     return route.fulfill({ status: 403, body: '{}' });
   });
   await page.goto('/');
-  await expect(page.locator('.shop-switcher select')).toBeVisible();
-  await expect(page.locator('.shop-switcher option')).toHaveCount(2);
-  expect(unauthorizedReads).toEqual([]);
+  const switcher = page.locator('.shop-switcher select');
+  await expect(switcher.locator('option')).toHaveCount(2);
+  await expect(switcher.locator('option[value="shop-a"]')).toHaveText('TUX Maadi');
+  await expect(switcher.locator('option[value="shop-b"]')).toHaveText(
+    'TUX Zamalek · Inactive',
+  );
+  await expect(switcher).not.toContainText('Unauthorized Branch');
+  expect(settingsReads).toEqual([]);
 });
-
 for (const viewport of [
   { name: 'small-phone', width: 320, height: 720 },
   { name: 'narrow-phone', width: 375, height: 844 },
