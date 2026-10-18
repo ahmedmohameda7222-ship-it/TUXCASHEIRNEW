@@ -1,4 +1,10 @@
-export function BrandLogo({ size = 36, decorative = true }: { size?: number; decorative?: boolean }) {
+export function BrandLogo({
+  size = 36,
+  decorative = true,
+}: {
+  size?: number;
+  decorative?: boolean;
+}) {
   return (
     <img
       className="admin-brand-logo"

@@ -143,10 +143,7 @@ function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
           {workspace.shop.timezone}
         </p>
       </section>
-      <section
-        className="admin-form-section"
-        aria-labelledby="settings-operations-summary"
-      >
+      <section className="admin-form-section" aria-labelledby="settings-operations-summary">
         <p className="admin-catalog-editor__eyebrow">Operations</p>
         <h2 id="settings-operations-summary">Order setup</h2>
         <p className="admin-field__help">
