@@ -50,19 +50,24 @@ describe('authorized shop identity projection', () => {
     it(`returns names for the ${role} scope without granting Settings rights`, async () => {
       const { client, calls } = sessionClient(role);
       const result = await loadAdminSession(token, client);
-      expect(result.principal.shopSummaries).toEqual([
+      const expectedShops = [
         { id: 'shop-a', name: 'TUX Maadi', active: true, temporaryClosed: false },
         { id: 'shop-b', name: 'TUX Zamalek', active: false, temporaryClosed: true },
-      ]);
+      ];
+      expect(result.principal.shopSummaries).toEqual(
+        role === 'OWNER' ? expectedShops : [...expectedShops].reverse(),
+      );
       expect(result.principal.shopSummaries).not.toContainEqual(
         expect.objectContaining({ name: 'Secret Shop' }),
       );
-      expect(result.principal.shopIds).toEqual(['shop-a', 'shop-b'].sort((a, b) =>
-        result.principal.shopIds.indexOf(a) - result.principal.shopIds.indexOf(b),
-      ));
+      expect(result.principal.shopIds).toEqual(
+        role === 'OWNER' ? ['shop-a', 'shop-b'] : ['shop-b', 'shop-a'],
+      );
       expect(calls.filter((call) => call.table === 'shops')).toHaveLength(1);
       expect(calls.find((call) => call.table === 'shops')?.query).toContain(
-        'id=in.%28shop-a%2Cshop-b%29',
+        role === 'OWNER'
+          ? 'id=in.%28shop-a%2Cshop-b%29'
+          : 'id=in.%28shop-b%2Cshop-a%29',
       );
       if (role === 'MANAGER') {
         expect(result.principal.permissions).not.toContain('settings.manage');
