@@ -8,6 +8,20 @@ function scopeValue(scope: ShopScope): string {
   return scope.kind === 'all-shops' ? '__all__' : scope.shopId;
 }
 
+function shopOptionLabel(
+  shop: AdminSettingsWorkspace['shop'] | undefined,
+  shopId: string,
+  loading: boolean,
+): string {
+  if (shop?.name) {
+    if (!shop.active) return `${shop.name} · Inactive`;
+    if (shop.temporaryClosed) return `${shop.name} · Temporarily closed`;
+    return shop.name;
+  }
+  if (loading) return 'Loading shop name…';
+  return `Shop · ${shopId.slice(0, 8)}`;
+}
+
 export function ShopSwitcher() {
   const { principal, scope, setScope } = useShopScope();
 
@@ -46,20 +60,14 @@ export function ShopSwitcher() {
         {principal.role === 'OWNER' ? <option value="__all__">All Shops</option> : null}
         {principal.shopIds.map((shopId, index) => {
           const shop = shopMetadata[index]?.data;
-          const label = shop?.name
-            ? shop.name
-            : canReadNames && shopMetadata[index]?.isPending
-              ? 'Loading shop name…'
-              : `Shop · ${shopId.slice(0, 8)}`;
-          const status = shop && !shop.active
-            ? ' · Inactive'
-            : shop?.temporaryClosed
-              ? ' · Temporarily closed'
-              : '';
+          const label = shopOptionLabel(
+            shop,
+            shopId,
+            canReadNames && Boolean(shopMetadata[index]?.isPending),
+          );
           return (
             <option key={shopId} value={shopId}>
               {label}
-              {status}
             </option>
           );
         })}

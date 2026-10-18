@@ -229,6 +229,14 @@ export function AuditPage() {
     entityType,
     approvalStatus,
   ].filter(Boolean).length;
+  const activeFilterChips = [
+    { label: 'From', value: fromDate },
+    { label: 'To', value: toDate },
+    { label: 'Shop', value: shopId ? shopNames.get(shopId) ?? shopId : '' },
+    { label: 'Actor', value: actorEmployeeId },
+    { label: 'Activity', value: entityType ? auditLabel(entityType) : '' },
+    { label: 'Approval', value: approvalStatus ? auditLabel(approvalStatus) : '' },
+  ].filter((chip) => Boolean(chip.value));
   const selected = detailQuery.data ?? null;
 
   const filters = (
@@ -373,20 +381,11 @@ export function AuditPage() {
 
       {activeFilterCount > 0 ? (
         <div className="admin-audit-applied-filters" aria-label="Applied audit filters">
-          {[
-            ['From', fromDate],
-            ['To', toDate],
-            ['Shop', shopId ? shopNames.get(shopId) ?? shopId : ''],
-            ['Actor', actorEmployeeId],
-            ['Activity', entityType ? auditLabel(entityType) : ''],
-            ['Approval', approvalStatus ? auditLabel(approvalStatus) : ''],
-          ].map(([label, value]) =>
-            value ? (
-              <span className="admin-audit-filter-chip" key={label}>
-                {label}: {value}
-              </span>
-            ) : null,
-          )}
+          {activeFilterChips.map((chip) => (
+            <span className="admin-audit-filter-chip" key={chip.label}>
+              {chip.label}: {chip.value}
+            </span>
+          ))}
         </div>
       ) : null}
 

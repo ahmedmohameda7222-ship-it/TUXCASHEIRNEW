@@ -229,7 +229,10 @@ test('stages audit filters until apply and discards an escaped draft', async ({ 
   await page.getByRole('button', { name: 'Filters', exact: true }).click();
   await expect(page.getByLabel('Approval status')).toHaveValue('');
   await page.getByLabel('Approval status').selectOption('APPROVED');
-  await page.screenshot({ path: 'test-results/admin-stage1-audit-filters-phone.png', fullPage: true });
+  await page.screenshot({
+    path: 'test-results/admin-stage1-audit-filters-phone.png',
+    fullPage: true,
+  });
   await page.getByRole('button', { name: 'Show results' }).click();
   await expect(page.getByLabel('Applied audit filters')).toContainText('Approval: Approved');
   await expect

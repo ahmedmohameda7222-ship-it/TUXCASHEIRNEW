@@ -75,6 +75,9 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
       }
     }
     // CI artifact proves the actual rendered viewport at this exact PR head.
-    await page.screenshot({ path: `test-results/admin-stage1-shell-${viewport.name}.png`, fullPage: true });
+    await page.screenshot({
+      path: `test-results/admin-stage1-shell-${viewport.name}.png`,
+      fullPage: true,
+    });
   });
 }
