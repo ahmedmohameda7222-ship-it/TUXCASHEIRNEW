@@ -250,7 +250,7 @@ export function CatalogPage() {
               : 'Multiple compatible drafts exist. Select one explicitly so no saved work is silently replaced.'}
           </span>
           {catalog.compatibleDrafts.length > 1 ? (
-            <div className="admin-settings-row__main">
+            <div className="admin-record-row__main">
               {catalog.compatibleDrafts.map((draft) => (
                 <button
                   key={draft.id}

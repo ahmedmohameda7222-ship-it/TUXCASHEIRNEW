@@ -131,7 +131,7 @@ export function StaffPage() {
         detailActive={selectedId !== null}
         backHref="/staff"
         list={
-          <div className="admin-inventory-list">
+          <div className="admin-record-list">
             {staff.workspaceQuery.isLoading ? <LoadingState title="Loading staff" /> : null}
             {staff.workspaceQuery.isError ? (
               <ErrorState

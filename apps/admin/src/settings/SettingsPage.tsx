@@ -135,7 +135,7 @@ function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
   const firstActiveReason = workspace.reasonCodes.find((reason) => reason.active);
   return (
     <div className="admin-settings-overview">
-      <section className="admin-catalog-editor__section" aria-labelledby="settings-shop-summary">
+      <section className="admin-form-section" aria-labelledby="settings-shop-summary">
         <p className="admin-catalog-editor__eyebrow">Shop</p>
         <h2 id="settings-shop-summary">Shop identity</h2>
         <p className="admin-field__help">
@@ -144,7 +144,7 @@ function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
         </p>
       </section>
       <section
-        className="admin-catalog-editor__section"
+        className="admin-form-section"
         aria-labelledby="settings-operations-summary"
       >
         <p className="admin-catalog-editor__eyebrow">Operations</p>
@@ -154,7 +154,7 @@ function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
           methods · {workspace.deliveryZones.length} delivery zones
         </p>
       </section>
-      <section className="admin-catalog-editor__section" aria-labelledby="settings-live-summary">
+      <section className="admin-form-section" aria-labelledby="settings-live-summary">
         <p className="admin-catalog-editor__eyebrow">Live controls</p>
         <h2 id="settings-live-summary">Receipt and reason settings</h2>
         <p className="admin-field__help">

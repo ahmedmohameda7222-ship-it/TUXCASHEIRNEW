@@ -1,3 +1,4 @@
+import './finance.css';
 import { Link } from 'wouter';
 import { useState } from 'react';
 

@@ -6,6 +6,8 @@ import { Toaster } from 'sonner';
 import App from './app/App';
 import { queryClient } from './app/queryClient';
 import './styles/index.css';
+// Shared controls load at boot, independent of lazy feature entrypoints.
+import './components/ui/primitives.css';
 import './styles/hardening.css';
 
 const root = document.getElementById('root');
