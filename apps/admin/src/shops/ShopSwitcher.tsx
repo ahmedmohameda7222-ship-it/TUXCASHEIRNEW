@@ -9,7 +9,7 @@ function scopeValue(scope: ShopScope): string {
 }
 
 function shopOptionLabel(shop: AdminShopIdentitySummary | undefined): string {
-  if (!shop) return 'Shop name unavailable';
+  if (!shop) return 'Shop unavailable';
   if (!shop.active) return `${shop.name} · Inactive`;
   if (shop.temporaryClosed) return `${shop.name} · Temporarily closed`;
   return shop.name;
