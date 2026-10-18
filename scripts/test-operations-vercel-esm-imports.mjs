@@ -5,7 +5,10 @@ import { pathToFileURL } from 'node:url';
 const ROOT = process.cwd();
 const OPERATIONS_API_DIR = path.join(ROOT, 'apps', 'operations', 'api');
 const PACKAGES_DIR = path.join(ROOT, 'packages');
-// Native workspace source is allowed only through explicit relative .ts imports; bare source-only package runtime imports stay forbidden.
+// Workspace runtime values must enter the Vercel graph through explicit traceable source paths.
+// The deployed adapter uses .js specifiers so Vercel compiles the TypeScript source instead of
+// leaving raw .ts paths in the Lambda. CI rewrites only the temporary executable smoke back to
+// .ts so Node 24 can execute the same source graph before deployment.
 const packageTypeCache = new Map();
 
 function collectTsFiles(directory) {
@@ -186,18 +189,35 @@ if (relativeViolations.length > 0 || workspaceRuntimeViolations.length > 0) {
   );
 }
 
-const runtimeAdapterSource = fs.readFileSync(
-  path.join(ROOT, 'server', 'workspaceRuntime.ts'),
-  'utf8',
+const runtimeAdapterPath = path.join(ROOT, 'server', 'workspaceRuntime.ts');
+const runtimeAdapterSource = fs.readFileSync(runtimeAdapterPath, 'utf8');
+const rawTsSpecifiers = moduleReferences(runtimeAdapterSource)
+  .filter(({ specifier, typeOnly }) => !typeOnly && specifier.startsWith('.') && specifier.endsWith('.ts'))
+  .map(({ specifier }) => specifier);
+if (rawTsSpecifiers.length > 0) {
+  throw new Error(
+    `server/workspaceRuntime.ts must use compiled .js specifiers for Vercel packaging; raw .ts runtime specifiers are not guaranteed to be present in the Lambda:\n${rawTsSpecifiers
+      .sort()
+      .map((specifier) => `- ${specifier}`)
+      .join('\n')}`,
+  );
+}
+
+const executableAdapterSource = runtimeAdapterSource.replace(
+  /(['\"])(\.\.?\/[^'\"]+)\.js\1/g,
+  (match, quote, sourceWithoutExtension) => {
+    const tsSource = path.resolve(path.dirname(runtimeAdapterPath), `${sourceWithoutExtension}.ts`);
+    return fs.existsSync(tsSource) ? `${quote}${sourceWithoutExtension}.ts${quote}` : match;
+  },
 );
 const runtimeSmoke = path.join(ROOT, 'server', `.workspaceRuntime-smoke-${process.pid}.mjs`);
 try {
-  fs.writeFileSync(runtimeSmoke, runtimeAdapterSource);
+  fs.writeFileSync(runtimeSmoke, executableAdapterSource);
   await import(`${pathToFileURL(runtimeSmoke).href}?run=${Date.now()}`);
 } finally {
   fs.rmSync(runtimeSmoke, { force: true });
 }
 
 console.log(
-  `Operations Vercel ESM import guard passed across ${visited.size} reachable TypeScript modules with executable workspace runtime graph.`,
+  `Operations Vercel ESM import guard passed across ${visited.size} reachable TypeScript modules with executable workspace source graph and compiled adapter specifiers.`,
 );
