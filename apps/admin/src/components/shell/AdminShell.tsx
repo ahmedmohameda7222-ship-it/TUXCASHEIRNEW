@@ -28,10 +28,15 @@ export function AdminShell({
 }>) {
   return (
     <div className="admin-shell">
+      <a href="#main-content" className="admin-skip-link">
+        Skip to main content
+      </a>
       <DesktopSidebar principal={principal} />
       <div className="admin-shell__workspace">
         <AdminTopBar principal={principal} shopControl={shopControl} onLogout={onLogout} />
-        <main className="admin-shell__content">{children}</main>
+        <main id="main-content" tabIndex={-1} className="admin-shell__content">
+          {children}
+        </main>
       </div>
       <MobileTabBar permitted={primaryDestinationsFor(principal)} />
     </div>
