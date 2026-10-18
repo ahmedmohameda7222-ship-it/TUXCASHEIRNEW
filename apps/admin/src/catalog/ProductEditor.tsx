@@ -141,7 +141,6 @@ export function ProductEditor({
     );
   }, [advancedModel, comboEnabled]);
 
-
   const baseDirty =
     name !== product.name ||
     description !== (product.description ?? '') ||
