@@ -97,8 +97,5 @@ export function useUnsavedShopDraft(isDirty: boolean) {
   const { registerUnsavedDraftGuard } = useShopScope();
   const dirtyRef = useRef(isDirty);
   dirtyRef.current = isDirty;
-  useEffect(
-    () => registerUnsavedDraftGuard(() => dirtyRef.current),
-    [registerUnsavedDraftGuard],
-  );
+  useEffect(() => registerUnsavedDraftGuard(() => dirtyRef.current), [registerUnsavedDraftGuard]);
 }
