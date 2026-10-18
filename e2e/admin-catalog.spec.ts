@@ -266,9 +266,7 @@ test('normal product edit creates a draft while Sold Out uses the immediate comm
   expect(availability).toMatchObject({ type: 'availability.set', soldOut: true });
 });
 
-test('switching shops requires explicit discard for a dirty product editor', async ({
-  page,
-}) => {
+test('switching shops requires explicit discard for a dirty product editor', async ({ page }) => {
   const fixture = await mockCatalog(page, { allowSecondShop: true });
   await page.goto('/catalog/products');
 
@@ -279,9 +277,7 @@ test('switching shops requires explicit discard for a dirty product editor', asy
   await productName.fill('Unsaved operator edit');
 
   await shopSwitcher.selectOption(secondShopId);
-  const confirmation = page.getByRole('dialog', {
-    name: 'Discard unsaved changes?',
-  });
+  const confirmation = page.getByRole('dialog', { name: 'Discard unsaved changes?' });
   await expect(confirmation).toBeVisible();
   await expect(shopSwitcher).toHaveValue(shopId);
   await confirmation.getByRole('button', { name: 'Keep editing' }).click();
@@ -291,8 +287,7 @@ test('switching shops requires explicit discard for a dirty product editor', asy
 
   await shopSwitcher.selectOption(secondShopId);
   await expect(confirmation).toBeVisible();
-  const discardButton = confirmation.getByRole('button', { name: 'Discard and switch' });
-  await discardButton.click();
+  await confirmation.getByRole('button', { name: 'Discard and switch' }).click();
   await expect(shopSwitcher).toHaveValue(secondShopId);
   expect(fixture.commands).toHaveLength(0);
 });
