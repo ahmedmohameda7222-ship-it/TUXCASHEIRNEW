@@ -485,9 +485,7 @@ test('supplier form exposes linked field guidance and restores focus after Escap
   const dialog = await openSupplierDialog(page);
   const phone = dialog.getByRole('textbox', { name: 'Phone' });
   await expect(phone).toHaveAttribute('aria-describedby', 'supplier-phone-hint');
-  await expect(dialog.locator('#supplier-phone-hint')).toContainText(
-    'Optional contact number',
-  );
+  await expect(dialog.locator('#supplier-phone-hint')).toContainText('Optional contact number');
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(page.getByRole('button', { name: 'Add supplier' })).toBeFocused();
