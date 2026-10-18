@@ -1,0 +1,44 @@
+name: Admin Stage 1 formatter snapshot
+on:
+  push:
+    branches:
+      - feat/admin-premium-ui-foundation
+permissions:
+  contents: read
+jobs:
+  format-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Format only Stage 1 touched files
+        run: |
+          npx prettier --write \
+            apps/admin/server/adminAuthService.ts \
+            apps/admin/server/adminAuthGateway.ts \
+            apps/admin/server/adminAuthService.shopIdentities.test.ts \
+            apps/admin/src/styles/hardening.css \
+            apps/admin/src/shops/ShopSwitcher.tsx \
+            e2e/admin-shell.spec.ts \
+            e2e/admin-purchasing.spec.ts \
+            e2e/admin-approvals-audit.spec.ts \
+            e2e/admin-catalog.spec.ts
+      - name: Capture formatted file contents
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-stage1-formatted-sources
+          path: |
+            apps/admin/server/adminAuthService.ts
+            apps/admin/server/adminAuthGateway.ts
+            apps/admin/server/adminAuthService.shopIdentities.test.ts
+            apps/admin/src/styles/hardening.css
+            apps/admin/src/shops/ShopSwitcher.tsx
+            e2e/admin-shell.spec.ts
+            e2e/admin-purchasing.spec.ts
+            e2e/admin-approvals-audit.spec.ts
+            e2e/admin-catalog.spec.ts
+          retention-days: 1
