@@ -3,6 +3,9 @@ on:
   push:
     branches:
       - feat/admin-premium-ui-foundation
+  pull_request:
+    branches:
+      - main
 permissions:
   contents: read
 jobs:
