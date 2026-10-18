@@ -203,6 +203,24 @@ select {
   overflow: hidden;
   clip: rect(0 0 0 0);
 }
+/* Keep desktop header controls shrinkable under text scaling and 200% zoom.
+   This is a shared shell constraint, not a one-off page override. */
+.admin-topbar .shop-switcher {
+  min-width: 0;
+  flex: 0 1 230px;
+}
+.admin-topbar .shop-switcher select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
+.admin-topbar__logout {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .shop-switcher select,
 .admin-icon-button {
   min-height: var(--tux-touch-target);
