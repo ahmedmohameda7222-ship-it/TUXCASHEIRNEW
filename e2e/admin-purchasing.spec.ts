@@ -581,3 +581,47 @@ for (const width of [320, 390]) {
     });
   });
 }
+
+for (const width of [320, 390]) {
+  test(`mobile PO validation and cancellation remain accessible at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: width === 320 ? 720 : 844 });
+    const fixture = await mockPurchasing(page);
+    await page.goto('/purchasing');
+    await openPurchaseOrders(page);
+    const trigger = page.getByRole('button', { name: 'New purchase order' });
+    await trigger.click();
+    const dialog = page.getByRole('dialog', { name: 'New purchase order' });
+    await dialog.getByLabel('Quantity (purchase units)').fill('0');
+    await dialog.getByLabel('Expected cost per purchase unit (EGP)').fill('240');
+    await dialog.getByRole('button', { name: 'Create purchase order' }).click();
+    await expect(dialog.getByRole('alert')).toBeVisible();
+    expect(fixture.commands).toHaveLength(0);
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+
+    await trigger.click();
+    await dialog.getByLabel('Quantity (purchase units)').fill('2');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+    expect(fixture.commands).toHaveLength(0);
+  });
+}
+
+test('shared Supplier and PO surfaces use dark theme tokens', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockPurchasing(page);
+  await page.goto('/purchasing');
+  const supplier = await openSupplierDialog(page);
+  await page.screenshot({ path: 'test-results/admin-stage1-supplier-dark-phone.png' });
+  await page.keyboard.press('Escape');
+  await expect(supplier).toBeHidden();
+  await openPurchaseOrders(page);
+  await page.getByRole('button', { name: 'New purchase order' }).click();
+  await expect(page.getByRole('dialog', { name: 'New purchase order' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/admin-stage1-purchase-order-dark-phone.png' });
+});
