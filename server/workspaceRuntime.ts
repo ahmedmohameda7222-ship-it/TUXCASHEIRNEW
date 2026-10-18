@@ -1,5 +1,5 @@
-export { parseEntityId } from '../packages/domain/src/ids.ts';
-export { normalizeEgyptianPhone } from '../packages/domain/src/phone.ts';
-export { instant } from '../packages/domain/src/time.ts';
-export { assertWhatsAppMessageInvariant } from '../packages/domain/src/whatsapp.ts';
-export { parseWhatsAppMessage } from '../packages/application/src/whatsappWire.ts';
+export { parseEntityId } from '../packages/domain/src/ids.js';
+export { normalizeEgyptianPhone } from '../packages/domain/src/phone.js';
+export { instant } from '../packages/domain/src/time.js';
+export { assertWhatsAppMessageInvariant } from '../packages/domain/src/whatsapp.js';
+export { parseWhatsAppMessage } from '../packages/application/src/whatsappWire.js';
