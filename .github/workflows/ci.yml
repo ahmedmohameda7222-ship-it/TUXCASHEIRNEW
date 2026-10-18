@@ -59,11 +59,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Diagnostic - show Prettier differences for Admin worktree
-        run: |
-          npx prettier --write apps/admin/src/audit/AuditPage.tsx apps/admin/src/shops/ShopSwitcher.tsx e2e/admin-approvals-audit.spec.ts e2e/admin-shell.spec.ts e2e/admin-css-ownership.spec.ts e2e/admin-settings.spec.ts
-          git diff -- apps/admin/src/audit/AuditPage.tsx apps/admin/src/shops/ShopSwitcher.tsx e2e/admin-approvals-audit.spec.ts e2e/admin-shell.spec.ts e2e/admin-css-ownership.spec.ts e2e/admin-settings.spec.ts
-          git restore -- apps/admin/src/audit/AuditPage.tsx apps/admin/src/shops/ShopSwitcher.tsx e2e/admin-approvals-audit.spec.ts e2e/admin-shell.spec.ts e2e/admin-css-ownership.spec.ts e2e/admin-settings.spec.ts
       - name: Format check
         run: npm run format:check
       - name: Lint

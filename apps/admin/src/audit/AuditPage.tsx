@@ -232,7 +232,7 @@ export function AuditPage() {
   const activeFilterChips = [
     { label: 'From', value: fromDate },
     { label: 'To', value: toDate },
-    { label: 'Shop', value: shopId ? shopNames.get(shopId) ?? shopId : '' },
+    { label: 'Shop', value: shopId ? (shopNames.get(shopId) ?? shopId) : '' },
     { label: 'Actor', value: actorEmployeeId },
     { label: 'Activity', value: entityType ? auditLabel(entityType) : '' },
     { label: 'Approval', value: approvalStatus ? auditLabel(approvalStatus) : '' },
@@ -498,11 +498,7 @@ export function AuditPage() {
           >
             Clear advanced filters
           </button>
-          <button
-            className="admin-primary-button"
-            type="button"
-            onClick={applyAdvancedFilters}
-          >
+          <button className="admin-primary-button" type="button" onClick={applyAdvancedFilters}>
             Show results
           </button>
         </div>
