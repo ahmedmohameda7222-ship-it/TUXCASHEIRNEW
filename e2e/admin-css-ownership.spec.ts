@@ -60,7 +60,14 @@ async function computedStyles(page: Page) {
     record.className = 'admin-record-list';
     const finance = document.createElement('section');
     finance.className = 'tux-finance-position';
-    for (const el of [field, button, section, record, finance]) document.body.append(el);
+    const card = document.createElement('article');
+    card.className = 'admin-card';
+    const cardGrid = document.createElement('div');
+    cardGrid.className = 'admin-card-grid';
+    const formGrid = document.createElement('form');
+    formGrid.className = 'admin-form-grid';
+    const probes = [field, button, section, record, finance, card, cardGrid, formGrid];
+    for (const el of probes) document.body.append(el);
     const result = {
       fieldGap: getComputedStyle(field).rowGap,
       buttonBorderStyle: getComputedStyle(button).borderTopStyle,
@@ -69,8 +76,13 @@ async function computedStyles(page: Page) {
       sectionPadding: getComputedStyle(section).paddingTop,
       recordBorderWidth: getComputedStyle(record).borderTopWidth,
       financeBorderWidth: getComputedStyle(finance).borderTopWidth,
+      cardDisplay: getComputedStyle(card).display,
+      cardGap: getComputedStyle(card).rowGap,
+      cardGridDisplay: getComputedStyle(cardGrid).display,
+      formGridDisplay: getComputedStyle(formGrid).display,
+      formGridGap: getComputedStyle(formGrid).rowGap,
     };
-    for (const el of [field, button, section, record, finance]) el.remove();
+    for (const el of probes) el.remove();
     return result;
   });
 }
@@ -99,6 +111,11 @@ for (const width of [390, 1440]) {
       expect(cold.sectionBorderWidth).not.toBe('0px');
       expect(cold.sectionPadding).not.toBe('0px');
       expect(cold.recordBorderWidth).not.toBe('0px');
+      expect(cold.cardDisplay).toBe('grid');
+      expect(cold.cardGap).not.toBe('normal');
+      expect(cold.cardGridDisplay).toBe('grid');
+      expect(cold.formGridDisplay).toBe('grid');
+      expect(cold.formGridGap).not.toBe('normal');
       if (path.startsWith('/finance/')) expect(cold.financeBorderWidth).not.toBe('0px');
 
       // Visiting Catalog or Finance Overview must not be a prerequisite.

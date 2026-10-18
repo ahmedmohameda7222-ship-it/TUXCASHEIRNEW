@@ -210,3 +210,51 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Shared record cards and forms. These classes previously had no CSS owner. */
+.admin-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  align-items: start;
+  gap: var(--tux-space-4);
+}
+.admin-card {
+  display: grid;
+  min-width: 0;
+  gap: var(--tux-space-2);
+  padding: var(--tux-space-4);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+  overflow-wrap: anywhere;
+}
+.admin-card > strong {
+  font-size: var(--tux-font-size-md);
+  line-height: 1.35;
+}
+.admin-card > span {
+  color: var(--tux-text-secondary);
+  line-height: 1.45;
+}
+.admin-form-grid {
+  display: grid;
+  min-width: 0;
+  gap: var(--tux-space-3);
+}
+.admin-form-grid > label {
+  display: grid;
+  min-width: 0;
+  gap: var(--tux-space-2);
+  color: var(--tux-text-secondary);
+  font-weight: 650;
+}
+.admin-form-grid > label > :is(input, select, textarea) {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--tux-touch-target);
+  padding: var(--tux-space-2) var(--tux-space-3);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-control);
+  background: var(--tux-surface-panel);
+  color: var(--tux-text-primary);
+}

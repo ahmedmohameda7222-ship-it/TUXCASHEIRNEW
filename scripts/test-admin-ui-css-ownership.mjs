@@ -10,7 +10,7 @@ const shared = read('components/ui/primitives.css');
 const main = read('main.tsx');
 
 assert.match(main, /import ['"]\.\/components\/ui\/primitives\.css['"]/, 'Shared CSS must load at Admin boot');
-for (const selector of ['admin-secondary-button', 'admin-field', 'admin-field__help', 'admin-record-row', 'admin-record-list', 'admin-form-section']) {
+for (const selector of ['admin-secondary-button', 'admin-field', 'admin-field__help', 'admin-record-row', 'admin-record-list', 'admin-form-section', 'admin-card-grid', 'admin-card', 'admin-form-grid']) {
   assert.ok(shared.includes('.' + selector), selector + ' must be styled by shared UI');
 }
 for (const [owner, regex] of [
