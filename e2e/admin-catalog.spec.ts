@@ -2,6 +2,7 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 import { ADMIN_WIDE_TABLET_VIEWPORTS } from './adminViewports';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const secondShopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab';
 const categoryId = '22222222-2222-4222-8222-222222222222';
 const productId = '11111111-1111-4111-8111-111111111111';
 
@@ -69,7 +70,7 @@ function canonicalBundle(product: FixtureProduct, version: number) {
   };
 }
 
-async function mockCatalog(page: Page) {
+async function mockCatalog(page: Page, options: { allowSecondShop?: boolean } = {}) {
   let publishVersion = 48;
   let draftRevision = 1;
   let liveProduct: FixtureProduct = {
@@ -95,7 +96,13 @@ async function mockCatalog(page: Page) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(ownerSession),
+      body: JSON.stringify({
+        ...ownerSession,
+        principal: {
+          ...ownerSession.principal,
+          shopIds: options.allowSecondShop ? [shopId, secondShopId] : [shopId],
+        },
+      }),
     });
   });
 
@@ -257,4 +264,31 @@ test('normal product edit creates a draft while Sold Out uses the immediate comm
   ]);
   const availability = fixture.commands.at(-1);
   expect(availability).toMatchObject({ type: 'availability.set', soldOut: true });
+});
+
+
+test('switching shops requires explicit discard for a dirty product editor', async ({ page }) => {
+  const fixture = await mockCatalog(page, { allowSecondShop: true });
+  await page.goto('/catalog/products');
+
+  const shopSwitcher = page.locator('.shop-switcher select');
+  await expect(shopSwitcher).toHaveValue(shopId);
+  const productName = page.locator('input[name="name"]');
+  await expect(productName).toHaveValue('Classic Smash');
+  await productName.fill('Unsaved operator edit');
+
+  await shopSwitcher.selectOption(secondShopId);
+  const confirmation = page.getByRole('dialog', { name: 'Discard unsaved changes?' });
+  await expect(confirmation).toBeVisible();
+  await expect(shopSwitcher).toHaveValue(shopId);
+  await confirmation.getByRole('button', { name: 'Keep editing' }).click();
+  await expect(confirmation).toBeHidden();
+  await expect(productName).toHaveValue('Unsaved operator edit');
+  expect(fixture.commands).toHaveLength(0);
+
+  await shopSwitcher.selectOption(secondShopId);
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole('button', { name: 'Discard and switch' }).click();
+  await expect(shopSwitcher).toHaveValue(secondShopId);
+  expect(fixture.commands).toHaveLength(0);
 });
