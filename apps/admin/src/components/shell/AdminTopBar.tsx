@@ -27,7 +27,7 @@ export function AdminTopBar({
     <header className="admin-topbar">
       <div className="admin-topbar__mobile-brand">
         <BrandLogo size={32} />
-        <strong>TUX Admin</strong>
+        <strong>TUX<span className="admin-brand-suffix"> Admin</span></strong>
       </div>
       <div className="admin-topbar__context">
         <ShieldCheck size={17} aria-hidden="true" />

@@ -496,3 +496,38 @@ select {
   color: var(--tux-text-secondary);
   font-size: var(--tux-font-size-sm);
 }
+
+/* Narrow viewports: keep scope selection and logout in the visible header. */
+@media (max-width: 420px) {
+  .admin-topbar {
+    gap: 8px;
+    padding-inline: 12px;
+  }
+  .admin-topbar__mobile-brand {
+    min-width: 0;
+    flex-shrink: 0;
+    gap: 6px;
+  }
+  .admin-topbar .shop-switcher {
+    min-width: 0;
+    flex: 0 1 160px;
+  }
+  .admin-topbar .shop-switcher select {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding-inline: 8px;
+    text-overflow: ellipsis;
+  }
+  .admin-topbar__logout {
+    flex: 0 0 var(--tux-touch-target);
+    justify-content: center;
+    padding-inline: 0;
+  }
+}
+@media (max-width: 359px) {
+  .admin-topbar__mobile-brand .admin-brand-suffix {
+    display: none;
+  }
+}
