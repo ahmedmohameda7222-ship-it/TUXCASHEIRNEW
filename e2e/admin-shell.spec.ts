@@ -138,3 +138,34 @@ test('does not request shop metadata without settings read permission', async ({
   await expect(page.locator('.shop-switcher option')).toHaveCount(2);
   expect(unauthorizedReads).toEqual([]);
 });
+
+for (const viewport of [
+  { name: 'small-phone', width: 320, height: 720 },
+  { name: 'narrow-phone', width: 375, height: 844 },
+  { name: 'desktop-1280', width: 1280, height: 800 },
+]) {
+  test(`keeps Admin navigation and layout within ${viewport.name} viewport`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await mockSession(page);
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await expect(page.locator('#main-content')).toBeVisible();
+    const phone = viewport.width < 768;
+    if (phone) {
+      await expect(page.locator('[data-admin-mobile-nav]')).toBeVisible();
+      await expect(page.locator('[data-admin-desktop-nav]')).toBeHidden();
+    } else {
+      await expect(page.locator('[data-admin-mobile-nav]')).toBeHidden();
+      await expect(page.locator('[data-admin-desktop-nav]')).toBeVisible();
+    }
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
+    ).toBe(false);
+    await page.screenshot({
+      path: `test-results/admin-stage1-shell-${viewport.name}.png`,
+      fullPage: true,
+    });
+  });
+}

@@ -490,3 +490,38 @@ test('supplier form exposes linked field guidance and restores focus after Escap
   await expect(dialog).toBeHidden();
   await expect(page.getByRole('button', { name: 'Add supplier' })).toBeFocused();
 });
+
+for (const viewport of [
+  { name: 'small-phone', width: 320, height: 720 },
+  { name: 'phone', width: 390, height: 844 },
+  { name: 'desktop', width: 1440, height: 900 },
+]) {
+  test(`captures supplier and wide PO task surfaces at ${viewport.name}`, async ({ page }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await mockPurchasing(page);
+    await page.goto('/purchasing');
+    const supplier = await openSupplierDialog(page);
+    await expect(supplier.getByLabel('Supplier name')).toBeVisible();
+    await page.screenshot({
+      path: `test-results/admin-stage1-supplier-${viewport.name}.png`,
+      fullPage: true,
+    });
+    await page.keyboard.press('Escape');
+    await expect(supplier).toBeHidden();
+    await openPurchaseOrders(page);
+    await page.getByRole('button', { name: 'New purchase order' }).click();
+    const po = page.getByRole('dialog', { name: 'New purchase order' });
+    await expect(po.getByLabel('Quantity (purchase units)')).toBeVisible();
+    const bounds = await po.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.width).toBeLessThanOrEqual(viewport.width);
+    if (viewport.width >= 768) expect(bounds!.width).toBeGreaterThan(700);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
+    ).toBe(false);
+    await page.screenshot({
+      path: `test-results/admin-stage1-purchase-order-${viewport.name}.png`,
+      fullPage: true,
+    });
+  });
+}
