@@ -144,9 +144,7 @@ for (const viewport of [
   { name: 'narrow-phone', width: 375, height: 844 },
   { name: 'desktop-1280', width: 1280, height: 800 },
 ]) {
-  test(`keeps Admin navigation and layout within ${viewport.name} viewport`, async ({
-    page,
-  }) => {
+  test(`keeps Admin navigation and layout within ${viewport.name} viewport`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await mockSession(page);
     await page.goto('/');
