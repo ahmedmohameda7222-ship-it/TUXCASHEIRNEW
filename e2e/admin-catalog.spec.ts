@@ -101,6 +101,12 @@ async function mockCatalog(page: Page, options: { allowSecondShop?: boolean } = 
         principal: {
           ...ownerSession.principal,
           shopIds: options.allowSecondShop ? [shopId, secondShopId] : [shopId],
+          shopSummaries: options.allowSecondShop
+            ? [
+                { id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false },
+                { id: secondShopId, name: 'TUX Zamalek', active: true, temporaryClosed: false },
+              ]
+            : [],
         },
       }),
     });
@@ -280,6 +286,9 @@ test('switching shops requires explicit discard for a dirty product editor', asy
   const confirmation = page.getByRole('dialog', { name: 'Discard unsaved changes?' });
   await expect(confirmation).toBeVisible();
   await expect(shopSwitcher).toHaveValue(shopId);
+  await page.screenshot({
+    path: 'test-results/admin-stage1-catalog-shop-switch-confirmation.png',
+  });
   await confirmation.getByRole('button', { name: 'Keep editing' }).click();
   await expect(confirmation).toBeHidden();
   await expect(productName).toHaveValue('Unsaved operator edit');
