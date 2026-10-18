@@ -7,7 +7,7 @@ on:
     branches:
       - main
 permissions:
-  contents: read
+  contents: write
 jobs:
   format-snapshot:
     runs-on: ubuntu-latest
@@ -30,6 +30,16 @@ jobs:
             e2e/admin-purchasing.spec.ts \
             e2e/admin-approvals-audit.spec.ts \
             e2e/admin-catalog.spec.ts
+      - name: Apply canonical formatting to the Draft branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feat/admin-premium-ui-foundation'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- apps/admin/server/adminAuthService.ts apps/admin/server/adminAuthGateway.ts apps/admin/server/adminAuthService.shopIdentities.test.ts apps/admin/src/styles/hardening.css apps/admin/src/shops/ShopSwitcher.tsx e2e/admin-shell.spec.ts e2e/admin-purchasing.spec.ts e2e/admin-approvals-audit.spec.ts e2e/admin-catalog.spec.ts
+          if ! git diff --cached --quiet; then
+            git commit -m 'style(admin): apply canonical formatting to Planner corrections'
+            git push origin HEAD:refs/heads/feat/admin-premium-ui-foundation
+          fi
       - name: Capture formatted file contents
         uses: actions/upload-artifact@v4
         with:
