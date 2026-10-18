@@ -266,8 +266,9 @@ test('normal product edit creates a draft while Sold Out uses the immediate comm
   expect(availability).toMatchObject({ type: 'availability.set', soldOut: true });
 });
 
-
-test('switching shops requires explicit discard for a dirty product editor', async ({ page }) => {
+test('switching shops requires explicit discard for a dirty product editor', async ({
+  page,
+}) => {
   const fixture = await mockCatalog(page, { allowSecondShop: true });
   await page.goto('/catalog/products');
 
