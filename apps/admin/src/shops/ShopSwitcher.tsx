@@ -1,6 +1,8 @@
 import { useQueries } from '@tanstack/react-query';
+import { useState } from 'react';
 import type { AdminSettingsWorkspace, ShopScope } from '@tux/admin-contracts';
 
+import { ConfirmationDialog } from '../components/overlay/AdminDialog';
 import { adminFetch } from '../lib/adminApi';
 import { useShopScope } from './ShopScopeProvider';
 
@@ -23,7 +25,8 @@ function shopOptionLabel(
 }
 
 export function ShopSwitcher() {
-  const { principal, scope, setScope } = useShopScope();
+  const { principal, scope, setScope, hasUnsavedDrafts } = useShopScope();
+  const [pendingScope, setPendingScope] = useState<ShopScope | null>(null);
 
   // The settings workspace is an existing authorized shop-scoped read. Never
   // fetch names for shops outside principal.shopIds or for roles without access.
@@ -45,16 +48,23 @@ export function ShopSwitcher() {
   if (principal.shopIds.length <= 1 && principal.role !== 'OWNER') return null;
 
   return (
+    <>
     <label className="shop-switcher">
       <span>Shop</span>
       <select
         value={scopeValue(scope)}
         onChange={(event) => {
-          setScope(
-            event.target.value === '__all__'
+          const nextScope: ShopScope =
+            event.currentTarget.value === '__all__'
               ? { kind: 'all-shops' }
-              : { kind: 'shop', shopId: event.target.value },
-          );
+              : { kind: 'shop', shopId: event.currentTarget.value };
+          if (hasUnsavedDrafts()) {
+            // Keep the controlled select on its actual scope until the operator decides.
+            event.currentTarget.value = scopeValue(scope);
+            setPendingScope(nextScope);
+            return;
+          }
+          setScope(nextScope);
         }}
       >
         {principal.role === 'OWNER' ? <option value="__all__">All Shops</option> : null}
@@ -73,5 +83,21 @@ export function ShopSwitcher() {
         })}
       </select>
     </label>
+    <ConfirmationDialog
+      open={pendingScope !== null}
+      title="Discard unsaved changes?"
+      description="You have unsaved changes in this shop. Switching shops will discard these edits."
+      confirmLabel="Discard and switch"
+      cancelLabel="Keep editing"
+      destructive
+      onConfirm={() => {
+        if (pendingScope) setScope(pendingScope, { discardUnsavedDrafts: true });
+        setPendingScope(null);
+      }}
+      onOpenChange={(open) => {
+        if (!open) setPendingScope(null);
+      }}
+    />
+    </>
   );
 }
