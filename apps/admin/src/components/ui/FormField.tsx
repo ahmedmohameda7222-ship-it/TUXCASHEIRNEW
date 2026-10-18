@@ -1,10 +1,10 @@
 import { cloneElement, isValidElement, type ReactNode } from 'react';
 
 type FieldControlProps = {
-  id?: string;
-  required?: boolean;
-  'aria-describedby'?: string;
-  'aria-invalid'?: boolean | 'true' | 'false';
+  id?: string | undefined;
+  required?: boolean | undefined;
+  'aria-describedby'?: string | undefined;
+  'aria-invalid'?: boolean | 'true' | 'false' | undefined;
 };
 
 export function FormField({
