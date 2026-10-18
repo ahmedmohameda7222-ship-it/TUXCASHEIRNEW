@@ -73,6 +73,7 @@ function requireRole(role: string): AdminRole {
 async function resolvePrincipal(
   employee: AdminEmployeeRow,
   client: AdminSupabaseClient,
+  includeShopSummaries = false,
 ): Promise<AdminSessionPrincipal> {
   const role = requireRole(employee.role);
   const shopIds = new Set<string>();
@@ -133,7 +134,7 @@ async function resolvePrincipal(
   // to select, and never return an unassigned shop even if the store drifts.
   const authorizedIds = [...shopIds];
   let shopSummaries: NonNullable<AdminSessionPrincipal['shopSummaries']> = [];
-  if (authorizedIds.length > 0) {
+  if (includeShopSummaries && authorizedIds.length > 0) {
     try {
       const rows = await client.select<
         Array<{ id: string; name: string; active: boolean; temporary_closed: boolean }>
@@ -214,7 +215,7 @@ export async function loginAdmin(
     throw new AdminAuthError('invalid_pin', 401);
   }
 
-  const principal = await resolvePrincipal(employee, client);
+  const principal = await resolvePrincipal(employee, client, true);
   const material = createSessionMaterial(now, env.sessionTtlSeconds);
   await client.insert<unknown>('admin_sessions', {
     business_id: employee.business_id,
@@ -231,6 +232,7 @@ export async function loadAdminSession(
   token: string,
   client: AdminSupabaseClient,
   now = new Date(),
+  includeShopSummaries = false,
 ): Promise<AdminSessionContext> {
   const tokenHash = sha256Hex(token);
   const sessions = await client.select<AdminSessionRow[]>(
@@ -258,7 +260,7 @@ export async function loadAdminSession(
   );
   const employee = employees[0];
   if (!employee?.active) throw new AdminAuthError('employee_inactive', 403);
-  const principal = await resolvePrincipal(employee, client);
+  const principal = await resolvePrincipal(employee, client, includeShopSummaries);
   return { session, employee, principal };
 }
 
