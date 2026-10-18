@@ -291,7 +291,8 @@ test('switching shops requires explicit discard for a dirty product editor', asy
 
   await shopSwitcher.selectOption(secondShopId);
   await expect(confirmation).toBeVisible();
-  await confirmation.getByRole('button', { name: 'Discard and switch' }).click();
+  const discardButton = confirmation.getByRole('button', { name: 'Discard and switch' });
+  await discardButton.click();
   await expect(shopSwitcher).toHaveValue(secondShopId);
   expect(fixture.commands).toHaveLength(0);
 });
