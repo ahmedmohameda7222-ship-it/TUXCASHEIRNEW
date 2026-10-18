@@ -49,55 +49,55 @@ export function ShopSwitcher() {
 
   return (
     <>
-    <label className="shop-switcher">
-      <span>Shop</span>
-      <select
-        value={scopeValue(scope)}
-        onChange={(event) => {
-          const nextScope: ShopScope =
-            event.currentTarget.value === '__all__'
-              ? { kind: 'all-shops' }
-              : { kind: 'shop', shopId: event.currentTarget.value };
-          if (hasUnsavedDrafts()) {
-            // Keep the controlled select on its actual scope until the operator decides.
-            event.currentTarget.value = scopeValue(scope);
-            setPendingScope(nextScope);
-            return;
-          }
-          setScope(nextScope);
+      <label className="shop-switcher">
+        <span>Shop</span>
+        <select
+          value={scopeValue(scope)}
+          onChange={(event) => {
+            const nextScope: ShopScope =
+              event.currentTarget.value === '__all__'
+                ? { kind: 'all-shops' }
+                : { kind: 'shop', shopId: event.currentTarget.value };
+            if (hasUnsavedDrafts()) {
+              // Keep the controlled select on its actual scope until the operator decides.
+              event.currentTarget.value = scopeValue(scope);
+              setPendingScope(nextScope);
+              return;
+            }
+            setScope(nextScope);
+          }}
+        >
+          {principal.role === 'OWNER' ? <option value="__all__">All Shops</option> : null}
+          {principal.shopIds.map((shopId, index) => {
+            const shop = shopMetadata[index]?.data;
+            const label = shopOptionLabel(
+              shop,
+              shopId,
+              canReadNames && Boolean(shopMetadata[index]?.isPending),
+            );
+            return (
+              <option key={shopId} value={shopId}>
+                {label}
+              </option>
+            );
+          })}
+        </select>
+      </label>
+      <ConfirmationDialog
+        open={pendingScope !== null}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes in this shop. Switching shops will discard these edits."
+        confirmLabel="Discard and switch"
+        cancelLabel="Keep editing"
+        destructive
+        onConfirm={() => {
+          if (pendingScope) setScope(pendingScope, { discardUnsavedDrafts: true });
+          setPendingScope(null);
         }}
-      >
-        {principal.role === 'OWNER' ? <option value="__all__">All Shops</option> : null}
-        {principal.shopIds.map((shopId, index) => {
-          const shop = shopMetadata[index]?.data;
-          const label = shopOptionLabel(
-            shop,
-            shopId,
-            canReadNames && Boolean(shopMetadata[index]?.isPending),
-          );
-          return (
-            <option key={shopId} value={shopId}>
-              {label}
-            </option>
-          );
-        })}
-      </select>
-    </label>
-    <ConfirmationDialog
-      open={pendingScope !== null}
-      title="Discard unsaved changes?"
-      description="You have unsaved changes in this shop. Switching shops will discard these edits."
-      confirmLabel="Discard and switch"
-      cancelLabel="Keep editing"
-      destructive
-      onConfirm={() => {
-        if (pendingScope) setScope(pendingScope, { discardUnsavedDrafts: true });
-        setPendingScope(null);
-      }}
-      onOpenChange={(open) => {
-        if (!open) setPendingScope(null);
-      }}
-    />
+        onOpenChange={(open) => {
+          if (!open) setPendingScope(null);
+        }}
+      />
     </>
   );
 }
