@@ -49,7 +49,7 @@ describe('authorized shop identity projection', () => {
   for (const role of ['OWNER', 'MANAGER'] as const) {
     it(`returns names for the ${role} scope without granting Settings rights`, async () => {
       const { client, calls } = sessionClient(role);
-      const result = await loadAdminSession(token, client);
+      const result = await loadAdminSession(token, client, undefined, true);
       const expectedShops = [
         { id: 'shop-a', name: 'TUX Maadi', active: true, temporaryClosed: false },
         { id: 'shop-b', name: 'TUX Zamalek', active: false, temporaryClosed: true },
@@ -74,6 +74,13 @@ describe('authorized shop identity projection', () => {
       }
     });
   }
+
+  it('does not query shops for ordinary authorized API session checks', async () => {
+    const { client, calls } = sessionClient('MANAGER');
+    const result = await loadAdminSession(token, client);
+    expect(result.principal.shopIds).toEqual(['shop-b', 'shop-a']);
+    expect(calls.some((call) => call.table === 'shops')).toBe(false);
+  });
 
   it('keeps authentication usable when the optional shop-label query fails', async () => {
     const { client } = sessionClient('MANAGER', true);
