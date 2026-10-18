@@ -21,6 +21,7 @@ import { Link, useLocation } from 'wouter';
 
 import type { AdminSessionPrincipal } from '@tux/admin-contracts';
 import { ADMIN_ROUTES, routeIsPermitted } from '../../app/routes';
+import { BrandLogo } from '../ui/BrandLogo';
 
 const ICONS: Record<string, LucideIcon> = {
   '/': Home,
@@ -58,7 +59,7 @@ function DesktopSidebarView({ principal, currentPath }: Required<DesktopSidebarP
   return (
     <aside className="admin-sidebar" data-admin-desktop-nav>
       <div className="admin-sidebar__identity" aria-label="TUX Admin">
-        <span className="admin-sidebar__mark">T</span>
+        <BrandLogo size={40} />
         <span className="admin-sidebar__brand">TUX Admin</span>
       </div>
       <nav className="admin-sidebar__nav" aria-label="Admin sections">

@@ -2,6 +2,7 @@ import { LogOut, ShieldCheck } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import type { AdminSessionPrincipal } from '@tux/admin-contracts';
+import { BrandLogo } from '../ui/BrandLogo';
 
 function roleLabel(role: AdminSessionPrincipal['role']): string {
   return role === 'OWNER'
@@ -25,7 +26,7 @@ export function AdminTopBar({
   return (
     <header className="admin-topbar">
       <div className="admin-topbar__mobile-brand">
-        <span className="admin-sidebar__mark">T</span>
+        <BrandLogo size={32} />
         <strong>TUX Admin</strong>
       </div>
       <div className="admin-topbar__context">
