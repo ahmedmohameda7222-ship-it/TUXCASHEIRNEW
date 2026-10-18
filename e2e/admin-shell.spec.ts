@@ -81,3 +81,60 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     });
   });
 }
+
+test('uses actual authorized shop names while keeping UUID scope values', async ({ page }) => {
+  await mockSession(page);
+  const requestedShopIds: string[] = [];
+  await page.route('**/api/admin/settings?*', async (route) => {
+    const shopId = new URL(route.request().url()).searchParams.get('shopId');
+    expect(['shop-a', 'shop-b']).toContain(shopId);
+    requestedShopIds.push(shopId!);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        shop: {
+          id: shopId,
+          name: shopId === 'shop-a' ? 'TUX Maadi' : 'TUX Zamalek',
+          active: true,
+          temporaryClosed: shopId === 'shop-b',
+        },
+      }),
+    });
+  });
+  await page.goto('/');
+  const switcher = page.locator('.shop-switcher select');
+  await expect(switcher.locator('option[value="shop-a"]')).toHaveText('TUX Maadi');
+  await expect(switcher.locator('option[value="shop-b"]')).toHaveText(
+    'TUX Zamalek · Temporarily closed',
+  );
+  expect(requestedShopIds.sort()).toEqual(['shop-a', 'shop-b']);
+  await switcher.selectOption('shop-b');
+  await expect(switcher).toHaveValue('shop-b');
+});
+
+test('does not request shop metadata without settings read permission', async ({ page }) => {
+  await page.route('**/api/admin/session', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...ownerSession,
+        principal: {
+          ...ownerSession.principal,
+          role: 'MANAGER',
+          permissions: ['orders.view'],
+        },
+      }),
+    }),
+  );
+  const unauthorizedReads: string[] = [];
+  await page.route('**/api/admin/settings?*', (route) => {
+    unauthorizedReads.push(route.request().url());
+    return route.fulfill({ status: 403, body: '{}' });
+  });
+  await page.goto('/');
+  await expect(page.locator('.shop-switcher select')).toBeVisible();
+  await expect(page.locator('.shop-switcher option')).toHaveCount(2);
+  expect(unauthorizedReads).toEqual([]);
+});
