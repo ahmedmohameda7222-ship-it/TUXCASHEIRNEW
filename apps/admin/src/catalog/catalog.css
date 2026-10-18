@@ -23,8 +23,7 @@
   cursor: pointer;
 }
 
-.admin-danger-link:disabled,
-.admin-primary-button:disabled {
+.admin-danger-link:disabled {
   opacity: 0.5;
   cursor: default;
 }

@@ -14,7 +14,7 @@ for (const selector of ['admin-secondary-button', 'admin-field', 'admin-field__h
   assert.ok(shared.includes('.' + selector), selector + ' must be styled by shared UI');
 }
 for (const [owner, regex] of [
-  ['catalog/catalog.css', /\.admin-(?:secondary-button|field(?:__help)?)\b/],
+  ['catalog/catalog.css', /\.admin-(?:secondary-button|primary-button|field(?:__help)?)\b/],
   ['settings/settings.css', /\.admin-record-row\b/],
   ['inventory/inventory.css', /\.admin-record-list\b/],
 ]) {
