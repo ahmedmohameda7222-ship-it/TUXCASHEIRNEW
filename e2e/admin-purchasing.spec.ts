@@ -475,3 +475,20 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     ).toBe(true);
   });
 }
+
+test('supplier form exposes linked field guidance and restores focus after Escape', async ({
+  page,
+}) => {
+  await mockPurchasing(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/purchasing');
+  const dialog = await openSupplierDialog(page);
+  const phone = dialog.getByRole('textbox', { name: 'Phone' });
+  await expect(phone).toHaveAttribute('aria-describedby', 'supplier-phone-hint');
+  await expect(dialog.locator('#supplier-phone-hint')).toContainText(
+    'Optional contact number',
+  );
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Add supplier' })).toBeFocused();
+});
