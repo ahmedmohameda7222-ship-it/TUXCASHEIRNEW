@@ -209,3 +209,30 @@ test('exposes every required audit filter', async ({ page }) => {
     await expect(page.getByLabel(label, { exact: true })).toBeVisible();
   }
 });
+
+test('stages audit filters until apply and discards an escaped draft', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockAdmin(page);
+  const requestedUrls: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/api/admin/audit')) requestedUrls.push(request.url());
+  });
+  await page.goto('/audit');
+  await expect(page.getByRole('heading', { name: 'Audit log' })).toBeVisible();
+  await page.getByRole('button', { name: 'Filters', exact: true }).click();
+  await page.getByLabel('Approval status').selectOption('APPROVED');
+  const baseline = requestedUrls.length;
+  await page.getByRole('dialog', { name: 'Audit filters' }).press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Audit filters' })).toBeHidden();
+  expect(requestedUrls.length).toBe(baseline);
+
+  await page.getByRole('button', { name: 'Filters', exact: true }).click();
+  await expect(page.getByLabel('Approval status')).toHaveValue('');
+  await page.getByLabel('Approval status').selectOption('APPROVED');
+  await page.screenshot({ path: 'test-results/admin-stage1-audit-filters-phone.png', fullPage: true });
+  await page.getByRole('button', { name: 'Show results' }).click();
+  await expect(page.getByLabel('Applied audit filters')).toContainText('Approval: Approved');
+  await expect
+    .poll(() => requestedUrls.some((url) => url.includes('approvalStatus=APPROVED')))
+    .toBe(true);
+});
