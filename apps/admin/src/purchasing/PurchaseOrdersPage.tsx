@@ -128,7 +128,7 @@ export function PurchaseOrdersPage({
 
   return (
     <section aria-labelledby="purchase-orders-heading">
-      <div className="admin-catalog-editor__section-heading">
+      <div className="admin-section-heading">
         <h2 id="purchase-orders-heading">Purchase orders</h2>
         {canManage ? (
           <button
@@ -140,11 +140,13 @@ export function PurchaseOrdersPage({
           </button>
         ) : null}
       </div>
-      <div className="admin-inventory-list">
+      <div className="admin-record-list">
         {purchaseOrders.map((order) => (
           <button
             className={
-              selectedId === order.id ? 'admin-inventory-row is-selected' : 'admin-inventory-row'
+              selectedId === order.id
+                ? 'admin-record-row admin-record-row--button is-selected'
+                : 'admin-record-row admin-record-row--button'
             }
             type="button"
             key={order.id}
@@ -162,6 +164,7 @@ export function PurchaseOrdersPage({
         <AdminDialog
           open={createOpen}
           variant="sheet"
+          size="wide"
           title="New purchase order"
           description="Choose a supplier and add one or more purchase-order lines."
           onOpenChange={(open) => {
@@ -169,7 +172,7 @@ export function PurchaseOrdersPage({
           }}
         >
           <form
-            className="admin-form-grid"
+            className="admin-form-grid admin-po-builder"
             onSubmit={(event) => {
               event.preventDefault();
               const error = !selectedSupplierId

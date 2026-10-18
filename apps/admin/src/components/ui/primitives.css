@@ -178,3 +178,34 @@
 .admin-form-field__error {
   color: var(--tux-destructive);
 }
+
+/* A purchase order is a multi-line task, not a narrow single-field popup. */
+.admin-po-builder {
+  min-width: 0;
+}
+.admin-po-builder fieldset {
+  min-width: 0;
+  display: grid;
+  gap: var(--tux-space-3);
+  margin: 0;
+  padding: var(--tux-space-4);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-subtle);
+}
+.admin-po-builder legend {
+  padding-inline: 6px;
+  font-weight: 750;
+}
+.admin-po-builder label {
+  min-width: 0;
+}
+.admin-po-builder :is(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+}
+@media (min-width: 48rem) {
+  .admin-po-builder fieldset {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

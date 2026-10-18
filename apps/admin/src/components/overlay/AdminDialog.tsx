@@ -9,6 +9,7 @@ export type AdminDialogProps = {
   children?: ReactNode;
   footer?: ReactNode;
   variant?: AdminDialogVariant;
+  size?: 'default' | 'wide';
   destructive?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
   onOpenChange(open: boolean): void;
@@ -21,6 +22,7 @@ export function AdminDialog({
   children,
   footer,
   variant = 'dialog',
+  size = 'default',
   destructive = false,
   initialFocusRef,
   onOpenChange,
@@ -63,7 +65,7 @@ export function AdminDialog({
     <dialog
       ref={dialogRef}
       role="dialog"
-      className={`admin-dialog admin-dialog--${variant}${destructive ? ' is-destructive' : ''}`}
+      className={`admin-dialog admin-dialog--${variant} admin-dialog--${size}${destructive ? ' is-destructive' : ''}`}
       aria-modal="true"
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
