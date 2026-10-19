@@ -2,6 +2,28 @@ import { expect, test, type Page } from '@playwright/test';
 
 const shopId = '11111111-1111-4111-8111-111111111111';
 const employeeId = '22222222-2222-4222-8222-222222222222';
+const secondShopId = '44444444-4444-4444-8444-444444444444';
+
+function cairoFixtureDay(): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Cairo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+function requestedTrend(from: string, to: string) {
+  const amounts = [20000, 25000, 15000];
+  return amounts.flatMap((netSalesMinor, index) => {
+    const day = new Date(`${from}T12:00:00Z`);
+    day.setUTCDate(day.getUTCDate() + index);
+    const date = day.toISOString().slice(0, 10);
+    return date <= to ? [{ date, netSalesMinor }] : [];
+  });
+}
 
 async function mockHome(page: Page, role: 'OWNER' | 'MANAGER') {
   await page.route('**/api/admin/session', async (route) => {
@@ -13,14 +35,35 @@ async function mockHome(page: Page, role: 'OWNER' | 'MANAGER') {
           businessId: '33333333-3333-4333-8333-333333333333',
           employeeId,
           role,
-          shopIds: [shopId],
-          shopSummaries: [{ id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false }],
+          shopIds: [shopId, secondShopId],
+          shopSummaries: [
+            { id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false },
+            {
+              id: secondShopId,
+              name: 'TUX Zamalek Riverside & Catering Kitchen',
+              active: true,
+              temporaryClosed: true,
+            },
+          ],
           permissions: [
-            'reports.view',
+            'orders.view',
+            'catalog.view',
+            'inventory.view',
+            'customers.view',
+            'purchasing.view',
             'staff.view',
             'delivery.view',
+            'reports.view',
             ...(role === 'OWNER'
-              ? ['finance.view', 'catalog.view', 'inventory.view', 'approvals.review']
+              ? [
+                  'finance.view',
+                  'approvals.review',
+                  'settings.manage',
+                  'audit.view',
+                  'alerts.view',
+                  'devices.view',
+                  'whatsapp.view',
+                ]
               : []),
           ],
         },
@@ -31,6 +74,8 @@ async function mockHome(page: Page, role: 'OWNER' | 'MANAGER') {
   await page.route('**/api/admin/reports**', async (route) => {
     const url = new URL(route.request().url());
     const view = url.searchParams.get('view');
+    const from = url.searchParams.get('from') ?? cairoFixtureDay();
+    const to = url.searchParams.get('to') ?? from;
     const content =
       view === 'dashboard'
         ? {
@@ -45,20 +90,38 @@ async function mockHome(page: Page, role: 'OWNER' | 'MANAGER') {
             pendingApprovalCount: 3,
             staffOnShiftCount: 4,
             deliveryOpenCount: 2,
-            salesTrend: [
-              { date: '2026-10-02', netSalesMinor: 20000 },
-              { date: '2026-10-03', netSalesMinor: 25000 },
-              { date: '2026-10-04', netSalesMinor: 15000 },
-            ],
+            salesTrend: requestedTrend(from, to),
             topProducts: [{ name: 'Espresso', quantity: 7, recordedSalesMinor: 24000 }],
             sourceMix: [
               { source: 'POS', orderCount: 10 },
               { source: 'ONLINE', orderCount: 2 },
             ],
-            shopComparison: [{ shopName: 'Main shop', orderCount: 12, netSalesMinor: 155000 }],
+            shopComparison: [{ shopName: 'TUX Maadi', orderCount: 12, netSalesMinor: 155000 }],
           }
         : view === 'configuration'
-          ? { savedViews: [], targets: [] }
+          ? {
+              savedViews: [],
+              targets: [
+                {
+                  id: 'target-net-sales',
+                  shopId,
+                  metric: 'NET_SALES',
+                  periodStart: cairoFixtureDay(),
+                  periodEnd: cairoFixtureDay(),
+                  targetValue: 175000,
+                  version: 1,
+                },
+                {
+                  id: 'target-orders',
+                  shopId,
+                  metric: 'ORDER_COUNT',
+                  periodStart: cairoFixtureDay(),
+                  periodEnd: cairoFixtureDay(),
+                  targetValue: 20,
+                  version: 1,
+                },
+              ],
+            }
           : view === 'filter-options'
             ? { options: {} }
             : {
@@ -84,7 +147,25 @@ async function mockHome(page: Page, role: 'OWNER' | 'MANAGER') {
     const url = new URL(route.request().url());
     const content =
       url.searchParams.get('view') === 'owner-summary'
-        ? { summaries: [] }
+        ? {
+            summaries: [
+              {
+                id: 'owner-summary-1',
+                business_day_id: 'day-1',
+                generated_at: '2026-10-19T00:00:00.000Z',
+                summary: {
+                  netSalesMinor: 155000,
+                  estimatedOperatingProfitMinor: 51000,
+                  orderCount: 12,
+                  cashVarianceMinor: 0,
+                  cashVarianceCount: 0,
+                  lowStockCount: 2,
+                  failedOnlineOrderCount: 1,
+                  pendingApprovalCount: 3,
+                },
+              },
+            ],
+          }
         : url.searchParams.get('view') === 'days'
           ? { days: [] }
           : { ok: true };
