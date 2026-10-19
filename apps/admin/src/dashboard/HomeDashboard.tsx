@@ -10,6 +10,7 @@ import { useShopScope } from '../shops/ShopScopeProvider';
 
 import { OwnerSummaryCard } from './OwnerSummaryCard';
 import { TargetsPanel } from './TargetsPanel';
+import { cairoReportDay, priorReportDay, trendMatchesPeriod } from './reportDates';
 import './homeDashboard.css';
 
 type HomeMetrics = {
@@ -29,23 +30,6 @@ type HomeMetrics = {
   sourceMix: readonly { source: string; orderCount: number }[];
   shopComparison: readonly { shopName: string; orderCount: number; netSalesMinor: number }[];
 };
-
-function cairoDay(): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Africa/Cairo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date());
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
-  return `${get('year')}-${get('month')}-${get('day')}`;
-}
-
-function priorDay(date: string, days: number): string {
-  const result = new Date(`${date}T12:00:00Z`);
-  result.setUTCDate(result.getUTCDate() - days);
-  return result.toISOString().slice(0, 10);
-}
 
 function valueOf(value: number | null | undefined, money = false): string {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 'Unavailable';
@@ -104,8 +88,8 @@ export function HomeDashboard() {
         : selectedShop?.active === true
           ? 'Active · not marked temporarily closed'
           : 'Operational status unavailable';
-  const today = cairoDay();
-  const fromWeek = priorDay(today, 6);
+  const today = cairoReportDay(new Date());
+  const fromWeek = priorReportDay(today, 6);
   const filters: ReportFilters = {
     area: 'sales',
     fromDate: today,
@@ -115,7 +99,7 @@ export function HomeDashboard() {
     comparePrevious: false,
     offset: 0,
   };
-  const reports = useReports(canReport ? shopId : undefined, filters, false, false);
+  const reports = useReports(canReport ? shopId : undefined, filters, false, canReport);
   const readDashboard = (from: string, to: string) => {
     const params = new URLSearchParams({ shopId: shopId!, view: 'dashboard', from, to });
     for (const id of scopeIds) params.append('reportShopId', id);
@@ -133,6 +117,7 @@ export function HomeDashboard() {
   });
   const current = todayMetrics.data;
   const historic = weekMetrics.data;
+  const trendValid = historic ? trendMatchesPeriod(historic.salesTrend, fromWeek, today) : true;
   const trendMax = Math.max(
     1,
     ...(historic?.salesTrend ?? []).map((point) => Math.max(0, point.netSalesMinor)),
@@ -363,7 +348,12 @@ export function HomeDashboard() {
                 <div className="tux-home-insights">
                   <section aria-label="Seven-day sales trend">
                     <h2>Sales trend · 7 days</h2>
-                    {historic.salesTrend.length === 0 ? (
+                    {!trendValid ? (
+                      <p role="alert">
+                        Sales trend unavailable: returned dates do not match the requested Cairo
+                        reporting period. Source figures have not been changed.
+                      </p>
+                    ) : historic.salesTrend.length === 0 ? (
                       <p>No recorded sales trend for this period.</p>
                     ) : (
                       <ul className="tux-home-trend">
