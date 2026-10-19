@@ -92,7 +92,7 @@
   gap: var(--tux-space-3);
   padding: 15px 18px;
   border: 1px solid var(--tux-border-subtle);
-  border-inline-start: 3px solid var(--tux-warning, #a86400);
+  border-inline-start: 3px solid var(--tux-warning);
   border-radius: var(--tux-radius-lg);
   background: var(--tux-surface-panel);
 }
@@ -238,7 +238,7 @@
   display: block;
   width: min(100%, 40px);
   min-height: 3px;
-  background: var(--tux-accent, #1f6b52);
+  background: var(--tux-accent);
   border-radius: 5px 5px 0 0;
 }
 .tux-home-trend li > span:last-child,
