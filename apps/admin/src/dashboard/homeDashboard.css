@@ -449,3 +449,27 @@
     font-size: 17px;
   }
 }
+
+/* Secondary finalized-day facts remain discoverable without forcing nine
+   stacked dashboard cards into the 320px first-pass mobile scroll. */
+.tux-home-summary-disclosure {
+  margin: 2px 0 12px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-md);
+}
+.tux-home-summary-disclosure > summary {
+  cursor: pointer;
+  min-height: var(--tux-touch-target);
+  padding: 12px 15px;
+  color: var(--tux-text-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+.tux-home-summary-disclosure > summary:focus-visible {
+  outline: 2px solid var(--tux-text-primary);
+  outline-offset: 2px;
+}
+.tux-home-summary-disclosure[open] > .tux-home-summary-metrics {
+  padding: 12px;
+  margin-bottom: 0;
+}
