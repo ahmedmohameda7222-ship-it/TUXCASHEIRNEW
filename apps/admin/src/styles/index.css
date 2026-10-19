@@ -472,6 +472,16 @@ select {
   flex-shrink: 0;
   object-fit: contain;
 }
+/* The original TUX Operations bitmap is dark ink. Keep its original bytes
+   and give it a neutral light substrate in dark navigation chrome. */
+@media (prefers-color-scheme: dark) {
+  .admin-sidebar__identity .admin-brand-logo,
+  .admin-topbar__mobile-brand .admin-brand-logo {
+    padding: 3px;
+    border-radius: 8px;
+    background: #fff;
+  }
+}
 .admin-entry__mark {
   width: 64px;
   height: 64px;
