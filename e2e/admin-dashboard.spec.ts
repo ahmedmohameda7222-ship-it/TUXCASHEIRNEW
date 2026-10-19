@@ -357,7 +357,7 @@ test('P01 direct Home owns Owner Summary and Targets styling regardless of Finan
   await expect(targets).toContainText('EGP 1,750.00');
   const presentation = async () =>
     page.evaluate(() => {
-      const summary = document.querySelector('.tux-owner-summary')!;
+      const summary = document.querySelector('.tux-home-owner-summary')!;
       const target = document.querySelector('.tux-targets-panel')!;
       const metrics = document.querySelector('.tux-home-summary-metrics')!;
       const summaryStyle = getComputedStyle(summary);
