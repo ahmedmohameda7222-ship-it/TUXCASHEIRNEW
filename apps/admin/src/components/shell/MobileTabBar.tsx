@@ -38,7 +38,17 @@ function MobileTabBarView({ permitted, currentPath }: Required<MobileTabBarProps
       {permitted.map((destination) => {
         const item = DESTINATIONS[destination];
         const Icon = item.icon;
-        const active = routeIsActive(currentPath, item.href);
+        // A secondary deep link belongs to More, not to an unselected tab.
+        // Never mask a current primary destination (including its child routes).
+        const primaryMatch = permitted.some(
+          (candidate) =>
+            candidate !== 'more' &&
+            routeIsActive(currentPath, DESTINATIONS[candidate].href),
+        );
+        const active =
+          destination === 'more'
+            ? routeIsActive(currentPath, '/more') || !primaryMatch
+            : routeIsActive(currentPath, item.href);
         return (
           <Link
             className={active ? 'admin-mobile-tabs__item is-active' : 'admin-mobile-tabs__item'}
