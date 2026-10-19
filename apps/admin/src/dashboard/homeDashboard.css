@@ -348,3 +348,104 @@
     animation: none;
   }
 }
+
+/* Home-owned presentation for composable Owner Summary and Shop Targets.
+   These components must never inherit entire Finance or Reports page CSS. */
+.tux-owner-summary,
+.tux-targets-panel {
+  min-width: 0;
+  padding: clamp(16px, 2vw, 24px);
+  background: var(--tux-surface-panel);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+}
+.tux-home-owned-heading {
+  align-items: center;
+}
+.tux-home-owned-heading h2,
+.tux-targets-panel h2 {
+  margin: 0;
+  font-size: clamp(18px, 2.2vw, 23px);
+  line-height: 1.3;
+}
+.tux-home-supporting-text {
+  color: var(--tux-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+.tux-home-summary-content {
+  min-width: 0;
+}
+.tux-home-summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 195px), 1fr));
+  margin: 0 0 14px;
+  gap: 12px;
+}
+.tux-home-summary-metrics > div {
+  min-width: 0;
+  background: var(--tux-surface-subtle);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-md);
+  padding: 14px;
+}
+.tux-home-summary-metrics dt {
+  color: var(--tux-text-secondary);
+  font-size: 12px;
+}
+.tux-home-summary-metrics dd {
+  margin: 7px 0 0;
+  font-weight: 750;
+  font-size: clamp(17px, 2.5vw, 23px);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.tux-home-source-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tux-touch-target);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.tux-targets-panel h2 {
+  margin-bottom: 16px;
+}
+.tux-home-target-list {
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+.tux-home-target-list li {
+  display: flex;
+  min-width: 0;
+  gap: 8px 14px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 13px 15px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-md);
+  background: var(--tux-surface-subtle);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.tux-home-target-list li span {
+  color: var(--tux-text-secondary);
+  overflow-wrap: anywhere;
+}
+.tux-home-target-list li strong {
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 420px) {
+  .tux-home-summary-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tux-home-summary-metrics dd {
+    font-size: 17px;
+  }
+}
