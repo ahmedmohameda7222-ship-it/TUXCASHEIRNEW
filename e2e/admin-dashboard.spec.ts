@@ -551,3 +551,28 @@ for (const role of ['OWNER', 'MANAGER'] as const) {
     });
   });
 }
+
+
+test('P01 mobile Owner Summary keeps important facts visible and disclosures keyboard reachable', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  await mockHome(page, 'OWNER');
+  await page.goto('/');
+  const owner = page.getByRole('region', { name: 'Daily Owner Summary' });
+  await expect(owner.getByText('Net sales', { exact: true })).toBeVisible();
+  await expect(owner.getByText('Operating estimate', { exact: true })).toBeVisible();
+  const more = owner.getByText(/Additional finalized-day metrics/);
+  await expect(more).toBeVisible();
+  await expect(owner.getByText('Low stock items', { exact: true })).toBeHidden();
+  await more.focus();
+  await more.press('Enter');
+  await expect(owner.getByText('Low stock items', { exact: true })).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+    .toBe(true);
+  await page.screenshot({
+    path: 'test-results/p01-owner-summary-expanded-keyboard-320.png',
+    fullPage: true,
+  });
+});
