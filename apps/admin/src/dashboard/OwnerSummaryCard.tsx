@@ -25,7 +25,7 @@ export function OwnerSummaryCard({ shopId }: { shopId: string }) {
   });
 
   return (
-    <section className="tux-owner-summary" aria-label="Daily Owner Summary">
+    <section className="tux-home-owner-summary" aria-label="Daily Owner Summary">
       <div className="tux-home-section-heading tux-home-owned-heading">
         <h2>Daily Owner Summary</h2>
         <Link className="admin-secondary-button" href="/finance/end-day">
