@@ -181,6 +181,11 @@ test('P01 dark mobile dashboard retains readable status and routes', async ({ pa
   await mockHome(page, 'OWNER');
   await page.goto('/');
   await expect(page.getByRole('region', { name: 'Needs attention' })).toBeVisible();
+  const logo = page.locator('.admin-topbar__mobile-brand .admin-brand-logo');
+  await expect(logo).toBeVisible();
+  expect(await logo.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(
+    'rgb(255, 255, 255)',
+  );
   await page.screenshot({ path: 'test-results/p01-dashboard-owner-390-dark.png', fullPage: true });
 });
 
@@ -236,4 +241,24 @@ test('P01 respects 200% CSS zoom and preserves keyboard entry', async ({ page })
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
     .toBe(true);
   await page.screenshot({ path: 'test-results/p01-dashboard-owner-200-percent-css-zoom.png' });
+});
+
+test('P01 keeps the shell stable while daily reports are loading', async ({ page }) => {
+  await mockHome(page, 'OWNER');
+  let releaseReports: () => void = () => {};
+  const held = new Promise<void>((resolve) => {
+    releaseReports = resolve;
+  });
+  await page.route('**/api/admin/reports?*', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get('view') !== 'dashboard') return route.fallback();
+    await held;
+    return route.fallback();
+  });
+  await page.goto('/');
+  await expect(page.getByText("Loading today's recorded activity")).toBeVisible();
+  await expect(page.locator('.tux-home-kpi--skeleton')).toHaveCount(3);
+  await page.screenshot({ path: 'test-results/p01-dashboard-loading-390.png' });
+  releaseReports();
+  await expect(page.getByRole('region', { name: 'Needs attention' })).toBeVisible();
 });
