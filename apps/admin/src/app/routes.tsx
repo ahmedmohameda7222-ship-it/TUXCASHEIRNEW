@@ -90,9 +90,9 @@ export const ADMIN_ROUTES: readonly AdminRouteDefinition[] = [
 /** Navigation labels and grouping; access control still comes from routeIsPermitted. */
 export const ADMIN_NAV_GROUPS = [
   { label: 'Overview', paths: ['/'] },
-  { label: 'Operations', paths: ['/orders', '/delivery', '/inventory', '/purchasing'] },
+  { label: 'Operations', paths: ['/orders', '/catalog/products', '/inventory', '/purchasing', '/delivery'] },
   { label: 'People', paths: ['/staff', '/customers'] },
-  { label: 'Business', paths: ['/catalog/products', '/finance', '/reports'] },
+  { label: 'Business', paths: ['/finance', '/reports'] },
   { label: 'Administration', paths: ['/settings', '/approvals', '/approvals/rules', '/audit'] },
 ] as const;
 
@@ -191,11 +191,13 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
     );
   }
 
+  // These existing deep links are preserved for compatibility but are not
+  // represented as shipped management modules or promoted in navigation.
   return (
     <PageScaffold
-      eyebrow="TUX Admin"
+      eyebrow="Planned capability"
       title={route.label}
-      description="Authenticated management workspace."
+      description="This area is planned but is not available in the current TUX Admin release. Use the shipped management areas for live work."
     />
   );
 }
