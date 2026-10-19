@@ -14,6 +14,7 @@ async function mockHome(page: Page, role: 'OWNER' | 'MANAGER') {
           employeeId,
           role,
           shopIds: [shopId],
+          shopSummaries: [{ id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false }],
           permissions: [
             'reports.view',
             'staff.view',
@@ -125,4 +126,56 @@ test('manager Home prioritizes assigned shop operations and not owner profit', a
   await expect(page.getByText('Staff clocked in')).toBeVisible();
   await expect(page.getByText('Active deliveries')).toBeVisible();
   await expect(page.getByText('Estimated operating profit')).toHaveCount(0);
+});
+
+for (const viewport of [
+  { width: 320, height: 720 },
+  { width: 375, height: 844 },
+  { width: 390, height: 844 },
+  { width: 768, height: 1024 },
+  { width: 1280, height: 800 },
+  { width: 1440, height: 900 },
+]) {
+  test(`P01 decision-first dashboard at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await mockHome(page, 'OWNER');
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await expect(page.getByText('TUX Maadi').first()).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Needs attention' })).toBeVisible();
+    await expect(page.getByText('Failed online orders').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: /Open reports/i }).first()).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+      .toBe(true);
+    await page.screenshot({
+      path: `test-results/p01-dashboard-owner-${viewport.width}-light.png`,
+      fullPage: true,
+    });
+  });
+}
+
+test('P01 distinguishes real zero from loading and reports failures', async ({ page }) => {
+  await mockHome(page, 'OWNER');
+  await page.route('**/api/admin/reports?*', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get('view') === 'dashboard') {
+      await route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"unavailable"}' });
+    } else {
+      await route.continue();
+    }
+  });
+  await page.goto('/');
+  await expect(page.getByRole('alert').filter({ hasText: /dashboard data/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Retry dashboard' })).toBeVisible();
+  await expect(page.getByText('Net sales today')).toHaveCount(0);
+});
+
+test('P01 dark mobile dashboard retains readable status and routes', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockHome(page, 'OWNER');
+  await page.goto('/');
+  await expect(page.getByRole('region', { name: 'Needs attention' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/p01-dashboard-owner-390-dark.png', fullPage: true });
 });
