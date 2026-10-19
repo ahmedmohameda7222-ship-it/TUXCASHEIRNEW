@@ -248,3 +248,46 @@ test('P01 future-module deep links are honest instead of acting shipped', async 
   await expect(page.getByText('Planned capability')).toBeVisible();
   await expect(page.getByText(/not available in the current TUX Admin release/i)).toBeVisible();
 });
+
+test('P01 remembers the selected shop after reload without keeping revoked scope', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockSession(page);
+  await page.goto('/');
+  const shop = page.locator('.shop-switcher select');
+  await shop.selectOption('shop-b');
+  await expect(shop).toHaveValue('shop-b');
+  await page.reload();
+  await expect(shop).toHaveValue('shop-b');
+  await expect(page.getByRole('region', { name: 'Current business context' })).toContainText(
+    'TUX Zamalek',
+  );
+  await page.screenshot({ path: 'test-results/p01-shop-reload-390.png' });
+
+  // The remembered UUID never grants access after the authenticated principal changes.
+  await page.route('**/api/admin/session', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...ownerSession,
+        principal: {
+          ...ownerSession.principal,
+          role: 'MANAGER',
+          permissions: ['orders.view'],
+          shopIds: ['shop-a'],
+          shopSummaries: [
+            { id: 'shop-a', name: 'TUX Maadi', active: true, temporaryClosed: false },
+          ],
+        },
+      }),
+    }),
+  );
+  await page.reload();
+  await expect(page.getByRole('region', { name: 'Current business context' })).toContainText(
+    'TUX Maadi',
+  );
+  await expect(page.locator('.shop-switcher select')).toHaveCount(0);
+  await expect(page.getByText('TUX Zamalek')).toHaveCount(0);
+});
