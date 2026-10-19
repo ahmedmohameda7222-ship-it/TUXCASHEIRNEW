@@ -69,7 +69,9 @@ export function OwnerSummaryCard({ shopId }: { shopId: string }) {
               })}
             </dl>
           )}
-          <Link className="tux-home-source-link" href="/reports">Open source reports</Link>
+          <Link className="tux-home-source-link" href="/reports">
+            Open source reports
+          </Link>
         </div>
       ) : (
         <LoadingState title="Loading Owner Summary" />

@@ -345,7 +345,6 @@ test('P01 keeps the shell stable while daily reports are loading', async ({ page
   await expect(page.getByRole('region', { name: 'Needs attention' })).toBeVisible();
 });
 
-
 test('P01 direct Home owns Owner Summary and Targets styling regardless of Finance/Reports route CSS', async ({
   page,
 }) => {
@@ -379,7 +378,10 @@ test('P01 direct Home owns Owner Summary and Targets styling regardless of Finan
   expect(direct.summaryBorder).toBe('1px');
   expect(direct.targetBorder).toBe('1px');
   expect(direct.summaryBackground).not.toBe('rgba(0, 0, 0, 0)');
-  await page.screenshot({ path: 'test-results/p01-summary-targets-direct-home-1440.png', fullPage: true });
+  await page.screenshot({
+    path: 'test-results/p01-summary-targets-direct-home-1440.png',
+    fullPage: true,
+  });
 
   const nav = page.locator('[data-admin-desktop-nav]');
   for (const routeName of ['Finance', 'Reports']) {
@@ -389,10 +391,15 @@ test('P01 direct Home owns Owner Summary and Targets styling regardless of Finan
     await expect(targets.getByText('175,000', { exact: false })).toBeVisible();
     expect(await presentation()).toEqual(direct);
   }
-  await page.screenshot({ path: 'test-results/p01-summary-targets-after-finance-reports-1440.png', fullPage: true });
+  await page.screenshot({
+    path: 'test-results/p01-summary-targets-after-finance-reports-1440.png',
+    fullPage: true,
+  });
 });
 
-test('P01 trend uses requested Cairo date window and preserves source numeric values', async ({ page }) => {
+test('P01 trend uses requested Cairo date window and preserves source numeric values', async ({
+  page,
+}) => {
   await mockHome(page, 'OWNER');
   const requested: Array<{ from: string; to: string }> = [];
   await page.route('**/api/admin/reports?*', async (route) => {
@@ -420,7 +427,9 @@ test('P01 trend uses requested Cairo date window and preserves source numeric va
     day.setUTCDate(day.getUTCDate() + index);
     const label = day.toISOString().slice(0, 10);
     await expect(trend.locator('li').nth(index)).toHaveAttribute('aria-label', new RegExp(label));
-    await expect(trend.locator('li').nth(index)).toContainText((amount / 100).toLocaleString('en-EG'));
+    await expect(trend.locator('li').nth(index)).toContainText(
+      (amount / 100).toLocaleString('en-EG'),
+    );
   }
 });
 
@@ -430,8 +439,10 @@ test('P01 rejects stale response dates instead of presenting them under the curr
   await mockHome(page, 'OWNER');
   await page.route('**/api/admin/reports?*', async (route) => {
     const url = new URL(route.request().url());
-    if (url.searchParams.get('view') !== 'dashboard' ||
-        url.searchParams.get('from') === url.searchParams.get('to')) {
+    if (
+      url.searchParams.get('view') !== 'dashboard' ||
+      url.searchParams.get('from') === url.searchParams.get('to')
+    ) {
       return route.fallback();
     }
     await route.fulfill({
@@ -469,7 +480,9 @@ for (const role of ['OWNER', 'MANAGER'] as const) {
     { width: 390, height: 844 },
     { width: 320, height: 720 },
   ]) {
-    test(`P01 representative ${role} navigation and Home at ${viewport.width}px`, async ({ page }) => {
+    test(`P01 representative ${role} navigation and Home at ${viewport.width}px`, async ({
+      page,
+    }) => {
       await page.setViewportSize(viewport);
       await mockHome(page, role);
       await page.goto('/');
@@ -525,7 +538,9 @@ for (const role of ['OWNER', 'MANAGER'] as const) {
     const context = page.getByRole('region', { name: 'Current business context' });
     await expect(context).toContainText('TUX Zamalek Riverside & Catering Kitchen');
     await expect(context).toContainText('Temporarily closed');
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
     await page.screenshot({
       path: `test-results/p01-representative-${role.toLowerCase()}-390-dark.png`,
       fullPage: true,

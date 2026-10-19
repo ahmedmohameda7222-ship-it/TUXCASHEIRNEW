@@ -27,10 +27,18 @@ export function trendMatchesPeriod(
   const seen = new Set<string>();
   return points.every(({ date, netSalesMinor }) => {
     const parsed = /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T12:00:00Z`) : null;
-    const validDate = parsed !== null && !Number.isNaN(parsed.valueOf()) &&
+    const validDate =
+      parsed !== null &&
+      !Number.isNaN(parsed.valueOf()) &&
       parsed.toISOString().slice(0, 10) === date;
-    if (!validDate || date < from || date > to || seen.has(date) ||
-        !Number.isSafeInteger(netSalesMinor)) return false;
+    if (
+      !validDate ||
+      date < from ||
+      date > to ||
+      seen.has(date) ||
+      !Number.isSafeInteger(netSalesMinor)
+    )
+      return false;
     seen.add(date);
     return true;
   });

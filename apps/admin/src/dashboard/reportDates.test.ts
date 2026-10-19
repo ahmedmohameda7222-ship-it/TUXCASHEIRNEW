@@ -22,11 +22,19 @@ describe('Cairo dashboard reporting date integrity', () => {
 
   it('rejects stale, future, duplicate, invalid and fabricated-calendar dates', () => {
     for (const date of ['2026-10-02', '2026-10-20', '2026-02-30', 'bad-date']) {
-      expect(trendMatchesPeriod([{ date, netSalesMinor: 15000 }], '2026-10-13', '2026-10-19')).toBe(false);
+      expect(trendMatchesPeriod([{ date, netSalesMinor: 15000 }], '2026-10-13', '2026-10-19')).toBe(
+        false,
+      );
     }
-    expect(trendMatchesPeriod([
-      { date: '2026-10-15', netSalesMinor: 100 },
-      { date: '2026-10-15', netSalesMinor: 200 },
-    ], '2026-10-13', '2026-10-19')).toBe(false);
+    expect(
+      trendMatchesPeriod(
+        [
+          { date: '2026-10-15', netSalesMinor: 100 },
+          { date: '2026-10-15', netSalesMinor: 200 },
+        ],
+        '2026-10-13',
+        '2026-10-19',
+      ),
+    ).toBe(false);
   });
 });
