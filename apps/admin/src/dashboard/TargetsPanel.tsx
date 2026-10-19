@@ -27,7 +27,7 @@ export function TargetsPanel({
   return (
     <section className="tux-targets-panel" aria-label="Shop targets">
       <h2>Shop targets</h2>
-      <ul className="tux-reports-saved">
+      <ul className="tux-home-target-list">
         {targets.map((target) => {
           const isMatchingRange =
             target.periodStart === filters.fromDate && target.periodEnd === filters.toDate;
@@ -59,7 +59,7 @@ export function TargetsPanel({
           );
         })}
       </ul>
-      <p className="tux-finance-muted">
+      <p className="tux-home-supporting-text">
         Progress is shown only when the selected reporting metric and dates match the target.
       </p>
     </section>
