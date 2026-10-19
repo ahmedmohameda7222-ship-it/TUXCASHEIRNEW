@@ -1,0 +1,32 @@
+name: P01 one-time browser evidence formatting
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: write
+jobs:
+  apply-prettier:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/admin-premium-p01-dashboard-navigation
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Format P01 follow-up
+        run: npx prettier --write apps/admin/src/styles/index.css e2e/admin-dashboard.spec.ts
+      - name: Commit canonical formatting
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- apps/admin/src/styles/index.css e2e/admin-dashboard.spec.ts
+          if ! git diff --cached --quiet; then
+            git commit -m 'style(admin-p01): format dark brand and loading evidence tests'
+            git push origin HEAD:refs/heads/feat/admin-premium-p01-dashboard-navigation
+          fi
