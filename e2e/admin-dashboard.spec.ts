@@ -552,7 +552,6 @@ for (const role of ['OWNER', 'MANAGER'] as const) {
   });
 }
 
-
 test('P01 mobile Owner Summary keeps important facts visible and disclosures keyboard reachable', async ({
   page,
 }) => {
