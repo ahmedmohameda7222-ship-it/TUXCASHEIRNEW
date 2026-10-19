@@ -351,7 +351,7 @@
 
 /* Home-owned presentation for composable Owner Summary and Shop Targets.
    These components must never inherit entire Finance or Reports page CSS. */
-.tux-owner-summary,
+.tux-home-owner-summary,
 .tux-targets-panel {
   min-width: 0;
   padding: clamp(16px, 2vw, 24px);
