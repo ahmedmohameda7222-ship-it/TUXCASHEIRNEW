@@ -26,7 +26,7 @@ export function OwnerSummaryCard({ shopId }: { shopId: string }) {
 
   return (
     <section className="tux-owner-summary" aria-label="Daily Owner Summary">
-      <div className="tux-finance-toolbar">
+      <div className="tux-home-section-heading tux-home-owned-heading">
         <h2>Daily Owner Summary</h2>
         <Link className="admin-secondary-button" href="/finance/end-day">
           End Day history
@@ -51,13 +51,13 @@ export function OwnerSummaryCard({ shopId }: { shopId: string }) {
       ) : query.data?.summaries.length === 0 ? (
         <p>No finalized financial day has generated an Owner Summary for this shop yet.</p>
       ) : latest ? (
-        <div>
-          <p className="tux-finance-muted">
+        <div className="tux-home-summary-content">
+          <p className="tux-home-supporting-text">
             Generated{' '}
             {new Date(latest.generated_at).toLocaleString('en-EG', { timeZone: 'Africa/Cairo' })}
           </p>
           {authorizedMetrics.length > 0 && (
-            <dl className="tux-finance-x-grid">
+            <dl className="tux-home-summary-metrics">
               {authorizedMetrics.map(({ field, label, kind }) => {
                 const value = latest.summary[field] as number;
                 return (
@@ -69,7 +69,7 @@ export function OwnerSummaryCard({ shopId }: { shopId: string }) {
               })}
             </dl>
           )}
-          <Link href="/reports">Open source reports</Link>
+          <Link className="tux-home-source-link" href="/reports">Open source reports</Link>
         </div>
       ) : (
         <LoadingState title="Loading Owner Summary" />
