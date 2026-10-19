@@ -221,7 +221,7 @@ export function ApprovalRulesPage() {
       {rulesQuery.data?.rules.length === 0 ? (
         <EmptyState title="No approval rules configured" />
       ) : null}
-      <div className="admin-settings-list">
+      <div className="admin-record-stack">
         {rulesQuery.data?.rules.map((rule) => {
           const supportedAction = availableActions.find(
             (action) => action.actionType === rule.actionType,
@@ -231,7 +231,7 @@ export function ApprovalRulesPage() {
             ? thresholdLabel(rule)
             : 'Unsupported legacy action — editing disabled';
           return (
-            <div className="admin-settings-row" key={rule.id}>
+            <div className="admin-record-row" key={rule.id}>
               <div>
                 <strong>{rule.actionType}</strong>
                 <span>
@@ -258,9 +258,9 @@ export function ApprovalRulesPage() {
         })}
       </div>
 
-      <section className="admin-settings-section">
+      <section className="admin-form-section">
         <h2>{editing ? 'Edit approval rule' : 'Add approval rule'}</h2>
-        <form onSubmit={submit} className="admin-catalog-editor__section is-compact">
+        <form onSubmit={submit} className="admin-form-section admin-form-section--compact">
           <label className="admin-field">
             <span>Scope</span>
             <select

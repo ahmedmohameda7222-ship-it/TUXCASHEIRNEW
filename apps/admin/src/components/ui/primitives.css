@@ -1,0 +1,264 @@
+/* Admin-wide component styles: imported by main.tsx before any lazy route. */
+.admin-secondary-button {
+  min-height: var(--tux-touch-target);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-control);
+  padding: 0 14px;
+  background: var(--tux-surface-panel);
+  color: var(--tux-text-primary);
+  font-weight: 700;
+  cursor: pointer;
+}
+.admin-secondary-button:hover:not(:disabled) {
+  background: var(--tux-surface-subtle);
+  border-color: var(--tux-border-strong);
+}
+.admin-secondary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.admin-primary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.admin-field {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+.admin-field > span,
+.admin-field > label {
+  color: var(--tux-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+.admin-field input,
+.admin-field select,
+.admin-field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 12px;
+  color: var(--tux-text-primary);
+  background: var(--tux-surface-panel);
+}
+.admin-field input,
+.admin-field select {
+  min-height: var(--tux-touch-target);
+  padding: 0 12px;
+}
+.admin-field textarea {
+  padding: 10px 12px;
+  resize: vertical;
+}
+.admin-field input:focus-visible,
+.admin-field select:focus-visible,
+.admin-field textarea:focus-visible {
+  border-color: var(--tux-border-strong);
+}
+.admin-field__help {
+  margin: 0;
+  color: var(--tux-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.admin-form-section {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
+.admin-form-section--compact {
+  gap: 6px;
+}
+.admin-record-stack {
+  display: grid;
+  gap: 0.55rem;
+}
+.admin-record-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
+.admin-record-row > div:first-child,
+.admin-record-row__main > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+.admin-record-row span {
+  color: var(--tux-text-secondary);
+  overflow-wrap: anywhere;
+}
+.admin-record-list {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
+@media (max-width: 640px) {
+  .admin-record-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Task surfaces shared by Purchasing, Catalog and Settings. */
+.admin-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.admin-section-heading h2 {
+  margin: 0;
+  font-size: clamp(1.125rem, 3vw, 1.375rem);
+}
+.admin-section-eyebrow {
+  margin: 0;
+  color: var(--tux-text-secondary);
+  font-size: var(--tux-font-size-xs);
+  font-weight: 750;
+}
+.admin-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tux-space-2);
+}
+.admin-record-row--button {
+  width: 100%;
+  min-height: 68px;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--tux-border-subtle);
+  border-radius: 0;
+  cursor: pointer;
+}
+.admin-record-row--button:last-child {
+  border-bottom: 0;
+}
+.admin-record-row--button.is-selected {
+  background: var(--tux-surface-subtle);
+}
+.admin-record-row--button > span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.admin-record-row--button small {
+  color: var(--tux-text-secondary);
+}
+.admin-button--quiet {
+  min-height: var(--tux-touch-target);
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--tux-radius-control);
+  background: transparent;
+  color: var(--tux-text-primary);
+  cursor: pointer;
+}
+.admin-button--small {
+  min-height: 36px;
+  padding-inline: 10px;
+}
+.admin-form-field__hint,
+.admin-form-field__error {
+  margin: 0;
+  font-size: var(--tux-font-size-xs);
+}
+.admin-form-field__hint {
+  color: var(--tux-text-secondary);
+}
+.admin-form-field__error {
+  color: var(--tux-destructive);
+}
+
+/* A purchase order is a multi-line task, not a narrow single-field popup. */
+.admin-po-builder {
+  min-width: 0;
+}
+.admin-po-builder fieldset {
+  min-width: 0;
+  display: grid;
+  gap: var(--tux-space-3);
+  margin: 0;
+  padding: var(--tux-space-4);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-subtle);
+}
+.admin-po-builder legend {
+  padding-inline: 6px;
+  font-weight: 750;
+}
+.admin-po-builder label {
+  min-width: 0;
+}
+.admin-po-builder :is(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+}
+@media (min-width: 48rem) {
+  .admin-po-builder fieldset {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Shared record cards and forms. These classes previously had no CSS owner. */
+.admin-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  align-items: start;
+  gap: var(--tux-space-4);
+}
+.admin-card {
+  display: grid;
+  min-width: 0;
+  gap: var(--tux-space-2);
+  padding: var(--tux-space-4);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+  overflow-wrap: anywhere;
+}
+.admin-card > strong {
+  font-size: var(--tux-font-size-md);
+  line-height: 1.35;
+}
+.admin-card > span {
+  color: var(--tux-text-secondary);
+  line-height: 1.45;
+}
+.admin-form-grid {
+  display: grid;
+  min-width: 0;
+  gap: var(--tux-space-3);
+}
+.admin-form-grid > label {
+  display: grid;
+  min-width: 0;
+  gap: var(--tux-space-2);
+  color: var(--tux-text-secondary);
+  font-weight: 650;
+}
+.admin-form-grid > label > :is(input, select, textarea) {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--tux-touch-target);
+  padding: var(--tux-space-2) var(--tux-space-3);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-control);
+  background: var(--tux-surface-panel);
+  color: var(--tux-text-primary);
+}

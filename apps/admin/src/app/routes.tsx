@@ -87,6 +87,15 @@ export const ADMIN_ROUTES: readonly AdminRouteDefinition[] = [
   { path: '/more', label: 'More' },
 ] as const;
 
+/** Navigation labels and grouping; access control still comes from routeIsPermitted. */
+export const ADMIN_NAV_GROUPS = [
+  { label: 'Overview', paths: ['/'] },
+  { label: 'Operations', paths: ['/orders', '/delivery', '/inventory', '/purchasing'] },
+  { label: 'People', paths: ['/staff', '/customers'] },
+  { label: 'Business', paths: ['/catalog/products', '/finance', '/reports'] },
+  { label: 'Administration', paths: ['/settings', '/approvals', '/approvals/rules', '/audit'] },
+] as const;
+
 function routeForLocation(location: string): AdminRouteDefinition | undefined {
   return [...ADMIN_ROUTES]
     .sort((left, right) => right.path.length - left.path.length)
@@ -147,7 +156,9 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
       (candidate) =>
         !new Set(['/', '/orders', '/catalog/products', '/inventory', '/more']).has(
           candidate.path,
-        ) && routeIsPermitted(principal, candidate.path),
+        ) &&
+        !new Set(['/alerts', '/devices', '/whatsapp']).has(candidate.path) &&
+        routeIsPermitted(principal, candidate.path),
     );
     return (
       <PageScaffold
@@ -155,13 +166,26 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
         title="More"
         description="Additional management areas available to your role."
       >
-        <div className="admin-more-grid">
-          {secondary.map((candidate) => (
-            <Link className="admin-more-card" href={candidate.path} key={candidate.path}>
-              <strong>{candidate.label}</strong>
-              <span>Open</span>
-            </Link>
-          ))}
+        <div className="admin-more-index">
+          {ADMIN_NAV_GROUPS.map((group) => {
+            const entries = secondary.filter((candidate) =>
+              group.paths.some((path) => path === candidate.path),
+            );
+            if (entries.length === 0) return null;
+            return (
+              <section className="admin-more-group" key={group.label}>
+                <h2>{group.label}</h2>
+                <div className="admin-more-grid">
+                  {entries.map((candidate) => (
+                    <Link className="admin-more-card" href={candidate.path} key={candidate.path}>
+                      <strong>{candidate.label}</strong>
+                      <span>Open</span>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
         </div>
       </PageScaffold>
     );

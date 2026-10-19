@@ -203,6 +203,24 @@ select {
   overflow: hidden;
   clip: rect(0 0 0 0);
 }
+/* Keep desktop header controls shrinkable under text scaling and 200% zoom.
+   This is a shared shell constraint, not a one-off page override. */
+.admin-topbar .shop-switcher {
+  min-width: 0;
+  flex: 0 1 230px;
+}
+.admin-topbar .shop-switcher select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
+.admin-topbar__logout {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .shop-switcher select,
 .admin-icon-button {
   min-height: var(--tux-touch-target);
@@ -445,5 +463,89 @@ select {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+}
+
+/* TUX Precision navigation and accessible keyboard entry. */
+.admin-brand-logo {
+  display: block;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+.admin-entry__mark {
+  width: 64px;
+  height: 64px;
+  background: transparent;
+}
+.admin-skip-link {
+  position: fixed;
+  z-index: calc(var(--tux-z-header) + 3);
+  top: -100px;
+  left: 12px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--tux-surface-panel);
+  color: var(--tux-text-primary);
+  box-shadow: var(--tux-shadow-md);
+}
+.admin-skip-link:focus-visible {
+  top: 10px;
+}
+.admin-sidebar__group {
+  display: grid;
+  gap: 2px;
+  margin-bottom: var(--tux-space-3);
+}
+.admin-sidebar__group-title {
+  margin: 8px 10px 4px;
+  color: var(--tux-text-secondary);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.admin-more-index,
+.admin-more-group {
+  display: grid;
+  gap: 12px;
+}
+.admin-more-group h2 {
+  margin: 12px 0 0;
+  color: var(--tux-text-secondary);
+  font-size: var(--tux-font-size-sm);
+}
+
+/* Narrow viewports: keep scope selection and logout in the visible header. */
+@media (max-width: 420px) {
+  .admin-topbar {
+    gap: 8px;
+    padding-inline: 12px;
+  }
+  .admin-topbar__mobile-brand {
+    min-width: 0;
+    flex-shrink: 0;
+    gap: 6px;
+  }
+  .admin-topbar .shop-switcher {
+    min-width: 0;
+    flex: 0 1 160px;
+  }
+  .admin-topbar .shop-switcher select {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding-inline: 8px;
+    text-overflow: ellipsis;
+  }
+  .admin-topbar__logout {
+    flex: 0 0 var(--tux-touch-target);
+    justify-content: center;
+    padding-inline: 0;
+  }
+}
+@media (max-width: 359px) {
+  .admin-topbar__mobile-brand .admin-brand-suffix {
+    display: none;
   }
 }

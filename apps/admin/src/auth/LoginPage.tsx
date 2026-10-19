@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { BrandLogo } from '../components/ui/BrandLogo';
 
 export function LoginPage({ login }: { login(pin: string): Promise<void> }) {
   const [pin, setPin] = useState('');
@@ -27,7 +28,7 @@ export function LoginPage({ login }: { login(pin: string): Promise<void> }) {
     <main className="admin-entry" aria-labelledby="login-title">
       <form className="admin-entry__card admin-login" onSubmit={submit}>
         <div className="admin-entry__mark" aria-hidden="true">
-          T
+          <BrandLogo size={64} />
         </div>
         <p className="admin-entry__eyebrow">Secure access</p>
         <h1 id="login-title">Enter PIN</h1>

@@ -5,6 +5,7 @@ import type {
 } from '@tux/admin-contracts';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'wouter';
+import { useUnsavedShopDraft } from '../shops/ShopScopeProvider';
 
 import {
   buildProductAdvancedDraft,
@@ -139,6 +140,41 @@ export function ProductEditor({
       ),
     );
   }, [advancedModel, comboEnabled]);
+
+  const baseDirty =
+    name !== product.name ||
+    description !== (product.description ?? '') ||
+    (canPrice && price !== formatEgpMinor(product.priceMinor)) ||
+    bestSeller !== product.bestSeller ||
+    visible !== product.active ||
+    selectedCategoryId !== product.categoryId ||
+    comboEnabled !== product.isCombo ||
+    sortOrder !== String(product.sortOrder);
+  const advancedDirty = advancedModel
+    ? advancedModel.modifiers.some((modifier) => {
+        const current = modifierState[modifier.id];
+        return (
+          current !== undefined &&
+          (current.linked !== modifier.linked ||
+            current.maxQuantity !==
+              (modifier.maxQuantity === null ? '' : String(modifier.maxQuantity)))
+        );
+      }) ||
+      advancedModel.comboOptions.some(
+        (option) =>
+          comboState[option.productId] !== undefined &&
+          comboState[option.productId] !== option.selected,
+      ) ||
+      advancedModel.inventoryItems.some((item) => {
+        const current = recipeState[item.inventoryItemId];
+        return (
+          current !== undefined &&
+          current !==
+            (item.quantityMicros === null ? '' : formatQuantityMicrosForInput(item.quantityMicros))
+        );
+      })
+    : false;
+  useUnsavedShopDraft(baseDirty || advancedDirty);
 
   const draftPreview = useMemo(() => {
     let priceMinor = product.priceMinor;

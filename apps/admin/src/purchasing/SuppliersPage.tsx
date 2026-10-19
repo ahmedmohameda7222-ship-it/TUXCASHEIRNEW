@@ -2,6 +2,8 @@ import { useState } from 'react';
 
 import type { AdminSupplier } from '@tux/admin-contracts';
 import { AdminDialog } from '../components/overlay/AdminDialog';
+import { Button } from '../components/ui/Button';
+import { FormField } from '../components/ui/FormField';
 
 export function SuppliersPage({
   suppliers,
@@ -65,7 +67,7 @@ export function SuppliersPage({
 
   return (
     <section aria-labelledby="purchasing-suppliers-heading">
-      <div className="admin-catalog-editor__section-heading">
+      <div className="admin-section-heading">
         <h2 id="purchasing-suppliers-heading">Suppliers</h2>
         {canManage ? (
           <button
@@ -97,7 +99,7 @@ export function SuppliersPage({
             <span>{supplier.phone ?? supplier.email ?? 'No contact details'}</span>
             <span>{supplier.active ? 'Active' : 'Archived'}</span>
             {canManageLifecycle && typeof supplier.version === 'number' ? (
-              <div className="admin-inventory-page-actions">
+              <div className="admin-inline-actions">
                 <button
                   className="admin-secondary-button"
                   type="button"
@@ -179,49 +181,45 @@ export function SuppliersPage({
               }
             }}
           >
-            <label>
-              Supplier name
+            <FormField id="supplier-name" label="Supplier name" required>
               <input
+                id="supplier-name"
                 autoFocus
+                required
                 value={name}
                 onChange={(event) => setName(event.currentTarget.value)}
               />
-            </label>
-            <label>
-              Contact name
+            </FormField>
+            <FormField id="supplier-contact" label="Contact name">
               <input
+                id="supplier-contact"
                 value={contactName}
                 onChange={(event) => setContactName(event.currentTarget.value)}
               />
-            </label>
-            <label>
-              Phone
-              <input value={phone} onChange={(event) => setPhone(event.currentTarget.value)} />
-            </label>
-            <label>
-              Email
+            </FormField>
+            <FormField id="supplier-phone" label="Phone" hint="Optional contact number">
               <input
+                id="supplier-phone"
+                type="tel"
+                value={phone}
+                onChange={(event) => setPhone(event.currentTarget.value)}
+              />
+            </FormField>
+            <FormField id="supplier-email" label="Email">
+              <input
+                id="supplier-email"
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.currentTarget.value)}
               />
-            </label>
-            <div className="admin-inventory-page-actions">
-              <button
-                className="admin-secondary-button"
-                type="button"
-                disabled={pending}
-                onClick={() => setOpen(false)}
-              >
+            </FormField>
+            <div className="admin-inline-actions">
+              <Button variant="secondary" disabled={pending} onClick={() => setOpen(false)}>
                 Cancel
-              </button>
-              <button
-                className="admin-primary-button"
-                type="submit"
-                disabled={pending || !name.trim()}
-              >
+              </Button>
+              <Button variant="primary" type="submit" pending={pending} disabled={!name.trim()}>
                 {pending ? 'Saving…' : editingSupplier ? 'Save supplier' : 'Add supplier'}
-              </button>
+              </Button>
             </div>
           </form>
         </AdminDialog>

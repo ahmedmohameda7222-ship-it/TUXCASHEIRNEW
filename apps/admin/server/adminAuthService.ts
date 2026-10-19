@@ -73,6 +73,7 @@ function requireRole(role: string): AdminRole {
 async function resolvePrincipal(
   employee: AdminEmployeeRow,
   client: AdminSupabaseClient,
+  includeShopSummaries = false,
 ): Promise<AdminSessionPrincipal> {
   const role = requireRole(employee.role);
   const shopIds = new Set<string>();
@@ -128,12 +129,62 @@ async function resolvePrincipal(
     }
   }
 
+  // These labels are strictly display metadata, not a new authorization scope.
+  // Filter the service-role read to IDs that the principal is already entitled
+  // to select, and never return an unassigned shop even if the store drifts.
+  const authorizedIds = [...shopIds];
+  let shopSummaries: NonNullable<AdminSessionPrincipal['shopSummaries']> = [];
+  if (includeShopSummaries && authorizedIds.length > 0) {
+    try {
+      const rows = await client.select<
+        Array<{ id: string; name: string; active: boolean; temporary_closed: boolean }>
+      >(
+        'shops',
+        query({
+          select: 'id,name,active,temporary_closed',
+          id: `in.(${authorizedIds.join(',')})`,
+        }),
+      );
+      const allowed = new Set(authorizedIds);
+      const validRows = new Map(
+        rows
+          .filter(
+            (row) =>
+              allowed.has(row.id) &&
+              typeof row.name === 'string' &&
+              row.name.trim().length > 0 &&
+              typeof row.active === 'boolean' &&
+              typeof row.temporary_closed === 'boolean',
+          )
+          .map((row) => [row.id, row]),
+      );
+      shopSummaries = authorizedIds.flatMap((id) => {
+        const row = validRows.get(id);
+        return row
+          ? [
+              {
+                id,
+                name: row.name,
+                active: row.active,
+                temporaryClosed: row.temporary_closed,
+              },
+            ]
+          : [];
+      });
+    } catch {
+      // A transient identity read must not invalidate an otherwise valid
+      // authenticated session. The switcher displays "Name unavailable".
+      shopSummaries = [];
+    }
+  }
+
   return {
     employeeId: employee.id,
     businessId: employee.business_id,
     role,
     permissions: ADMIN_PERMISSIONS.filter((permission) => granted.has(permission)),
-    shopIds: [...shopIds],
+    shopIds: authorizedIds,
+    shopSummaries,
   };
 }
 
@@ -166,7 +217,7 @@ export async function loginAdmin(
     throw new AdminAuthError('invalid_pin', 401);
   }
 
-  const principal = await resolvePrincipal(employee, client);
+  const principal = await resolvePrincipal(employee, client, true);
   const material = createSessionMaterial(now, env.sessionTtlSeconds);
   await client.insert<unknown>('admin_sessions', {
     business_id: employee.business_id,
@@ -183,6 +234,7 @@ export async function loadAdminSession(
   token: string,
   client: AdminSupabaseClient,
   now = new Date(),
+  includeShopSummaries = false,
 ): Promise<AdminSessionContext> {
   const tokenHash = sha256Hex(token);
   const sessions = await client.select<AdminSessionRow[]>(
@@ -210,7 +262,7 @@ export async function loadAdminSession(
   );
   const employee = employees[0];
   if (!employee?.active) throw new AdminAuthError('employee_inactive', 403);
-  const principal = await resolvePrincipal(employee, client);
+  const principal = await resolvePrincipal(employee, client, includeShopSummaries);
   return { session, employee, principal };
 }
 

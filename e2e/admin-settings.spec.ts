@@ -141,14 +141,15 @@ async function mockSettings(
     const url = new URL(request.url());
 
     if (request.method() === 'GET') {
-      expect(url.searchParams.get('shopId')).toBe(shopId);
+      const requestedShopId = url.searchParams.get('shopId');
+      expect(authorizedShopIds).toContain(requestedShopId);
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           shop: {
-            id: shopId,
-            name: 'TUX Maadi',
+            id: requestedShopId,
+            name: requestedShopId === shopId ? 'TUX Maadi' : 'TUX Second Location',
             lifecycleState: shopLifecycleState,
             lifecycleRevision: shopLifecycleRevision,
             active: shopLifecycleState === 'ACTIVE',

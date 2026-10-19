@@ -20,7 +20,8 @@ import {
 import { Link, useLocation } from 'wouter';
 
 import type { AdminSessionPrincipal } from '@tux/admin-contracts';
-import { ADMIN_ROUTES, routeIsPermitted } from '../../app/routes';
+import { ADMIN_NAV_GROUPS, ADMIN_ROUTES, routeIsPermitted } from '../../app/routes';
+import { BrandLogo } from '../ui/BrandLogo';
 
 const ICONS: Record<string, LucideIcon> = {
   '/': Home,
@@ -58,24 +59,40 @@ function DesktopSidebarView({ principal, currentPath }: Required<DesktopSidebarP
   return (
     <aside className="admin-sidebar" data-admin-desktop-nav>
       <div className="admin-sidebar__identity" aria-label="TUX Admin">
-        <span className="admin-sidebar__mark">T</span>
+        <BrandLogo size={40} />
         <span className="admin-sidebar__brand">TUX Admin</span>
       </div>
       <nav className="admin-sidebar__nav" aria-label="Admin sections">
-        {routes.map((route) => {
-          const Icon = ICONS[route.path] ?? ClipboardList;
-          const active = routeIsActive(currentPath, route.path);
+        {ADMIN_NAV_GROUPS.map((group) => {
+          const entries = routes.filter((route) => group.paths.some((path) => path === route.path));
+          if (entries.length === 0) return null;
           return (
-            <Link
-              className={active ? 'admin-sidebar__link is-active' : 'admin-sidebar__link'}
-              href={route.path}
-              aria-label={route.label}
-              aria-current={active ? 'page' : undefined}
-              key={route.path}
-            >
-              <Icon size={19} aria-hidden="true" />
-              <span aria-hidden="true">{route.label}</span>
-            </Link>
+            <div className="admin-sidebar__group" key={group.label}>
+              <h2 className="admin-sidebar__group-title">{group.label}</h2>
+              {entries.map((route) => {
+                const Icon = ICONS[route.path] ?? ClipboardList;
+                const active =
+                  routeIsActive(currentPath, route.path) &&
+                  !entries.some(
+                    (other) =>
+                      other.path !== route.path &&
+                      other.path.startsWith(`${route.path}/`) &&
+                      routeIsActive(currentPath, other.path),
+                  );
+                return (
+                  <Link
+                    className={active ? 'admin-sidebar__link is-active' : 'admin-sidebar__link'}
+                    href={route.path}
+                    aria-label={route.label}
+                    aria-current={active ? 'page' : undefined}
+                    key={route.path}
+                  >
+                    <Icon size={19} aria-hidden="true" />
+                    <span aria-hidden="true">{route.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
           );
         })}
       </nav>

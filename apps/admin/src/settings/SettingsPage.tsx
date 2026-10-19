@@ -135,27 +135,24 @@ function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
   const firstActiveReason = workspace.reasonCodes.find((reason) => reason.active);
   return (
     <div className="admin-settings-overview">
-      <section className="admin-catalog-editor__section" aria-labelledby="settings-shop-summary">
-        <p className="admin-catalog-editor__eyebrow">Shop</p>
+      <section className="admin-form-section" aria-labelledby="settings-shop-summary">
+        <p className="admin-section-eyebrow">Shop</p>
         <h2 id="settings-shop-summary">Shop identity</h2>
         <p className="admin-field__help">
           {workspace.shop.name} · {workspace.shop.address ?? 'No address configured'} ·{' '}
           {workspace.shop.timezone}
         </p>
       </section>
-      <section
-        className="admin-catalog-editor__section"
-        aria-labelledby="settings-operations-summary"
-      >
-        <p className="admin-catalog-editor__eyebrow">Operations</p>
+      <section className="admin-form-section" aria-labelledby="settings-operations-summary">
+        <p className="admin-section-eyebrow">Operations</p>
         <h2 id="settings-operations-summary">Order setup</h2>
         <p className="admin-field__help">
           {workspace.orderTypes.length} order types · {workspace.paymentMethods.length} payment
           methods · {workspace.deliveryZones.length} delivery zones
         </p>
       </section>
-      <section className="admin-catalog-editor__section" aria-labelledby="settings-live-summary">
-        <p className="admin-catalog-editor__eyebrow">Live controls</p>
+      <section className="admin-form-section" aria-labelledby="settings-live-summary">
+        <p className="admin-section-eyebrow">Live controls</p>
         <h2 id="settings-live-summary">Receipt and reason settings</h2>
         <p className="admin-field__help">
           Receipt prefix: {receiptPrefix === null ? 'Not configured' : String(receiptPrefix)}
@@ -326,7 +323,7 @@ export function SettingsWorkspaceView({
     <main className="admin-settings-workspace" data-settings-version={workspace.settingsVersion}>
       <header className="admin-settings-workspace__header">
         <div>
-          <p className="admin-catalog-editor__eyebrow">Settings</p>
+          <p className="admin-section-eyebrow">Settings</p>
           <h1>{workspace.shop.name}</h1>
           <p className="admin-field__help">Shop settings and operational controls</p>
         </div>

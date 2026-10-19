@@ -6,6 +6,7 @@ const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const supplierId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const inactiveSupplierId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbc';
 const itemId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const secondItemId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccd';
 const poId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const lineId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const csrfToken = 'p'.repeat(64);
@@ -78,6 +79,12 @@ async function mockPurchasing(
             {
               id: itemId,
               name: 'Beef',
+              unitLabel: 'kg',
+              purchaseUnits: [{ label: 'case', baseMicrosPerPurchaseUnit }],
+            },
+            {
+              id: secondItemId,
+              name: 'Chicken',
               unitLabel: 'kg',
               purchaseUnits: [{ label: 'case', baseMicrosPerPurchaseUnit }],
             },
@@ -475,3 +482,159 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     ).toBe(true);
   });
 }
+
+test('supplier form exposes linked field guidance and restores focus after Escape', async ({
+  page,
+}) => {
+  await mockPurchasing(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/purchasing');
+  const dialog = await openSupplierDialog(page);
+  const phone = dialog.getByRole('textbox', { name: 'Phone' });
+  await expect(phone).toHaveAttribute('aria-describedby', 'supplier-phone-hint');
+  await expect(dialog.locator('#supplier-phone-hint')).toContainText('Optional contact number');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Add supplier' })).toBeFocused();
+});
+
+for (const viewport of [
+  { name: 'small-phone', width: 320, height: 720 },
+  { name: 'narrow-phone', width: 375, height: 844 },
+  { name: 'phone', width: 390, height: 844 },
+  { name: 'tablet', width: 768, height: 1024 },
+  { name: 'desktop-1280', width: 1280, height: 800 },
+  { name: 'desktop', width: 1440, height: 900 },
+]) {
+  test(`captures supplier and wide PO task surfaces at ${viewport.name}`, async ({ page }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await mockPurchasing(page);
+    await page.goto('/purchasing');
+    const supplier = await openSupplierDialog(page);
+    await expect(supplier.getByLabel('Supplier name')).toBeVisible();
+    const supplierBounds = await supplier.boundingBox();
+    expect(supplierBounds).not.toBeNull();
+    expect(
+      Math.abs(supplierBounds!.x + supplierBounds!.width / 2 - viewport.width / 2),
+    ).toBeLessThan(4);
+    expect(supplierBounds!.y).toBeGreaterThanOrEqual(8);
+    expect(supplierBounds!.y + supplierBounds!.height).toBeLessThanOrEqual(viewport.height - 8);
+    if (supplierBounds!.height < viewport.height * 0.8) {
+      expect(
+        Math.abs(supplierBounds!.y + supplierBounds!.height / 2 - viewport.height / 2),
+      ).toBeLessThan(8);
+    }
+    await page.screenshot({
+      path: `test-results/admin-stage1-supplier-${viewport.name}.png`,
+      fullPage: true,
+    });
+    await page.keyboard.press('Escape');
+    await expect(supplier).toBeHidden();
+    await openPurchaseOrders(page);
+    await page.getByRole('button', { name: 'New purchase order' }).click();
+    const po = page.getByRole('dialog', { name: 'New purchase order' });
+    await expect(po.getByLabel('Quantity (purchase units)')).toBeVisible();
+    const bounds = await po.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.width).toBeLessThanOrEqual(viewport.width);
+    expect(Math.abs(bounds!.x + bounds!.width / 2 - viewport.width / 2)).toBeLessThan(4);
+    expect(bounds!.y).toBeGreaterThanOrEqual(8);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport.height - 8);
+    if (viewport.width >= 768) expect(bounds!.width).toBeGreaterThan(700);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
+    ).toBe(false);
+    await page.screenshot({
+      path: `test-results/admin-stage1-purchase-order-${viewport.name}.png`,
+      fullPage: true,
+    });
+  });
+}
+
+for (const width of [320, 390]) {
+  test(`mobile PO task exposes every action after scrolling at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: width === 320 ? 720 : 844 });
+    const fixture = await mockPurchasing(page);
+    await page.goto('/purchasing');
+    await openPurchaseOrders(page);
+    await page.getByRole('button', { name: 'New purchase order' }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'New purchase order' });
+    const body = dialog.locator('.admin-dialog__body');
+    await expect(dialog.getByLabel('Expected delivery')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Add line' }).click();
+    await expect(dialog.locator('fieldset')).toHaveCount(2);
+    await dialog.locator('fieldset').nth(1).getByLabel('Inventory item').selectOption(secondItemId);
+    for (const fieldset of await dialog.locator('fieldset').all()) {
+      await fieldset.getByLabel('Quantity (purchase units)').fill('2');
+      await fieldset.getByLabel('Expected cost per purchase unit (EGP)').fill('240');
+    }
+    await body.evaluate((node) => {
+      node.scrollTop = node.scrollHeight;
+    });
+    const submit = dialog.getByRole('button', { name: 'Create purchase order' });
+    await expect(submit).toBeInViewport();
+    await expect(submit).toBeEnabled();
+    await page.screenshot({
+      path: `test-results/admin-stage1-po-final-actions-${width}.png`,
+    });
+    await submit.focus();
+    await expect(submit).toBeFocused();
+    await submit.press('Enter');
+    await expect.poll(() => fixture.commands.length).toBe(1);
+    expect(fixture.commands[0]).toMatchObject({
+      type: 'po.create',
+      lines: [
+        expect.objectContaining({ inventoryItemId: itemId, orderedPurchaseUnitsMicros: 2_000_000 }),
+        expect.objectContaining({
+          inventoryItemId: secondItemId,
+          orderedPurchaseUnitsMicros: 2_000_000,
+        }),
+      ],
+    });
+  });
+}
+
+for (const width of [320, 390]) {
+  test(`mobile PO validation and cancellation remain accessible at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: width === 320 ? 720 : 844 });
+    const fixture = await mockPurchasing(page);
+    await page.goto('/purchasing');
+    await openPurchaseOrders(page);
+    const trigger = page.getByRole('button', { name: 'New purchase order' });
+    await trigger.click();
+    const dialog = page.getByRole('dialog', { name: 'New purchase order' });
+    await dialog.getByLabel('Quantity (purchase units)').fill('0');
+    await dialog.getByLabel('Expected cost per purchase unit (EGP)').fill('240');
+    await dialog.getByRole('button', { name: 'Create purchase order' }).click();
+    await expect(dialog.getByRole('alert')).toBeVisible();
+    expect(fixture.commands).toHaveLength(0);
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+
+    await trigger.click();
+    await dialog.getByLabel('Quantity (purchase units)').fill('2');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+    expect(fixture.commands).toHaveLength(0);
+  });
+}
+
+test('shared Supplier and PO surfaces use dark theme tokens', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockPurchasing(page);
+  await page.goto('/purchasing');
+  const supplier = await openSupplierDialog(page);
+  await page.screenshot({ path: 'test-results/admin-stage1-supplier-dark-phone.png' });
+  await page.keyboard.press('Escape');
+  await expect(supplier).toBeHidden();
+  await openPurchaseOrders(page);
+  await page.getByRole('button', { name: 'New purchase order' }).click();
+  await expect(page.getByRole('dialog', { name: 'New purchase order' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/admin-stage1-purchase-order-dark-phone.png' });
+});

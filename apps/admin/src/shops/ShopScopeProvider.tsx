@@ -1,5 +1,14 @@
 import type { AdminSessionPrincipal, ShopScope } from '@tux/admin-contracts';
-import { createContext, useContext, useMemo, useState, type PropsWithChildren } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PropsWithChildren,
+} from 'react';
 
 export function initialShopScope(principal: AdminSessionPrincipal): ShopScope {
   const firstShop = principal.shopIds[0];
@@ -26,7 +35,9 @@ export function requireConcreteShop(scope: ShopScope): string {
 
 type ShopScopeContextValue = {
   scope: ShopScope;
-  setScope(scope: ShopScope): void;
+  setScope(scope: ShopScope, options?: { discardUnsavedDrafts?: boolean }): boolean;
+  hasUnsavedDrafts(): boolean;
+  registerUnsavedDraftGuard(isDirty: () => boolean): () => void;
   principal: AdminSessionPrincipal;
 };
 
@@ -37,15 +48,38 @@ export function ShopScopeProvider({
   children,
 }: PropsWithChildren<{ principal: AdminSessionPrincipal }>) {
   const [scope, setRawScope] = useState<ShopScope>(() => initialShopScope(principal));
+  const dirtyGuards = useRef(new Set<() => boolean>());
+  const hasUnsavedDrafts = useCallback(
+    () => Array.from(dirtyGuards.current).some((isDirty) => isDirty()),
+    [],
+  );
+  const registerUnsavedDraftGuard = useCallback((isDirty: () => boolean) => {
+    dirtyGuards.current.add(isDirty);
+    return () => {
+      dirtyGuards.current.delete(isDirty);
+    };
+  }, []);
   const value = useMemo<ShopScopeContextValue>(
     () => ({
       scope,
       principal,
-      setScope(next) {
-        setRawScope(validateShopScope(principal, next));
+      hasUnsavedDrafts,
+      registerUnsavedDraftGuard,
+      setScope(next, options) {
+        const validated = validateShopScope(principal, next);
+        if (
+          validated.kind === scope.kind &&
+          (validated.kind === 'all-shops' ||
+            (scope.kind === 'shop' && validated.shopId === scope.shopId))
+        ) {
+          return true;
+        }
+        if (!options?.discardUnsavedDrafts && hasUnsavedDrafts()) return false;
+        setRawScope(validated);
+        return true;
       },
     }),
-    [scope, principal],
+    [scope, principal, hasUnsavedDrafts, registerUnsavedDraftGuard],
   );
   return <ShopScopeContext.Provider value={value}>{children}</ShopScopeContext.Provider>;
 }
@@ -54,4 +88,20 @@ export function useShopScope() {
   const value = useContext(ShopScopeContext);
   if (!value) throw new Error('useShopScope must be used within ShopScopeProvider');
   return value;
+}
+
+// A form opts in only while it actually holds unsaved, shop-specific edits.
+// The guard is registered once; the ref keeps the latest dirty state without
+// re-registering on every keystroke.
+export function useUnsavedShopDraft(isDirty: boolean) {
+  // Editors also render standalone in isolated component tests. The guard is
+  // active only when the real authenticated shell provides shop context.
+  const context = useContext(ShopScopeContext);
+  const registerUnsavedDraftGuard = context?.registerUnsavedDraftGuard;
+  const dirtyRef = useRef(isDirty);
+  dirtyRef.current = isDirty;
+  useEffect(() => {
+    if (!registerUnsavedDraftGuard) return;
+    return registerUnsavedDraftGuard(() => dirtyRef.current);
+  }, [registerUnsavedDraftGuard]);
 }
