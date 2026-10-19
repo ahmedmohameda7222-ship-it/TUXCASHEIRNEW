@@ -25,7 +25,7 @@ export function TargetsPanel({
 }) {
   if (targets.length === 0) return null;
   return (
-    <section className="tux-targets-panel" aria-label="Shop targets">
+    <section className="tux-home-targets-panel" aria-label="Shop targets">
       <h2>Shop targets</h2>
       <ul className="tux-home-target-list">
         {targets.map((target) => {
