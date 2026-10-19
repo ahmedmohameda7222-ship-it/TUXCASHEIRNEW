@@ -232,7 +232,8 @@ test('P01 desktop navigation groups Catalog under Operations and preserves selec
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockSession(page);
   await page.goto('/catalog/products');
-  await expect(page.locator('main#main-content').getByRole('heading', { name: 'Catalog' })).toBeVisible();
+  const main = page.locator('main#main-content');
+  await expect(main.getByRole('heading', { name: 'Catalog' })).toBeVisible();
   const nav = page.locator('[data-admin-desktop-nav]');
   await expect(nav.getByRole('link', { name: 'Catalog' })).toHaveAttribute('aria-current', 'page');
   await expect(nav.getByText('Operations')).toBeVisible();
