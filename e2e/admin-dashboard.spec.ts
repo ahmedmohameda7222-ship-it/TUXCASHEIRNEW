@@ -344,3 +344,197 @@ test('P01 keeps the shell stable while daily reports are loading', async ({ page
   releaseReports();
   await expect(page.getByRole('region', { name: 'Needs attention' })).toBeVisible();
 });
+
+
+test('P01 direct Home owns Owner Summary and Targets styling regardless of Finance/Reports route CSS', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockHome(page, 'OWNER');
+  await page.goto('/');
+  const owner = page.getByRole('region', { name: 'Daily Owner Summary' });
+  const targets = page.getByRole('region', { name: 'Shop targets' });
+  await expect(owner.getByText('Net sales', { exact: true })).toBeVisible();
+  await expect(targets.getByText('175,000', { exact: false })).toBeVisible();
+  const presentation = async () =>
+    page.evaluate(() => {
+      const summary = document.querySelector('.tux-owner-summary')!;
+      const target = document.querySelector('.tux-targets-panel')!;
+      const metrics = document.querySelector('.tux-home-summary-metrics')!;
+      const summaryStyle = getComputedStyle(summary);
+      const targetStyle = getComputedStyle(target);
+      const metricStyle = getComputedStyle(metrics);
+      return {
+        summaryBackground: summaryStyle.backgroundColor,
+        summaryPadding: summaryStyle.padding,
+        summaryBorder: summaryStyle.borderTopWidth,
+        targetBackground: targetStyle.backgroundColor,
+        targetPadding: targetStyle.padding,
+        targetBorder: targetStyle.borderTopWidth,
+        metricDisplay: metricStyle.display,
+      };
+    });
+  const direct = await presentation();
+  expect(direct.metricDisplay).toBe('grid');
+  expect(direct.summaryBorder).toBe('1px');
+  expect(direct.targetBorder).toBe('1px');
+  expect(direct.summaryBackground).not.toBe('rgba(0, 0, 0, 0)');
+  await page.screenshot({ path: 'test-results/p01-summary-targets-direct-home-1440.png', fullPage: true });
+
+  const nav = page.locator('[data-admin-desktop-nav]');
+  for (const routeName of ['Finance', 'Reports']) {
+    await nav.getByRole('link', { name: routeName, exact: true }).click();
+    await nav.getByRole('link', { name: 'Home' }).click();
+    await expect(owner.getByText('Net sales', { exact: true })).toBeVisible();
+    await expect(targets.getByText('175,000', { exact: false })).toBeVisible();
+    expect(await presentation()).toEqual(direct);
+  }
+  await page.screenshot({ path: 'test-results/p01-summary-targets-after-finance-reports-1440.png', fullPage: true });
+});
+
+test('P01 trend uses requested Cairo date window and preserves source numeric values', async ({ page }) => {
+  await mockHome(page, 'OWNER');
+  const requested: Array<{ from: string; to: string }> = [];
+  await page.route('**/api/admin/reports?*', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get('view') === 'dashboard') {
+      requested.push({ from: url.searchParams.get('from')!, to: url.searchParams.get('to')! });
+    }
+    await route.fallback();
+  });
+  await page.goto('/');
+  const today = cairoFixtureDay();
+  const first = new Date(`${today}T12:00:00Z`);
+  first.setUTCDate(first.getUTCDate() - 6);
+  const start = first.toISOString().slice(0, 10);
+  await expect(page.getByRole('region', { name: 'Seven-day sales trend' })).toBeVisible();
+  await expect
+    .poll(() => requested.some(({ from, to }) => from === start && to === today))
+    .toBe(true);
+  await expect
+    .poll(() => requested.some(({ from, to }) => from === today && to === today))
+    .toBe(true);
+  const trend = page.getByRole('region', { name: 'Seven-day sales trend' });
+  for (const [index, amount] of [20000, 25000, 15000].entries()) {
+    const day = new Date(`${start}T12:00:00Z`);
+    day.setUTCDate(day.getUTCDate() + index);
+    const label = day.toISOString().slice(0, 10);
+    await expect(trend.locator('li').nth(index)).toHaveAttribute('aria-label', new RegExp(label));
+    await expect(trend.locator('li').nth(index)).toContainText((amount / 100).toLocaleString('en-EG'));
+  }
+});
+
+test('P01 rejects stale response dates instead of presenting them under the current week', async ({
+  page,
+}) => {
+  await mockHome(page, 'OWNER');
+  await page.route('**/api/admin/reports?*', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get('view') !== 'dashboard' ||
+        url.searchParams.get('from') === url.searchParams.get('to')) {
+      return route.fallback();
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        netSalesMinor: 155000,
+        orderCount: 12,
+        averageOrderMinor: 12917,
+        estimatedOperatingProfitMinor: 51000,
+        lowStockCount: 2,
+        outOfStockCount: 1,
+        failedOnlineOrderCount: 1,
+        pendingApprovalCount: 3,
+        staffOnShiftCount: 4,
+        deliveryOpenCount: 2,
+        salesTrend: [{ date: '2026-10-02', netSalesMinor: 20000 }],
+        topProducts: [],
+        sourceMix: [],
+        shopComparison: [],
+      }),
+    });
+  });
+  await page.goto('/');
+  const trend = page.getByRole('region', { name: 'Seven-day sales trend' });
+  await expect(trend.getByRole('alert')).toContainText('returned dates do not match');
+  await expect(trend.locator('li')).toHaveCount(0);
+  await expect(page.getByText('Net sales today')).toBeVisible();
+});
+
+for (const role of ['OWNER', 'MANAGER'] as const) {
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 390, height: 844 },
+    { width: 320, height: 720 },
+  ]) {
+    test(`P01 representative ${role} navigation and Home at ${viewport.width}px`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await mockHome(page, role);
+      await page.goto('/');
+      await expect(page.getByRole('region', { name: 'Current business context' })).toContainText(
+        'TUX Maadi',
+      );
+      await expect(page.getByRole('region', { name: 'Needs attention' })).toBeVisible();
+      await expect(page.getByRole('region', { name: 'Shop targets' })).toBeVisible();
+      if (role === 'OWNER') {
+        await expect(page.getByRole('region', { name: 'Daily Owner Summary' })).toBeVisible();
+      } else {
+        await expect(page.getByRole('region', { name: 'Daily Owner Summary' })).toHaveCount(0);
+        await expect(page.getByText('Estimated operating profit')).toHaveCount(0);
+      }
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+        .toBe(true);
+      if (viewport.width >= 768) {
+        const nav = page.locator('[data-admin-desktop-nav]');
+        for (const group of ['Operations', 'People', 'Business']) {
+          await expect(nav.getByText(group, { exact: true })).toBeVisible();
+        }
+        if (role === 'OWNER') {
+          await expect(nav.getByText('Administration', { exact: true })).toBeVisible();
+          await expect(nav.getByRole('link', { name: 'Audit Log' })).toBeVisible();
+        } else {
+          await expect(nav.getByRole('link', { name: 'Audit Log' })).toHaveCount(0);
+          await expect(nav.getByRole('link', { name: 'Finance', exact: true })).toHaveCount(0);
+        }
+      } else {
+        const mobile = page.locator('[data-admin-mobile-nav]');
+        await expect(mobile.getByRole('link', { name: 'More' })).toBeVisible();
+        await mobile.getByRole('link', { name: 'More' }).click();
+        await expect(page.getByRole('heading', { name: 'More' })).toBeVisible();
+        await expect(page.getByRole('link', { name: /Staff/ }).first()).toBeVisible();
+        await expect(page.getByText('WhatsApp')).toHaveCount(0);
+      }
+      await page.screenshot({
+        path: `test-results/p01-representative-${role.toLowerCase()}-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+    });
+  }
+}
+
+for (const role of ['OWNER', 'MANAGER'] as const) {
+  test(`P01 ${role} long shop identity and mobile dark More remain usable`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockHome(page, role);
+    await page.goto('/');
+    await page.locator('.shop-switcher select').selectOption(secondShopId);
+    const context = page.getByRole('region', { name: 'Current business context' });
+    await expect(context).toContainText('TUX Zamalek Riverside & Catering Kitchen');
+    await expect(context).toContainText('Temporarily closed');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({
+      path: `test-results/p01-representative-${role.toLowerCase()}-390-dark.png`,
+      fullPage: true,
+    });
+    await page.locator('[data-admin-mobile-nav]').getByRole('link', { name: 'More' }).click();
+    await expect(page.getByRole('heading', { name: 'More' })).toBeVisible();
+    await page.screenshot({
+      path: `test-results/p01-representative-${role.toLowerCase()}-more-390-dark.png`,
+      fullPage: true,
+    });
+  });
+}
