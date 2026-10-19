@@ -249,7 +249,7 @@ test('P01 future-module deep links are honest instead of acting shipped', async 
   await expect(page.getByText(/not available in the current TUX Admin release/i)).toBeVisible();
 });
 
-test('P01 remembers the selected shop after reload without keeping revoked scope', async ({
+test('P01 keeps shop selection in memory and rejects revoked assignment on reload', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -258,14 +258,13 @@ test('P01 remembers the selected shop after reload without keeping revoked scope
   const shop = page.locator('.shop-switcher select');
   await shop.selectOption('shop-b');
   await expect(shop).toHaveValue('shop-b');
-  await page.reload();
-  await expect(shop).toHaveValue('shop-b');
   await expect(page.getByRole('region', { name: 'Current business context' })).toContainText(
     'TUX Zamalek',
   );
-  await page.screenshot({ path: 'test-results/p01-shop-reload-390.png' });
+  await page.screenshot({ path: 'test-results/p01-shop-selection-390.png' });
 
-  // The remembered UUID never grants access after the authenticated principal changes.
+  // Shop selection is memory-only: reloading requires revalidating the
+  // authenticated principal and selecting a currently permitted shop.
   await page.route('**/api/admin/session', (route) =>
     route.fulfill({
       status: 200,
