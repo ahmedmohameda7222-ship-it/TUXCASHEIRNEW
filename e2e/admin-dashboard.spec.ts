@@ -160,7 +160,11 @@ test('P01 distinguishes real zero from loading and reports failures', async ({ p
   await page.route('**/api/admin/reports?*', async (route) => {
     const url = new URL(route.request().url());
     if (url.searchParams.get('view') === 'dashboard') {
-      await route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"unavailable"}' });
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: '{"error":"unavailable"}',
+      });
     } else {
       await route.fallback();
     }
@@ -202,7 +206,11 @@ test('P01 zero-value daily report is not misrepresented as unavailable', async (
       sourceMix: [],
       shopComparison: [],
     };
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
   });
   await page.goto('/');
   await expect(page.getByRole('region', { name: 'Needs attention' })).toContainText(
@@ -220,7 +228,9 @@ test('P01 respects 200% CSS zoom and preserves keyboard entry', async ({ page })
   await mockHome(page, 'OWNER');
   await page.goto('/');
   await expect(page.getByRole('region', { name: 'Needs attention' })).toBeVisible();
-  await page.evaluate(() => { document.documentElement.style.zoom = '2'; });
+  await page.evaluate(() => {
+    document.documentElement.style.zoom = '2';
+  });
   await expect(page.getByRole('link', { name: /Open reports/i }).first()).toBeVisible();
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))

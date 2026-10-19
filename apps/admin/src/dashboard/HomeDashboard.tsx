@@ -88,12 +88,13 @@ export function HomeDashboard() {
   const canOrders = permissions.includes('orders.view');
   const ownerView = principal.role === 'OWNER' || principal.role === 'ADMIN';
   const canShowAll = ownerView;
-  const scopeIds =
-    isAllShops && canShowAll ? principal.shopIds : shopId ? [shopId] : [];
+  const scopeIds = isAllShops && canShowAll ? principal.shopIds : shopId ? [shopId] : [];
   const selectedShop = principal.shopSummaries?.find(
     (shop) => shop.id === shopId && principal.shopIds.includes(shop.id),
   );
-  const contextName = isAllShops ? 'All authorized shops' : (selectedShop?.name ?? 'Shop unavailable');
+  const contextName = isAllShops
+    ? 'All authorized shops'
+    : (selectedShop?.name ?? 'Shop unavailable');
   const operationalStatus = isAllShops
     ? 'Aggregated view · select a shop for shop-specific actions'
     : selectedShop?.active === false
@@ -137,7 +138,11 @@ export function HomeDashboard() {
     ...(historic?.salesTrend ?? []).map((point) => Math.max(0, point.netSalesMinor)),
   );
   const exceptionSignals = [
-    { label: 'Failed online orders', count: current?.failedOnlineOrderCount, href: canOrders ? '/orders' : null },
+    {
+      label: 'Failed online orders',
+      count: current?.failedOnlineOrderCount,
+      href: canOrders ? '/orders' : null,
+    },
     ...(canApprovals
       ? [{ label: 'Pending approvals', count: current?.pendingApprovalCount, href: '/approvals' }]
       : []),
@@ -175,12 +180,22 @@ export function HomeDashboard() {
       <div className="tux-home-layout">
         <section className="tux-home-context" aria-label="Current business context">
           <div>
-            <span className="tux-home-eyebrow">{ownerView ? 'Business overview' : 'Shop overview'}</span>
+            <span className="tux-home-eyebrow">
+              {ownerView ? 'Business overview' : 'Shop overview'}
+            </span>
             <h2>{contextName}</h2>
             <p>{operationalStatus}</p>
           </div>
           <div className="tux-home-context__meta">
-            <span>{principal.role === 'OWNER' ? 'Owner' : principal.role === 'ADMIN' ? 'Administrator' : principal.role === 'MANAGER' ? 'Manager' : 'Staff'}</span>
+            <span>
+              {principal.role === 'OWNER'
+                ? 'Owner'
+                : principal.role === 'ADMIN'
+                  ? 'Administrator'
+                  : principal.role === 'MANAGER'
+                    ? 'Manager'
+                    : 'Staff'}
+            </span>
             <span>Business date · {today} (Cairo)</span>
           </div>
         </section>
@@ -191,7 +206,9 @@ export function HomeDashboard() {
               <div className="tux-home-pending" aria-busy="true">
                 <LoadingState title="Loading today's recorded activity" />
                 <div className="tux-home-kpis" aria-hidden="true">
-                  {[1, 2, 3].map((item) => <div key={item} className="tux-home-kpi tux-home-kpi--skeleton" />)}
+                  {[1, 2, 3].map((item) => (
+                    <div key={item} className="tux-home-kpi tux-home-kpi--skeleton" />
+                  ))}
                 </div>
               </div>
             ) : todayMetrics.isError ? (
@@ -199,7 +216,11 @@ export function HomeDashboard() {
                 title="Current dashboard data is unavailable"
                 description="No sales or exception values can be confirmed right now. Previously recorded data has not been changed."
                 action={
-                  <button type="button" className="admin-secondary-button" onClick={() => void todayMetrics.refetch()}>
+                  <button
+                    type="button"
+                    className="admin-secondary-button"
+                    onClick={() => void todayMetrics.refetch()}
+                  >
                     Retry dashboard
                   </button>
                 }
@@ -222,14 +243,26 @@ export function HomeDashboard() {
                             <strong className="tux-home-alert__value">{valueOf(item.count)}</strong>
                             <span>{item.label}</span>
                           </div>
-                          {item.href ? <Link href={item.href} aria-label={`Review ${item.label.toLowerCase()}`}>Review <span aria-hidden="true">→</span></Link> : null}
+                          {item.href ? (
+                            <Link
+                              href={item.href}
+                              aria-label={`Review ${item.label.toLowerCase()}`}
+                            >
+                              Review <span aria-hidden="true">→</span>
+                            </Link>
+                          ) : null}
                         </div>
                       ))}
                     </div>
                   ) : knownSignals.length === exceptionSignals.length ? (
-                    <p className="tux-home-calm">No flagged exceptions in the available daily report.</p>
+                    <p className="tux-home-calm">
+                      No flagged exceptions in the available daily report.
+                    </p>
                   ) : (
-                    <p className="tux-home-calm">Some exception counts are unavailable. Open the relevant workspace for details.</p>
+                    <p className="tux-home-calm">
+                      Some exception counts are unavailable. Open the relevant workspace for
+                      details.
+                    </p>
                   )}
                 </section>
 
@@ -239,33 +272,75 @@ export function HomeDashboard() {
                       <span className="tux-home-eyebrow">Daily overview · {today}</span>
                       <h2>Recorded performance</h2>
                     </div>
-                    <Link className="admin-secondary-button" href="/reports">Open reports</Link>
+                    <Link className="admin-secondary-button" href="/reports">
+                      Open reports
+                    </Link>
                   </div>
                   <dl className="tux-home-kpis">
-                    <MetricCard label="Net sales today" value={current.netSalesMinor} money description="Recorded net sales · EGP" />
-                    <MetricCard label="Orders today" value={current.orderCount} description="Recorded order count" />
-                    <MetricCard label="Average order value" value={current.averageOrderMinor} money description="EGP per recorded order" />
-                    {canFinance ? <MetricCard label="Estimated operating profit" value={current.estimatedOperatingProfitMinor} money description="Estimate · not finalized profit" /> : null}
+                    <MetricCard
+                      label="Net sales today"
+                      value={current.netSalesMinor}
+                      money
+                      description="Recorded net sales · EGP"
+                    />
+                    <MetricCard
+                      label="Orders today"
+                      value={current.orderCount}
+                      description="Recorded order count"
+                    />
+                    <MetricCard
+                      label="Average order value"
+                      value={current.averageOrderMinor}
+                      money
+                      description="EGP per recorded order"
+                    />
+                    {canFinance ? (
+                      <MetricCard
+                        label="Estimated operating profit"
+                        value={current.estimatedOperatingProfitMinor}
+                        money
+                        description="Estimate · not finalized profit"
+                      />
+                    ) : null}
                   </dl>
                 </section>
                 {canStaff || canDelivery ? (
                   <section className="tux-home-operations" aria-label="Operations snapshot">
-                    <div className="tux-home-section-heading"><h2>Operations snapshot</h2></div>
+                    <div className="tux-home-section-heading">
+                      <h2>Operations snapshot</h2>
+                    </div>
                     <dl className="tux-home-kpis tux-home-kpis--secondary">
-                      {canStaff ? <MetricCard label="Staff clocked in" value={current.staffOnShiftCount} description="Reported on shift" /> : null}
-                      {canDelivery ? <MetricCard label="Active deliveries" value={current.deliveryOpenCount} description="Reported open deliveries" /> : null}
+                      {canStaff ? (
+                        <MetricCard
+                          label="Staff clocked in"
+                          value={current.staffOnShiftCount}
+                          description="Reported on shift"
+                        />
+                      ) : null}
+                      {canDelivery ? (
+                        <MetricCard
+                          label="Active deliveries"
+                          value={current.deliveryOpenCount}
+                          description="Reported open deliveries"
+                        />
+                      ) : null}
                     </dl>
                   </section>
                 ) : null}
               </>
             ) : (
-              <EmptyState title="No dashboard response" description="The reporting workspace did not return current-day values." />
+              <EmptyState
+                title="No dashboard response"
+                description="The reporting workspace did not return current-day values."
+              />
             )}
 
             <section className="tux-home-analytics" aria-label="Seven-day business context">
               <div className="tux-home-section-heading">
                 <div>
-                  <span className="tux-home-eyebrow">Historical context · {fromWeek} to {today}</span>
+                  <span className="tux-home-eyebrow">
+                    Historical context · {fromWeek} to {today}
+                  </span>
                   <h2>Seven-day view</h2>
                 </div>
               </div>
@@ -274,7 +349,15 @@ export function HomeDashboard() {
               ) : weekMetrics.isError ? (
                 <ErrorState
                   title="Historical trends are unavailable"
-                  action={<button type="button" className="admin-secondary-button" onClick={() => void weekMetrics.refetch()}>Retry history</button>}
+                  action={
+                    <button
+                      type="button"
+                      className="admin-secondary-button"
+                      onClick={() => void weekMetrics.refetch()}
+                    >
+                      Retry history
+                    </button>
+                  }
                 />
               ) : historic ? (
                 <div className="tux-home-insights">
@@ -285,8 +368,17 @@ export function HomeDashboard() {
                     ) : (
                       <ul className="tux-home-trend">
                         {historic.salesTrend.map((item) => (
-                          <li key={item.date} aria-label={`${item.date}: ${formatEgp(item.netSalesMinor)}`}>
-                            <span className="tux-home-trend__bar" style={{ height: `${Math.max(3, Math.round(Math.max(0, item.netSalesMinor) / trendMax * 100))}%` }} aria-hidden="true" />
+                          <li
+                            key={item.date}
+                            aria-label={`${item.date}: ${formatEgp(item.netSalesMinor)}`}
+                          >
+                            <span
+                              className="tux-home-trend__bar"
+                              style={{
+                                height: `${Math.max(3, Math.round((Math.max(0, item.netSalesMinor) / trendMax) * 100))}%`,
+                              }}
+                              aria-hidden="true"
+                            />
                             <small>{item.date.slice(5)}</small>
                             <span>{formatEgp(item.netSalesMinor)}</span>
                           </li>
@@ -297,10 +389,15 @@ export function HomeDashboard() {
                   {canCatalog ? (
                     <section aria-label="Top recorded products">
                       <h2>Top products · 7 days</h2>
-                      {historic.topProducts.length === 0 ? <p>No recorded products this week.</p> : (
+                      {historic.topProducts.length === 0 ? (
+                        <p>No recorded products this week.</p>
+                      ) : (
                         <ol className="tux-home-insight-list">
                           {historic.topProducts.map((item, index) => (
-                            <li key={`${index}:${item.name}`}><span>{item.name}</span><strong>{valueOf(item.quantity)} sold</strong></li>
+                            <li key={`${index}:${item.name}`}>
+                              <span>{item.name}</span>
+                              <strong>{valueOf(item.quantity)} sold</strong>
+                            </li>
                           ))}
                         </ol>
                       )}
@@ -308,11 +405,19 @@ export function HomeDashboard() {
                   ) : null}
                   <section aria-label="Sales channels">
                     <h2>POS vs online · 7 days</h2>
-                    {historic.sourceMix.length === 0 ? <p>No recorded orders this week.</p> : (
+                    {historic.sourceMix.length === 0 ? (
+                      <p>No recorded orders this week.</p>
+                    ) : (
                       <dl className="tux-home-insight-list">
                         {historic.sourceMix.map((item) => (
                           <div key={item.source}>
-                            <dt>{item.source === 'POS' ? 'In-store POS' : item.source === 'ONLINE' ? 'Online' : 'Other'}</dt>
+                            <dt>
+                              {item.source === 'POS'
+                                ? 'In-store POS'
+                                : item.source === 'ONLINE'
+                                  ? 'Online'
+                                  : 'Other'}
+                            </dt>
                             <dd>{valueOf(item.orderCount)} orders</dd>
                           </div>
                         ))}
@@ -322,17 +427,29 @@ export function HomeDashboard() {
                   {ownerView && scopeIds.length > 1 ? (
                     <section aria-label="Authorized shop comparison">
                       <h2>Shop comparison · 7 days</h2>
-                      {historic.shopComparison.length === 0 ? <p>No shop comparison returned.</p> : (
+                      {historic.shopComparison.length === 0 ? (
+                        <p>No shop comparison returned.</p>
+                      ) : (
                         <dl className="tux-home-insight-list">
                           {historic.shopComparison.map((item, index) => (
-                            <div key={`${index}:${item.shopName}`}><dt>{item.shopName}</dt><dd>{formatEgp(item.netSalesMinor)} · {valueOf(item.orderCount)} orders</dd></div>
+                            <div key={`${index}:${item.shopName}`}>
+                              <dt>{item.shopName}</dt>
+                              <dd>
+                                {formatEgp(item.netSalesMinor)} · {valueOf(item.orderCount)} orders
+                              </dd>
+                            </div>
                           ))}
                         </dl>
                       )}
                     </section>
                   ) : null}
                 </div>
-              ) : <EmptyState title="No historical report" description="No seven-day report is currently available." />}
+              ) : (
+                <EmptyState
+                  title="No historical report"
+                  description="No seven-day report is currently available."
+                />
+              )}
             </section>
             <TargetsPanel
               targets={reports.configQuery.data?.targets ?? []}
@@ -342,10 +459,16 @@ export function HomeDashboard() {
           </>
         ) : !canReport ? (
           <section className="tux-home-no-report">
-            <EmptyState title="Reporting is not enabled for this role" description="Choose an authorized workspace below. Nothing is shown from restricted reports." />
+            <EmptyState
+              title="Reporting is not enabled for this role"
+              description="Choose an authorized workspace below. Nothing is shown from restricted reports."
+            />
           </section>
         ) : (
-          <EmptyState title="No assigned shops" description="No authorized shop is available to summarize." />
+          <EmptyState
+            title="No assigned shops"
+            description="No authorized shop is available to summarize."
+          />
         )}
 
         <section className="tux-home-actions" aria-label="Authorized next actions">
@@ -358,10 +481,15 @@ export function HomeDashboard() {
           {shortcuts.length ? (
             <nav className="tux-home-actions__grid" aria-label="Authorized management shortcuts">
               {shortcuts.map((item) => (
-                <Link key={item.href} href={item.href}>{item.label}<span aria-hidden="true">→</span></Link>
+                <Link key={item.href} href={item.href}>
+                  {item.label}
+                  <span aria-hidden="true">→</span>
+                </Link>
               ))}
             </nav>
-          ) : <p>No additional workspaces are authorized for this account.</p>}
+          ) : (
+            <p>No additional workspaces are authorized for this account.</p>
+          )}
         </section>
         {canFinance && shopId && !isAllShops ? <OwnerSummaryCard shopId={shopId} /> : null}
       </div>

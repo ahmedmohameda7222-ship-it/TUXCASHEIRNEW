@@ -212,11 +212,10 @@ test('P01 secondary routes keep More active while hiding unshipped modules', asy
   await mockSession(page);
   await page.goto('/staff');
   const mobile = page.locator('[data-admin-mobile-nav]');
-  await expect(mobile.getByRole('link', { name: 'More' })).toHaveAttribute(
-    'aria-current', 'page',
-  );
+  await expect(mobile.getByRole('link', { name: 'More' })).toHaveAttribute('aria-current', 'page');
   await expect(mobile.getByRole('link', { name: 'Home' })).not.toHaveAttribute(
-    'aria-current', 'page',
+    'aria-current',
+    'page',
   );
   await mobile.getByRole('link', { name: 'More' }).click();
   await expect(page.getByRole('heading', { name: 'More' })).toBeVisible();
@@ -234,9 +233,7 @@ test('P01 desktop navigation groups Catalog under Operations and preserves selec
   await mockSession(page);
   await page.goto('/catalog/products');
   const nav = page.locator('[data-admin-desktop-nav]');
-  await expect(nav.getByRole('link', { name: 'Catalog' })).toHaveAttribute(
-    'aria-current', 'page',
-  );
+  await expect(nav.getByRole('link', { name: 'Catalog' })).toHaveAttribute('aria-current', 'page');
   await expect(nav.getByText('Operations')).toBeVisible();
   await expect(nav.getByRole('link', { name: 'Catalog' })).toBeVisible();
   await expect(nav.getByText('WhatsApp')).toHaveCount(0);

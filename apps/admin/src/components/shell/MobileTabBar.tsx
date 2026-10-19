@@ -42,8 +42,7 @@ function MobileTabBarView({ permitted, currentPath }: Required<MobileTabBarProps
         // Never mask a current primary destination (including its child routes).
         const primaryMatch = permitted.some(
           (candidate) =>
-            candidate !== 'more' &&
-            routeIsActive(currentPath, DESTINATIONS[candidate].href),
+            candidate !== 'more' && routeIsActive(currentPath, DESTINATIONS[candidate].href),
         );
         const active =
           destination === 'more'

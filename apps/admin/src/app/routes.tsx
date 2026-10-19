@@ -90,7 +90,10 @@ export const ADMIN_ROUTES: readonly AdminRouteDefinition[] = [
 /** Navigation labels and grouping; access control still comes from routeIsPermitted. */
 export const ADMIN_NAV_GROUPS = [
   { label: 'Overview', paths: ['/'] },
-  { label: 'Operations', paths: ['/orders', '/catalog/products', '/inventory', '/purchasing', '/delivery'] },
+  {
+    label: 'Operations',
+    paths: ['/orders', '/catalog/products', '/inventory', '/purchasing', '/delivery'],
+  },
   { label: 'People', paths: ['/staff', '/customers'] },
   { label: 'Business', paths: ['/finance', '/reports'] },
   { label: 'Administration', paths: ['/settings', '/approvals', '/approvals/rules', '/audit'] },
