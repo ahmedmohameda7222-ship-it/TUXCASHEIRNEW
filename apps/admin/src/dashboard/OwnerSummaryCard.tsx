@@ -58,7 +58,7 @@ export function OwnerSummaryCard({ shopId }: { shopId: string }) {
           </p>
           {authorizedMetrics.length > 0 && (
             <dl className="tux-home-summary-metrics">
-              {authorizedMetrics.map(({ field, label, kind }) => {
+              {authorizedMetrics.slice(0, 3).map(({ field, label, kind }) => {
                 const value = latest.summary[field] as number;
                 return (
                   <div key={field}>
@@ -68,6 +68,22 @@ export function OwnerSummaryCard({ shopId }: { shopId: string }) {
                 );
               })}
             </dl>
+          )}
+          {authorizedMetrics.length > 3 && (
+            <details className="tux-home-summary-disclosure">
+              <summary>Additional finalized-day metrics ({authorizedMetrics.length - 3})</summary>
+              <dl className="tux-home-summary-metrics">
+                {authorizedMetrics.slice(3).map(({ field, label, kind }) => {
+                  const value = latest.summary[field] as number;
+                  return (
+                    <div key={field}>
+                      <dt>{label}</dt>
+                      <dd>{kind === 'money' ? formatEgp(value) : value.toLocaleString('en-EG')}</dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            </details>
           )}
           <Link className="tux-home-source-link" href="/reports">
             Open source reports
