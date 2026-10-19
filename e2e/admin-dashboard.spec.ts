@@ -427,9 +427,7 @@ test('P01 trend uses requested Cairo date window and preserves source numeric va
     day.setUTCDate(day.getUTCDate() + index);
     const label = day.toISOString().slice(0, 10);
     await expect(trend.locator('li').nth(index)).toHaveAttribute('aria-label', new RegExp(label));
-    await expect(trend.locator('li').nth(index)).toContainText(
-      (amount / 100).toLocaleString('en-EG'),
-    );
+    await expect(trend.locator('li').nth(index)).toContainText(`EGP ${(amount / 100).toFixed(2)}`);
   }
 });
 
