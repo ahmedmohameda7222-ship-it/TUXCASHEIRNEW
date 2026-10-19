@@ -244,6 +244,7 @@ test('P01 respects 200% CSS zoom and preserves keyboard entry', async ({ page })
 });
 
 test('P01 keeps the shell stable while daily reports are loading', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await mockHome(page, 'OWNER');
   let releaseReports: () => void = () => {};
   const held = new Promise<void>((resolve) => {
