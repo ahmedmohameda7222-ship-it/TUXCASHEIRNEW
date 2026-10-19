@@ -28,6 +28,34 @@ export function validateShopScope(principal: AdminSessionPrincipal, scope: ShopS
   return scope;
 }
 
+const SHOP_SCOPE_STORAGE_PREFIX = 'tux-admin-shop-scope:v1';
+
+function scopeStorageKey(principal: AdminSessionPrincipal): string {
+  return `${SHOP_SCOPE_STORAGE_PREFIX}:${principal.businessId}:${principal.employeeId}`;
+}
+
+/** Remember a display choice, never authorization. The session principal remains authoritative. */
+function readRememberedScope(principal: AdminSessionPrincipal): ShopScope {
+  if (typeof window === 'undefined') return initialShopScope(principal);
+  try {
+    const stored = window.sessionStorage.getItem(scopeStorageKey(principal));
+    if (!stored) return initialShopScope(principal);
+    const parsed: unknown = JSON.parse(stored);
+    if (typeof parsed !== 'object' || parsed === null) return initialShopScope(principal);
+    const candidate = parsed as { kind?: unknown; shopId?: unknown };
+    if (candidate.kind === 'all-shops') {
+      return validateShopScope(principal, { kind: 'all-shops' });
+    }
+    if (candidate.kind === 'shop' && typeof candidate.shopId === 'string') {
+      return validateShopScope(principal, { kind: 'shop', shopId: candidate.shopId });
+    }
+  } catch {
+    // Removed assignments, malformed storage, and restricted browser storage
+    // all recover through the current authenticated principal.
+  }
+  return initialShopScope(principal);
+}
+
 export function requireConcreteShop(scope: ShopScope): string {
   if (scope.kind !== 'shop') throw new Error('concrete_shop_required');
   return scope.shopId;
@@ -47,8 +75,22 @@ export function ShopScopeProvider({
   principal,
   children,
 }: PropsWithChildren<{ principal: AdminSessionPrincipal }>) {
-  const [scope, setRawScope] = useState<ShopScope>(() => initialShopScope(principal));
+  const [scope, setRawScope] = useState<ShopScope>(() => readRememberedScope(principal));
   const dirtyGuards = useRef(new Set<() => boolean>());
+  useEffect(() => {
+    try {
+      validateShopScope(principal, scope);
+    } catch {
+      setRawScope(initialShopScope(principal));
+      return;
+    }
+    if (typeof window === 'undefined') return;
+    try {
+      window.sessionStorage.setItem(scopeStorageKey(principal), JSON.stringify(scope));
+    } catch {
+      // Optional session persistence must not block shop selection.
+    }
+  }, [principal, scope]);
   const hasUnsavedDrafts = useCallback(
     () => Array.from(dirtyGuards.current).some((isDirty) => isDirty()),
     [],
