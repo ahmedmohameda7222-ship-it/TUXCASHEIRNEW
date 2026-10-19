@@ -162,7 +162,7 @@ test('P01 distinguishes real zero from loading and reports failures', async ({ p
     if (url.searchParams.get('view') === 'dashboard') {
       await route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"unavailable"}' });
     } else {
-      await route.continue();
+      await route.fallback();
     }
   });
   await page.goto('/');
@@ -178,4 +178,52 @@ test('P01 dark mobile dashboard retains readable status and routes', async ({ pa
   await page.goto('/');
   await expect(page.getByRole('region', { name: 'Needs attention' })).toBeVisible();
   await page.screenshot({ path: 'test-results/p01-dashboard-owner-390-dark.png', fullPage: true });
+});
+
+test('P01 zero-value daily report is not misrepresented as unavailable', async ({ page }) => {
+  await mockHome(page, 'OWNER');
+  await page.route('**/api/admin/reports?*', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get('view') !== 'dashboard') return route.fallback();
+    const body = {
+      ok: true,
+      netSalesMinor: 0,
+      orderCount: 0,
+      averageOrderMinor: null,
+      estimatedOperatingProfitMinor: null,
+      lowStockCount: 0,
+      outOfStockCount: 0,
+      failedOnlineOrderCount: 0,
+      pendingApprovalCount: 0,
+      staffOnShiftCount: null,
+      deliveryOpenCount: null,
+      salesTrend: [],
+      topProducts: [],
+      sourceMix: [],
+      shopComparison: [],
+    };
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+  await page.goto('/');
+  await expect(page.getByRole('region', { name: 'Needs attention' })).toContainText(
+    'No flagged exceptions',
+  );
+  await expect(page.getByRole('region', { name: "Today's recorded performance" })).toContainText(
+    'No recorded activity',
+  );
+  await expect(page.getByText('Unavailable').first()).toBeVisible();
+  await expect(page.getByText('Net sales today')).toBeVisible();
+});
+
+test('P01 respects 200% CSS zoom and preserves keyboard entry', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockHome(page, 'OWNER');
+  await page.goto('/');
+  await expect(page.getByRole('region', { name: 'Needs attention' })).toBeVisible();
+  await page.evaluate(() => { document.documentElement.style.zoom = '2'; });
+  await expect(page.getByRole('link', { name: /Open reports/i }).first()).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+    .toBe(true);
+  await page.screenshot({ path: 'test-results/p01-dashboard-owner-200-percent-css-zoom.png' });
 });
