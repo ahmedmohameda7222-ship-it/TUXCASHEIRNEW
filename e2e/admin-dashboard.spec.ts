@@ -141,7 +141,7 @@ for (const viewport of [
     await mockHome(page, 'OWNER');
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
-    await expect(page.getByText('TUX Maadi').first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'TUX Maadi' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Needs attention' })).toBeVisible();
     await expect(page.getByText('Failed online orders').first()).toBeVisible();
     await expect(page.getByRole('link', { name: /Open reports/i }).first()).toBeVisible();
