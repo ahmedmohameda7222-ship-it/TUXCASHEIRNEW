@@ -354,7 +354,7 @@ test('P01 direct Home owns Owner Summary and Targets styling regardless of Finan
   const owner = page.getByRole('region', { name: 'Daily Owner Summary' });
   const targets = page.getByRole('region', { name: 'Shop targets' });
   await expect(owner.getByText('Net sales', { exact: true })).toBeVisible();
-  await expect(targets.getByText('175,000', { exact: false })).toBeVisible();
+  await expect(targets).toContainText('EGP 1,750.00');
   const presentation = async () =>
     page.evaluate(() => {
       const summary = document.querySelector('.tux-owner-summary')!;
@@ -388,7 +388,7 @@ test('P01 direct Home owns Owner Summary and Targets styling regardless of Finan
     await nav.getByRole('link', { name: routeName, exact: true }).click();
     await nav.getByRole('link', { name: 'Home' }).click();
     await expect(owner.getByText('Net sales', { exact: true })).toBeVisible();
-    await expect(targets.getByText('175,000', { exact: false })).toBeVisible();
+    await expect(targets).toContainText('EGP 1,750.00');
     expect(await presentation()).toEqual(direct);
   }
   await page.screenshot({
