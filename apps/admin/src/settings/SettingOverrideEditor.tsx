@@ -142,7 +142,11 @@ export function SettingOverrideEditor({
   }
 
   const configuredValue =
-    kind === 'boolean' ? (resolvedRaw === 'true' ? 'Enabled' : 'Disabled') : resolvedRaw || 'Not configured';
+    kind === 'boolean'
+      ? resolvedRaw === 'true'
+        ? 'Enabled'
+        : 'Disabled'
+      : resolvedRaw || 'Not configured';
 
   return (
     <form
