@@ -216,6 +216,11 @@ export function AuditPage() {
       ].sort(),
     [events],
   );
+  const authorizedShopNames = new Map(
+    (principal.shopSummaries ?? [])
+      .filter((shop) => principal.shopIds.includes(shop.id))
+      .map((shop) => [shop.id, shop.name]),
+  );
   const shopNames = useMemo(
     () =>
       new Map(events.flatMap((event) => (event.shopId ? [[event.shopId, event.shopName]] : []))),
@@ -232,8 +237,8 @@ export function AuditPage() {
   const activeFilterChips = [
     { label: 'From', value: fromDate },
     { label: 'To', value: toDate },
-    { label: 'Shop', value: shopId ? (shopNames.get(shopId) ?? shopId) : '' },
-    { label: 'Actor', value: actorEmployeeId },
+    { label: 'Shop', value: shopId ? (authorizedShopNames.get(shopId) ?? shopNames.get(shopId) ?? 'Authorized shop') : '' },
+    { label: 'Actor', value: actorEmployeeId ? (actorOptions.find((actor) => actor.employeeId === actorEmployeeId)?.label ?? 'Selected staff member') : '' },
     { label: 'Activity', value: entityType ? auditLabel(entityType) : '' },
     { label: 'Approval', value: approvalStatus ? auditLabel(approvalStatus) : '' },
   ].filter((chip) => Boolean(chip.value));
@@ -278,7 +283,7 @@ export function AuditPage() {
           <option value="">All authorized shops</option>
           {principal.shopIds.map((authorizedShopId, index) => (
             <option key={authorizedShopId} value={authorizedShopId}>
-              {shopNames.get(authorizedShopId) ?? `Authorized shop ${index + 1}`}
+              {authorizedShopNames.get(authorizedShopId) ?? shopNames.get(authorizedShopId) ?? `Authorized shop ${index + 1}`}
             </option>
           ))}
         </select>
@@ -425,10 +430,19 @@ export function AuditPage() {
                 type="button"
                 onClick={() => navigate(detailPath('/audit', event.id))}
               >
-                <strong>{auditLabel(event.actionType)}</strong>
-                <span>{event.actorLabel}</span>
-                <span>{event.shopName}</span>
-                <span>{formatInstant(event.createdAt)}</span>
+                <span className="admin-audit-list__heading">
+                  <strong>{auditLabel(event.actionType)}</strong>
+                  {event.approvalStatus ? (
+                    <span className="admin-audit-list__status">{auditLabel(event.approvalStatus)}</span>
+                  ) : null}
+                </span>
+                <span className="admin-audit-list__shop">{event.shopName}</span>
+                <span className="admin-audit-list__meta">
+                  {event.actorLabel} · {formatInstant(event.createdAt)}
+                </span>
+                <span className="admin-audit-list__entity">
+                  {event.entityType ? auditLabel(event.entityType) : 'General activity'}
+                </span>
               </button>
             ))}
             {auditQuery.hasNextPage ? (
@@ -472,7 +486,6 @@ export function AuditPage() {
 
       <AdminDialog
         open={filtersOpen}
-        variant="sheet"
         title="Audit filters"
         description="Narrow history without reducing the available audit filter capabilities."
         onOpenChange={(nextOpen) => {
@@ -498,8 +511,18 @@ export function AuditPage() {
           >
             Clear advanced filters
           </button>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={() => {
+              setDraftFilters(currentFilters());
+              setFiltersOpen(false);
+            }}
+          >
+            Cancel
+          </button>
           <button className="admin-primary-button" type="button" onClick={applyAdvancedFilters}>
-            Show results
+            Apply filters
           </button>
         </div>
       </AdminDialog>
