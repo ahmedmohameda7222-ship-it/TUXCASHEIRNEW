@@ -1167,7 +1167,9 @@ if (process.env['P02_CAPTURE'] === '1') {
         fullPage: true,
       });
       await page.goto('/settings/business-defaults');
-      await expect(page.getByRole('heading', { name: 'Business defaults', exact: true })).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: 'Business defaults', exact: true }),
+      ).toBeVisible();
       await page.screenshot({
         path: `artifacts/p02/settings-defaults-${viewport.width}-light.png`,
         fullPage: true,
