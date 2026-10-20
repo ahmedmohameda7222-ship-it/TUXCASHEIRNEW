@@ -964,3 +964,30 @@ for (const viewport of ADMIN_WIDE_TABLET_VIEWPORTS) {
     await expect(page.getByLabel('Activation time (Cairo)')).toBeVisible();
   });
 }
+
+
+if (process.env['P02_CAPTURE'] === '1') {
+  const widths = [
+    { width: 1440, height: 900 }, { width: 1280, height: 800 },
+    { width: 768, height: 1024 }, { width: 390, height: 844 },
+    { width: 375, height: 844 }, { width: 320, height: 720 },
+  ] as const;
+  for (const viewport of widths) {
+    test(`P02 screenshots: catalog publish and copy preview ${viewport.width}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await mockPublishing(page, true);
+      await page.goto('/catalog/products/publishing');
+      await expect(page.getByRole('heading', { name: 'Review & publish' })).toBeVisible();
+      await page.screenshot({ path: `artifacts/p02/catalog-publish-${viewport.width}-light.png`, fullPage: true });
+      await expect(page.getByRole('heading', { name: 'Selective catalog copy' })).toBeVisible();
+      await page.getByRole('checkbox', { name: 'Product availability' }).uncheck();
+      await page.getByRole('checkbox', { name: 'Product display order (mapped products only)' }).check();
+      await page.getByRole('button', { name: 'Preview catalog copy' }).click();
+      await expect(page.getByText('Order: 40 → 5.')).toBeVisible();
+      await page.screenshot({ path: `artifacts/p02/catalog-copy-preview-${viewport.width}-light.png`, fullPage: true });
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await page.screenshot({ path: `artifacts/p02/catalog-copy-preview-${viewport.width}-dark.png`, fullPage: true });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    });
+  }
+}
