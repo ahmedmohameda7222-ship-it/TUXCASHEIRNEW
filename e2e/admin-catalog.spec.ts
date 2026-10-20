@@ -230,8 +230,10 @@ for (const viewport of ADMIN_WIDE_TABLET_VIEWPORTS) {
       await page.getByRole('button', { name: 'Products' }).click();
       await expect(page).toHaveURL(/\/catalog\/products$/);
     } else {
+      await expect(inspector).toBeHidden();
+      await page.getByRole('button', { name: /Classic Smash/ }).click();
       await expect(inspector).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Products' })).toBeHidden();
+      await expect(page.getByRole('button', { name: 'Products' })).toBeVisible();
       await page.getByRole('button', { name: 'More' }).click();
       await expect(page.getByText('Recipe / Inventory')).toBeVisible();
       await expect(page.getByText('Shop Overrides')).toBeVisible();
@@ -254,6 +256,7 @@ test('normal product edit creates a draft while Sold Out uses the immediate comm
   const fixture = await mockCatalog(page);
   await page.goto('/catalog/products');
 
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
   const name = page.locator('input[name="name"]');
   await name.fill('Classic Smash Updated');
   await page.getByRole('button', { name: 'Save draft' }).click();
@@ -278,6 +281,7 @@ test('switching shops requires explicit discard for a dirty product editor', asy
 
   const shopSwitcher = page.locator('.shop-switcher select');
   await expect(shopSwitcher).toHaveValue(shopId);
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
   const productName = page.locator('input[name="name"]');
   await expect(productName).toHaveValue('Classic Smash');
   await productName.fill('Unsaved operator edit');
