@@ -472,3 +472,51 @@ test('P03 screenshot all seven server-returned approval states', async ({ page }
     });
   }
 });
+
+test('P03 screenshot denied approval deep link with insufficient permissions', async ({ page }) => {
+  test.skip(process.env['P03_CAPTURE'] !== '1', 'Visual evidence runs in the exact-head job');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockAdmin(page);
+  await page.route('**/api/admin/session', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...ownerSession,
+        principal: {
+          ...ownerSession.principal,
+          role: 'MANAGER',
+          permissions: ['orders.view'],
+          employeeId: 'manager-without-review',
+        },
+      }),
+    }),
+  );
+  await page.goto('/approvals');
+  await expect(page.getByRole('heading', { name: 'Not available' })).toBeVisible();
+  await expect(page.getByText('This area is not included in your current Admin access.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
+  await page.screenshot({ path: 'artifacts/p03/approvals-denied-390.png' });
+});
+
+test('P03 screenshot the loading approval inbox with unresolved mocked fetch', async ({ page }) => {
+  test.skip(process.env['P03_CAPTURE'] !== '1', 'Visual evidence runs in the exact-head job');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockAdmin(page);
+  let finishLoading: () => void = () => undefined;
+  const pendingRequest = new Promise<void>((resolve) => {
+    finishLoading = resolve;
+  });
+  await page.route('**/api/admin/approvals*', async (route) => {
+    await pendingRequest;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ approvals: [] }),
+    });
+  });
+  await page.goto('/approvals');
+  await expect(page.getByText('Loading approvals')).toBeVisible();
+  await page.screenshot({ path: 'artifacts/p03/approvals-loading-390.png' });
+  finishLoading();
+});

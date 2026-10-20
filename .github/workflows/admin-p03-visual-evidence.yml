@@ -55,12 +55,12 @@ jobs:
               source: "Playwright Chromium with mocked Admin API fixtures; NOT authenticated hosted UAT",
               exactHeadSha: process.env.P03_HEAD_SHA,
               actualCheckoutSha: require("node:child_process").execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
-              expectedScenes: 67,
+              expectedScenes: 69,
               screenshots: digests
             };
             fs.writeFileSync(dir + "/SHA256_MANIFEST.json", JSON.stringify(manifest, null, 2) + "\n");
-            if (digests.length !== 67 || new Set(digests.map(x => x.file)).size !== 67) {
-              console.error("P03 screenshot inventory incomplete: " + digests.length + "/67");
+            if (digests.length !== 69 || new Set(digests.map(x => x.file)).size !== 69) {
+              console.error("P03 screenshot inventory incomplete: " + digests.length + "/69");
               process.exitCode = 1;
             }
           '
