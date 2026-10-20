@@ -412,8 +412,7 @@
 }
 
 .admin-catalog-editor__actions {
-  position: sticky;
-  bottom: 0;
+  position: static;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -526,9 +525,6 @@
   }
 }
 @media (max-width: 767px) {
-  .admin-catalog-editor__actions {
-    position: static;
-  }
   .admin-catalog-danger-zone__confirm {
     display: grid;
     width: 100%;
@@ -553,4 +549,49 @@
   flex-wrap: wrap;
   gap: 8px;
   padding: 8px 0 12px;
+}
+
+/* P02: a predictable, non-overlapping catalog task toolbar. */
+.admin-catalog-new-product-controls {
+  display: grid;
+  grid-template-columns: max-content minmax(160px, 1fr) max-content;
+  align-items: end;
+  gap: 10px;
+  max-width: 650px;
+  min-width: 0;
+}
+.admin-catalog-new-product-controls > label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  font-weight: 650;
+  font-size: 12px;
+  color: var(--tux-text-secondary);
+}
+.admin-catalog-new-product-controls > label select {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--tux-touch-target);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-control);
+  padding: 6px 10px;
+  background: var(--tux-surface-panel);
+  color: var(--tux-text-primary);
+}
+@media (max-width: 1050px) {
+  .admin-catalog-new-product-controls {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .admin-catalog-new-product-controls > .admin-primary-button {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 520px) {
+  .admin-catalog-new-product-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-catalog-new-product-controls > .admin-primary-button {
+    grid-column: auto;
+  }
 }
