@@ -483,6 +483,14 @@ function SpecialHoursRowEditor({
   );
 }
 
+export function shopOperationalStateDisabled(
+  shop: Pick<AdminSettingsWorkspace['shop'], 'lifecycleState'>,
+  busy: boolean,
+  hasUpdatePermission: boolean,
+): boolean {
+  return busy || shop.lifecycleState !== 'ACTIVE' || !hasUpdatePermission;
+}
+
 export function ShopsPage({
   workspace,
   onUpdateOperationalState,
@@ -547,8 +555,11 @@ export function ShopsPage({
     });
   }, [shop.address, shop.contactPhone, shop.latitude, shop.longitude, shop.name]);
 
-  const operationalStateDisabled =
-    busy || shop.lifecycleState !== 'ACTIVE' || !onUpdateOperationalState;
+  const operationalStateDisabled = shopOperationalStateDisabled(
+    shop,
+    busy,
+    Boolean(onUpdateOperationalState),
+  );
 
   async function saveIdentity(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
