@@ -206,3 +206,89 @@ test('200% page zoom keeps the Admin header and shop scope usable', async ({ pag
   );
   await page.screenshot({ path: 'test-results/admin-stage1-zoom-200-percent-css.png' });
 });
+
+test('P01 secondary routes keep More active while hiding unshipped modules', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockSession(page);
+  await page.goto('/staff');
+  const mobile = page.locator('[data-admin-mobile-nav]');
+  await expect(mobile.getByRole('link', { name: 'More' })).toHaveAttribute('aria-current', 'page');
+  await expect(mobile.getByRole('link', { name: 'Home' })).not.toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await mobile.getByRole('link', { name: 'More' }).click();
+  await expect(page.getByRole('heading', { name: 'More' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Staff/ }).first()).toBeVisible();
+  await expect(page.getByText('WhatsApp')).toHaveCount(0);
+  await expect(page.getByText('Devices / Operations')).toHaveCount(0);
+  await expect(page.getByText('Alerts')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/p01-mobile-more-390.png' });
+});
+
+test('P01 desktop navigation groups Catalog under Operations and preserves selected route', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockSession(page);
+  await page.goto('/catalog/products');
+  const main = page.locator('main#main-content');
+  await expect(main.getByRole('heading', { name: 'Catalog' })).toBeVisible();
+  const nav = page.locator('[data-admin-desktop-nav]');
+  await expect(nav.getByRole('link', { name: 'Catalog' })).toHaveAttribute('aria-current', 'page');
+  await expect(nav.getByText('Operations')).toBeVisible();
+  await expect(nav.getByRole('link', { name: 'Catalog' })).toBeVisible();
+  await expect(nav.getByText('WhatsApp')).toHaveCount(0);
+  await expect(nav.getByText('Devices / Operations')).toHaveCount(0);
+  await expect(nav.getByText('Alerts')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/p01-desktop-sidebar-catalog-active.png' });
+});
+
+test('P01 future-module deep links are honest instead of acting shipped', async ({ page }) => {
+  await mockSession(page);
+  await page.goto('/alerts');
+  await expect(page.getByText('Planned capability')).toBeVisible();
+  await expect(page.getByText(/not available in the current TUX Admin release/i)).toBeVisible();
+});
+
+test('P01 keeps shop selection in memory and rejects revoked assignment on reload', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockSession(page);
+  await page.goto('/');
+  const shop = page.locator('.shop-switcher select');
+  await shop.selectOption('shop-b');
+  await expect(shop).toHaveValue('shop-b');
+  await expect(page.getByRole('region', { name: 'Current business context' })).toContainText(
+    'TUX Zamalek',
+  );
+  await page.screenshot({ path: 'test-results/p01-shop-selection-390.png' });
+
+  // Shop selection is memory-only: reloading requires revalidating the
+  // authenticated principal and selecting a currently permitted shop.
+  await page.route('**/api/admin/session', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...ownerSession,
+        principal: {
+          ...ownerSession.principal,
+          role: 'MANAGER',
+          permissions: ['orders.view'],
+          shopIds: ['shop-a'],
+          shopSummaries: [
+            { id: 'shop-a', name: 'TUX Maadi', active: true, temporaryClosed: false },
+          ],
+        },
+      }),
+    }),
+  );
+  await page.reload();
+  await expect(page.getByRole('region', { name: 'Current business context' })).toContainText(
+    'TUX Maadi',
+  );
+  await expect(page.locator('.shop-switcher select')).toHaveCount(0);
+  await expect(page.getByText('TUX Zamalek')).toHaveCount(0);
+});

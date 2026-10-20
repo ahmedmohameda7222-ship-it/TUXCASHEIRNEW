@@ -25,8 +25,8 @@ export function OwnerSummaryCard({ shopId }: { shopId: string }) {
   });
 
   return (
-    <section className="tux-owner-summary" aria-label="Daily Owner Summary">
-      <div className="tux-finance-toolbar">
+    <section className="tux-home-owner-summary" aria-label="Daily Owner Summary">
+      <div className="tux-home-section-heading tux-home-owned-heading">
         <h2>Daily Owner Summary</h2>
         <Link className="admin-secondary-button" href="/finance/end-day">
           End Day history
@@ -51,14 +51,14 @@ export function OwnerSummaryCard({ shopId }: { shopId: string }) {
       ) : query.data?.summaries.length === 0 ? (
         <p>No finalized financial day has generated an Owner Summary for this shop yet.</p>
       ) : latest ? (
-        <div>
-          <p className="tux-finance-muted">
+        <div className="tux-home-summary-content">
+          <p className="tux-home-supporting-text">
             Generated{' '}
             {new Date(latest.generated_at).toLocaleString('en-EG', { timeZone: 'Africa/Cairo' })}
           </p>
           {authorizedMetrics.length > 0 && (
-            <dl className="tux-finance-x-grid">
-              {authorizedMetrics.map(({ field, label, kind }) => {
+            <dl className="tux-home-summary-metrics">
+              {authorizedMetrics.slice(0, 3).map(({ field, label, kind }) => {
                 const value = latest.summary[field] as number;
                 return (
                   <div key={field}>
@@ -69,7 +69,25 @@ export function OwnerSummaryCard({ shopId }: { shopId: string }) {
               })}
             </dl>
           )}
-          <Link href="/reports">Open source reports</Link>
+          {authorizedMetrics.length > 3 && (
+            <details className="tux-home-summary-disclosure">
+              <summary>Additional finalized-day metrics ({authorizedMetrics.length - 3})</summary>
+              <dl className="tux-home-summary-metrics">
+                {authorizedMetrics.slice(3).map(({ field, label, kind }) => {
+                  const value = latest.summary[field] as number;
+                  return (
+                    <div key={field}>
+                      <dt>{label}</dt>
+                      <dd>{kind === 'money' ? formatEgp(value) : value.toLocaleString('en-EG')}</dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            </details>
+          )}
+          <Link className="tux-home-source-link" href="/reports">
+            Open source reports
+          </Link>
         </div>
       ) : (
         <LoadingState title="Loading Owner Summary" />
