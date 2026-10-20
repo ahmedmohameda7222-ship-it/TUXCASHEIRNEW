@@ -20,6 +20,7 @@ const ownerSession = {
       'inventory.adjust',
     ],
     shopIds: [shopId],
+    shopSummaries: [{ id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false }],
   },
   csrfToken: 'a'.repeat(64),
 };
@@ -49,6 +50,10 @@ async function mockPublishing(
               principal: {
                 ...ownerSession.principal,
                 shopIds: [shopId, copySourceShopId],
+                shopSummaries: [
+                  { id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false },
+                  { id: copySourceShopId, name: 'TUX Zamalek', active: true, temporaryClosed: true },
+                ],
               },
             }
           : ownerSession,
