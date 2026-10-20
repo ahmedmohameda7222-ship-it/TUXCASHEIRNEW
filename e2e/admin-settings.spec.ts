@@ -1117,39 +1117,72 @@ test('does not offer cross-shop copy when no other authorized source shop exists
   );
 });
 
-
 if (process.env['P02_CAPTURE'] === '1') {
   const widths = [
-    { width: 1440, height: 900 }, { width: 1280, height: 800 },
-    { width: 768, height: 1024 }, { width: 390, height: 844 },
-    { width: 375, height: 844 }, { width: 320, height: 720 },
+    { width: 1440, height: 900 },
+    { width: 1280, height: 800 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 },
+    { width: 375, height: 844 },
+    { width: 320, height: 720 },
   ] as const;
   for (const viewport of widths) {
-    test(`P02 screenshots: Settings hub and focused shop controls ${viewport.width}`, async ({ page }) => {
+    test(`P02 screenshots: Settings hub and focused shop controls ${viewport.width}`, async ({
+      page,
+    }) => {
       await page.setViewportSize(viewport);
       await mockSettings(page, ['settings.manage', 'shops.manage', 'staff.view', 'staff.manage']);
       await page.goto('/settings');
       await expect(page.getByRole('heading', { name: 'TUX Maadi', level: 1 })).toBeVisible();
-      await page.screenshot({ path: `artifacts/p02/settings-overview-${viewport.width}-light.png`, fullPage: true });
+      await page.screenshot({
+        path: `artifacts/p02/settings-overview-${viewport.width}-light.png`,
+        fullPage: true,
+      });
       await page.goto('/settings/shop');
       await expect(page.getByRole('button', { name: 'Identity', exact: true })).toBeVisible();
-      await page.screenshot({ path: `artifacts/p02/settings-shop-identity-${viewport.width}-light.png`, fullPage: true });
+      await page.screenshot({
+        path: `artifacts/p02/settings-shop-identity-${viewport.width}-light.png`,
+        fullPage: true,
+      });
       await page.getByRole('button', { name: 'Hours & scheduling' }).click();
-      await page.screenshot({ path: `artifacts/p02/settings-shop-hours-${viewport.width}-light.png`, fullPage: true });
+      await page.screenshot({
+        path: `artifacts/p02/settings-shop-hours-${viewport.width}-light.png`,
+        fullPage: true,
+      });
       await page.getByRole('button', { name: 'Immediate controls' }).click();
       await expect(page.getByText('Pause online orders')).toBeVisible();
-      await page.screenshot({ path: `artifacts/p02/settings-immediate-${viewport.width}-light.png`, fullPage: true });
+      await page.screenshot({
+        path: `artifacts/p02/settings-immediate-${viewport.width}-light.png`,
+        fullPage: true,
+      });
       await page.getByRole('button', { name: 'Danger zone' }).click();
-      await page.screenshot({ path: `artifacts/p02/settings-danger-${viewport.width}-light.png`, fullPage: true });
+      await page.screenshot({
+        path: `artifacts/p02/settings-danger-${viewport.width}-light.png`,
+        fullPage: true,
+      });
       await page.goto('/settings/checkout');
-      await page.screenshot({ path: `artifacts/p02/settings-checkout-${viewport.width}-light.png`, fullPage: true });
+      await page.screenshot({
+        path: `artifacts/p02/settings-checkout-${viewport.width}-light.png`,
+        fullPage: true,
+      });
       await page.goto('/settings/business-defaults');
-      await page.screenshot({ path: `artifacts/p02/settings-defaults-${viewport.width}-light.png`, fullPage: true });
+      await page.screenshot({
+        path: `artifacts/p02/settings-defaults-${viewport.width}-light.png`,
+        fullPage: true,
+      });
       await page.getByText('Publish saved configuration').click();
-      await page.screenshot({ path: `artifacts/p02/settings-publish-${viewport.width}-light.png`, fullPage: true });
+      await page.screenshot({
+        path: `artifacts/p02/settings-publish-${viewport.width}-light.png`,
+        fullPage: true,
+      });
       await page.emulateMedia({ colorScheme: 'dark' });
-      await page.screenshot({ path: `artifacts/p02/settings-publish-${viewport.width}-dark.png`, fullPage: true });
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await page.screenshot({
+        path: `artifacts/p02/settings-publish-${viewport.width}-dark.png`,
+        fullPage: true,
+      });
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
     });
   }
   test('P02 screenshot: restricted Manager Settings navigation', async ({ page }) => {
@@ -1159,6 +1192,9 @@ if (process.env['P02_CAPTURE'] === '1') {
     await expect(page.getByRole('heading', { name: 'TUX Maadi', level: 1 })).toBeVisible();
     await page.getByRole('button', { name: 'Danger zone' }).click();
     await expect(page.getByRole('button', { name: 'Archive shop' })).toHaveCount(0);
-    await page.screenshot({ path: 'artifacts/p02/settings-manager-restricted-390-light.png', fullPage: true });
+    await page.screenshot({
+      path: 'artifacts/p02/settings-manager-restricted-390-light.png',
+      fullPage: true,
+    });
   });
 }
