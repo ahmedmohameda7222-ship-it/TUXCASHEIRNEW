@@ -90,7 +90,7 @@ export function CatalogPage() {
       const selected = catalog.products.find((product) => product.id === selectedProductId);
       if (selected) return selected;
     }
-    return catalog.products[0] ?? null;
+    return null;
   }, [catalog.products, selectedProductId, unsavedProduct]);
 
   const actionError = mutationMessage(
@@ -293,6 +293,11 @@ export function CatalogPage() {
           <span>{actionError}</span>
         </div>
       ) : null}
+
+      <div className="admin-catalog-scope" role="status">
+        <strong>{principal.shopSummaries?.find((shop) => shop.id === shopId)?.name ?? 'Selected shop'}</strong>
+        <span>{definitionsOpen ? 'Organize catalog definitions' : mobileEditing ? 'Editing product draft' : 'Browse live catalog'}</span>
+      </div>
 
       {definitionsOpen ? (
         <CatalogDefinitionsEditor
