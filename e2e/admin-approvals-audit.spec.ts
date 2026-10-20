@@ -494,7 +494,9 @@ test('P03 screenshot denied approval deep link with insufficient permissions', a
   );
   await page.goto('/approvals');
   await expect(page.getByRole('heading', { name: 'Not available' })).toBeVisible();
-  await expect(page.getByText('This area is not included in your current Admin access.')).toBeVisible();
+  await expect(
+    page.getByText('This area is not included in your current Admin access.'),
+  ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
   await page.screenshot({ path: 'artifacts/p03/approvals-denied-390.png' });
 });
