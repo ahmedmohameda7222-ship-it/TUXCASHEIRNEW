@@ -402,7 +402,7 @@ export function ApprovalRulesPage() {
               />
             </label>
           ) : null}
-          <label className="admin-field">
+          <label className="admin-approval-rule-builder__toggle">
             <input
               type="checkbox"
               checked={form.requiresSecondPerson}
@@ -416,7 +416,7 @@ export function ApprovalRulesPage() {
             />
             <span>Require different approver</span>
           </label>
-          <label className="admin-field">
+          <label className="admin-approval-rule-builder__toggle">
             <input
               type="checkbox"
               checked={form.requiresRequesterRepin}
@@ -430,7 +430,7 @@ export function ApprovalRulesPage() {
             />
             <span>Require requester re-PIN</span>
           </label>
-          <label className="admin-field">
+          <label className="admin-approval-rule-builder__toggle">
             <input
               type="checkbox"
               checked={form.active}
