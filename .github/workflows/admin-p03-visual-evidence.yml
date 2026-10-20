@@ -54,13 +54,13 @@ jobs:
             const manifest = {
               source: "Playwright Chromium with mocked Admin API fixtures; NOT authenticated hosted UAT",
               exactHeadSha: process.env.P03_HEAD_SHA,
-              actualCheckoutSha: process.env.GITHUB_SHA,
-              expectedScenes: 59,
+              actualCheckoutSha: require("node:child_process").execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+              expectedScenes: 67,
               screenshots: digests
             };
             fs.writeFileSync(dir + "/SHA256_MANIFEST.json", JSON.stringify(manifest, null, 2) + "\n");
-            if (digests.length !== 59 || new Set(digests.map(x => x.file)).size !== 59) {
-              console.error("P03 screenshot inventory incomplete: " + digests.length + "/59");
+            if (digests.length !== 67 || new Set(digests.map(x => x.file)).size !== 59) {
+              console.error("P03 screenshot inventory incomplete: " + digests.length + "/67");
               process.exitCode = 1;
             }
           '
