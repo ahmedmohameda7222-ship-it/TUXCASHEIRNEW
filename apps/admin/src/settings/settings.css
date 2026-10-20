@@ -255,3 +255,55 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* P02 setting field ownership: distinct saved configuration and unpublished edit. */
+.admin-settings-override-editor {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  background: var(--tux-surface-panel);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+}
+.admin-settings-override-editor__heading h3 {
+  margin: 0;
+}
+.admin-settings-override-editor__eyebrow {
+  margin: 0 0 4px;
+  color: var(--tux-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+.admin-settings-override-editor__configured {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 10px;
+  border-radius: var(--tux-radius-control);
+  background: var(--tux-surface-subtle);
+  font-size: 13px;
+}
+.admin-settings-override-editor__configured span {
+  color: var(--tux-text-secondary);
+}
+.admin-settings-override-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.admin-settings-override-editor__actions button {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+}
+.admin-settings-override-editor__actions span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tux-text-secondary);
+}
