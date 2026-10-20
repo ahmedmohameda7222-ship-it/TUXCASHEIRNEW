@@ -453,19 +453,22 @@ test('P03 screenshot all seven server-returned approval states', async ({ page }
     await expect(
       page.getByRole('heading', { name: 'Emergency inventory adjustment' }),
     ).toBeVisible();
-    const statusLabel = status === 'EXECUTING'
-      ? 'In progress'
-      : status === 'EXECUTED'
-        ? 'Completed'
-        : status === 'FAILED'
-          ? 'Needs attention'
-          : status.charAt(0) + status.slice(1).toLowerCase();
+    const statusLabel =
+      status === 'EXECUTING'
+        ? 'In progress'
+        : status === 'EXECUTED'
+          ? 'Completed'
+          : status === 'FAILED'
+            ? 'Needs attention'
+            : status.charAt(0) + status.slice(1).toLowerCase();
     await expect(page.locator('.admin-approval-detail .admin-approval-status')).toHaveText(
       statusLabel,
     );
     if (status !== 'PENDING') {
       await expect(page.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
     }
-    await page.screenshot({ path: `artifacts/p03/approval-status-${status.toLowerCase()}-390.png` });
+    await page.screenshot({
+      path: `artifacts/p03/approval-status-${status.toLowerCase()}-390.png`,
+    });
   }
 });
