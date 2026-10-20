@@ -53,6 +53,9 @@ async function mockRules(page: Page, role: 'OWNER' | 'MANAGER' = 'OWNER') {
           role,
           permissions: ['settings.manage'],
           shopIds: [shopId],
+          shopSummaries: [
+            { id: shopId, name: 'TUX Downtown', active: true, temporaryClosed: false },
+          ],
         },
         csrfToken,
       }),
