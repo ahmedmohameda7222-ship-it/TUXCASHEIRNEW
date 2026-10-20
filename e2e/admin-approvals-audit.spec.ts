@@ -300,3 +300,67 @@ test('audit advanced filters support explicit cancel and clear actions', async (
   await page.getByRole('button', { name: 'Apply filters' }).click();
   await expect(page.getByLabel('Applied audit filters')).toHaveCount(0);
 });
+
+for (const width of [320, 375, 390, 768, 1280, 1440]) {
+  test(`P03 screenshot approvals and audit mocked Chromium at ${width}`, async ({ page }) => {
+    test.skip(process.env['P03_CAPTURE'] !== '1', 'Visual evidence runs in the exact-head job');
+    await page.setViewportSize({ width, height: width < 500 ? 844 : 960 });
+    await mockAdmin(page);
+    await page.goto('/approvals');
+    await expect(page.getByRole('heading', { name: 'Approvals' })).toBeVisible();
+    await page.screenshot({ path: `artifacts/p03/approvals-inbox-${width}.png` });
+    await page.getByRole('button', { name: /Emergency inventory adjustment/ }).click();
+    await expect(page.getByRole('heading', { name: 'Emergency inventory adjustment' })).toBeVisible();
+    await page.screenshot({ path: `artifacts/p03/approval-detail-${width}.png` });
+    await page.getByRole('button', { name: 'Approve', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Enter PIN to approve' })).toBeVisible();
+    await page.screenshot({ path: `artifacts/p03/pin-decision-modal-${width}.png` });
+    await page.keyboard.press('Escape');
+    await page.goto('/audit');
+    await expect(page.getByRole('heading', { name: 'Audit log' })).toBeVisible();
+    await page.screenshot({ path: `artifacts/p03/audit-list-${width}.png` });
+    await page.getByLabel('Audit events').getByRole('button').first().click();
+    await expect(page.getByRole('heading', { name: 'Before' })).toBeVisible();
+    await page.screenshot({ path: `artifacts/p03/audit-detail-${width}.png` });
+    await page.goto('/audit');
+    await page.getByRole('button', { name: /^Filters/ }).click();
+    await expect(page.getByRole('dialog', { name: 'Audit filters' })).toBeVisible();
+    await page.screenshot({ path: `artifacts/p03/audit-filters-before-${width}.png` });
+    await page.getByLabel('Approval status').selectOption('APPROVED');
+    await page.getByRole('button', { name: 'Apply filters' }).click();
+    await expect(page.getByLabel('Applied audit filters')).toContainText('Approval: Approved');
+    await page.screenshot({ path: `artifacts/p03/audit-filters-applied-${width}.png` });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+}
+
+test('P03 screenshot empty and error approval states with mocked APIs', async ({ page }) => {
+  test.skip(process.env['P03_CAPTURE'] !== '1', 'Visual evidence runs in the exact-head job');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockAdmin(page);
+  await page.route('**/api/admin/approvals*', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ approvals: [] }) }),
+  );
+  await page.goto('/approvals');
+  await expect(page.getByText('No approval requests')).toBeVisible();
+  await page.screenshot({ path: 'artifacts/p03/approvals-empty-390.png' });
+  await page.unroute('**/api/admin/approvals*');
+  await page.route('**/api/admin/approvals*', (route) =>
+    route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'unavailable' }) }),
+  );
+  await page.reload();
+  await expect(page.getByText('Approvals could not be loaded')).toBeVisible();
+  await page.screenshot({ path: 'artifacts/p03/approvals-error-390.png' });
+});
+
+test('P03 screenshot dark audit filter modal with mocked APIs', async ({ page }) => {
+  test.skip(process.env['P03_CAPTURE'] !== '1', 'Visual evidence runs in the exact-head job');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockAdmin(page);
+  await page.goto('/audit');
+  await page.getByRole('button', { name: /^Filters/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Audit filters' })).toBeVisible();
+  await page.screenshot({ path: 'artifacts/p03/audit-filters-dark-1440.png' });
+});

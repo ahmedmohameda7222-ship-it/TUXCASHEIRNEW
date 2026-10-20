@@ -183,3 +183,38 @@ test('explains the next safe step for legacy rules', async ({ page }) => {
   await expect(page.getByText(/Legacy.*cannot edit/i)).toBeVisible();
   await expect(page.getByText(/authorized administrator.*supported rule/i)).toBeVisible();
 });
+
+for (const width of [320, 375, 390, 768, 1280, 1440]) {
+  test(`P03 screenshot rule builder and legacy rule mocked Chromium at ${width}`, async ({ page }) => {
+    test.skip(process.env['P03_CAPTURE'] !== '1', 'Visual evidence runs in the exact-head job');
+    await page.setViewportSize({ width, height: width < 500 ? 844 : 960 });
+    await mockRules(page);
+    await page.goto('/approvals/rules');
+    await expect(page.getByRole('heading', { name: 'Approval rules' })).toBeVisible();
+    await page.screenshot({ path: `artifacts/p03/approval-rules-${width}.png`, fullPage: true });
+    await page.route('**/api/admin/approval-rules', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+        rules: [{ ...existing, thresholdContext: { unsupportedLegacyThreshold: 1 }, active: false }],
+        availableActions,
+      }) }),
+    );
+    await page.reload();
+    await expect(page.getByText(/Legacy \/ cannot edit/)).toBeVisible();
+    await page.screenshot({ path: `artifacts/p03/approval-rules-legacy-${width}.png`, fullPage: true });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+}
+
+test('P03 screenshot manager policy scope and dark appearance mocked Chromium', async ({ page }) => {
+  test.skip(process.env['P03_CAPTURE'] !== '1', 'Visual evidence runs in the exact-head job');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockRules(page, 'MANAGER');
+  await page.goto('/approvals/rules');
+  await expect(page.getByRole('option', { name: 'Business-wide' })).toHaveCount(0);
+  await page.screenshot({ path: 'artifacts/p03/approval-rules-manager-390.png', fullPage: true });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.reload();
+  await page.screenshot({ path: 'artifacts/p03/approval-rules-dark-1440.png', fullPage: true });
+});
