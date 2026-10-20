@@ -327,7 +327,12 @@ export function SettingsWorkspaceView({
           <h1>{workspace.shop.name}</h1>
           <p className="admin-field__help">Shop settings and operational controls</p>
         </div>
-        <div className="admin-settings-workspace__publish">
+        <details className="admin-settings-workspace__publish">
+          <summary>Publish saved configuration</summary>
+          <p className="admin-field__help">
+            Saving a setting updates its draft, not what customers see. Publish after review;
+            approval-required changes do not become live until a second authorized person approves.
+          </p>
           <label className="admin-field">
             <span>Requester PIN (if required for approval)</span>
             <input
@@ -349,9 +354,9 @@ export function SettingsWorkspaceView({
           </button>
           {publishFeedback ? <p role="status">{publishFeedback}</p> : null}
           <p className="admin-field__help">
-            Configuration edits publish here. Emergency shop controls publish immediately.
+            Emergency shop controls take effect immediately and are managed in Shop → Immediate controls.
           </p>
-        </div>
+        </details>
       </header>
       <nav className="admin-settings-workspace__nav" aria-label="Settings sections">
         <button

@@ -150,7 +150,7 @@ export function SettingOverrideEditor({
       <div className="admin-catalog-editor__section-heading">
         <div>
           <p className="admin-catalog-editor__eyebrow">
-            {scope === 'business' ? 'Business default' : settingSourceLabel(resolved.source)}
+            Current effective source: {scope === 'business' ? 'Business default' : settingSourceLabel(resolved.source)}
           </p>
           <h3>{label}</h3>
         </div>

@@ -513,6 +513,7 @@ export function ShopsPage({
   const shop = workspace.shop;
   const [lifecyclePin, setLifecyclePin] = useState('');
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [area, setArea] = useState<'identity' | 'hours' | 'operations' | 'lifecycle'>('identity');
   const [identity, setIdentity] = useState<IdentityForm>({
     name: shop.name,
     address: shop.address ?? '',
@@ -610,7 +611,26 @@ export function ShopsPage({
         <span className="admin-status-pill">{shop.lifecycleState}</span>
       </div>
 
-      {canAssignStaff ? (
+      <nav className="admin-shop-task-nav" aria-label="Shop management tasks">
+        {([
+          ['identity', 'Identity'],
+          ['hours', 'Hours & scheduling'],
+          ['operations', 'Immediate controls'],
+          ['lifecycle', 'Danger zone'],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            className="admin-secondary-button"
+            type="button"
+            aria-current={area === id ? 'page' : undefined}
+            onClick={() => setArea(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {area === 'identity' && canAssignStaff ? (
         <div className="admin-settings-card">
           <strong>Staff assignments</strong>
           <p className="admin-field__help">
@@ -622,84 +642,9 @@ export function ShopsPage({
         </div>
       ) : null}
 
-      {canManageLifecycle &&
-      shop.lifecycleState !== 'ARCHIVED' &&
-      typeof shop.lifecycleRevision === 'number' &&
-      onUpdateLifecycle ? (
-        <div className="admin-settings-card">
-          <strong>Shop lifecycle</strong>
-          <p className="admin-field__help">
-            Suspending stops new intake. Reactivation leaves online orders paused and the shop
-            temporarily closed until separately reopened.
-          </p>
-          {lifecycleApprovalPending ? (
-            <p role="status" className="admin-field__help">
-              Lifecycle change is pending second-person approval. The shop has not changed state.
-            </p>
-          ) : null}
-          <label className="admin-field">
-            <span>Requester PIN (only when the approval rule requires reauthentication)</span>
-            <input
-              type="password"
-              autoComplete="off"
-              maxLength={64}
-              value={lifecyclePin}
-              disabled={busy || lifecycleUpdating}
-              onChange={(event) => setLifecyclePin(event.currentTarget.value)}
-            />
-          </label>
-          <button
-            className="admin-secondary-button"
-            type="button"
-            disabled={busy || lifecycleUpdating}
-            onClick={() => {
-              if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined)
-                return;
-              const requesterPin = lifecyclePin.trim();
-              setLifecyclePin('');
-              void onUpdateLifecycle({
-                expectedState: shop.lifecycleState,
-                targetState: shop.lifecycleState === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE',
-                expectedLifecycleRevision: shop.lifecycleRevision,
-                ...(requesterPin === '' ? {} : { requesterPin }),
-              });
-            }}
-          >
-            {shop.lifecycleState === 'ACTIVE' ? 'Suspend shop' : 'Reactivate shop'}
-          </button>
-          <button
-            className="admin-secondary-button"
-            type="button"
-            disabled={busy || lifecycleUpdating}
-            onClick={() => setArchiveConfirmOpen(true)}
-          >
-            Archive shop
-          </button>
-          <ConfirmationDialog
-            open={archiveConfirmOpen}
-            title={`Archive ${shop.name}?`}
-            description="This closes the shop to new operations and preserves its history. A configured approval rule requires a distinct authorized approver."
-            confirmLabel="Archive shop"
-            destructive
-            pending={lifecycleUpdating}
-            onOpenChange={setArchiveConfirmOpen}
-            onConfirm={async () => {
-              if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined)
-                return;
-              const requesterPin = lifecyclePin.trim();
-              setLifecyclePin('');
-              await onUpdateLifecycle({
-                expectedState: shop.lifecycleState,
-                targetState: 'ARCHIVED',
-                expectedLifecycleRevision: shop.lifecycleRevision,
-                ...(requesterPin === '' ? {} : { requesterPin }),
-              });
-              setArchiveConfirmOpen(false);
-            }}
-          />
-        </div>
-      ) : null}
-
+      {area === 'identity' ? (
+        <>
+          <h3>Identity & contact</h3>
       <form className="admin-settings-card" onSubmit={(event) => void saveIdentity(event)}>
         <div className="admin-settings-grid">
           <label className="admin-field">
@@ -779,6 +724,13 @@ export function ShopsPage({
         </button>
       </form>
 
+        </>
+      ) : null}
+
+      {area === 'operations' ? (
+        <>
+          <h3>Immediate operational controls</h3>
+          <p className="admin-field__help">These controls change live ordering immediately, without publishing a settings draft.</p>
       <div className="admin-settings-grid">
         <article className="admin-settings-card">
           <span>Online orders</span>
@@ -827,6 +779,12 @@ export function ShopsPage({
         </article>
       </div>
 
+        </>
+      ) : null}
+
+      {area === 'hours' ? (
+        <>
+          <h3>Hours & scheduling</h3>
       <SettingsSchedulePanel workspace={workspace} busy={busy} />
 
       <div className="admin-settings-subsection">
@@ -1001,6 +959,91 @@ export function ShopsPage({
         </form>
       </div>
 
+        </>
+      ) : null}
+
+      {area === 'lifecycle' ? (
+        <section className="admin-settings-lifecycle" aria-label="Shop danger zone">
+          <h3>Danger zone</h3>
+          <p className="admin-field__help">Suspend, archive or delete only after reviewing the consequences for {shop.name}. Approval policies remain enforced.</p>
+      {canManageLifecycle &&
+      shop.lifecycleState !== 'ARCHIVED' &&
+      typeof shop.lifecycleRevision === 'number' &&
+      onUpdateLifecycle ? (
+        <div className="admin-settings-card">
+          <strong>Shop lifecycle</strong>
+          <p className="admin-field__help">
+            Suspending stops new intake. Reactivation leaves online orders paused and the shop
+            temporarily closed until separately reopened.
+          </p>
+          {lifecycleApprovalPending ? (
+            <p role="status" className="admin-field__help">
+              Lifecycle change is pending second-person approval. The shop has not changed state.
+            </p>
+          ) : null}
+          <label className="admin-field">
+            <span>Requester PIN (only when the approval rule requires reauthentication)</span>
+            <input
+              type="password"
+              autoComplete="off"
+              maxLength={64}
+              value={lifecyclePin}
+              disabled={busy || lifecycleUpdating}
+              onChange={(event) => setLifecyclePin(event.currentTarget.value)}
+            />
+          </label>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={busy || lifecycleUpdating}
+            onClick={() => {
+              if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined)
+                return;
+              const requesterPin = lifecyclePin.trim();
+              setLifecyclePin('');
+              void onUpdateLifecycle({
+                expectedState: shop.lifecycleState,
+                targetState: shop.lifecycleState === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE',
+                expectedLifecycleRevision: shop.lifecycleRevision,
+                ...(requesterPin === '' ? {} : { requesterPin }),
+              });
+            }}
+          >
+            {shop.lifecycleState === 'ACTIVE' ? 'Suspend shop' : 'Reactivate shop'}
+          </button>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={busy || lifecycleUpdating}
+            onClick={() => setArchiveConfirmOpen(true)}
+          >
+            Archive shop
+          </button>
+          <ConfirmationDialog
+            open={archiveConfirmOpen}
+            title={`Archive ${shop.name}?`}
+            description="This closes the shop to new operations and preserves its history. A configured approval rule requires a distinct authorized approver."
+            confirmLabel="Archive shop"
+            destructive
+            pending={lifecycleUpdating}
+            onOpenChange={setArchiveConfirmOpen}
+            onConfirm={async () => {
+              if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined)
+                return;
+              const requesterPin = lifecyclePin.trim();
+              setLifecyclePin('');
+              await onUpdateLifecycle({
+                expectedState: shop.lifecycleState,
+                targetState: 'ARCHIVED',
+                expectedLifecycleRevision: shop.lifecycleRevision,
+                ...(requesterPin === '' ? {} : { requesterPin }),
+              });
+              setArchiveConfirmOpen(false);
+            }}
+          />
+        </div>
+      ) : null}
+
       {onDeleteOrArchive ? (
         <div className="admin-settings-danger-zone">
           <div>
@@ -1018,6 +1061,8 @@ export function ShopsPage({
             Delete unused shop
           </button>
         </div>
+      ) : null}
+        </section>
       ) : null}
     </section>
   );
