@@ -1,0 +1,82 @@
+name: P03 Chromium Visual Evidence
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/src/approvals/**'
+      - 'apps/admin/src/audit/**'
+      - 'e2e/admin-approvals-audit.spec.ts'
+      - 'e2e/admin-approval-rules.spec.ts'
+      - 'playwright.admin.config.ts'
+      - '.github/workflows/admin-p03-visual-evidence.yml'
+permissions:
+  contents: read
+jobs:
+  exact-head-p03:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      CI: '1'
+      P03_CAPTURE: '1'
+      P03_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      TZ: Africa/Cairo
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact review head
+        run: test "$(git rev-parse HEAD)" = "$P03_HEAD_SHA"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Capture mocked six-width P03 scenes
+        run: |
+          mkdir -p artifacts/p03
+          npx playwright test --config playwright.admin.config.ts --grep 'P03 screenshot'
+      - name: Verify complete scene set and SHA256 evidence
+        if: always()
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const crypto = require("node:crypto");
+            const dir = "artifacts/p03";
+            fs.mkdirSync(dir, { recursive: true });
+            const files = fs.readdirSync(dir).filter(x => x.endsWith(".png")).sort();
+            const digests = files.map(file => ({
+              file,
+              sha256: crypto.createHash("sha256").update(fs.readFileSync(dir + "/" + file)).digest("hex")
+            }));
+            const manifest = {
+              source: "Playwright Chromium with mocked Admin API fixtures; NOT authenticated hosted UAT",
+              exactHeadSha: process.env.P03_HEAD_SHA,
+              actualCheckoutSha: process.env.GITHUB_SHA,
+              expectedScenes: 59,
+              screenshots: digests
+            };
+            fs.writeFileSync(dir + "/SHA256_MANIFEST.json", JSON.stringify(manifest, null, 2) + "\n");
+            if (digests.length !== 59 || new Set(digests.map(x => x.file)).size !== 59) {
+              console.error("P03 screenshot inventory incomplete: " + digests.length + "/59");
+              process.exitCode = 1;
+            }
+          '
+      - name: Create screenshot evidence ZIP
+        if: always()
+        run: |
+          if [ -d artifacts/p03 ]; then
+            (cd artifacts && zip -q -r P03_Chromium_Evidence.zip p03)
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p03-chromium-exact-head
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            artifacts/P03_Chromium_Evidence.zip
+            artifacts/p03/SHA256_MANIFEST.json
+            playwright-report-admin/
