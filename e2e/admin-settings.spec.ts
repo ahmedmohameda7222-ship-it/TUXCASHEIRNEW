@@ -510,8 +510,8 @@ test('keeps checkout tax publication pending until a second person approves', as
     true,
   );
   await page.goto('/settings/checkout');
-  await page.getByLabel('Requester PIN (if required for approval)').fill('2468');
   await page.getByText('Publish saved configuration').click();
+  await page.getByLabel('Requester PIN (if required for approval)').fill('2468');
   await page.getByRole('button', { name: 'Publish settings' }).click();
   await expect(
     page.getByRole('status').filter({ hasText: 'second person must approve' }),
@@ -1161,11 +1161,13 @@ if (process.env['P02_CAPTURE'] === '1') {
         fullPage: true,
       });
       await page.goto('/settings/checkout');
+      await expect(page.getByRole('heading', { name: 'Checkout', exact: true })).toBeVisible();
       await page.screenshot({
         path: `artifacts/p02/settings-checkout-${viewport.width}-light.png`,
         fullPage: true,
       });
       await page.goto('/settings/business-defaults');
+      await expect(page.getByRole('heading', { name: 'Business defaults', exact: true })).toBeVisible();
       await page.screenshot({
         path: `artifacts/p02/settings-defaults-${viewport.width}-light.png`,
         fullPage: true,
