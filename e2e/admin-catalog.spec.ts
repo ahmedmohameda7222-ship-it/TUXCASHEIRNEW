@@ -325,6 +325,30 @@ test('switching shops requires explicit discard for a dirty product editor', asy
 });
 
 if (process.env['P02_CAPTURE'] === '1') {
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 375, height: 844 },
+    { width: 320, height: 720 },
+  ] as const) {
+    test(`P02 screenshot: category and modifier management ${viewport.width}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await mockCatalog(page);
+      await page.goto('/catalog/products');
+      await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+      await expect(page.getByRole('heading', { name: 'Categories', exact: true })).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/p02/catalog-definitions-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      await page.getByText('Actions for Burgers').click();
+      await expect(page.getByRole('button', { name: 'Edit Burgers' })).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/p02/catalog-definition-actions-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+    });
+  }
+
   const widths = [
     { width: 1440, height: 900 },
     { width: 1280, height: 800 },
