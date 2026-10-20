@@ -52,7 +52,12 @@ async function mockPublishing(
                 shopIds: [shopId, copySourceShopId],
                 shopSummaries: [
                   { id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false },
-                  { id: copySourceShopId, name: 'TUX Zamalek', active: true, temporaryClosed: true },
+                  {
+                    id: copySourceShopId,
+                    name: 'TUX Zamalek',
+                    active: true,
+                    temporaryClosed: true,
+                  },
                 ],
               },
             }
