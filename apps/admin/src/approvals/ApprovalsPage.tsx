@@ -196,6 +196,9 @@ export function ApprovalsPage() {
           Manage approval rules
         </a>
       ) : null}
+      <p className="admin-approvals-context">
+        Approval is a decision, not confirmation that the requested action has executed.
+      </p>
       <div className="admin-approvals-toolbar">
         <label className="admin-field">
           <span>Status</span>
@@ -253,10 +256,19 @@ export function ApprovalsPage() {
                   navigate(detailPath('/approvals', approval.id));
                 }}
               >
-                <strong>{approval.actionLabel}</strong>
-                <span>{approval.requesterName}</span>
-                <span>{approval.shopName}</span>
-                <span>{approvalStatusLabel(approval.displayStatus ?? approval.status)}</span>
+                <span className="admin-approval-list__heading">
+                  <strong>{approval.actionLabel}</strong>
+                  <span
+                    className={`admin-approval-status admin-approval-status--${(approval.displayStatus ?? approval.status).toLowerCase()}`}
+                  >
+                    {approvalStatusLabel(approval.displayStatus ?? approval.status)}
+                  </span>
+                </span>
+                <span className="admin-approval-list__shop">{approval.shopName}</span>
+                <span className="admin-approval-list__meta">
+                  Requested by {approval.requesterName} · {formatInstant(approval.createdAt)}
+                </span>
+                <span className="admin-approval-list__consequence">{approval.consequence}</span>
               </button>
             ))}
             {approvalsQuery.hasNextPage ? (

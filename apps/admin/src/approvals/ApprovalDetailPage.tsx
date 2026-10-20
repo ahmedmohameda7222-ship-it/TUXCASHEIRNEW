@@ -59,7 +59,7 @@ export function ApprovalDetailView({
     <section className="admin-approval-detail" aria-labelledby={`approval-${approval.id}`}>
       <header className="admin-approval-detail__header">
         <div>
-          <p className="admin-catalog-editor__eyebrow">Approval request</p>
+          <p className="admin-approval-detail__eyebrow">Approval request</p>
           <h2 id={`approval-${approval.id}`}>{approval.actionLabel}</h2>
         </div>
         <span
@@ -70,12 +70,12 @@ export function ApprovalDetailView({
       </header>
       <dl className="admin-approval-facts">
         <div>
-          <dt>Requester</dt>
-          <dd>{approval.requesterName}</dd>
-        </div>
-        <div>
           <dt>Shop</dt>
           <dd>{approval.shopName}</dd>
+        </div>
+        <div>
+          <dt>Requester</dt>
+          <dd>{approval.requesterName}</dd>
         </div>
         <div>
           <dt>Value</dt>
@@ -85,6 +85,18 @@ export function ApprovalDetailView({
           <dt>Requested</dt>
           <dd>{approval.createdAtLabel}</dd>
         </div>
+        {approval.approverName ? (
+          <div>
+            <dt>Approver</dt>
+            <dd>{approval.approverName}</dd>
+          </div>
+        ) : null}
+        {approval.decidedAtLabel ? (
+          <div>
+            <dt>Decision time</dt>
+            <dd>{approval.decidedAtLabel}</dd>
+          </div>
+        ) : null}
         {approval.expiresAtLabel ? (
           <div>
             <dt>Expires</dt>
@@ -93,7 +105,7 @@ export function ApprovalDetailView({
         ) : null}
       </dl>
       <div className="admin-approval-detail__section">
-        <strong>Reason</strong>
+        <strong>Reason for request</strong>
         <p>{approval.reason ?? 'No reason supplied.'}</p>
       </div>
       <div className="admin-approval-detail__section">
@@ -101,7 +113,7 @@ export function ApprovalDetailView({
         <p>{approval.consequence}</p>
       </div>
       <div className="admin-approval-detail__section" aria-live="polite">
-        <strong>Execution</strong>
+        <strong>Execution — separate from approval</strong>
         <p>{approval.executionLabel}</p>
         {approval.failureMessage ? (
           <p className="admin-error-text">{approval.failureMessage}</p>
@@ -109,7 +121,7 @@ export function ApprovalDetailView({
         {approval.recoveryMessage ? <p>{approval.recoveryMessage}</p> : null}
       </div>
       {canDecide ? (
-        <div className="admin-approval-actions">
+        <div className="admin-approval-actions" aria-label="Authorized decisions">
           <button
             className="admin-primary-button"
             type="button"
