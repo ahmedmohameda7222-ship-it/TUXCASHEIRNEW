@@ -573,7 +573,7 @@ test('catalog price approval remains pending without falsely publishing prices',
     requesterPin: '2468',
   });
   await page.reload();
-  await expect(page.getByText('Version 48')).toBeVisible();
+  await expect(page.getByText('Version 48', { exact: true }).first()).toBeVisible();
 });
 
 test('publish history restores as a new version and pending schedules can be cancelled', async ({
