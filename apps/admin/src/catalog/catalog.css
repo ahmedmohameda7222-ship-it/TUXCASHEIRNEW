@@ -583,7 +583,7 @@
     width: 100%;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
-  .admin-catalog-new-product-controls > .admin-primary-button {
+  .admin-catalog-new-product-controls > button:last-child {
     grid-column: 1 / -1;
   }
 }
@@ -591,7 +591,7 @@
   .admin-catalog-new-product-controls {
     grid-template-columns: minmax(0, 1fr);
   }
-  .admin-catalog-new-product-controls > .admin-primary-button {
+  .admin-catalog-new-product-controls > button:last-child {
     grid-column: auto;
   }
 }
