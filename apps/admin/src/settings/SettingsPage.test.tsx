@@ -193,8 +193,8 @@ describe('Settings workspace', () => {
     expect(html).toContain('Thank you');
     expect(html).toContain('Business setting');
     expect(html).toContain('Sequence start');
-    expect(html).toContain('Save unpublished draft: Order prefix');
-    expect(html).toContain('Save unpublished draft: Receipt footer');
+    expect(html).toContain('Save Order prefix');
+    expect(html).toContain('Save Receipt footer');
     expect(html).toContain('Effective value:');
   });
 
