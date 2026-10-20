@@ -1118,6 +1118,91 @@ test('does not offer cross-shop copy when no other authorized source shop exists
 });
 
 if (process.env['P02_CAPTURE'] === '1') {
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 375, height: 844 },
+  ] as const) {
+    test(`P02 screenshot: settings copy preview ${viewport.width}`, async ({ page }) => {
+      const sourceShopId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
+      await page.setViewportSize(viewport);
+      const { commands } = await mockSettings(
+        page,
+        ['settings.manage'],
+        'OWNER',
+        [],
+        [shopId, sourceShopId],
+      );
+      await page.route('**/api/admin/shop-copy-preview', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            sourceShopId,
+            targetShopId: shopId,
+            selectedDomains: ['checkout'],
+            sourceSettingsVersion: 3,
+            targetSettingsVersion: 7,
+            changes: [{
+              settingKey: 'checkout.taxBps',
+              sourceValue: 1500,
+              source: 'shop',
+              sourceExpectedVersion: 2,
+              targetValue: 1400,
+              targetSource: 'business',
+              targetExpectedVersion: null,
+              wouldChange: true,
+            }],
+          }),
+        });
+      });
+      await page.goto('/settings/shop');
+      await expect(page.getByRole('heading', { name: 'Selective settings copy preview' })).toBeVisible();
+      await page.getByLabel('Source shop').selectOption(sourceShopId);
+      await page.getByRole('button', { name: 'Preview selected configuration' }).click();
+      await expect(page.getByRole('status')).toContainText('Applying copies only the selected');
+      await page.screenshot({
+        path: `artifacts/p02/settings-copy-preview-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      expect(commands).toHaveLength(0);
+    });
+  }
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 375, height: 844 },
+    { width: 320, height: 720 },
+  ] as const) {
+    test(`P02 screenshot: shop archive confirmation ${viewport.width}`, async ({ page }) => {
+      const { commands } = await mockSettings(page, ['settings.manage', 'shops.manage']);
+      await page.setViewportSize(viewport);
+      await page.goto('/settings/shop');
+      await page.getByRole('button', { name: 'Danger zone' }).click();
+      await page.getByRole('button', { name: 'Archive shop' }).click();
+      await expect(page.getByRole('dialog', { name: 'Archive TUX Maadi?' })).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/p02/settings-archive-confirm-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      expect(commands).toHaveLength(0);
+    });
+  }
+  test('P02 screenshot: settings publish pending second-person approval', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockSettings(page, ownerSession.principal.permissions, 'OWNER', [], [shopId], false, false, true);
+    await page.goto('/settings/checkout');
+    await page.getByText('Publish saved configuration').click();
+    await page.getByLabel('Requester PIN (if required for approval)').fill('2468');
+    await page.getByRole('button', { name: 'Publish settings' }).click();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'second person must approve' }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: 'artifacts/p02/settings-pending-approval-390-light.png',
+      fullPage: true,
+    });
+  }
+
   const widths = [
     { width: 1440, height: 900 },
     { width: 1280, height: 800 },
