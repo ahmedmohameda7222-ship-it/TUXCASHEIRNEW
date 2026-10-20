@@ -233,7 +233,7 @@ test('stages audit filters until apply and discards an escaped draft', async ({ 
     path: 'test-results/admin-stage1-audit-filters-phone.png',
     fullPage: true,
   });
-  await page.getByRole('button', { name: 'Show results' }).click();
+  await page.getByRole('button', { name: 'Apply filters' }).click();
   await expect(page.getByLabel('Applied audit filters')).toContainText('Approval: Approved');
   await expect
     .poll(() => requestedUrls.some((url) => url.includes('approvalStatus=APPROVED')))
@@ -285,7 +285,7 @@ test('captures dark mode Audit filters with the shared modal surface', async ({ 
 test('audit advanced filters support explicit cancel and clear actions', async ({ page }) => {
   await mockAdmin(page);
   await page.goto('/audit');
-  const trigger = page.getByRole('button', { name: 'Filters', exact: true });
+  const trigger = page.getByRole('button', { name: /^Filters/ });
   await trigger.click();
   await page.getByLabel('Approval status').selectOption('APPROVED');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();

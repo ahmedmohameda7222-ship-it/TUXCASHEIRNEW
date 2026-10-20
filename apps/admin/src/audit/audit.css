@@ -136,3 +136,73 @@
     width: 100%;
   }
 }
+
+/* P03: Audit owns its detail typography and responsive filter composition. */
+.admin-audit-detail__eyebrow {
+  margin: 0 0 0.4rem;
+  color: var(--tux-text-secondary);
+  font-size: var(--tux-font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-audit-detail__time,
+.admin-audit-list__meta,
+.admin-audit-list__entity {
+  color: var(--tux-text-secondary);
+  font-size: 0.875rem;
+}
+
+.admin-audit-list__heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.admin-audit-list__shop {
+  font-weight: 600;
+}
+
+.admin-audit-list__status {
+  display: inline-flex;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  background: var(--tux-surface-subtle);
+}
+
+.admin-audit-detail__reason {
+  padding-block: 0.5rem;
+}
+
+.admin-audit-detail__reason p {
+  margin: 0.35rem 0 0;
+}
+
+.admin-audit-filters > .admin-field {
+  min-width: 0;
+}
+
+.admin-audit-filters input,
+.admin-audit-filters select {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-audit-filter-actions {
+  position: sticky;
+  bottom: 0;
+  padding-block: 0.65rem;
+  background: var(--tux-surface-panel);
+  border-top: 1px solid var(--tux-border-subtle);
+}
+
+.admin-audit-list__item,
+.admin-audit-detail,
+.admin-audit-change {
+  min-width: 0;
+}
