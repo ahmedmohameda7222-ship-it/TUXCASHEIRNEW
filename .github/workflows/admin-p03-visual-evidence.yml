@@ -59,7 +59,7 @@ jobs:
               screenshots: digests
             };
             fs.writeFileSync(dir + "/SHA256_MANIFEST.json", JSON.stringify(manifest, null, 2) + "\n");
-            if (digests.length !== 67 || new Set(digests.map(x => x.file)).size !== 59) {
+            if (digests.length !== 67 || new Set(digests.map(x => x.file)).size !== 67) {
               console.error("P03 screenshot inventory incomplete: " + digests.length + "/67");
               process.exitCode = 1;
             }
