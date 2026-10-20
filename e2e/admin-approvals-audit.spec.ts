@@ -13,9 +13,7 @@ const ownerSession = {
     role: 'OWNER',
     permissions: ['approvals.review', 'audit.view'],
     shopIds: [shopId],
-    shopSummaries: [
-      { id: shopId, name: 'TUX Downtown', active: true, temporaryClosed: false },
-    ],
+    shopSummaries: [{ id: shopId, name: 'TUX Downtown', active: true, temporaryClosed: false }],
   },
   csrfToken: 'a'.repeat(64),
 };
