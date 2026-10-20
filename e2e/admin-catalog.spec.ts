@@ -280,7 +280,7 @@ test('normal product edit creates a draft while Sold Out uses the immediate comm
   await name.fill('Classic Smash Updated');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft in progress')).toBeVisible();
-  await expect(page.getByText('Not live')).toBeVisible();
+  await expect(page.getByText('Not live', { exact: true })).toBeVisible();
   expect(fixture.commands.map((command) => command.type)).toEqual(['draft.create', 'draft.save']);
 
   await page.getByRole('button', { name: 'Mark sold out' }).click();
