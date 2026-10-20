@@ -510,18 +510,23 @@ for (const role of ['OWNER', 'MANAGER'] as const) {
           await expect(nav.getByRole('link', { name: 'Audit Log' })).toHaveCount(0);
           await expect(nav.getByRole('link', { name: 'Finance', exact: true })).toHaveCount(0);
         }
-      } else {
+      }
+      await page.screenshot({
+        path: `test-results/p01-representative-${role.toLowerCase()}-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      if (viewport.width < 768) {
         const mobile = page.locator('[data-admin-mobile-nav]');
         await expect(mobile.getByRole('link', { name: 'More' })).toBeVisible();
         await mobile.getByRole('link', { name: 'More' }).click();
         await expect(page.getByRole('heading', { name: 'More' })).toBeVisible();
         await expect(page.getByRole('link', { name: /Staff/ }).first()).toBeVisible();
         await expect(page.getByText('WhatsApp')).toHaveCount(0);
+        await page.screenshot({
+          path: `test-results/p01-representative-${role.toLowerCase()}-more-${viewport.width}-light.png`,
+          fullPage: true,
+        });
       }
-      await page.screenshot({
-        path: `test-results/p01-representative-${role.toLowerCase()}-${viewport.width}-light.png`,
-        fullPage: true,
-      });
     });
   }
 }
