@@ -199,48 +199,48 @@ export function CatalogDefinitionsEditor({
               <details className="admin-catalog-record-actions">
                 <summary>Actions for {category.name}</summary>
                 <div className="admin-inventory-page-actions">
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  disabled={pending}
-                  onClick={() => setEditor(editingCategory(category))}
-                >
-                  Edit {category.name}
-                </button>
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  disabled={pending}
-                  onClick={() =>
-                    void persist('categories', {
-                      id: category.id,
-                      shopId,
-                      slug: category.slug,
-                      name: category.name,
-                      description: category.description,
-                      sortOrder: category.sortOrder,
-                      active: !category.active,
-                    })
-                  }
-                >
-                  {category.active ? 'Archive' : 'Restore'} {category.name}
-                </button>
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  disabled={pending || index === 0}
-                  onClick={() => changeOrder('categories', category.id, 'up')}
-                >
-                  Move up
-                </button>
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  disabled={pending || index === orderedCategories.length - 1}
-                  onClick={() => changeOrder('categories', category.id, 'down')}
-                >
-                  Move down
-                </button>
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    disabled={pending}
+                    onClick={() => setEditor(editingCategory(category))}
+                  >
+                    Edit {category.name}
+                  </button>
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    disabled={pending}
+                    onClick={() =>
+                      void persist('categories', {
+                        id: category.id,
+                        shopId,
+                        slug: category.slug,
+                        name: category.name,
+                        description: category.description,
+                        sortOrder: category.sortOrder,
+                        active: !category.active,
+                      })
+                    }
+                  >
+                    {category.active ? 'Archive' : 'Restore'} {category.name}
+                  </button>
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    disabled={pending || index === 0}
+                    onClick={() => changeOrder('categories', category.id, 'up')}
+                  >
+                    Move up
+                  </button>
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    disabled={pending || index === orderedCategories.length - 1}
+                    onClick={() => changeOrder('categories', category.id, 'down')}
+                  >
+                    Move down
+                  </button>
                 </div>
               </details>
             ) : null}
@@ -278,47 +278,47 @@ export function CatalogDefinitionsEditor({
               <details className="admin-catalog-record-actions">
                 <summary>Actions for {modifier.name}</summary>
                 <div className="admin-inventory-page-actions">
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  disabled={pending}
-                  onClick={() => setEditor(editingModifier(modifier))}
-                >
-                  Edit {modifier.name}
-                </button>
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  disabled={pending}
-                  onClick={() =>
-                    void persist('modifiers', {
-                      id: modifier.id,
-                      shopId,
-                      name: modifier.name,
-                      priceMinor: modifier.priceMinor,
-                      active: !modifier.active,
-                      sortOrder: modifier.sortOrder,
-                    })
-                  }
-                >
-                  {modifier.active ? 'Archive' : 'Restore'} {modifier.name}
-                </button>
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  disabled={pending || index === 0}
-                  onClick={() => changeOrder('modifiers', modifier.id, 'up')}
-                >
-                  Move up
-                </button>
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  disabled={pending || index === orderedModifiers.length - 1}
-                  onClick={() => changeOrder('modifiers', modifier.id, 'down')}
-                >
-                  Move down
-                </button>
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    disabled={pending}
+                    onClick={() => setEditor(editingModifier(modifier))}
+                  >
+                    Edit {modifier.name}
+                  </button>
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    disabled={pending}
+                    onClick={() =>
+                      void persist('modifiers', {
+                        id: modifier.id,
+                        shopId,
+                        name: modifier.name,
+                        priceMinor: modifier.priceMinor,
+                        active: !modifier.active,
+                        sortOrder: modifier.sortOrder,
+                      })
+                    }
+                  >
+                    {modifier.active ? 'Archive' : 'Restore'} {modifier.name}
+                  </button>
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    disabled={pending || index === 0}
+                    onClick={() => changeOrder('modifiers', modifier.id, 'up')}
+                  >
+                    Move up
+                  </button>
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    disabled={pending || index === orderedModifiers.length - 1}
+                    onClick={() => changeOrder('modifiers', modifier.id, 'down')}
+                  >
+                    Move down
+                  </button>
                 </div>
               </details>
             ) : null}

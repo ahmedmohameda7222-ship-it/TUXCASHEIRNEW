@@ -5,19 +5,31 @@ import { describe, expect, it, vi } from 'vitest';
 import { ShopsPage } from './ShopsPage';
 
 const shop = {
-  id: 'shop-a', name: 'TUX Maadi', lifecycleState: 'ACTIVE',
-  timezone: 'Africa/Cairo', temporaryClosed: false, onlineOrdersPaused: false,
+  id: 'shop-a',
+  name: 'TUX Maadi',
+  lifecycleState: 'ACTIVE',
+  timezone: 'Africa/Cairo',
+  temporaryClosed: false,
+  onlineOrdersPaused: false,
   active: true,
 } as AdminSettingsWorkspace['shop'];
 const workspace = {
-  shop, settingsVersion: 9, weeklyHours: [], specialHours: [],
+  shop,
+  settingsVersion: 9,
+  weeklyHours: [],
+  specialHours: [],
 } as unknown as AdminSettingsWorkspace;
 
 describe('P02 shop task segmentation', () => {
   it('opens on identity and does not render emergency or lifecycle commands in routine editing', () => {
     const html = renderToStaticMarkup(
-      <ShopsPage workspace={workspace} canManageLifecycle onDeleteOrArchive={vi.fn()}
-        onUpdateOperationalState={vi.fn()} onUpdateIdentity={vi.fn()} />,
+      <ShopsPage
+        workspace={workspace}
+        canManageLifecycle
+        onDeleteOrArchive={vi.fn()}
+        onUpdateOperationalState={vi.fn()}
+        onUpdateIdentity={vi.fn()}
+      />,
     );
     expect(html).toContain('Shop management tasks');
     expect(html).toContain('Identity &amp; contact');

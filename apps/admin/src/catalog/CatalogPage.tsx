@@ -295,8 +295,16 @@ export function CatalogPage() {
       ) : null}
 
       <div className="admin-catalog-scope" role="status">
-        <strong>{principal.shopSummaries?.find((shop) => shop.id === shopId)?.name ?? 'Selected shop'}</strong>
-        <span>{definitionsOpen ? 'Organize catalog definitions' : mobileEditing ? 'Editing product draft' : 'Browse live catalog'}</span>
+        <strong>
+          {principal.shopSummaries?.find((shop) => shop.id === shopId)?.name ?? 'Selected shop'}
+        </strong>
+        <span>
+          {definitionsOpen
+            ? 'Organize catalog definitions'
+            : mobileEditing
+              ? 'Editing product draft'
+              : 'Browse live catalog'}
+        </span>
       </div>
 
       {definitionsOpen ? (

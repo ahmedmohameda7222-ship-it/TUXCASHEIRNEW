@@ -150,7 +150,8 @@ export function SettingOverrideEditor({
       <div className="admin-catalog-editor__section-heading">
         <div>
           <p className="admin-catalog-editor__eyebrow">
-            Current effective source: {scope === 'business' ? 'Business default' : settingSourceLabel(resolved.source)}
+            Current effective source:{' '}
+            {scope === 'business' ? 'Business default' : settingSourceLabel(resolved.source)}
           </p>
           <h3>{label}</h3>
         </div>
@@ -188,11 +189,13 @@ export function SettingOverrideEditor({
 
       <p className="admin-field__help" data-setting-effective>
         Effective value: <strong>{resolvedRaw || 'Not configured'}</strong>. Source:{' '}
-        {settingSourceLabel(resolved.source)}. Editing below does not update the live
-        checkout until the required publication or approval completes.
+        {settingSourceLabel(resolved.source)}. Editing below does not update the live checkout until
+        the required publication or approval completes.
       </p>
       {editor.raw !== editor.baselineRaw ? (
-        <p className="admin-field__help" role="status">Unsaved local edit</p>
+        <p className="admin-field__help" role="status">
+          Unsaved local edit
+        </p>
       ) : (
         <p className="admin-field__help">Current editable draft loaded</p>
       )}

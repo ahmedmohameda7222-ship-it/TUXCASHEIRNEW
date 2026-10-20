@@ -373,7 +373,9 @@ export function ProductEditor({
         </div>
         <p className="admin-catalog-live-notice" role="note">
           <strong>Immediate operation</strong>
-          <span>This change goes live immediately. It does not save or publish your editing draft.</span>
+          <span>
+            This change goes live immediately. It does not save or publish your editing draft.
+          </span>
         </p>
         <button
           className="admin-secondary-button"
@@ -614,12 +616,25 @@ export function ProductEditor({
             Archive product
           </button>
         ) : (
-          <div className="admin-catalog-danger-zone__confirm" role="group" aria-label="Confirm product archive">
+          <div
+            className="admin-catalog-danger-zone__confirm"
+            role="group"
+            aria-label="Confirm product archive"
+          >
             <p>Archive {product.name} in the next catalog draft?</p>
-            <button type="button" className="admin-danger-link" disabled={readOnly} onClick={() => void archiveProduct()}>
+            <button
+              type="button"
+              className="admin-danger-link"
+              disabled={readOnly}
+              onClick={() => void archiveProduct()}
+            >
               Confirm archive draft
             </button>
-            <button type="button" className="admin-secondary-button" onClick={() => setArchiveConfirmationOpen(false)}>
+            <button
+              type="button"
+              className="admin-secondary-button"
+              onClick={() => setArchiveConfirmationOpen(false)}
+            >
               Keep product
             </button>
           </div>

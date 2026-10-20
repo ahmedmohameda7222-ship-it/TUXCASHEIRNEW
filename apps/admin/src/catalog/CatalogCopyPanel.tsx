@@ -469,7 +469,9 @@ export function CatalogCopyPanel({
               ))}
             </select>
           </label>
-          <p>Target shop: <strong>{authorizedShopNames.get(targetShopId) ?? 'Selected shop'}</strong></p>
+          <p>
+            Target shop: <strong>{authorizedShopNames.get(targetShopId) ?? 'Selected shop'}</strong>
+          </p>
           <details className="admin-settings-advanced">
             <summary>Technical shop IDs</summary>
             <small>Source: {activeSourceShopId}</small>

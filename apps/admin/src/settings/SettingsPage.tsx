@@ -354,7 +354,8 @@ export function SettingsWorkspaceView({
           </button>
           {publishFeedback ? <p role="status">{publishFeedback}</p> : null}
           <p className="admin-field__help">
-            Emergency shop controls take effect immediately and are managed in Shop → Immediate controls.
+            Emergency shop controls take effect immediately and are managed in Shop → Immediate
+            controls.
           </p>
         </details>
       </header>
