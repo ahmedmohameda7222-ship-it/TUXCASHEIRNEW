@@ -1201,7 +1201,7 @@ if (process.env['P02_CAPTURE'] === '1') {
       path: 'artifacts/p02/settings-pending-approval-390-light.png',
       fullPage: true,
     });
-  }
+  });
 
   const widths = [
     { width: 1440, height: 900 },
