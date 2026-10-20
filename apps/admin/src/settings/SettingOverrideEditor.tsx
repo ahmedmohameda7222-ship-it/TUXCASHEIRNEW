@@ -198,7 +198,9 @@ export function SettingOverrideEditor({
       )}
 
       {editor.raw !== editor.baselineRaw ? (
-        <p className="admin-field__help" role="status">Unsaved local edit</p>
+        <p className="admin-field__help" role="status">
+          Unsaved local edit
+        </p>
       ) : null}
       {help ? <p className="admin-field__help">{help}</p> : null}
       {error ? <p className="admin-field__error">{error}</p> : null}

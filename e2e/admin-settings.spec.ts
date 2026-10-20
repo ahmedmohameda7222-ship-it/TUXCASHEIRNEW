@@ -1143,21 +1143,25 @@ if (process.env['P02_CAPTURE'] === '1') {
             selectedDomains: ['checkout'],
             sourceSettingsVersion: 3,
             targetSettingsVersion: 7,
-            changes: [{
-              settingKey: 'checkout.taxBps',
-              sourceValue: 1500,
-              source: 'shop',
-              sourceExpectedVersion: 2,
-              targetValue: 1400,
-              targetSource: 'business',
-              targetExpectedVersion: null,
-              wouldChange: true,
-            }],
+            changes: [
+              {
+                settingKey: 'checkout.taxBps',
+                sourceValue: 1500,
+                source: 'shop',
+                sourceExpectedVersion: 2,
+                targetValue: 1400,
+                targetSource: 'business',
+                targetExpectedVersion: null,
+                wouldChange: true,
+              },
+            ],
           }),
         });
       });
       await page.goto('/settings/shop');
-      await expect(page.getByRole('heading', { name: 'Selective settings copy preview' })).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: 'Selective settings copy preview' }),
+      ).toBeVisible();
       await page.getByLabel('Source shop').selectOption(sourceShopId);
       await page.getByRole('button', { name: 'Preview selected configuration' }).click();
       await expect(page.getByRole('status')).toContainText('Applying copies only the selected');
@@ -1189,7 +1193,16 @@ if (process.env['P02_CAPTURE'] === '1') {
   }
   test('P02 screenshot: settings publish pending second-person approval', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await mockSettings(page, ownerSession.principal.permissions, 'OWNER', [], [shopId], false, false, true);
+    await mockSettings(
+      page,
+      ownerSession.principal.permissions,
+      'OWNER',
+      [],
+      [shopId],
+      false,
+      false,
+      true,
+    );
     await page.goto('/settings/checkout');
     await page.getByText('Publish saved configuration').click();
     await page.getByLabel('Requester PIN (if required for approval)').fill('2468');
