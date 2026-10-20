@@ -154,7 +154,7 @@ export function ApprovalRulesPage() {
     shopId === null
       ? 'Business-wide'
       : (authorizedShopNames.get(shopId) ??
-          `Authorized shop ${authorizedShops.indexOf(shopId) + 1}`);
+        `Authorized shop ${authorizedShops.indexOf(shopId) + 1}`);
   const [form, setForm] = useState<RuleForm>(() =>
     initialForm(
       session.state.status === 'authenticated'
@@ -250,7 +250,9 @@ export function ApprovalRulesPage() {
                 </span>
                 {legacy ? (
                   <p className="admin-approval-rule__legacy">
-                    <strong>Legacy / cannot edit.</strong> Ask an authorized administrator to create a supported rule after reviewing the existing policy. This legacy rule remains unchanged.
+                    <strong>Legacy / cannot edit.</strong> Ask an authorized administrator to create
+                    a supported rule after reviewing the existing policy. This legacy rule remains
+                    unchanged.
                   </p>
                 ) : null}
                 <details className="admin-approval-rule__technical">
@@ -280,7 +282,8 @@ export function ApprovalRulesPage() {
       <section className="admin-form-section admin-approval-rule-builder">
         <h2>{editing ? 'Edit approval rule' : 'Add approval rule'}</h2>
         <p className="admin-approval-rule-builder__intro">
-          Set a supported action, choose an authorized scope and review the exact approval requirements before saving.
+          Set a supported action, choose an authorized scope and review the exact approval
+          requirements before saving.
         </p>
         <form onSubmit={submit} className="admin-form-section admin-form-section--compact">
           <p className="admin-approval-rule-builder__connector">When</p>
@@ -442,7 +445,8 @@ export function ApprovalRulesPage() {
             <h3>Rule preview</h3>
             <p>
               When {selectedAction?.label ?? 'a supported action'} is requested in{' '}
-              <strong>{shopLabel(form.shopId)}</strong>, an authorized reviewer with approvals.review decides the request.
+              <strong>{shopLabel(form.shopId)}</strong>, an authorized reviewer with
+              approvals.review decides the request.
             </p>
             <p>
               {form.thresholdKind === 'none'
@@ -453,8 +457,12 @@ export function ApprovalRulesPage() {
               Expires after {form.expiresAfterSeconds || '—'} seconds.
             </p>
             <p>
-              {form.requiresSecondPerson ? 'Requires a different approver.' : 'Second-person requirement not selected.'}{' '}
-              {form.requiresRequesterRepin ? 'Requester must re-enter PIN.' : 'Requester re-PIN not required by this rule.'}{' '}
+              {form.requiresSecondPerson
+                ? 'Requires a different approver.'
+                : 'Second-person requirement not selected.'}{' '}
+              {form.requiresRequesterRepin
+                ? 'Requester must re-enter PIN.'
+                : 'Requester re-PIN not required by this rule.'}{' '}
               {form.active ? 'Enabled when saved.' : 'Disabled when saved.'}
             </p>
           </section>

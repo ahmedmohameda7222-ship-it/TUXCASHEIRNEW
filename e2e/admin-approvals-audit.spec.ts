@@ -310,7 +310,9 @@ for (const width of [320, 375, 390, 768, 1280, 1440]) {
     await expect(page.getByRole('heading', { name: 'Approvals' })).toBeVisible();
     await page.screenshot({ path: `artifacts/p03/approvals-inbox-${width}.png` });
     await page.getByRole('button', { name: /Emergency inventory adjustment/ }).click();
-    await expect(page.getByRole('heading', { name: 'Emergency inventory adjustment' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Emergency inventory adjustment' }),
+    ).toBeVisible();
     await page.screenshot({ path: `artifacts/p03/approval-detail-${width}.png` });
     await page.getByRole('button', { name: 'Approve', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Enter PIN to approve' })).toBeVisible();
@@ -340,14 +342,22 @@ test('P03 screenshot empty and error approval states with mocked APIs', async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await mockAdmin(page);
   await page.route('**/api/admin/approvals*', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ approvals: [] }) }),
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ approvals: [] }),
+    }),
   );
   await page.goto('/approvals');
   await expect(page.getByText('No approval requests')).toBeVisible();
   await page.screenshot({ path: 'artifacts/p03/approvals-empty-390.png' });
   await page.unroute('**/api/admin/approvals*');
   await page.route('**/api/admin/approvals*', (route) =>
-    route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'unavailable' }) }),
+    route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'unavailable' }),
+    }),
   );
   await page.reload();
   await expect(page.getByText('Approvals could not be loaded')).toBeVisible();

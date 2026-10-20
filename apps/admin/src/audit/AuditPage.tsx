@@ -237,8 +237,19 @@ export function AuditPage() {
   const activeFilterChips = [
     { label: 'From', value: fromDate },
     { label: 'To', value: toDate },
-    { label: 'Shop', value: shopId ? (authorizedShopNames.get(shopId) ?? shopNames.get(shopId) ?? 'Authorized shop') : '' },
-    { label: 'Actor', value: actorEmployeeId ? (actorOptions.find((actor) => actor.employeeId === actorEmployeeId)?.label ?? 'Selected staff member') : '' },
+    {
+      label: 'Shop',
+      value: shopId
+        ? (authorizedShopNames.get(shopId) ?? shopNames.get(shopId) ?? 'Authorized shop')
+        : '',
+    },
+    {
+      label: 'Actor',
+      value: actorEmployeeId
+        ? (actorOptions.find((actor) => actor.employeeId === actorEmployeeId)?.label ??
+          'Selected staff member')
+        : '',
+    },
     { label: 'Activity', value: entityType ? auditLabel(entityType) : '' },
     { label: 'Approval', value: approvalStatus ? auditLabel(approvalStatus) : '' },
   ].filter((chip) => Boolean(chip.value));
@@ -283,7 +294,9 @@ export function AuditPage() {
           <option value="">All authorized shops</option>
           {principal.shopIds.map((authorizedShopId, index) => (
             <option key={authorizedShopId} value={authorizedShopId}>
-              {authorizedShopNames.get(authorizedShopId) ?? shopNames.get(authorizedShopId) ?? `Authorized shop ${index + 1}`}
+              {authorizedShopNames.get(authorizedShopId) ??
+                shopNames.get(authorizedShopId) ??
+                `Authorized shop ${index + 1}`}
             </option>
           ))}
         </select>
@@ -433,7 +446,9 @@ export function AuditPage() {
                 <span className="admin-audit-list__heading">
                   <strong>{auditLabel(event.actionType)}</strong>
                   {event.approvalStatus ? (
-                    <span className="admin-audit-list__status">{auditLabel(event.approvalStatus)}</span>
+                    <span className="admin-audit-list__status">
+                      {auditLabel(event.approvalStatus)}
+                    </span>
                   ) : null}
                 </span>
                 <span className="admin-audit-list__shop">{event.shopName}</span>
