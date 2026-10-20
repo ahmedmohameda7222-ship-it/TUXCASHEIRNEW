@@ -195,7 +195,8 @@ describe('Settings workspace', () => {
     expect(html).toContain('Sequence start');
     expect(html).toContain('Save Order prefix');
     expect(html).toContain('Save Receipt footer');
-    expect(html).toContain('Effective value:');
+    expect(html).toContain('Current configured:');
+    expect(html).toContain('Draft only · Publish separately');
   });
 
   it('shows configured reasons using staff-facing labels', () => {
