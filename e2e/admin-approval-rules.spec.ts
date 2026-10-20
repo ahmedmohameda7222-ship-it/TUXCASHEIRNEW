@@ -240,17 +240,11 @@ test('P03 screenshot manager policy scope and dark appearance mocked Chromium', 
   await page.screenshot({ path: 'artifacts/p03/approval-rules-dark-1440.png', fullPage: true });
 });
 
-test('rule safety switches remain compact and keyboard accessible on a phone', async ({
-  page,
-}) => {
+test('rule safety switches remain compact and keyboard accessible on a phone', async ({ page }) => {
   await mockRules(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/approvals/rules');
-  for (const name of [
-    'Require different approver',
-    'Require requester re-PIN',
-    'Rule enabled',
-  ]) {
+  for (const name of ['Require different approver', 'Require requester re-PIN', 'Rule enabled']) {
     const checkbox = page.getByRole('checkbox', { name });
     await expect(checkbox).toBeVisible();
     const bounds = await checkbox.boundingBox();
