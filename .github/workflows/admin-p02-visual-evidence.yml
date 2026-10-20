@@ -49,12 +49,12 @@ jobs:
               source: "Chromium Playwright with mocked Admin API fixtures; not hosted UAT",
               exactPrHead: process.env.P02_HEAD_SHA,
               screenshotCount: evidence.length,
-              expectedScreenshotCount: 103,
+              expectedScreenshotCount: 115,
               evidence
             };
             fs.writeFileSync(path + "/SHA256_MANIFEST.json", JSON.stringify(manifest, null, 2) + "\n");
-            if (evidence.length !== 103) {
-              console.error("P02 evidence incomplete: " + evidence.length + "/103");
+            if (evidence.length !== 115) {
+              console.error("P02 evidence incomplete: " + evidence.length + "/115");
               process.exitCode = 1;
             }
           '
