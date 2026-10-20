@@ -9,7 +9,7 @@ import {
   type SettingsSection,
 } from './SettingsPage';
 import { ReceiptsPage } from './ReceiptsPage';
-import { ShopsPage } from './ShopsPage';
+import { ShopsPage, shopOperationalStateDisabled } from './ShopsPage';
 import { ReasonCodesPage } from './ReasonCodesPage';
 
 const workspace: AdminSettingsWorkspace = {
@@ -175,8 +175,8 @@ describe('Settings workspace', () => {
       expect(html).toContain(label);
     }
     expect(html).toContain('Publish settings');
-    expect(html).toContain('Configuration edits publish here');
-    expect(html).toContain('Emergency shop controls publish immediately');
+    expect(html).toContain('Saving a setting updates its draft');
+    expect(html).toContain('Emergency shop controls take effect immediately');
   });
 
   it('hides unused-shop deletion for users without shops.manage', () => {
@@ -195,6 +195,8 @@ describe('Settings workspace', () => {
     expect(html).toContain('Sequence start');
     expect(html).toContain('Save Order prefix');
     expect(html).toContain('Save Receipt footer');
+    expect(html).toContain('Current configured:');
+    expect(html).toContain('Draft only · Publish separately');
   });
 
   it('shows configured reasons using staff-facing labels', () => {
@@ -217,26 +219,21 @@ describe('Settings workspace', () => {
         onlineOrdersPaused: true,
       },
     };
-    const suspendedHtml = renderToStaticMarkup(
-      <ShopsPage workspace={suspended} onUpdateOperationalState={noop} busy={false} />,
-    );
-    expect(suspendedHtml.match(/<input[^>]*type="checkbox"[^>]*disabled=""/g)).toHaveLength(2);
-
-    const activeHtml = renderToStaticMarkup(
-      <ShopsPage workspace={workspace} onUpdateOperationalState={noop} busy={false} />,
-    );
-    expect(activeHtml.match(/<input[^>]*type="checkbox"[^>]*disabled=""/g)).toBeNull();
+    expect(shopOperationalStateDisabled(suspended.shop, false, true)).toBe(true);
+    expect(shopOperationalStateDisabled(workspace.shop, false, true)).toBe(false);
+    expect(shopOperationalStateDisabled(workspace.shop, true, true)).toBe(true);
+    expect(shopOperationalStateDisabled(workspace.shop, false, false)).toBe(true);
   });
 
   it('renders real shop, fulfillment, payment and editable checkout configuration', () => {
     const shop = renderSection('shop');
     expect(shop).toContain('+201000000000');
     expect(shop).toContain('Road 9, Maadi');
-    expect(shop).toContain('10:00');
-    expect(shop).toContain('23:00');
-    expect(shop).toContain('Temporarily close shop');
-    expect(shop).toContain('Pause online orders');
-    expect(shop).toContain('Delete unused shop');
+    expect(shop).toContain('Hours &amp; scheduling');
+    expect(shop).toContain('Immediate controls');
+    expect(shop).toContain('Danger zone');
+    expect(shop).not.toContain('Temporarily close shop');
+    expect(shop).not.toContain('Delete unused shop');
     const lifecycleShop = renderToStaticMarkup(
       <ShopsPage
         workspace={{
@@ -250,8 +247,9 @@ describe('Settings workspace', () => {
         busy={false}
       />,
     );
-    expect(lifecycleShop).toContain('Archive shop');
-    expect(lifecycleShop).toContain('Delete unused shop');
+    expect(lifecycleShop).toContain('Danger zone');
+    expect(lifecycleShop).not.toContain('Archive shop');
+    expect(lifecycleShop).not.toContain('Delete unused shop');
 
     const orderTypes = renderSection('order-types');
     expect(orderTypes).toContain('Take Away');

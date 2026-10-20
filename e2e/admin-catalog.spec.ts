@@ -70,7 +70,10 @@ function canonicalBundle(product: FixtureProduct, version: number) {
   };
 }
 
-async function mockCatalog(page: Page, options: { allowSecondShop?: boolean } = {}) {
+async function mockCatalog(
+  page: Page,
+  options: { allowSecondShop?: boolean; productCount?: number; emptyCatalog?: boolean } = {},
+) {
   let publishVersion = 48;
   let draftRevision = 1;
   let liveProduct: FixtureProduct = {
@@ -106,7 +109,7 @@ async function mockCatalog(page: Page, options: { allowSecondShop?: boolean } = 
                 { id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false },
                 { id: secondShopId, name: 'TUX Zamalek', active: true, temporaryClosed: false },
               ]
-            : [],
+            : [{ id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false }],
         },
       }),
     });
@@ -132,7 +135,23 @@ async function mockCatalog(page: Page, options: { allowSecondShop?: boolean } = 
               active: true,
             },
           ],
-          products: [liveProduct],
+          products: options.emptyCatalog
+            ? []
+            : [
+                liveProduct,
+                ...Array.from(
+                  { length: Math.max(0, (options.productCount ?? 1) - 1) },
+                  (_, index): FixtureProduct => ({
+                    ...liveProduct,
+                    id: `99999999-9999-4999-8999-${String(index + 1).padStart(12, '0')}`,
+                    name: `Catalog item ${String(index + 2).padStart(2, '0')} · long product name`,
+                    slug: `catalog-item-${index + 2}`,
+                    priceMinor: 1200 + index * 50,
+                    soldOut: index % 7 === 0,
+                    sortOrder: 20 + index * 10,
+                  }),
+                ),
+              ],
           drafts: [],
         }),
       });
@@ -230,8 +249,10 @@ for (const viewport of ADMIN_WIDE_TABLET_VIEWPORTS) {
       await page.getByRole('button', { name: 'Products' }).click();
       await expect(page).toHaveURL(/\/catalog\/products$/);
     } else {
+      await expect(inspector).toBeHidden();
+      await page.getByRole('button', { name: /Classic Smash/ }).click();
       await expect(inspector).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Products' })).toBeHidden();
+      await expect(page.getByRole('button', { name: 'Products' })).toBeVisible();
       await page.getByRole('button', { name: 'More' }).click();
       await expect(page.getByText('Recipe / Inventory')).toBeVisible();
       await expect(page.getByText('Shop Overrides')).toBeVisible();
@@ -254,11 +275,12 @@ test('normal product edit creates a draft while Sold Out uses the immediate comm
   const fixture = await mockCatalog(page);
   await page.goto('/catalog/products');
 
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
   const name = page.locator('input[name="name"]');
   await name.fill('Classic Smash Updated');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft in progress')).toBeVisible();
-  await expect(page.getByText('Not live')).toBeVisible();
+  await expect(page.getByText('Not live', { exact: true })).toBeVisible();
   expect(fixture.commands.map((command) => command.type)).toEqual(['draft.create', 'draft.save']);
 
   await page.getByRole('button', { name: 'Mark sold out' }).click();
@@ -278,6 +300,7 @@ test('switching shops requires explicit discard for a dirty product editor', asy
 
   const shopSwitcher = page.locator('.shop-switcher select');
   await expect(shopSwitcher).toHaveValue(shopId);
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
   const productName = page.locator('input[name="name"]');
   await expect(productName).toHaveValue('Classic Smash');
   await productName.fill('Unsaved operator edit');
@@ -300,3 +323,83 @@ test('switching shops requires explicit discard for a dirty product editor', asy
   await expect(shopSwitcher).toHaveValue(secondShopId);
   expect(fixture.commands).toHaveLength(0);
 });
+
+if (process.env['P02_CAPTURE'] === '1') {
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 375, height: 844 },
+    { width: 320, height: 720 },
+  ] as const) {
+    test(`P02 screenshot: category and modifier management ${viewport.width}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await mockCatalog(page);
+      await page.goto('/catalog/products');
+      await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+      await expect(page.getByRole('heading', { name: 'Categories', exact: true })).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/p02/catalog-definitions-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      await page.getByText('Actions for Burgers').click();
+      await expect(page.getByRole('button', { name: 'Edit Burgers' })).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/p02/catalog-definition-actions-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+    });
+  }
+
+  const widths = [
+    { width: 1440, height: 900 },
+    { width: 1280, height: 800 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 },
+    { width: 375, height: 844 },
+    { width: 320, height: 720 },
+  ] as const;
+  for (const viewport of widths) {
+    test(`P02 screenshots: catalog browse, editor and modifiers ${viewport.width}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await mockCatalog(page, { productCount: 49 });
+      await page.goto('/catalog/products');
+      await expect(page.getByRole('heading', { name: 'Catalog' })).toBeVisible();
+      await expect(page.locator('[data-catalog-list]')).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/p02/catalog-populated-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      await page.getByRole('button', { name: /Classic Smash/ }).click();
+      await expect(page.locator('[data-catalog-inspector]')).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/p02/catalog-editor-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      await page.getByRole('button', { name: 'More' }).click();
+      await expect(page.getByText('Extras / Modifiers')).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/p02/catalog-modifiers-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await page.screenshot({
+        path: `artifacts/p02/catalog-editor-${viewport.width}-dark.png`,
+        fullPage: true,
+      });
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+    });
+    test(`P02 screenshots: empty catalog ${viewport.width}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await mockCatalog(page, { emptyCatalog: true });
+      await page.goto('/catalog/products');
+      await expect(page.getByText('No products match these filters.')).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/p02/catalog-empty-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+    });
+  }
+}

@@ -184,3 +184,126 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* P02: focused shop tasks and separated publication control. */
+.admin-settings-workspace__header {
+  min-width: 0;
+}
+.admin-settings-workspace__publish {
+  min-width: min(100%, 330px);
+  justify-items: stretch;
+  padding: 12px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
+.admin-settings-workspace__publish summary {
+  display: list-item;
+  cursor: pointer;
+  font-weight: 750;
+  min-height: var(--tux-touch-target);
+}
+.admin-settings-workspace__publish[open] {
+  gap: 10px;
+}
+.admin-shop-task-nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--tux-border-subtle);
+}
+.admin-shop-task-nav button {
+  white-space: normal;
+  text-align: center;
+}
+.admin-shop-task-nav button[aria-current='page'] {
+  background: var(--tux-surface-subtle);
+  font-weight: 750;
+  border-color: var(--tux-border-strong);
+}
+.admin-settings-lifecycle {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.admin-settings-lifecycle > h3 {
+  margin: 0;
+  color: var(--tux-destructive);
+}
+.admin-settings-danger-zone {
+  border-color: var(--tux-destructive);
+}
+@media (max-width: 760px) {
+  .admin-settings-workspace__header {
+    display: grid;
+  }
+  .admin-settings-workspace__publish {
+    width: 100%;
+  }
+  .admin-settings-workspace__nav {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-padding: 16px;
+  }
+  .admin-settings-workspace__nav button {
+    min-width: max-content;
+    width: auto;
+  }
+  .admin-shop-task-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* P02 setting field ownership: distinct saved configuration and unpublished edit. */
+.admin-settings-override-editor {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  background: var(--tux-surface-panel);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+}
+.admin-settings-override-editor__heading h3 {
+  margin: 0;
+}
+.admin-settings-override-editor__eyebrow {
+  margin: 0 0 4px;
+  color: var(--tux-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+.admin-settings-override-editor__configured {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 10px;
+  border-radius: var(--tux-radius-control);
+  background: var(--tux-surface-subtle);
+  font-size: 13px;
+}
+.admin-settings-override-editor__configured span {
+  color: var(--tux-text-secondary);
+}
+.admin-settings-override-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.admin-settings-override-editor__actions button {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+}
+.admin-settings-override-editor__actions span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tux-text-secondary);
+}

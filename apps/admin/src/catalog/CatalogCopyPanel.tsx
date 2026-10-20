@@ -141,6 +141,15 @@ export function CatalogCopyPanel({
   canPrice: boolean;
 }) {
   const session = useAdminSession();
+  const principal =
+    session.state.status === 'authenticated' ? session.state.session.principal : null;
+  const authorizedShopNames = new Map(
+    principal
+      ? (principal.shopSummaries ?? [])
+          .filter((shop) => principal.shopIds.includes(shop.id))
+          .map((shop) => [shop.id, shop.name] as const)
+      : [],
+  );
   const queryClient = useQueryClient();
   const canCopyRecipe =
     session.state.status === 'authenticated' &&
@@ -455,12 +464,19 @@ export function CatalogCopyPanel({
             >
               {sourceShopIds.map((id) => (
                 <option key={id} value={id}>
-                  {id}
+                  {authorizedShopNames.get(id) ?? 'Shop unavailable'}
                 </option>
               ))}
             </select>
           </label>
-          <p>Target shop: {targetShopId}</p>
+          <p>
+            Target shop: <strong>{authorizedShopNames.get(targetShopId) ?? 'Selected shop'}</strong>
+          </p>
+          <details className="admin-settings-advanced">
+            <summary>Technical shop IDs</summary>
+            <small>Source: {activeSourceShopId}</small>
+            <small>Target: {targetShopId}</small>
+          </details>
           <label className="admin-field">
             <input
               type="checkbox"

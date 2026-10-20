@@ -38,6 +38,15 @@ export function ShopCopyPreviewPanel({
   sourceShopIds: readonly string[];
 }) {
   const session = useAdminSession();
+  const principal =
+    session.state.status === 'authenticated' ? session.state.session.principal : null;
+  const authorizedShopNames = new Map(
+    principal
+      ? (principal.shopSummaries ?? [])
+          .filter((shop) => principal.shopIds.includes(shop.id))
+          .map((shop) => [shop.id, shop.name] as const)
+      : [],
+  );
   const queryClient = useQueryClient();
   const [sourceShopId, setSourceShopId] = useState(sourceShopIds[0] ?? '');
   const activeSourceShopId = sourceShopIds.includes(sourceShopId)
@@ -164,12 +173,19 @@ export function ShopCopyPreviewPanel({
           >
             {sourceShopIds.map((id) => (
               <option value={id} key={id}>
-                {id}
+                {authorizedShopNames.get(id) ?? 'Shop unavailable'}
               </option>
             ))}
           </select>
         </label>
-        <p className="admin-field__help">Target shop: {targetShopId}</p>
+        <p className="admin-field__help">
+          Target shop: <strong>{authorizedShopNames.get(targetShopId) ?? 'Selected shop'}</strong>
+        </p>
+        <details className="admin-settings-advanced">
+          <summary>Technical shop identifiers</summary>
+          <small>Source: {activeSourceShopId}</small>
+          <small>Target: {targetShopId}</small>
+        </details>
         <label className="admin-field">
           <input
             type="checkbox"

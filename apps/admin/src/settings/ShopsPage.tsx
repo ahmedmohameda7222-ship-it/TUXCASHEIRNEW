@@ -483,6 +483,14 @@ function SpecialHoursRowEditor({
   );
 }
 
+export function shopOperationalStateDisabled(
+  shop: Pick<AdminSettingsWorkspace['shop'], 'lifecycleState'>,
+  busy: boolean,
+  hasUpdatePermission: boolean,
+): boolean {
+  return busy || shop.lifecycleState !== 'ACTIVE' || !hasUpdatePermission;
+}
+
 export function ShopsPage({
   workspace,
   onUpdateOperationalState,
@@ -513,6 +521,7 @@ export function ShopsPage({
   const shop = workspace.shop;
   const [lifecyclePin, setLifecyclePin] = useState('');
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [area, setArea] = useState<'identity' | 'hours' | 'operations' | 'lifecycle'>('identity');
   const [identity, setIdentity] = useState<IdentityForm>({
     name: shop.name,
     address: shop.address ?? '',
@@ -546,8 +555,11 @@ export function ShopsPage({
     });
   }, [shop.address, shop.contactPhone, shop.latitude, shop.longitude, shop.name]);
 
-  const operationalStateDisabled =
-    busy || shop.lifecycleState !== 'ACTIVE' || !onUpdateOperationalState;
+  const operationalStateDisabled = shopOperationalStateDisabled(
+    shop,
+    busy,
+    Boolean(onUpdateOperationalState),
+  );
 
   async function saveIdentity(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -610,7 +622,28 @@ export function ShopsPage({
         <span className="admin-status-pill">{shop.lifecycleState}</span>
       </div>
 
-      {canAssignStaff ? (
+      <nav className="admin-shop-task-nav" aria-label="Shop management tasks">
+        {(
+          [
+            ['identity', 'Identity'],
+            ['hours', 'Hours & scheduling'],
+            ['operations', 'Immediate controls'],
+            ['lifecycle', 'Danger zone'],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            className="admin-secondary-button"
+            type="button"
+            aria-current={area === id ? 'page' : undefined}
+            onClick={() => setArea(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {area === 'identity' && canAssignStaff ? (
         <div className="admin-settings-card">
           <strong>Staff assignments</strong>
           <p className="admin-field__help">
@@ -622,402 +655,461 @@ export function ShopsPage({
         </div>
       ) : null}
 
-      {canManageLifecycle &&
-      shop.lifecycleState !== 'ARCHIVED' &&
-      typeof shop.lifecycleRevision === 'number' &&
-      onUpdateLifecycle ? (
-        <div className="admin-settings-card">
-          <strong>Shop lifecycle</strong>
-          <p className="admin-field__help">
-            Suspending stops new intake. Reactivation leaves online orders paused and the shop
-            temporarily closed until separately reopened.
-          </p>
-          {lifecycleApprovalPending ? (
-            <p role="status" className="admin-field__help">
-              Lifecycle change is pending second-person approval. The shop has not changed state.
+      {area === 'identity' ? (
+        <>
+          <h3>Identity & contact</h3>
+          <form className="admin-settings-card" onSubmit={(event) => void saveIdentity(event)}>
+            <div className="admin-settings-grid">
+              <label className="admin-field">
+                <span>Display name</span>
+                <input
+                  value={identity.name}
+                  maxLength={160}
+                  required
+                  disabled={busy}
+                  onChange={(event) =>
+                    setIdentity((current) => ({ ...current, name: event.currentTarget.value }))
+                  }
+                />
+              </label>
+              <label className="admin-field">
+                <span>Address</span>
+                <input
+                  value={identity.address}
+                  maxLength={500}
+                  disabled={busy}
+                  onChange={(event) =>
+                    setIdentity((current) => ({ ...current, address: event.currentTarget.value }))
+                  }
+                />
+              </label>
+              <label className="admin-field">
+                <span>Contact phone</span>
+                <input
+                  value={identity.contactPhone}
+                  maxLength={80}
+                  disabled={busy}
+                  onChange={(event) =>
+                    setIdentity((current) => ({
+                      ...current,
+                      contactPhone: event.currentTarget.value,
+                    }))
+                  }
+                />
+              </label>
+            </div>
+            <details className="admin-settings-advanced">
+              <summary>Advanced location</summary>
+              <div className="admin-settings-grid">
+                <label className="admin-field">
+                  <span>Latitude</span>
+                  <input
+                    type="number"
+                    min={-90}
+                    max={90}
+                    step="any"
+                    value={identity.latitude}
+                    disabled={busy}
+                    onChange={(event) =>
+                      setIdentity((current) => ({
+                        ...current,
+                        latitude: event.currentTarget.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Longitude</span>
+                  <input
+                    type="number"
+                    min={-180}
+                    max={180}
+                    step="any"
+                    value={identity.longitude}
+                    disabled={busy}
+                    onChange={(event) =>
+                      setIdentity((current) => ({
+                        ...current,
+                        longitude: event.currentTarget.value,
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+            </details>
+            <p className="admin-field__help">
+              These details appear anywhere customers or staff need this shop&apos;s contact
+              information.
             </p>
-          ) : null}
-          <label className="admin-field">
-            <span>Requester PIN (only when the approval rule requires reauthentication)</span>
-            <input
-              type="password"
-              autoComplete="off"
-              maxLength={64}
-              value={lifecyclePin}
-              disabled={busy || lifecycleUpdating}
-              onChange={(event) => setLifecyclePin(event.currentTarget.value)}
-            />
-          </label>
-          <button
-            className="admin-secondary-button"
-            type="button"
-            disabled={busy || lifecycleUpdating}
-            onClick={() => {
-              if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined)
-                return;
-              const requesterPin = lifecyclePin.trim();
-              setLifecyclePin('');
-              void onUpdateLifecycle({
-                expectedState: shop.lifecycleState,
-                targetState: shop.lifecycleState === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE',
-                expectedLifecycleRevision: shop.lifecycleRevision,
-                ...(requesterPin === '' ? {} : { requesterPin }),
-              });
-            }}
-          >
-            {shop.lifecycleState === 'ACTIVE' ? 'Suspend shop' : 'Reactivate shop'}
-          </button>
-          <button
-            className="admin-secondary-button"
-            type="button"
-            disabled={busy || lifecycleUpdating}
-            onClick={() => setArchiveConfirmOpen(true)}
-          >
-            Archive shop
-          </button>
-          <ConfirmationDialog
-            open={archiveConfirmOpen}
-            title={`Archive ${shop.name}?`}
-            description="This closes the shop to new operations and preserves its history. A configured approval rule requires a distinct authorized approver."
-            confirmLabel="Archive shop"
-            destructive
-            pending={lifecycleUpdating}
-            onOpenChange={setArchiveConfirmOpen}
-            onConfirm={async () => {
-              if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined)
-                return;
-              const requesterPin = lifecyclePin.trim();
-              setLifecyclePin('');
-              await onUpdateLifecycle({
-                expectedState: shop.lifecycleState,
-                targetState: 'ARCHIVED',
-                expectedLifecycleRevision: shop.lifecycleRevision,
-                ...(requesterPin === '' ? {} : { requesterPin }),
-              });
-              setArchiveConfirmOpen(false);
-            }}
-          />
-        </div>
+            <button
+              className="admin-primary-button"
+              type="submit"
+              disabled={busy || !onUpdateIdentity}
+            >
+              Save shop identity
+            </button>
+          </form>
+        </>
       ) : null}
 
-      <form className="admin-settings-card" onSubmit={(event) => void saveIdentity(event)}>
-        <div className="admin-settings-grid">
-          <label className="admin-field">
-            <span>Display name</span>
-            <input
-              value={identity.name}
-              maxLength={160}
-              required
-              disabled={busy}
-              onChange={(event) =>
-                setIdentity((current) => ({ ...current, name: event.currentTarget.value }))
-              }
-            />
-          </label>
-          <label className="admin-field">
-            <span>Address</span>
-            <input
-              value={identity.address}
-              maxLength={500}
-              disabled={busy}
-              onChange={(event) =>
-                setIdentity((current) => ({ ...current, address: event.currentTarget.value }))
-              }
-            />
-          </label>
-          <label className="admin-field">
-            <span>Contact phone</span>
-            <input
-              value={identity.contactPhone}
-              maxLength={80}
-              disabled={busy}
-              onChange={(event) =>
-                setIdentity((current) => ({ ...current, contactPhone: event.currentTarget.value }))
-              }
-            />
-          </label>
-        </div>
-        <details className="admin-settings-advanced">
-          <summary>Advanced location</summary>
+      {area === 'operations' ? (
+        <>
+          <h3>Immediate operational controls</h3>
+          <p className="admin-field__help">
+            These controls change live ordering immediately, without publishing a settings draft.
+          </p>
           <div className="admin-settings-grid">
-            <label className="admin-field">
-              <span>Latitude</span>
-              <input
-                type="number"
-                min={-90}
-                max={90}
-                step="any"
-                value={identity.latitude}
-                disabled={busy}
-                onChange={(event) =>
-                  setIdentity((current) => ({ ...current, latitude: event.currentTarget.value }))
-                }
-              />
-            </label>
-            <label className="admin-field">
-              <span>Longitude</span>
-              <input
-                type="number"
-                min={-180}
-                max={180}
-                step="any"
-                value={identity.longitude}
-                disabled={busy}
-                onChange={(event) =>
-                  setIdentity((current) => ({ ...current, longitude: event.currentTarget.value }))
-                }
-              />
-            </label>
+            <article className="admin-settings-card">
+              <span>Online orders</span>
+              <strong>{shop.onlineOrdersPaused ? 'Paused' : 'Accepting orders'}</strong>
+              <small>
+                {shop.temporaryClosed
+                  ? 'Shop is temporarily closed.'
+                  : 'Shop is not temporarily closed.'}
+              </small>
+              <label className="admin-check-field">
+                <input
+                  type="checkbox"
+                  checked={shop.temporaryClosed}
+                  disabled={operationalStateDisabled}
+                  onChange={(event) =>
+                    onUpdateOperationalState?.({
+                      temporaryClosed: event.currentTarget.checked,
+                      onlineOrdersPaused: shop.onlineOrdersPaused,
+                      expectedSettingsVersion: workspace.settingsVersion,
+                    })
+                  }
+                />
+                <span>Temporarily close shop</span>
+              </label>
+              <label className="admin-check-field">
+                <input
+                  type="checkbox"
+                  checked={shop.onlineOrdersPaused}
+                  disabled={operationalStateDisabled}
+                  onChange={(event) =>
+                    onUpdateOperationalState?.({
+                      temporaryClosed: shop.temporaryClosed,
+                      onlineOrdersPaused: event.currentTarget.checked,
+                      expectedSettingsVersion: workspace.settingsVersion,
+                    })
+                  }
+                />
+                <span>Pause online orders</span>
+              </label>
+              <small>These emergency controls publish immediately.</small>
+            </article>
+            <article className="admin-settings-card">
+              <span>Timezone</span>
+              <strong>{shop.timezone}</strong>
+              <small>Service-hours wall-clock authority is fixed to Africa/Cairo.</small>
+            </article>
           </div>
-        </details>
-        <p className="admin-field__help">
-          These details appear anywhere customers or staff need this shop&apos;s contact
-          information.
-        </p>
-        <button className="admin-primary-button" type="submit" disabled={busy || !onUpdateIdentity}>
-          Save shop identity
-        </button>
-      </form>
+        </>
+      ) : null}
 
-      <div className="admin-settings-grid">
-        <article className="admin-settings-card">
-          <span>Online orders</span>
-          <strong>{shop.onlineOrdersPaused ? 'Paused' : 'Accepting orders'}</strong>
-          <small>
-            {shop.temporaryClosed
-              ? 'Shop is temporarily closed.'
-              : 'Shop is not temporarily closed.'}
-          </small>
-          <label className="admin-check-field">
-            <input
-              type="checkbox"
-              checked={shop.temporaryClosed}
-              disabled={operationalStateDisabled}
-              onChange={(event) =>
-                onUpdateOperationalState?.({
-                  temporaryClosed: event.currentTarget.checked,
-                  onlineOrdersPaused: shop.onlineOrdersPaused,
-                  expectedSettingsVersion: workspace.settingsVersion,
-                })
-              }
-            />
-            <span>Temporarily close shop</span>
-          </label>
-          <label className="admin-check-field">
-            <input
-              type="checkbox"
-              checked={shop.onlineOrdersPaused}
-              disabled={operationalStateDisabled}
-              onChange={(event) =>
-                onUpdateOperationalState?.({
-                  temporaryClosed: shop.temporaryClosed,
-                  onlineOrdersPaused: event.currentTarget.checked,
-                  expectedSettingsVersion: workspace.settingsVersion,
-                })
-              }
-            />
-            <span>Pause online orders</span>
-          </label>
-          <small>These emergency controls publish immediately.</small>
-        </article>
-        <article className="admin-settings-card">
-          <span>Timezone</span>
-          <strong>{shop.timezone}</strong>
-          <small>Service-hours wall-clock authority is fixed to Africa/Cairo.</small>
-        </article>
-      </div>
+      {area === 'hours' ? (
+        <>
+          <h3>Hours & scheduling</h3>
+          <SettingsSchedulePanel workspace={workspace} busy={busy} />
 
-      <SettingsSchedulePanel workspace={workspace} busy={busy} />
-
-      <div className="admin-settings-subsection">
-        <h3>Weekly service hours</h3>
-        <div className="admin-settings-list">
-          {workspace.weeklyHours.map((hours) => (
-            <WeeklyHoursRowEditor
-              key={hours.id}
-              hours={hours}
-              settingsVersion={workspace.settingsVersion}
-              onUpsert={onUpsertWeeklyHours}
-              busy={busy}
-            />
-          ))}
-        </div>
-        <form className="admin-settings-card" onSubmit={(event) => void createWeekly(event)}>
-          <strong>Add weekly window</strong>
-          <div className="admin-settings-grid">
-            <select
-              aria-label="New service hours type"
-              value={weeklyNew.serviceKind}
-              disabled={busy}
-              onChange={(event) =>
-                setWeeklyNew((current) => ({
-                  ...current,
-                  serviceKind: event.currentTarget.value as ShopHoursServiceKind,
-                }))
-              }
-            >
-              <option value="OPEN">Shop opening hours</option>
-              <option value="DELIVERY">Delivery hours</option>
-              <option value="ONLINE">Online ordering hours</option>
-            </select>
-            <select
-              aria-label="Weekday"
-              value={weeklyNew.dayOfWeek}
-              disabled={busy}
-              onChange={(event) =>
-                setWeeklyNew((current) => ({
-                  ...current,
-                  dayOfWeek: Number(event.currentTarget.value),
-                }))
-              }
-            >
-              {weekdays.map((day, index) => (
-                <option key={day} value={index}>
-                  {day}
-                </option>
+          <div className="admin-settings-subsection">
+            <h3>Weekly service hours</h3>
+            <div className="admin-settings-list">
+              {workspace.weeklyHours.map((hours) => (
+                <WeeklyHoursRowEditor
+                  key={hours.id}
+                  hours={hours}
+                  settingsVersion={workspace.settingsVersion}
+                  onUpsert={onUpsertWeeklyHours}
+                  busy={busy}
+                />
               ))}
-            </select>
-            <input
-              aria-label="New opening time"
-              type="time"
-              step={1}
-              value={weeklyNew.opensLocal}
-              disabled={busy}
-              onChange={(event) =>
-                setWeeklyNew((current) => ({ ...current, opensLocal: event.currentTarget.value }))
-              }
-            />
-            <input
-              aria-label="New closing time"
-              type="time"
-              step={1}
-              value={weeklyNew.closesLocal}
-              disabled={busy}
-              onChange={(event) =>
-                setWeeklyNew((current) => ({ ...current, closesLocal: event.currentTarget.value }))
-              }
-            />
+            </div>
+            <form className="admin-settings-card" onSubmit={(event) => void createWeekly(event)}>
+              <strong>Add weekly window</strong>
+              <div className="admin-settings-grid">
+                <select
+                  aria-label="New service hours type"
+                  value={weeklyNew.serviceKind}
+                  disabled={busy}
+                  onChange={(event) =>
+                    setWeeklyNew((current) => ({
+                      ...current,
+                      serviceKind: event.currentTarget.value as ShopHoursServiceKind,
+                    }))
+                  }
+                >
+                  <option value="OPEN">Shop opening hours</option>
+                  <option value="DELIVERY">Delivery hours</option>
+                  <option value="ONLINE">Online ordering hours</option>
+                </select>
+                <select
+                  aria-label="Weekday"
+                  value={weeklyNew.dayOfWeek}
+                  disabled={busy}
+                  onChange={(event) =>
+                    setWeeklyNew((current) => ({
+                      ...current,
+                      dayOfWeek: Number(event.currentTarget.value),
+                    }))
+                  }
+                >
+                  {weekdays.map((day, index) => (
+                    <option key={day} value={index}>
+                      {day}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  aria-label="New opening time"
+                  type="time"
+                  step={1}
+                  value={weeklyNew.opensLocal}
+                  disabled={busy}
+                  onChange={(event) =>
+                    setWeeklyNew((current) => ({
+                      ...current,
+                      opensLocal: event.currentTarget.value,
+                    }))
+                  }
+                />
+                <input
+                  aria-label="New closing time"
+                  type="time"
+                  step={1}
+                  value={weeklyNew.closesLocal}
+                  disabled={busy}
+                  onChange={(event) =>
+                    setWeeklyNew((current) => ({
+                      ...current,
+                      closesLocal: event.currentTarget.value,
+                    }))
+                  }
+                />
+              </div>
+              <button
+                className="admin-primary-button"
+                type="submit"
+                disabled={busy || !onUpsertWeeklyHours}
+              >
+                Save weekly hours
+              </button>
+            </form>
           </div>
-          <button
-            className="admin-primary-button"
-            type="submit"
-            disabled={busy || !onUpsertWeeklyHours}
-          >
-            Save weekly hours
-          </button>
-        </form>
-      </div>
 
-      <div className="admin-settings-subsection">
-        <h3>Special-date hours</h3>
-        <div className="admin-settings-list">
-          {workspace.specialHours.map((hours) => (
-            <SpecialHoursRowEditor
-              key={hours.id}
-              hours={hours}
-              settingsVersion={workspace.settingsVersion}
-              onUpsert={onUpsertSpecialHours}
-              busy={busy}
-            />
-          ))}
-        </div>
-        <form className="admin-settings-card" onSubmit={(event) => void createSpecial(event)}>
-          <strong>Add special-date hours</strong>
-          <div className="admin-settings-grid">
-            <input
-              aria-label="New special date"
-              type="date"
-              required
-              value={specialNew.serviceDate}
-              disabled={busy}
-              onChange={(event) =>
-                setSpecialNew((current) => ({ ...current, serviceDate: event.currentTarget.value }))
-              }
-            />
-            <select
-              aria-label="New special-date service hours type"
-              value={specialNew.serviceKind}
-              disabled={busy}
-              onChange={(event) =>
-                setSpecialNew((current) => ({
-                  ...current,
-                  serviceKind: event.currentTarget.value as ShopHoursServiceKind,
-                }))
-              }
-            >
-              <option value="OPEN">Shop opening hours</option>
-              <option value="DELIVERY">Delivery hours</option>
-              <option value="ONLINE">Online ordering hours</option>
-            </select>
-            <label className="admin-check-field">
-              <input
-                type="checkbox"
-                checked={specialNew.closed}
-                disabled={busy}
-                onChange={(event) =>
-                  setSpecialNew((current) => ({ ...current, closed: event.currentTarget.checked }))
-                }
+          <div className="admin-settings-subsection">
+            <h3>Special-date hours</h3>
+            <div className="admin-settings-list">
+              {workspace.specialHours.map((hours) => (
+                <SpecialHoursRowEditor
+                  key={hours.id}
+                  hours={hours}
+                  settingsVersion={workspace.settingsVersion}
+                  onUpsert={onUpsertSpecialHours}
+                  busy={busy}
+                />
+              ))}
+            </div>
+            <form className="admin-settings-card" onSubmit={(event) => void createSpecial(event)}>
+              <strong>Add special-date hours</strong>
+              <div className="admin-settings-grid">
+                <input
+                  aria-label="New special date"
+                  type="date"
+                  required
+                  value={specialNew.serviceDate}
+                  disabled={busy}
+                  onChange={(event) =>
+                    setSpecialNew((current) => ({
+                      ...current,
+                      serviceDate: event.currentTarget.value,
+                    }))
+                  }
+                />
+                <select
+                  aria-label="New special-date service hours type"
+                  value={specialNew.serviceKind}
+                  disabled={busy}
+                  onChange={(event) =>
+                    setSpecialNew((current) => ({
+                      ...current,
+                      serviceKind: event.currentTarget.value as ShopHoursServiceKind,
+                    }))
+                  }
+                >
+                  <option value="OPEN">Shop opening hours</option>
+                  <option value="DELIVERY">Delivery hours</option>
+                  <option value="ONLINE">Online ordering hours</option>
+                </select>
+                <label className="admin-check-field">
+                  <input
+                    type="checkbox"
+                    checked={specialNew.closed}
+                    disabled={busy}
+                    onChange={(event) =>
+                      setSpecialNew((current) => ({
+                        ...current,
+                        closed: event.currentTarget.checked,
+                      }))
+                    }
+                  />
+                  <span>Closed all day</span>
+                </label>
+                <input
+                  aria-label="New special-date opening time"
+                  type="time"
+                  step={1}
+                  value={specialNew.opensLocal}
+                  disabled={busy || specialNew.closed}
+                  onChange={(event) =>
+                    setSpecialNew((current) => ({
+                      ...current,
+                      opensLocal: event.currentTarget.value,
+                    }))
+                  }
+                />
+                <input
+                  aria-label="New special-date closing time"
+                  type="time"
+                  step={1}
+                  value={specialNew.closesLocal}
+                  disabled={busy || specialNew.closed}
+                  onChange={(event) =>
+                    setSpecialNew((current) => ({
+                      ...current,
+                      closesLocal: event.currentTarget.value,
+                    }))
+                  }
+                />
+                <input
+                  aria-label="New special-date note"
+                  value={specialNew.note}
+                  maxLength={500}
+                  disabled={busy}
+                  placeholder="Note"
+                  onChange={(event) =>
+                    setSpecialNew((current) => ({ ...current, note: event.currentTarget.value }))
+                  }
+                />
+              </div>
+              <button
+                className="admin-primary-button"
+                type="submit"
+                disabled={busy || !onUpsertSpecialHours}
+              >
+                Save special hours
+              </button>
+            </form>
+          </div>
+        </>
+      ) : null}
+
+      {area === 'lifecycle' ? (
+        <section className="admin-settings-lifecycle" aria-label="Shop danger zone">
+          <h3>Danger zone</h3>
+          <p className="admin-field__help">
+            Suspend, archive or delete only after reviewing the consequences for {shop.name}.
+            Approval policies remain enforced.
+          </p>
+          {canManageLifecycle &&
+          shop.lifecycleState !== 'ARCHIVED' &&
+          typeof shop.lifecycleRevision === 'number' &&
+          onUpdateLifecycle ? (
+            <div className="admin-settings-card">
+              <strong>Shop lifecycle</strong>
+              <p className="admin-field__help">
+                Suspending stops new intake. Reactivation leaves online orders paused and the shop
+                temporarily closed until separately reopened.
+              </p>
+              {lifecycleApprovalPending ? (
+                <p role="status" className="admin-field__help">
+                  Lifecycle change is pending second-person approval. The shop has not changed
+                  state.
+                </p>
+              ) : null}
+              <label className="admin-field">
+                <span>Requester PIN (only when the approval rule requires reauthentication)</span>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  maxLength={64}
+                  value={lifecyclePin}
+                  disabled={busy || lifecycleUpdating}
+                  onChange={(event) => setLifecyclePin(event.currentTarget.value)}
+                />
+              </label>
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={busy || lifecycleUpdating}
+                onClick={() => {
+                  if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined)
+                    return;
+                  const requesterPin = lifecyclePin.trim();
+                  setLifecyclePin('');
+                  void onUpdateLifecycle({
+                    expectedState: shop.lifecycleState,
+                    targetState: shop.lifecycleState === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE',
+                    expectedLifecycleRevision: shop.lifecycleRevision,
+                    ...(requesterPin === '' ? {} : { requesterPin }),
+                  });
+                }}
+              >
+                {shop.lifecycleState === 'ACTIVE' ? 'Suspend shop' : 'Reactivate shop'}
+              </button>
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={busy || lifecycleUpdating}
+                onClick={() => setArchiveConfirmOpen(true)}
+              >
+                Archive shop
+              </button>
+              <ConfirmationDialog
+                open={archiveConfirmOpen}
+                title={`Archive ${shop.name}?`}
+                description="This closes the shop to new operations and preserves its history. A configured approval rule requires a distinct authorized approver."
+                confirmLabel="Archive shop"
+                destructive
+                pending={lifecycleUpdating}
+                onOpenChange={setArchiveConfirmOpen}
+                onConfirm={async () => {
+                  if (shop.lifecycleState === 'ARCHIVED' || shop.lifecycleRevision === undefined)
+                    return;
+                  const requesterPin = lifecyclePin.trim();
+                  setLifecyclePin('');
+                  await onUpdateLifecycle({
+                    expectedState: shop.lifecycleState,
+                    targetState: 'ARCHIVED',
+                    expectedLifecycleRevision: shop.lifecycleRevision,
+                    ...(requesterPin === '' ? {} : { requesterPin }),
+                  });
+                  setArchiveConfirmOpen(false);
+                }}
               />
-              <span>Closed all day</span>
-            </label>
-            <input
-              aria-label="New special-date opening time"
-              type="time"
-              step={1}
-              value={specialNew.opensLocal}
-              disabled={busy || specialNew.closed}
-              onChange={(event) =>
-                setSpecialNew((current) => ({ ...current, opensLocal: event.currentTarget.value }))
-              }
-            />
-            <input
-              aria-label="New special-date closing time"
-              type="time"
-              step={1}
-              value={specialNew.closesLocal}
-              disabled={busy || specialNew.closed}
-              onChange={(event) =>
-                setSpecialNew((current) => ({ ...current, closesLocal: event.currentTarget.value }))
-              }
-            />
-            <input
-              aria-label="New special-date note"
-              value={specialNew.note}
-              maxLength={500}
-              disabled={busy}
-              placeholder="Note"
-              onChange={(event) =>
-                setSpecialNew((current) => ({ ...current, note: event.currentTarget.value }))
-              }
-            />
-          </div>
-          <button
-            className="admin-primary-button"
-            type="submit"
-            disabled={busy || !onUpsertSpecialHours}
-          >
-            Save special hours
-          </button>
-        </form>
-      </div>
+            </div>
+          ) : null}
 
-      {onDeleteOrArchive ? (
-        <div className="admin-settings-danger-zone">
-          <div>
-            <strong>Delete unused shop</strong>
-            <span>
-              Used shops must be archived through the approval-aware lifecycle control above.
-            </span>
-          </div>
-          <button
-            className="admin-secondary-button"
-            type="button"
-            disabled={busy}
-            onClick={onDeleteOrArchive}
-          >
-            Delete unused shop
-          </button>
-        </div>
+          {onDeleteOrArchive ? (
+            <div className="admin-settings-danger-zone">
+              <div>
+                <strong>Delete unused shop</strong>
+                <span>
+                  Used shops must be archived through the approval-aware lifecycle control above.
+                </span>
+              </div>
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={busy}
+                onClick={onDeleteOrArchive}
+              >
+                Delete unused shop
+              </button>
+            </div>
+          ) : null}
+        </section>
       ) : null}
     </section>
   );

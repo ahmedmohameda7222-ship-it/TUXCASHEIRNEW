@@ -39,7 +39,9 @@ export function ProductInspector({
           <span>Products</span>
         </button>
         <div>
-          <p className="admin-catalog-editor__eyebrow">Product editor</p>
+          <p className="admin-catalog-editor__eyebrow">
+            Product editor · Save draft before publishing
+          </p>
           <h2>{product.name}</h2>
         </div>
         {draftRevision === null ? (

@@ -86,7 +86,18 @@ async function mockSettings(
       contentType: 'application/json',
       body: JSON.stringify({
         ...ownerSession,
-        principal: { ...ownerSession.principal, permissions, role, shopIds: authorizedShopIds },
+        principal: {
+          ...ownerSession.principal,
+          permissions,
+          role,
+          shopIds: authorizedShopIds,
+          shopSummaries: authorizedShopIds.map((id, index) => ({
+            id,
+            name: index === 0 ? 'TUX Maadi' : 'TUX Zamalek',
+            active: true,
+            temporaryClosed: index !== 0,
+          })),
+        },
       }),
     });
   });
@@ -436,6 +447,7 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     await page.goto('/settings/shop');
 
     await expect(page.getByRole('heading', { name: 'TUX Maadi', level: 1 })).toBeVisible();
+    await page.getByText('Publish saved configuration').click();
     await expect(page.getByRole('button', { name: 'Publish settings' })).toBeVisible();
     await page.getByRole('button', { name: 'Checkout' }).click();
     await expect(page.getByRole('heading', { name: 'Checkout' })).toBeVisible();
@@ -476,6 +488,7 @@ test('edits checkout and receipt overrides with CAS, then publishes settings', a
     expectedVersion: 4,
   });
 
+  await page.getByText('Publish saved configuration').click();
   await page.getByRole('button', { name: 'Publish settings' }).click();
   await expect.poll(() => commands.length).toBeGreaterThanOrEqual(3);
   expect(commands[2]).toEqual({
@@ -497,6 +510,7 @@ test('keeps checkout tax publication pending until a second person approves', as
     true,
   );
   await page.goto('/settings/checkout');
+  await page.getByText('Publish saved configuration').click();
   await page.getByLabel('Requester PIN (if required for approval)').fill('2468');
   await page.getByRole('button', { name: 'Publish settings' }).click();
   await expect(
@@ -843,6 +857,7 @@ test('shop management does not offer assignment access without staff management 
 test('suspends a shop through version-fenced trusted lifecycle authority', async ({ page }) => {
   const { commands } = await mockSettings(page, ['settings.manage', 'shops.manage']);
   await page.goto('/settings/shop');
+  await page.getByRole('button', { name: 'Danger zone' }).click();
   await expect(page.getByRole('button', { name: 'Suspend shop' })).toBeVisible();
   await page.getByRole('button', { name: 'Suspend shop' }).click();
   await expect.poll(() => commands.length).toBe(1);
@@ -882,6 +897,7 @@ test('requests second-person approval for used-shop archive without applying the
   const { commands } = await mockSettings(page, ['settings.manage', 'shops.manage']);
 
   await page.goto('/settings/shop');
+  await page.getByRole('button', { name: 'Danger zone' }).click();
   await page.getByRole('button', { name: 'Archive shop' }).first().click();
   const confirmation = page.getByRole('dialog', { name: 'Archive TUX Maadi?' });
   await expect(confirmation).toBeVisible();
@@ -906,6 +922,7 @@ test('separately confirms deletion of an unused shop using the legacy trusted co
   const { commands } = await mockSettings(page, ['settings.manage', 'shops.manage']);
 
   await page.goto('/settings/shop');
+  await page.getByRole('button', { name: 'Danger zone' }).click();
   await page.getByRole('button', { name: 'Delete unused shop' }).click();
   const confirmation = page.getByRole('dialog', { name: 'Delete unused shop TUX Maadi?' });
   await expect(confirmation).toBeVisible();
@@ -1099,3 +1116,187 @@ test('does not offer cross-shop copy when no other authorized source shop exists
     0,
   );
 });
+
+if (process.env['P02_CAPTURE'] === '1') {
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 375, height: 844 },
+  ] as const) {
+    test(`P02 screenshot: settings copy preview ${viewport.width}`, async ({ page }) => {
+      const sourceShopId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
+      await page.setViewportSize(viewport);
+      const { commands } = await mockSettings(
+        page,
+        ['settings.manage'],
+        'OWNER',
+        [],
+        [shopId, sourceShopId],
+      );
+      await page.route('**/api/admin/shop-copy-preview', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            sourceShopId,
+            targetShopId: shopId,
+            selectedDomains: ['checkout'],
+            sourceSettingsVersion: 3,
+            targetSettingsVersion: 7,
+            changes: [
+              {
+                settingKey: 'checkout.taxBps',
+                sourceValue: 1500,
+                source: 'shop',
+                sourceExpectedVersion: 2,
+                targetValue: 1400,
+                targetSource: 'business',
+                targetExpectedVersion: null,
+                wouldChange: true,
+              },
+            ],
+          }),
+        });
+      });
+      await page.goto('/settings/shop');
+      await expect(
+        page.getByRole('heading', { name: 'Selective settings copy preview' }),
+      ).toBeVisible();
+      await page.getByLabel('Source shop').selectOption(sourceShopId);
+      await page.getByRole('button', { name: 'Preview selected configuration' }).click();
+      await expect(page.getByRole('status')).toContainText('Applying copies only the selected');
+      await page.screenshot({
+        path: `artifacts/p02/settings-copy-preview-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      expect(commands).toHaveLength(0);
+    });
+  }
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 375, height: 844 },
+    { width: 320, height: 720 },
+  ] as const) {
+    test(`P02 screenshot: shop archive confirmation ${viewport.width}`, async ({ page }) => {
+      const { commands } = await mockSettings(page, ['settings.manage', 'shops.manage']);
+      await page.setViewportSize(viewport);
+      await page.goto('/settings/shop');
+      await page.getByRole('button', { name: 'Danger zone' }).click();
+      await page.getByRole('button', { name: 'Archive shop' }).click();
+      await expect(page.getByRole('dialog', { name: 'Archive TUX Maadi?' })).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/p02/settings-archive-confirm-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      expect(commands).toHaveLength(0);
+    });
+  }
+  test('P02 screenshot: settings publish pending second-person approval', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockSettings(
+      page,
+      ownerSession.principal.permissions,
+      'OWNER',
+      [],
+      [shopId],
+      false,
+      false,
+      true,
+    );
+    await page.goto('/settings/checkout');
+    await page.getByText('Publish saved configuration').click();
+    await page.getByLabel('Requester PIN (if required for approval)').fill('2468');
+    await page.getByRole('button', { name: 'Publish settings' }).click();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'second person must approve' }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: 'artifacts/p02/settings-pending-approval-390-light.png',
+      fullPage: true,
+    });
+  });
+
+  const widths = [
+    { width: 1440, height: 900 },
+    { width: 1280, height: 800 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 },
+    { width: 375, height: 844 },
+    { width: 320, height: 720 },
+  ] as const;
+  for (const viewport of widths) {
+    test(`P02 screenshots: Settings hub and focused shop controls ${viewport.width}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await mockSettings(page, ['settings.manage', 'shops.manage', 'staff.view', 'staff.manage']);
+      await page.goto('/settings');
+      await expect(page.getByRole('heading', { name: 'TUX Maadi', level: 1 })).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/p02/settings-overview-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      await page.goto('/settings/shop');
+      await expect(page.getByRole('button', { name: 'Identity', exact: true })).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/p02/settings-shop-identity-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      await page.getByRole('button', { name: 'Hours & scheduling' }).click();
+      await page.screenshot({
+        path: `artifacts/p02/settings-shop-hours-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      await page.getByRole('button', { name: 'Immediate controls' }).click();
+      await expect(page.getByText('Pause online orders')).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/p02/settings-immediate-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      await page.getByRole('button', { name: 'Danger zone' }).click();
+      await page.screenshot({
+        path: `artifacts/p02/settings-danger-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      await page.goto('/settings/checkout');
+      await expect(page.getByRole('heading', { name: 'Checkout', exact: true })).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/p02/settings-checkout-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      await page.goto('/settings/business-defaults');
+      await expect(
+        page.getByRole('heading', { name: 'Business defaults', exact: true }),
+      ).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/p02/settings-defaults-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      await page.getByText('Publish saved configuration').click();
+      await page.screenshot({
+        path: `artifacts/p02/settings-publish-${viewport.width}-light.png`,
+        fullPage: true,
+      });
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await page.screenshot({
+        path: `artifacts/p02/settings-publish-${viewport.width}-dark.png`,
+        fullPage: true,
+      });
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+    });
+  }
+  test('P02 screenshot: restricted Manager Settings navigation', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockSettings(page, ['settings.manage'], 'MANAGER');
+    await page.goto('/settings/shop');
+    await expect(page.getByRole('heading', { name: 'TUX Maadi', level: 1 })).toBeVisible();
+    await page.getByRole('button', { name: 'Danger zone' }).click();
+    await expect(page.getByRole('button', { name: 'Archive shop' })).toHaveCount(0);
+    await page.screenshot({
+      path: 'artifacts/p02/settings-manager-restricted-390-light.png',
+      fullPage: true,
+    });
+  });
+}

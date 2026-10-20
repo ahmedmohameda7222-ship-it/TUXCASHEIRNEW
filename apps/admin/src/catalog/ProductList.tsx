@@ -48,6 +48,7 @@ export function ProductList({
   onSelectProduct(productId: string): void;
 }) {
   const visibleProducts = filterCatalogProducts(products, search, status, categoryId);
+  const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
 
   return (
     <section className="admin-catalog-list" aria-label="Products" data-catalog-list>
@@ -111,7 +112,10 @@ export function ProductList({
           >
             <span className="admin-product-row__main">
               <strong>{product.name}</strong>
-              <span>EGP {formatEgpMinor(product.priceMinor)}</span>
+              <span>{categoryNames.get(product.categoryId) ?? 'Uncategorized'}</span>
+            </span>
+            <span className="admin-product-row__price">
+              EGP {formatEgpMinor(product.priceMinor)}
             </span>
             <AvailabilityStatus active={product.active} soldOut={product.soldOut} />
           </button>
@@ -120,6 +124,19 @@ export function ProductList({
           <div className="admin-empty-state">
             <strong>No products match these filters.</strong>
             <span>Change the search or filters to see more products.</span>
+            {search || status !== 'all' || categoryId ? (
+              <button
+                type="button"
+                className="admin-secondary-button"
+                onClick={() => {
+                  onSearchChange('');
+                  onStatusChange('all');
+                  onCategoryChange('');
+                }}
+              >
+                Clear filters
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>

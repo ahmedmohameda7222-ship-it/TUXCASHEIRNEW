@@ -234,6 +234,8 @@ export function ProductEditor({
     });
   }
 
+  const [archiveConfirmationOpen, setArchiveConfirmationOpen] = useState(false);
+
   async function archiveProduct() {
     if (readOnly) return;
     const next = { ...draftPreview, active: false };
@@ -369,7 +371,12 @@ export function ProductEditor({
             {product.soldOut ? 'Sold out' : 'Available'}
           </span>
         </div>
-        <p className="admin-field__help">This change goes live immediately.</p>
+        <p className="admin-catalog-live-notice" role="note">
+          <strong>Immediate operation</strong>
+          <span>
+            This change goes live immediately. It does not save or publish your editing draft.
+          </span>
+        </p>
         <button
           className="admin-secondary-button"
           type="button"
@@ -593,15 +600,46 @@ export function ProductEditor({
         <button className="admin-primary-button" type="submit" disabled={readOnly}>
           Save draft
         </button>
-        <button
-          className="admin-danger-link"
-          type="button"
-          disabled={readOnly || !product.active}
-          onClick={() => void archiveProduct()}
-        >
-          Archive product
-        </button>
       </footer>
+      <section className="admin-catalog-danger-zone" aria-label="Product danger zone">
+        <div>
+          <strong>Danger zone</strong>
+          <p>Archiving is saved as a draft change. It is not live until catalog publication.</p>
+        </div>
+        {!archiveConfirmationOpen ? (
+          <button
+            className="admin-danger-link"
+            type="button"
+            disabled={readOnly || !product.active}
+            onClick={() => setArchiveConfirmationOpen(true)}
+          >
+            Archive product
+          </button>
+        ) : (
+          <div
+            className="admin-catalog-danger-zone__confirm"
+            role="group"
+            aria-label="Confirm product archive"
+          >
+            <p>Archive {product.name} in the next catalog draft?</p>
+            <button
+              type="button"
+              className="admin-danger-link"
+              disabled={readOnly}
+              onClick={() => void archiveProduct()}
+            >
+              Confirm archive draft
+            </button>
+            <button
+              type="button"
+              className="admin-secondary-button"
+              onClick={() => setArchiveConfirmationOpen(false)}
+            >
+              Keep product
+            </button>
+          </div>
+        )}
+      </section>
     </form>
   );
 }

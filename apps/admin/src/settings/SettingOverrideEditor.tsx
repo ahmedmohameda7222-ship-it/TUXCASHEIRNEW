@@ -141,20 +141,31 @@ export function SettingOverrideEditor({
     }
   }
 
+  const configuredValue =
+    kind === 'boolean'
+      ? resolvedRaw === 'true'
+        ? 'Enabled'
+        : 'Disabled'
+      : resolvedRaw || 'Not configured';
+
   return (
     <form
-      className="admin-catalog-editor__section is-compact"
+      className="admin-settings-override-editor"
       data-setting-key={settingKey}
       onSubmit={(event) => void submit(event)}
     >
-      <div className="admin-catalog-editor__section-heading">
+      <div className="admin-settings-override-editor__heading">
         <div>
-          <p className="admin-catalog-editor__eyebrow">
-            {scope === 'business' ? 'Business default' : settingSourceLabel(resolved.source)}
+          <p className="admin-settings-override-editor__eyebrow">
+            {scope === 'business' ? 'Business default' : 'Shop configuration'}
           </p>
           <h3>{label}</h3>
         </div>
       </div>
+      <p className="admin-settings-override-editor__configured" data-setting-effective>
+        Current configured: <strong>{configuredValue}</strong>
+        <span>{settingSourceLabel(resolved.source)} · May require publication</span>
+      </p>
 
       {kind === 'boolean' ? (
         <label className="admin-field">
@@ -186,15 +197,23 @@ export function SettingOverrideEditor({
         </label>
       )}
 
+      {editor.raw !== editor.baselineRaw ? (
+        <p className="admin-field__help" role="status">
+          Unsaved local edit
+        </p>
+      ) : null}
       {help ? <p className="admin-field__help">{help}</p> : null}
       {error ? <p className="admin-field__error">{error}</p> : null}
-      <button className="admin-secondary-button" type="submit" disabled={updating}>
-        {updating
-          ? 'Saving…'
-          : scope === 'business'
-            ? `Save business default: ${label}`
-            : `Save ${label}`}
-      </button>
+      <div className="admin-settings-override-editor__actions">
+        <button className="admin-secondary-button" type="submit" disabled={updating}>
+          {updating
+            ? 'Saving…'
+            : scope === 'business'
+              ? `Save business default: ${label}`
+              : `Save ${label}`}
+        </button>
+        <span>Draft only · Publish separately</span>
+      </div>
       {scope === 'shop' && resolved.source === 'shop' && onRestore ? (
         <button
           className="admin-secondary-button"
