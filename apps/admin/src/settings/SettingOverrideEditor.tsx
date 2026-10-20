@@ -186,14 +186,24 @@ export function SettingOverrideEditor({
         </label>
       )}
 
+      <p className="admin-field__help" data-setting-effective>
+        Effective value: <strong>{resolvedRaw || 'Not configured'}</strong>. Source:{' '}
+        {settingSourceLabel(resolved.source)}. Editing below does not update the live
+        checkout until the required publication or approval completes.
+      </p>
+      {editor.raw !== editor.baselineRaw ? (
+        <p className="admin-field__help" role="status">Unsaved local edit</p>
+      ) : (
+        <p className="admin-field__help">Current editable draft loaded</p>
+      )}
       {help ? <p className="admin-field__help">{help}</p> : null}
       {error ? <p className="admin-field__error">{error}</p> : null}
       <button className="admin-secondary-button" type="submit" disabled={updating}>
         {updating
           ? 'Saving…'
           : scope === 'business'
-            ? `Save business default: ${label}`
-            : `Save ${label}`}
+            ? `Save business default draft: ${label}`
+            : `Save unpublished draft: ${label}`}
       </button>
       {scope === 'shop' && resolved.source === 'shop' && onRestore ? (
         <button

@@ -196,7 +196,9 @@ export function CatalogDefinitionsEditor({
               </span>
             </div>
             {canEdit ? (
-              <div className="admin-inventory-page-actions">
+              <details className="admin-catalog-record-actions">
+                <summary>Actions for {category.name}</summary>
+                <div className="admin-inventory-page-actions">
                 <button
                   className="admin-secondary-button"
                   type="button"
@@ -239,7 +241,8 @@ export function CatalogDefinitionsEditor({
                 >
                   Move down
                 </button>
-              </div>
+                </div>
+              </details>
             ) : null}
           </article>
         ))}
@@ -272,7 +275,9 @@ export function CatalogDefinitionsEditor({
               </span>
             </div>
             {canEdit ? (
-              <div className="admin-inventory-page-actions">
+              <details className="admin-catalog-record-actions">
+                <summary>Actions for {modifier.name}</summary>
+                <div className="admin-inventory-page-actions">
                 <button
                   className="admin-secondary-button"
                   type="button"
@@ -314,7 +319,8 @@ export function CatalogDefinitionsEditor({
                 >
                   Move down
                 </button>
-              </div>
+                </div>
+              </details>
             ) : null}
           </article>
         ))}

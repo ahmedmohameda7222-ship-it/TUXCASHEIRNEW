@@ -38,10 +38,12 @@ export function ShopCopyPreviewPanel({
   sourceShopIds: readonly string[];
 }) {
   const session = useAdminSession();
+  const principal =
+    session.state.status === 'authenticated' ? session.state.session.principal : null;
   const authorizedShopNames = new Map(
-    session.state.status === 'authenticated'
-      ? (session.state.session.principal.shopSummaries ?? [])
-          .filter((shop) => session.state.session.principal.shopIds.includes(shop.id))
+    principal
+      ? (principal.shopSummaries ?? [])
+          .filter((shop) => principal.shopIds.includes(shop.id))
           .map((shop) => [shop.id, shop.name] as const)
       : [],
   );

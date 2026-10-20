@@ -261,7 +261,8 @@ export function PublishReviewPage() {
           <div className="admin-publish-live-bar">
             <div>
               <span className="admin-catalog-editor__eyebrow">Catalog status</span>
-              <strong>Live</strong>
+              <strong>{principal.shopSummaries?.find((shop) => shop.id === shopId)?.name ?? 'Selected shop'}</strong>
+              <small>Live catalog · publish version {data.currentPublishVersion}</small>
             </div>
             <span className="admin-status-pill">Shop scoped</span>
           </div>
@@ -327,7 +328,9 @@ export function PublishReviewPage() {
                   </div>
                 </div>
                 <p className="admin-publish-card__copy">
-                  Make these reviewed changes visible to customers and Operations.
+                  Publish reviewed draft changes for {principal.shopSummaries?.find((shop) => shop.id === shopId)?.name ?? 'this shop'}.
+                  This action checks the current published version {preview.currentPublishVersion},
+                  may require second-person approval, and is separate from immediate sold-out controls.
                 </p>
                 <label className="admin-field">
                   <span>Requester PIN (when required by approval policy)</span>
