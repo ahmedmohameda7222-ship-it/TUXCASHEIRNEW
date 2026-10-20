@@ -436,6 +436,7 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     await page.goto('/settings/shop');
 
     await expect(page.getByRole('heading', { name: 'TUX Maadi', level: 1 })).toBeVisible();
+    await page.getByText('Publish saved configuration').click();
     await expect(page.getByRole('button', { name: 'Publish settings' })).toBeVisible();
     await page.getByRole('button', { name: 'Checkout' }).click();
     await expect(page.getByRole('heading', { name: 'Checkout' })).toBeVisible();
@@ -476,6 +477,7 @@ test('edits checkout and receipt overrides with CAS, then publishes settings', a
     expectedVersion: 4,
   });
 
+  await page.getByText('Publish saved configuration').click();
   await page.getByRole('button', { name: 'Publish settings' }).click();
   await expect.poll(() => commands.length).toBeGreaterThanOrEqual(3);
   expect(commands[2]).toEqual({
@@ -498,6 +500,7 @@ test('keeps checkout tax publication pending until a second person approves', as
   );
   await page.goto('/settings/checkout');
   await page.getByLabel('Requester PIN (if required for approval)').fill('2468');
+  await page.getByText('Publish saved configuration').click();
   await page.getByRole('button', { name: 'Publish settings' }).click();
   await expect(
     page.getByRole('status').filter({ hasText: 'second person must approve' }),
@@ -843,6 +846,7 @@ test('shop management does not offer assignment access without staff management 
 test('suspends a shop through version-fenced trusted lifecycle authority', async ({ page }) => {
   const { commands } = await mockSettings(page, ['settings.manage', 'shops.manage']);
   await page.goto('/settings/shop');
+  await page.getByRole('button', { name: 'Danger zone' }).click();
   await expect(page.getByRole('button', { name: 'Suspend shop' })).toBeVisible();
   await page.getByRole('button', { name: 'Suspend shop' }).click();
   await expect.poll(() => commands.length).toBe(1);
@@ -882,6 +886,7 @@ test('requests second-person approval for used-shop archive without applying the
   const { commands } = await mockSettings(page, ['settings.manage', 'shops.manage']);
 
   await page.goto('/settings/shop');
+  await page.getByRole('button', { name: 'Danger zone' }).click();
   await page.getByRole('button', { name: 'Archive shop' }).first().click();
   const confirmation = page.getByRole('dialog', { name: 'Archive TUX Maadi?' });
   await expect(confirmation).toBeVisible();
@@ -906,6 +911,7 @@ test('separately confirms deletion of an unused shop using the legacy trusted co
   const { commands } = await mockSettings(page, ['settings.manage', 'shops.manage']);
 
   await page.goto('/settings/shop');
+  await page.getByRole('button', { name: 'Danger zone' }).click();
   await page.getByRole('button', { name: 'Delete unused shop' }).click();
   const confirmation = page.getByRole('dialog', { name: 'Delete unused shop TUX Maadi?' });
   await expect(confirmation).toBeVisible();
