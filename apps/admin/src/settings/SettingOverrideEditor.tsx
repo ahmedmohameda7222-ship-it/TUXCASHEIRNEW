@@ -201,7 +201,9 @@ export function SettingOverrideEditor({
       )}
       {help ? <p className="admin-field__help">{help}</p> : null}
       {error ? <p className="admin-field__error">{error}</p> : null}
-      <p className="admin-field__help">Save stores an unpublished draft. Use Publish settings separately when required.</p>
+      <p className="admin-field__help">
+        Save stores an unpublished draft. Use Publish settings separately when required.
+      </p>
       <button className="admin-secondary-button" type="submit" disabled={updating}>
         {updating
           ? 'Saving…'
