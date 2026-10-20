@@ -163,3 +163,23 @@ test('protects an unsupported legacy action from a misleading editable form', as
   await expect(page.getByText('Unsupported legacy action — editing disabled')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Edit rule inventory.adjust' })).toBeDisabled();
 });
+
+test('shows a readable policy model with preview', async ({ page }) => {
+  await mockRules(page);
+  await page.goto('/approvals/rules');
+  await expect(page.getByText('When', { exact: true })).toBeVisible();
+  await expect(page.getByText('Rule preview')).toBeVisible();
+  await expect(page.getByText(/authorized reviewer/i).first()).toBeVisible();
+});
+
+test('explains the next safe step for legacy rules', async ({ page }) => {
+  await mockRules(page);
+  await page.route('**/api/admin/approval-rules', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      rules: [{ ...existing, thresholdContext: { legacyThreshold: 1 } }], availableActions,
+    }) }),
+  );
+  await page.goto('/approvals/rules');
+  await expect(page.getByText(/Legacy.*cannot edit/i)).toBeVisible();
+  await expect(page.getByText(/authorized administrator.*supported rule/i)).toBeVisible();
+});

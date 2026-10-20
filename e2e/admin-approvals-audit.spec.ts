@@ -281,3 +281,22 @@ test('captures dark mode Audit filters with the shared modal surface', async ({ 
     path: 'test-results/admin-stage1-audit-filters-dark-desktop.png',
   });
 });
+
+test('audit advanced filters support explicit cancel and clear actions', async ({ page }) => {
+  await mockAdmin(page);
+  await page.goto('/audit');
+  const trigger = page.getByRole('button', { name: 'Filters', exact: true });
+  await trigger.click();
+  await page.getByLabel('Approval status').selectOption('APPROVED');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Audit filters' })).toBeHidden();
+  await trigger.click();
+  await expect(page.getByLabel('Approval status')).toHaveValue('');
+  await page.getByLabel('Approval status').selectOption('APPROVED');
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page.getByLabel('Applied audit filters')).toContainText('Approval: Approved');
+  await trigger.click();
+  await page.getByRole('button', { name: 'Clear advanced filters' }).click();
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page.getByLabel('Applied audit filters')).toHaveCount(0);
+});

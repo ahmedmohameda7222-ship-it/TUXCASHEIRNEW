@@ -63,6 +63,8 @@ describe('ApprovalDetailPage', () => {
     expect(html).toContain('Reject');
     expect(html).toContain('admin-destructive-button');
     expect(html).toContain('Pending');
+    expect(html).toContain('admin-approval-detail__eyebrow');
+    expect(html).not.toContain('admin-catalog-editor__eyebrow');
     expect(html).not.toContain('>PENDING<');
   });
 
