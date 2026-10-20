@@ -1,0 +1,76 @@
+name: P02 Chromium Visual Evidence
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/src/catalog/**'
+      - 'apps/admin/src/settings/**'
+      - 'e2e/admin-catalog.spec.ts'
+      - 'e2e/admin-catalog-publish.spec.ts'
+      - 'e2e/admin-settings.spec.ts'
+      - '.github/workflows/admin-p02-visual-evidence.yml'
+permissions:
+  contents: read
+jobs:
+  exact-head-screenshots:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      P02_CAPTURE: '1'
+      P02_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      TZ: Africa/Cairo
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Chromium runtime
+        run: npx playwright install --with-deps chromium
+      - name: Render screenshots with mocked Admin APIs
+        run: npx playwright test --config playwright.admin.config.ts --grep 'P02 screenshot'
+      - name: SHA256 manifest and complete-set check
+        if: always()
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const crypto = require("node:crypto");
+            const path = "artifacts/p02";
+            fs.mkdirSync(path, { recursive: true });
+            const files = fs.readdirSync(path).filter(name => name.endsWith(".png")).sort();
+            const evidence = files.map(file => ({
+              file,
+              sha256: crypto.createHash("sha256").update(fs.readFileSync(path + "/" + file)).digest("hex")
+            }));
+            const manifest = {
+              source: "Chromium Playwright with mocked Admin API fixtures; not hosted UAT",
+              exactPrHead: process.env.P02_HEAD_SHA,
+              screenshotCount: evidence.length,
+              expectedScreenshotCount: 103,
+              evidence
+            };
+            fs.writeFileSync(path + "/SHA256_MANIFEST.json", JSON.stringify(manifest, null, 2) + "\n");
+            if (evidence.length !== 103) {
+              console.error("P02 evidence incomplete: " + evidence.length + "/103");
+              process.exitCode = 1;
+            }
+          '
+      - name: Package evidence ZIP
+        if: always()
+        run: |
+          if [ -d artifacts/p02 ]; then
+            (cd artifacts && zip -q -r P02_Chromium_Evidence.zip p02)
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p02-chromium-evidence
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            artifacts/P02_Chromium_Evidence.zip
+            artifacts/p02/SHA256_MANIFEST.json
+            playwright-report-admin/
