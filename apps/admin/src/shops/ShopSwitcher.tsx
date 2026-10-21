@@ -40,8 +40,9 @@ export function ShopSwitcher() {
                 ? { kind: 'all-shops' }
                 : { kind: 'shop', shopId: event.currentTarget.value };
             if (hasUnsavedDrafts()) {
-              // Keep the controlled select on its actual scope until the operator decides.
-              event.currentTarget.value = scopeValue(scope);
+              // Updating pendingScope re-renders this controlled select with the current
+              // authorized scope. Do not imperatively set .value: React's input value
+              // tracker can swallow a second change after "Keep editing".
               setPendingScope(nextScope);
               return;
             }
