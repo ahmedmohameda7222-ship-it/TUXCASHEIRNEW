@@ -652,5 +652,7 @@ test('supplier archive requires named confirmation before issuing the preserved 
   expect(fixture.commands.filter((command) => command.type === 'supplier.archive')).toHaveLength(0);
   await page.getByRole('button', { name: 'Archive Prime Foods' }).click();
   await dialog.getByRole('button', { name: 'Archive supplier' }).click();
-  await expect.poll(() => fixture.commands.filter((command) => command.type === 'supplier.archive').length).toBe(1);
+  await expect
+    .poll(() => fixture.commands.filter((command) => command.type === 'supplier.archive').length)
+    .toBe(1);
 });
