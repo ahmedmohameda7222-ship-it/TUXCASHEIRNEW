@@ -6,6 +6,7 @@ import { useAdminSession } from '../auth/useAdminSession';
 import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { adminFetch } from '../lib/adminApi';
+import './approvalRules.css';
 
 type ThresholdKind = 'none' | 'minimumMinor' | 'minimumQuantityImpact';
 
