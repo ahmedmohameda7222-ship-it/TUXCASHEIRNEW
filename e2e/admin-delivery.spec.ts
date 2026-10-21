@@ -17,6 +17,10 @@ const session = {
     role: 'OWNER',
     permissions: ['delivery.view', 'delivery.manage'],
     shopIds: [shopId, backupShopId],
+    shopSummaries: [
+      { id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false },
+      { id: backupShopId, name: 'TUX QA Shop B', active: true, temporaryClosed: true },
+    ],
   },
   csrfToken,
 };

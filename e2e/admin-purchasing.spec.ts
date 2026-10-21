@@ -19,6 +19,7 @@ const session = {
     role: 'OWNER',
     permissions: ['purchasing.view', 'purchasing.manage', 'purchasing.receive', 'inventory.view'],
     shopIds: [shopId],
+    shopSummaries: [{ id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false }],
   },
   csrfToken,
 };

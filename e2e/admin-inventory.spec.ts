@@ -27,6 +27,10 @@ const ownerSession = {
       'purchasing.manage',
     ],
     shopIds: [shopId, otherShopId],
+    shopSummaries: [
+      { id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false },
+      { id: otherShopId, name: 'TUX QA Shop B', active: true, temporaryClosed: true },
+    ],
   },
   csrfToken,
 };
@@ -523,6 +527,12 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     await page.setViewportSize(viewport);
     await mockInventory(page);
     await page.goto('/inventory');
+    await expect(page.locator('.shop-switcher select option[value="' + shopId + '"]')).toHaveText(
+      'TUX Maadi',
+    );
+    await expect(
+      page.locator('.shop-switcher select option[value="' + otherShopId + '"]'),
+    ).toContainText('TUX QA Shop B');
 
     const list = page.getByRole('region', { name: 'Inventory items' });
     await list.getByRole('button', { name: /Beef/ }).click();

@@ -22,6 +22,7 @@ const ownerSession = {
     role: 'OWNER',
     permissions: ['orders.view', 'orders.cancel', 'orders.refund'],
     shopIds: [shopId],
+    shopSummaries: [{ id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false }],
   },
   csrfToken,
 };
