@@ -255,6 +255,42 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   });
 }
 
+for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
+  test(`restricted workforce access stays read-only at ${viewport.name}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const commands = await mockWorkforce(page);
+    await page.route('**/api/admin/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...session,
+          principal: {
+            ...session.principal,
+            role: 'MANAGER',
+            permissions: ['staff.view'],
+          },
+        }),
+      });
+    });
+    await page.goto('/staff');
+    await selectEmployee(page, 'Mona Ali');
+    await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+    const tasks = page.getByRole('navigation', { name: 'Employee access workspaces' });
+    await expect(tasks.getByRole('link')).toHaveCount(2);
+    await expect(page.getByRole('region', { name: 'Permissions' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Change role' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Reset employee PIN' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Complete Operations setup' })).toHaveCount(0);
+    await expect(page.locator('.admin-permission-group select').first()).toBeDisabled();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    expect(commands).toHaveLength(0);
+    await capturePremiumScreenshot(page, 'workforce-readonly');
+  });
+}
+
 test('switching employees resets local profile editor state to the selected employee', async ({
   page,
 }) => {
