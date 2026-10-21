@@ -644,6 +644,7 @@ test('supplier archive requires named confirmation before issuing the preserved 
 }) => {
   const fixture = await mockPurchasing(page);
   await page.goto('/purchasing');
+  await openSuppliers(page);
   await page.getByRole('button', { name: 'Archive Prime Foods' }).click();
   const dialog = page.getByRole('dialog', { name: 'Archive supplier?' });
   await expect(dialog).toContainText('Prime Foods');
