@@ -164,6 +164,12 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
   await expect(page).toHaveURL(/#staff-permission-policy$/);
   await expect(page.getByRole('region', { name: 'Permissions' })).toBeVisible();
   await expect(page.getByText('Operations setup required', { exact: true })).toBeVisible();
+  const setup = page.locator('.admin-staff-readiness-state').first();
+  await expect(setup).toBeVisible();
+  expect(await setup.evaluate((node) => getComputedStyle(node).display)).toBe('grid');
+  expect(await setup.evaluate((node) => parseFloat(getComputedStyle(node).rowGap))).toBeGreaterThan(
+    0,
+  );
 
   await page.getByRole('tab', { name: 'Pay / Compensation' }).click();
   await expect(page.getByLabel('Payment account')).toHaveValue(accountId);

@@ -117,3 +117,83 @@
 .admin-staff-access-policy {
   min-width: 0;
 }
+
+/* Staff page owns every lazy-route style consumed by its task components.
+   Do not borrow catalog.css or inventory.css through prior navigation. */
+.admin-staff-section {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.875rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
+.admin-staff-section.is-compact {
+  gap: 0.375rem;
+}
+.admin-staff-section h2,
+.admin-staff-section h3 {
+  margin: 0;
+}
+.admin-staff-readiness-state {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 0.65rem;
+  min-width: 0;
+  min-height: 7rem;
+  padding: 1rem;
+  border: 1px dashed var(--tux-border-strong);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-subtle);
+  color: var(--tux-text-secondary);
+}
+.admin-staff-readiness-state strong {
+  color: var(--tux-text-primary);
+}
+.admin-staff-readiness-state > span {
+  overflow-wrap: anywhere;
+}
+.admin-staff-readiness-state .admin-field {
+  width: 100%;
+  min-width: 0;
+}
+.admin-staff-record-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  min-width: 0;
+  padding: 0.875rem;
+  border-bottom: 1px solid var(--tux-border-subtle);
+}
+.admin-staff-record-row:last-child {
+  border-bottom: 0;
+}
+.admin-staff-record-row > span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.admin-staff-record-row > span:first-child {
+  flex: 1 1 12rem;
+}
+.admin-staff-record-row > span:last-child {
+  flex: 1 1 9rem;
+}
+.admin-staff-record-row small {
+  color: var(--tux-text-secondary);
+}
+.admin-staff-record-row .admin-secondary-button {
+  margin: 0.25rem 0;
+}
+@media (max-width: 480px) {
+  .admin-staff-section,
+  .admin-staff-readiness-state {
+    padding: 0.75rem;
+  }
+}

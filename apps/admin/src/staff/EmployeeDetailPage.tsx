@@ -115,7 +115,7 @@ export function EmployeeDetailPage({
 
   const profileContent = (
     <>
-      <section className="admin-catalog-editor__section">
+      <section className="admin-staff-section">
         <h3>Profile</h3>
         <dl>
           <dt>Phone</dt>
@@ -129,7 +129,7 @@ export function EmployeeDetailPage({
           </dd>
         </dl>
         {canManage ? (
-          <section className="admin-catalog-editor__section is-compact">
+          <section className="admin-staff-section is-compact">
             <h4>Edit profile</h4>
             <label className="admin-field">
               <span>Name</span>
@@ -174,7 +174,7 @@ export function EmployeeDetailPage({
         ) : null}
 
         {canManage && unassignedShopIds.length > 0 ? (
-          <section className="admin-catalog-editor__section is-compact">
+          <section className="admin-staff-section is-compact">
             <h4>Assign another shop</h4>
             <label className="admin-field">
               <span>Shop</span>
@@ -211,7 +211,7 @@ export function EmployeeDetailPage({
 
   const compensationContent = (
     <>
-      <section className="admin-catalog-editor__section is-compact">
+      <section className="admin-staff-section is-compact">
         <h3>Compensation</h3>
         {latestCompensation ? (
           <p>
@@ -306,10 +306,10 @@ export function EmployeeDetailPage({
           </a>
         ) : null}
       </nav>
-      <section className="admin-catalog-editor__section" aria-labelledby="staff-operations-access">
+      <section className="admin-staff-section" aria-labelledby="staff-operations-access">
         <h3 id="staff-operations-access">Operations access</h3>
         {setupRequired.length > 0 ? (
-          <div className="admin-empty-state">
+          <div className="admin-staff-readiness-state">
             <strong>Operations setup required</strong>
             <span>
               A linked Operations worker is missing for{' '}
@@ -373,7 +373,7 @@ export function EmployeeDetailPage({
         ) : null}
 
         {inactiveOperationsIdentities.length > 0 ? (
-          <div className="admin-empty-state">
+          <div className="admin-staff-readiness-state">
             <strong>Operations access disabled</strong>
             <span>
               Restoring access requires your Admin PIN and the preserved linked worker identity.
@@ -405,7 +405,7 @@ export function EmployeeDetailPage({
 
       {canManage ? (
         <section
-          className="admin-catalog-editor__section is-compact"
+          className="admin-staff-section is-compact"
           aria-labelledby="staff-sensitive-actions"
         >
           <h3 id="staff-sensitive-actions">Sensitive access actions</h3>

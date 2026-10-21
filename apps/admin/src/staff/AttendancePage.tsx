@@ -55,7 +55,7 @@ export function AttendancePage({
         .filter((summary) => summary.shopId === shopId)
         .map((summary) => (
           <article
-            className="admin-catalog-editor__section is-compact"
+            className="admin-staff-section is-compact"
             key={summary.scheduledShiftId ?? `session-${summary.actualStartsAt ?? 'unknown'}`}
           >
             <strong>
@@ -97,7 +97,7 @@ export function AttendancePage({
       {events.map((event) => {
         const correction = latestCorrection.get(event.id);
         return (
-          <article className="admin-inventory-row" key={event.id}>
+          <article className="admin-staff-record-row" key={event.id}>
             <span>
               <strong>{eventLabel(event.eventType)}</strong>
               <small>{formatBusinessDateTime(event.occurredAt)}</small>
