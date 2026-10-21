@@ -534,3 +534,27 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     ).toBe(true);
   });
 }
+
+test('inventory More actions closes on Escape, outside click and workflow selection', async ({
+  page,
+}) => {
+  await mockInventory(page);
+  await page.goto('/inventory');
+  const disclosure = page.locator('details.admin-inventory-more-actions');
+  const more = page.getByText('More actions', { exact: true });
+
+  await more.click();
+  await expect(disclosure).toHaveAttribute('open', '');
+  await page.keyboard.press('Escape');
+  await expect(disclosure).not.toHaveAttribute('open');
+  await expect(more).toBeFocused();
+
+  await more.click();
+  await page.getByRole('heading', { name: 'Inventory', exact: true }).click();
+  await expect(disclosure).not.toHaveAttribute('open');
+
+  await more.click();
+  await page.getByRole('button', { name: 'Reorder suggestions' }).click();
+  await expect(disclosure).not.toHaveAttribute('open');
+  await expect(page.getByRole('heading', { name: 'Reorder suggestions' })).toBeVisible();
+});
