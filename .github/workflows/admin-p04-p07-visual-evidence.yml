@@ -40,7 +40,7 @@ jobs:
             e2e/admin-orders.spec.ts e2e/admin-customers-promotions.spec.ts \
             e2e/admin-delivery.spec.ts e2e/admin-workforce.spec.ts \
             e2e/admin-finance.spec.ts e2e/admin-reports.spec.ts \
-            --grep 'inventory master-detail remains usable|purchasing master-detail remains usable|orders remain usable|customer CRM remains usable|staff keeps focused tasks|delivery uses business-facing copy|finance viewport|report table viewport'
+            --grep 'inventory master-detail remains usable|purchasing master-detail remains usable|orders remain usable|customer CRM remains usable|staff keeps focused tasks|delivery uses business-facing copy|finance viewport|finance scene|report table viewport'
       - name: Verify 48 actual PNGs and SHA256
         if: always()
         run: |
@@ -64,7 +64,7 @@ jobs:
             exactHeadSha: process.env.P04_P07_HEAD_SHA,
             source: 'Actual Chromium with mocked Admin auth and API; not hosted Owner UAT',
             generatedAt: new Date().toISOString(),
-            expectedCount: 48, observedCount: screenshots.length, missing, screenshots,
+            expectedCount: 66, observedCount: screenshots.length, missing, screenshots,
           };
           fs.writeFileSync(dir+'/SCREENSHOT_MANIFEST.json', JSON.stringify(manifest,null,2)+'\n');
           fs.writeFileSync(dir+'/SHA256SUMS.txt',screenshots.map(s=>s.sha256+'  '+s.file).join('\n')+'\n');

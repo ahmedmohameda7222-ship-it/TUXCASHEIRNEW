@@ -124,56 +124,109 @@ export function ExpensesPage() {
       }
     >
       <FinanceSectionNav active="expenses" />
-      {operations.expensesQuery.isLoading ? <LoadingState title="Loading expenses" /> : null}
-      {operations.expensesQuery.isError ? (
-        <ErrorState
-          title="Expenses unavailable"
-          action={
-            <button
-              type="button"
-              className="admin-secondary-button"
-              onClick={() => void operations.expensesQuery.refetch()}
+      <nav className="tux-finance-expense-tasks" aria-label="Expense workspaces">
+        <a href="#expense-recurring">
+          <strong>Due &amp; recurring</strong>
+          <span>Review scheduled expenses before recording a payment</span>
+        </a>
+        <a href="#expense-history">
+          <strong>Expense history</strong>
+          <span>See posted records and their source amounts</span>
+        </a>
+        {canPost ? (
+          <a href="#expense-categories">
+            <strong>Categories</strong>
+            <span>Manage classifications without posting an expense</span>
+          </a>
+        ) : null}
+      </nav>
+      <section
+        id="expense-recurring"
+        className="tux-finance-expense-task"
+        aria-label="Due and recurring expenses"
+      >
+        <RecurringExpenses
+          shopId={shopId}
+          accounts={accounts}
+          openBusinessDayId={availableDays[0]?.id ?? null}
+          categories={categories}
+          canManage={canPost}
+        />
+      </section>
+      <section
+        id="expense-history"
+        className="tux-finance-expense-task"
+        aria-label="Posted expense history"
+      >
+        <h2>Posted expense history</h2>
+        {operations.expensesQuery.isLoading ? <LoadingState title="Loading expenses" /> : null}
+        {operations.expensesQuery.isError ? (
+          <ErrorState
+            title="Expenses unavailable"
+            action={
+              <button
+                type="button"
+                className="admin-secondary-button"
+                onClick={() => void operations.expensesQuery.refetch()}
+              >
+                Retry
+              </button>
+            }
+          />
+        ) : null}
+        {!operations.expensesQuery.isLoading &&
+        !operations.expensesQuery.isError &&
+        operations.expensesQuery.data?.expenses.length === 0 ? (
+          <EmptyState
+            title="No expenses recorded"
+            description="Open-day management expenses will appear here."
+          />
+        ) : null}
+        <ul className="tux-finance-ledger-list">
+          {(operations.expensesQuery.data?.expenses ?? []).map((expense) => (
+            <li
+              key={expense.id}
+              aria-current={expense.id === requestedExpenseId ? 'true' : undefined}
+              className={expense.id === requestedExpenseId ? 'is-selected' : undefined}
             >
-              Retry
-            </button>
-          }
-        />
-      ) : null}
-      {!operations.expensesQuery.isLoading &&
-      !operations.expensesQuery.isError &&
-      operations.expensesQuery.data?.expenses.length === 0 ? (
-        <EmptyState
-          title="No expenses recorded"
-          description="Open-day management expenses will appear here."
-        />
-      ) : null}
-      <ul className="tux-finance-ledger-list">
-        {(operations.expensesQuery.data?.expenses ?? []).map((expense) => (
-          <li
-            key={expense.id}
-            aria-current={expense.id === requestedExpenseId ? 'true' : undefined}
-            className={expense.id === requestedExpenseId ? 'is-selected' : undefined}
-          >
-            <div>
-              <strong>{expense.description}</strong>
-              <small>
-                {new Date(expense.created_at).toLocaleString('en-EG', {
-                  timeZone: 'Africa/Cairo',
-                })}
-              </small>
-            </div>
-            <strong>{formatEgp(expense.amount_minor)}</strong>
-          </li>
-        ))}
-      </ul>
+              <div>
+                <strong>{expense.description}</strong>
+                <small>
+                  {new Date(expense.created_at).toLocaleString('en-EG', {
+                    timeZone: 'Africa/Cairo',
+                  })}
+                </small>
+              </div>
+              <strong>{formatEgp(expense.amount_minor)}</strong>
+            </li>
+          ))}
+        </ul>
+      </section>
       {canPost ? (
-        <button
-          className="admin-secondary-button"
-          type="button"
-          onClick={() => setCategoryOpen(true)}
+        <section
+          id="expense-categories"
+          className="tux-finance-expense-task"
+          aria-label="Expense categories"
         >
-          Add expense category
-        </button>
+          <h2>Expense categories</h2>
+          <p>Classification changes do not post a financial transaction.</p>
+          {categories.length ? (
+            <ul className="tux-finance-expense-categories">
+              {categories.map((category) => (
+                <li key={category.id}>{category.name}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>No categories configured for this shop.</p>
+          )}
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={() => setCategoryOpen(true)}
+          >
+            Add expense category
+          </button>
+        </section>
       ) : null}
       <AdminDialog
         open={categoryOpen}
@@ -229,13 +282,6 @@ export function ExpensesPage() {
           </label>
         </div>
       </AdminDialog>
-      <RecurringExpenses
-        shopId={shopId}
-        accounts={accounts}
-        openBusinessDayId={availableDays[0]?.id ?? null}
-        categories={categories}
-        canManage={canPost}
-      />
       <AdminDialog
         open={open}
         onOpenChange={setOpen}

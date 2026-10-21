@@ -1,4 +1,8 @@
-import { capturePremiumScreenshot, premiumVisualViewports } from './premiumVisualEvidence';
+import {
+  capturePremiumScreenshot,
+  premiumVisualViewports,
+  PREMIUM_EVIDENCE_VIEWPORTS,
+} from './premiumVisualEvidence';
 import { expect, test, type Page } from '@playwright/test';
 
 const shopId = '11111111-1111-4111-8111-111111111111';
@@ -189,6 +193,14 @@ async function mockFinance(
         : { workers: [], cashiers: [], reconciliations: [] };
     } else if (view === 'owner-summary') {
       data = { summaries: [] };
+    } else if (view === 'expenses') {
+      data = { expenses: [] };
+    } else if (view === 'categories') {
+      data = { categories: [] };
+    } else if (view === 'recurring') {
+      data = { rules: [], due: [] };
+    } else if (view === 'settlements') {
+      data = { settlements: [] };
     }
     await route.fulfill({
       status: 200,
@@ -368,3 +380,49 @@ test('end-day workspaces expose keyboard-reachable X, cashier, Z, and history ta
   await expect(page.getByRole('heading', { name: 'Financial Z history' })).toBeVisible();
   expect(commands).toHaveLength(0);
 });
+
+test('expense due workspaces separate recurring, history and category setup without posting', async ({
+  page,
+}) => {
+  const commands = await mockFinance(page);
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.goto('/finance/expenses');
+  const tasks = page.getByRole('navigation', { name: 'Expense workspaces' });
+  await expect(tasks.getByRole('link')).toHaveCount(3);
+  await tasks.getByRole('link', { name: /Due & recurring/ }).click();
+  await expect(page).toHaveURL(/#expense-recurring$/);
+  await expect(page.getByRole('region', { name: 'Due and recurring expenses' })).toContainText(
+    'Recurring expenses',
+  );
+  await tasks.getByRole('link', { name: /Expense history/ }).click();
+  await expect(page.getByRole('region', { name: 'Posted expense history' })).toBeVisible();
+  await tasks.getByRole('link', { name: /Categories/ }).click();
+  await page.getByRole('button', { name: 'Add expense category' }).click();
+  await expect(page.getByRole('dialog', { name: 'New expense category' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  expect(commands).toHaveLength(0);
+});
+
+// These scenes use the same isolated finance fixture as the command-regression tests.
+if (process.env['P04_P07_CAPTURE'] === '1') {
+  for (const viewport of PREMIUM_EVIDENCE_VIEWPORTS) {
+    for (const scene of [
+      { route: '/finance/expenses', id: 'expenses', heading: 'Expenses' },
+      { route: '/finance/settlements', id: 'settlements', heading: 'Settlements' },
+      { route: '/finance/end-day', id: 'end-day', heading: 'X Report / Financial End Day' },
+    ] as const) {
+      test(`finance scene ${scene.id} at ${viewport.width}x${viewport.height}`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(viewport);
+        await mockFinance(page, 'CLOSED');
+        await page.goto(scene.route);
+        await expect(page.getByRole('heading', { name: scene.heading, exact: true })).toBeVisible();
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        ).toBe(true);
+        await capturePremiumScreenshot(page, scene.id);
+      });
+    }
+  }
+}
