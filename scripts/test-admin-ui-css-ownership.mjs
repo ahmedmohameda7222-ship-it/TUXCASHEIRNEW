@@ -9,8 +9,22 @@ const read = (file) => readFileSync(resolve(root, file), 'utf8');
 const shared = read('components/ui/primitives.css');
 const main = read('main.tsx');
 
-assert.match(main, /import ['"]\.\/components\/ui\/primitives\.css['"]/, 'Shared CSS must load at Admin boot');
-for (const selector of ['admin-secondary-button', 'admin-field', 'admin-field__help', 'admin-record-row', 'admin-record-list', 'admin-form-section', 'admin-card-grid', 'admin-card', 'admin-form-grid']) {
+assert.match(
+  main,
+  /import ['"]\.\/components\/ui\/primitives\.css['"]/,
+  'Shared CSS must load at Admin boot',
+);
+for (const selector of [
+  'admin-secondary-button',
+  'admin-field',
+  'admin-field__help',
+  'admin-record-row',
+  'admin-record-list',
+  'admin-form-section',
+  'admin-card-grid',
+  'admin-card',
+  'admin-form-grid',
+]) {
   assert.ok(shared.includes('.' + selector), selector + ' must be styled by shared UI');
 }
 for (const [owner, regex] of [
@@ -27,9 +41,50 @@ for (const [foreign, forbidden] of [
   ['purchasing/SuppliersPage.tsx', /admin-(?:catalog-editor__|inventory-)/],
   ['purchasing/PurchaseOrdersPage.tsx', /admin-(?:catalog-editor__|inventory-)/],
 ]) {
-  assert.doesNotMatch(read(foreign), forbidden, foreign + ' depends on an unrelated lazy stylesheet');
+  assert.doesNotMatch(
+    read(foreign),
+    forbidden,
+    foreign + ' depends on an unrelated lazy stylesheet',
+  );
 }
 for (const route of ['ExpensesPage', 'SettlementsPage', 'EndDayPage']) {
-  assert.match(read('finance/' + route + '.tsx'), /import ['"]\.\/finance\.css['"]/, route + ' must load its finance style boundary when deep-linked');
+  assert.match(
+    read('finance/' + route + '.tsx'),
+    /import ['"]\.\/finance\.css['"]/,
+    route + ' must load its finance style boundary when deep-linked',
+  );
+}
+
+// P03 independently lazy-loads Rules and Inbox: styles must follow the consuming route.
+const rulesModule = read('approvals/ApprovalRulesPage.tsx');
+const inboxModule = read('approvals/ApprovalsPage.tsx');
+assert.ok(
+  rulesModule.includes("import './approvalRules.css';"),
+  'Rules lazy route must import its own CSS',
+);
+assert.ok(
+  inboxModule.includes("import './approvals.css';"),
+  'Inbox lazy route must import inbox CSS',
+);
+const rulesStyles = read('approvals/approvalRules.css');
+const inboxStyles = read('approvals/approvals.css');
+const ownedClasses = [
+  'admin-approval-rule-builder',
+  'admin-approval-rule-builder__intro',
+  'admin-approval-rule-builder__connector',
+  'admin-approval-rule-builder__authority',
+  'admin-approval-rule-builder__toggle',
+  'admin-approval-rule-preview',
+  'admin-approval-rule__legacy',
+  'admin-approval-rule__technical',
+];
+for (const cls of ownedClasses) {
+  assert.ok(rulesModule.includes(cls), cls + ' must be consumed by the Rules route');
+  assert.ok(rulesStyles.includes('.' + cls), cls + ' must have Rules-local styling');
+  assert.ok(!inboxStyles.includes('.' + cls), cls + ' must not depend on Inbox CSS');
+}
+for (const cls of ['admin-approval-list', 'admin-approval-detail', 'admin-approval-status']) {
+  assert.ok(inboxStyles.includes('.' + cls), cls + ' must remain Inbox-owned');
+  assert.ok(!rulesStyles.includes('.' + cls), cls + ' must not leak into Rules CSS');
 }
 console.log('Admin CSS ownership and direct-route import guard passed.');
