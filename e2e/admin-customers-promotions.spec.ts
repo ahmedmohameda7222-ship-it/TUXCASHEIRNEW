@@ -1,4 +1,8 @@
-import { capturePremiumScreenshot, premiumVisualViewports } from './premiumVisualEvidence';
+import {
+  capturePremiumScreenshot,
+  premiumVisualViewports,
+  PREMIUM_EVIDENCE_VIEWPORTS,
+} from './premiumVisualEvidence';
 import { expect, test, type Page } from '@playwright/test';
 import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
 
@@ -389,4 +393,24 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     ).toBe(true);
     await capturePremiumScreenshot(page, 'crm');
   });
+}
+
+if (process.env['P04_P07_CAPTURE'] === '1') {
+  for (const viewport of PREMIUM_EVIDENCE_VIEWPORTS) {
+    test(`CRM settings saved vs draft scene at ${viewport.width}x${viewport.height}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.goto('/customers');
+      await page.getByRole('tab', { name: 'CRM settings' }).click();
+      await expect(
+        page.getByRole('region', { name: 'Current saved loyalty settings' }),
+      ).toContainText('75 points');
+      await expect(page.getByLabel('Minimum points to redeem')).toHaveValue('75');
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      await capturePremiumScreenshot(page, 'crm-settings');
+    });
+  }
 }

@@ -1,4 +1,8 @@
-import { capturePremiumScreenshot, premiumVisualViewports } from './premiumVisualEvidence';
+import {
+  capturePremiumScreenshot,
+  premiumVisualViewports,
+  PREMIUM_EVIDENCE_VIEWPORTS,
+} from './premiumVisualEvidence';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
 
@@ -561,3 +565,24 @@ test('inventory More actions closes on Escape, outside click and workflow select
   await expect(disclosure).not.toHaveAttribute('open');
   await expect(page.getByRole('heading', { name: 'Reorder suggestions' })).toBeVisible();
 });
+
+if (process.env['P04_P07_CAPTURE'] === '1') {
+  for (const viewport of PREMIUM_EVIDENCE_VIEWPORTS) {
+    test(`reorder policy editor scene at ${viewport.width}x${viewport.height}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      const fixture = await mockInventory(page);
+      await page.goto('/inventory');
+      await page.getByText('More actions', { exact: true }).click();
+      await page.getByRole('button', { name: 'Reorder suggestions' }).click();
+      await page.getByRole('button', { name: 'Edit policy for Beef' }).click();
+      await expect(page.getByLabel('Par level (kg)')).toBeVisible();
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      expect(fixture.commands).toHaveLength(0);
+      await capturePremiumScreenshot(page, 'reorder-policy');
+    });
+  }
+}
