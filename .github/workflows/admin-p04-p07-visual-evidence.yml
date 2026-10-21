@@ -40,15 +40,15 @@ jobs:
             e2e/admin-orders.spec.ts e2e/admin-customers-promotions.spec.ts \
             e2e/admin-delivery.spec.ts e2e/admin-workforce.spec.ts \
             e2e/admin-finance.spec.ts e2e/admin-reports.spec.ts \
-            --grep 'inventory master-detail remains usable|inventory More actions menu scene|authorized owner explicitly creates an audited recipe inventory master binding|reorder policy editor scene|purchasing master-detail remains usable|orders remain usable|customer CRM remains usable|CRM settings saved vs draft scene|staff keeps focused tasks|restricted workforce access stays read-only|delivery uses business-facing copy|finance viewport|finance scene|end day task scene|report table viewport|captures supplier and wide PO task surfaces|supplier archive requires named confirmation'
-      - name: Verify 144 actual PNGs and SHA256
+            --grep 'inventory master-detail remains usable|inventory More actions menu scene|authorized owner explicitly creates an audited recipe inventory master binding|reorder policy editor scene|purchasing master-detail remains usable|orders remain usable|ACTIVE cancellation uses a valid central reason|customer CRM remains usable|CRM settings saved vs draft scene|staff keeps focused tasks|restricted workforce access stays read-only|delivery uses business-facing copy|finance viewport|finance scene|end day task scene|report table viewport|captures supplier and wide PO task surfaces|supplier archive requires named confirmation'
+      - name: Verify 150 actual PNGs and SHA256
         if: always()
         run: |
           node <<'NODE'
           const fs = require('node:fs'), crypto = require('node:crypto');
           const dir = 'artifacts/p04-p07';
           fs.mkdirSync(dir, { recursive: true });
-          const scenes = ['inventory','inventory-more-actions','recipe-binding','reorder-policy','purchasing','orders','crm','crm-settings','delivery','workforce','workforce-permissions','workforce-list','workforce-readonly','finance','expenses','settlements','end-day','end-day-cashier','end-day-z','end-day-history','reports','supplier-dialog','po-dialog','supplier-archive'];
+          const scenes = ['inventory','inventory-more-actions','recipe-binding','reorder-policy','purchasing','orders','order-cancel','crm','crm-settings','delivery','workforce','workforce-permissions','workforce-list','workforce-readonly','finance','expenses','settlements','end-day','end-day-cashier','end-day-z','end-day-history','reports','supplier-dialog','po-dialog','supplier-archive'];
           const viewports = ['1440x900','1280x800','768x1024','390x844','375x844','320x720'];
           const missing = [], screenshots = [];
           for (const scene of scenes) for (const viewport of viewports) {
@@ -69,7 +69,7 @@ jobs:
           fs.writeFileSync(dir+'/SCREENSHOT_MANIFEST.json', JSON.stringify(manifest,null,2)+'\n');
           fs.writeFileSync(dir+'/SHA256SUMS.txt',screenshots.map(s=>s.sha256+'  '+s.file).join('\n')+'\n');
           const extra = fs.readdirSync(dir).filter(file => file.endsWith('.png') && !screenshots.some(s => s.file === file));
-          if (missing.length || extra.length || screenshots.length !== 144)
+          if (missing.length || extra.length || screenshots.length !== 150)
             throw Error('Screenshot set invalid: missing='+missing.join(', ')+' extra='+extra.join(', ')+' count='+screenshots.length);
 
           NODE

@@ -476,40 +476,47 @@ test('orders search filters real Admin list and exposes status-contextual action
   await expect(page.getByRole('button', { name: /#101/ })).toHaveCount(0);
 });
 
-test('ACTIVE cancellation uses a valid central reason and refreshes immutable reason history', async ({
-  page,
-}) => {
-  const fixture = await mockOrders(page);
-  await page.goto('/orders');
-  await page.getByRole('button', { name: /#101/ }).click();
+for (const viewport of premiumVisualViewports([{ name: 'desktop', width: 1440, height: 900 }])) {
+  test(
+    'ACTIVE cancellation uses a valid central reason at ' + viewport.width + 'px',
+    async ({ page }) => {
+      await page.setViewportSize(viewport);
+      const fixture = await mockOrders(page);
+      await page.goto('/orders');
+      await page.getByRole('button', { name: /#101/ }).click();
 
-  await page.getByRole('button', { name: 'Cancel order' }).click();
-  const reason = page.getByLabel('Cancellation reason');
-  await expect(reason.locator('option')).toHaveCount(1);
-  await expect(reason.locator(`option[value="${cancellationReasonId}"]`)).toHaveText(
-    'Customer request',
+      await page.getByRole('button', { name: 'Cancel order' }).click();
+      const reason = page.getByLabel('Cancellation reason');
+      await expect(reason.locator('option')).toHaveCount(1);
+      await expect(reason.locator(`option[value="${cancellationReasonId}"]`)).toHaveText(
+        'Customer request',
+      );
+      await expect(reason.locator(`option[value="${refundReasonId}"]`)).toHaveCount(0);
+      await expect(reason.locator(`option[value="${inactiveCancellationReasonId}"]`)).toHaveCount(
+        0,
+      );
+
+      await page.getByLabel('Note').fill('Customer called the shop');
+      await capturePremiumScreenshot(page, 'order-cancel');
+      await page.getByLabel('Admin PIN').fill('1234');
+      await page.getByRole('button', { name: 'Confirm cancellation' }).click();
+
+      await expect.poll(() => fixture.commands.length).toBe(1);
+      expect(fixture.commands[0]).toMatchObject({
+        type: 'order.cancel',
+        shopId,
+        orderId: activeOrderId,
+        expectedOperationalRevision: 4,
+        reasonCodeId: cancellationReasonId,
+        note: 'Customer called the shop',
+      });
+
+      const detail = page.getByLabel('Order detail');
+      await expect(detail.getByText(/Cancelled · In-store/).last()).toBeVisible();
+      await expect(detail.getByText(/Customer request/)).toBeVisible();
+    },
   );
-  await expect(reason.locator(`option[value="${refundReasonId}"]`)).toHaveCount(0);
-  await expect(reason.locator(`option[value="${inactiveCancellationReasonId}"]`)).toHaveCount(0);
-
-  await page.getByLabel('Note').fill('Customer called the shop');
-  await page.getByLabel('Admin PIN').fill('1234');
-  await page.getByRole('button', { name: 'Confirm cancellation' }).click();
-
-  await expect.poll(() => fixture.commands.length).toBe(1);
-  expect(fixture.commands[0]).toMatchObject({
-    type: 'order.cancel',
-    shopId,
-    orderId: activeOrderId,
-    expectedOperationalRevision: 4,
-    reasonCodeId: cancellationReasonId,
-    note: 'Customer called the shop',
-  });
-
-  const detail = page.getByLabel('Order detail');
-  await expect(detail.getByText(/Cancelled · In-store/).last()).toBeVisible();
-  await expect(detail.getByText(/Customer request/)).toBeVisible();
-});
+}
 
 test('stale operational revision conflict is surfaced without pretending cancellation succeeded', async ({
   page,

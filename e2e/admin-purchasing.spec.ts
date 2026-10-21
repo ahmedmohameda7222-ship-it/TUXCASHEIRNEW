@@ -656,21 +656,32 @@ test('shared Supplier and PO surfaces use dark theme tokens', async ({ page }) =
   await page.screenshot({ path: 'test-results/admin-stage1-purchase-order-dark-phone.png' });
 });
 
-test('supplier archive requires named confirmation before issuing the preserved command', async ({
-  page,
-}) => {
-  const fixture = await mockPurchasing(page);
-  await page.goto('/purchasing');
-  await openSuppliers(page);
-  await page.getByRole('button', { name: 'Archive Prime Foods' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Archive supplier?' });
-  await expect(dialog).toContainText('Prime Foods');
-  expect(fixture.commands.filter((command) => command.type === 'supplier.archive')).toHaveLength(0);
-  await dialog.getByRole('button', { name: 'Cancel' }).click();
-  expect(fixture.commands.filter((command) => command.type === 'supplier.archive')).toHaveLength(0);
-  await page.getByRole('button', { name: 'Archive Prime Foods' }).click();
-  await dialog.getByRole('button', { name: 'Archive supplier' }).click();
-  await expect
-    .poll(() => fixture.commands.filter((command) => command.type === 'supplier.archive').length)
-    .toBe(1);
-});
+for (const viewport of premiumVisualViewports([{ name: 'desktop', width: 1440, height: 900 }])) {
+  test(
+    'supplier archive requires named confirmation at ' + viewport.width + 'px',
+    async ({ page }) => {
+      await page.setViewportSize(viewport);
+      const fixture = await mockPurchasing(page);
+      await page.goto('/purchasing');
+      await openSuppliers(page);
+      await page.getByRole('button', { name: 'Archive Prime Foods' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Archive supplier?' });
+      await expect(dialog).toContainText('Prime Foods');
+      await capturePremiumScreenshot(page, 'supplier-archive');
+      expect(
+        fixture.commands.filter((command) => command.type === 'supplier.archive'),
+      ).toHaveLength(0);
+      await dialog.getByRole('button', { name: 'Cancel' }).click();
+      expect(
+        fixture.commands.filter((command) => command.type === 'supplier.archive'),
+      ).toHaveLength(0);
+      await page.getByRole('button', { name: 'Archive Prime Foods' }).click();
+      await dialog.getByRole('button', { name: 'Archive supplier' }).click();
+      await expect
+        .poll(
+          () => fixture.commands.filter((command) => command.type === 'supplier.archive').length,
+        )
+        .toBe(1);
+    },
+  );
+}
