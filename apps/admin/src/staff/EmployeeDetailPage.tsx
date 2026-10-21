@@ -288,6 +288,24 @@ export function EmployeeDetailPage({
 
   const accessContent = (
     <>
+      <nav className="admin-staff-access-tasks" aria-label="Employee access workspaces">
+        <a href="#staff-operations-access">
+          <strong>Operations readiness</strong>
+          <span>
+            {operationsHealthy ? 'Ready to use' : 'Review worker setup or disabled access'}
+          </span>
+        </a>
+        <a href="#staff-permission-policy">
+          <strong>Role & permissions</strong>
+          <span>Review role defaults and per-employee exceptions</span>
+        </a>
+        {canManage ? (
+          <a href="#staff-sensitive-actions">
+            <strong>Sensitive actions</strong>
+            <span>PIN-confirmed role, PIN and status changes</span>
+          </a>
+        ) : null}
+      </nav>
       <section className="admin-catalog-editor__section" aria-labelledby="staff-operations-access">
         <h3 id="staff-operations-access">Operations access</h3>
         {setupRequired.length > 0 ? (
@@ -417,12 +435,15 @@ export function EmployeeDetailPage({
           </div>
         </section>
       ) : null}
-      <PermissionsEditor
-        employee={employee}
-        canManage={canManage}
-        onCommand={onCommand}
-        onSensitiveCommand={onSensitiveCommand}
-      />
+      <div id="staff-permission-policy" className="admin-staff-access-policy">
+        <PermissionsEditor
+          employee={employee}
+          shopId={shopId}
+          canManage={canManage}
+          onCommand={onCommand}
+          onSensitiveCommand={onSensitiveCommand}
+        />
+      </div>
     </>
   );
 

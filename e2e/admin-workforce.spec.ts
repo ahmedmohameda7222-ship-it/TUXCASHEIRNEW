@@ -158,6 +158,11 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
   await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
   await selectEmployee(page, 'Mona Ali');
   await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+  const accessWorkspaces = page.getByRole('navigation', { name: 'Employee access workspaces' });
+  await expect(accessWorkspaces.getByRole('link')).toHaveCount(3);
+  await accessWorkspaces.getByRole('link', { name: /Role & permissions/ }).click();
+  await expect(page).toHaveURL(/#staff-permission-policy$/);
+  await expect(page.getByRole('region', { name: 'Permissions' })).toBeVisible();
   await expect(page.getByText('Operations setup required', { exact: true })).toBeVisible();
 
   await page.getByRole('tab', { name: 'Pay / Compensation' }).click();

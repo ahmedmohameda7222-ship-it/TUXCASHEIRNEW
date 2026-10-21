@@ -18,6 +18,7 @@ function shopOptionLabel(shop: AdminShopIdentitySummary | undefined): string {
 export function ShopSwitcher() {
   const { principal, scope, setScope, hasUnsavedDrafts } = useShopScope();
   const [pendingScope, setPendingScope] = useState<ShopScope | null>(null);
+  const [selectionRevision, setSelectionRevision] = useState(0);
 
   // Only the authenticated principal provides display names. Never re-query
   // Settings or accept a label for a shop outside principal.shopIds.
@@ -33,6 +34,7 @@ export function ShopSwitcher() {
       <label className="shop-switcher">
         <span>Shop</span>
         <select
+          key={selectionRevision}
           value={scopeValue(scope)}
           onChange={(event) => {
             const nextScope: ShopScope =
@@ -72,7 +74,13 @@ export function ShopSwitcher() {
           setPendingScope(null);
         }}
         onOpenChange={(open) => {
-          if (!open) setPendingScope(null);
+          if (!open) {
+            setPendingScope(null);
+            // React's select value tracker can otherwise retain the attempted
+            // option after cancel and swallow the next identical change event.
+            // Remount the select at the authorized scope instead of trusting DOM state.
+            setSelectionRevision((revision) => revision + 1);
+          }
         }}
       />
     </>
