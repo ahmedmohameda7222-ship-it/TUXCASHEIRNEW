@@ -4,6 +4,7 @@ import type { AdminSupplier } from '@tux/admin-contracts';
 import { AdminDialog } from '../components/overlay/AdminDialog';
 import { Button } from '../components/ui/Button';
 import { FormField } from '../components/ui/FormField';
+import './suppliers.css';
 
 export function SuppliersPage({
   suppliers,
@@ -37,6 +38,7 @@ export function SuppliersPage({
   ): void;
 }) {
   const [open, setOpen] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<AdminSupplier | null>(null);
   const [editingSupplier, setEditingSupplier] = useState<AdminSupplier | null>(null);
   const [name, setName] = useState('');
   const [contactName, setContactName] = useState('');
@@ -93,13 +95,39 @@ export function SuppliersPage({
       </label>
       <div className="admin-card-grid">
         {visibleSuppliers.map((supplier) => (
-          <article className="admin-card" key={supplier.id}>
-            <strong>{supplier.name}</strong>
-            <span>{supplier.contactName ?? 'No contact name'}</span>
-            <span>{supplier.phone ?? supplier.email ?? 'No contact details'}</span>
-            <span>{supplier.active ? 'Active' : 'Archived'}</span>
+          <article className="admin-card admin-supplier-card" key={supplier.id}>
+            <header className="admin-supplier-card__identity">
+              <strong>{supplier.name}</strong>
+              <span
+                className={
+                  supplier.active
+                    ? 'admin-supplier-card__status'
+                    : 'admin-supplier-card__status is-archived'
+                }
+              >
+                {supplier.active ? 'Active' : 'Archived'}
+              </span>
+            </header>
+            <dl className="admin-supplier-card__facts">
+              <div>
+                <dt>Contact</dt>
+                <dd>{supplier.contactName ?? 'Not provided'}</dd>
+              </div>
+              <div>
+                <dt>Phone</dt>
+                <dd>{supplier.phone ?? 'Not provided'}</dd>
+              </div>
+              <div>
+                <dt>Email</dt>
+                <dd>{supplier.email ?? 'Not provided'}</dd>
+              </div>
+            </dl>
             {canManageLifecycle && typeof supplier.version === 'number' ? (
-              <div className="admin-inline-actions">
+              <div
+                className="admin-supplier-card__actions"
+                role="group"
+                aria-label={'Actions for ' + supplier.name}
+              >
                 <button
                   className="admin-secondary-button"
                   type="button"
@@ -112,17 +140,21 @@ export function SuppliersPage({
                   className="admin-secondary-button"
                   type="button"
                   disabled={pending}
-                  onClick={() =>
-                    onManage(
-                      {
-                        type: supplier.active ? 'supplier.archive' : 'supplier.restore',
-                        supplierId: supplier.id,
-                        expectedVersion: supplier.version!,
-                        payload: {},
-                      },
-                      () => undefined,
-                    )
-                  }
+                  onClick={() => {
+                    if (supplier.active) {
+                      setArchiveTarget(supplier);
+                    } else {
+                      onManage(
+                        {
+                          type: 'supplier.restore',
+                          supplierId: supplier.id,
+                          expectedVersion: supplier.version!,
+                          payload: {},
+                        },
+                        () => undefined,
+                      );
+                    }
+                  }}
                 >
                   {supplier.active ? 'Archive' : 'Restore'} {supplier.name}
                 </button>
@@ -131,6 +163,55 @@ export function SuppliersPage({
           </article>
         ))}
       </div>
+      <AdminDialog
+        open={archiveTarget !== null}
+        destructive
+        title="Archive supplier?"
+        description={
+          archiveTarget
+            ? 'Archive ' + archiveTarget.name + '? Existing purchase orders remain unchanged.'
+            : 'Confirm supplier archive.'
+        }
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && !pending) setArchiveTarget(null);
+        }}
+        footer={
+          <div className="admin-supplier-card__confirm">
+            <button
+              className="admin-secondary-button"
+              type="button"
+              disabled={pending}
+              onClick={() => setArchiveTarget(null)}
+            >
+              Cancel
+            </button>
+            <button
+              className="admin-destructive-button"
+              type="button"
+              disabled={pending || archiveTarget === null}
+              onClick={() => {
+                if (archiveTarget === null || typeof archiveTarget.version !== 'number') return;
+                onManage(
+                  {
+                    type: 'supplier.archive',
+                    supplierId: archiveTarget.id,
+                    expectedVersion: archiveTarget.version,
+                    payload: {},
+                  },
+                  () => setArchiveTarget(null),
+                );
+              }}
+            >
+              Archive supplier
+            </button>
+          </div>
+        }
+      >
+        <p>
+          This removes the supplier from active purchasing choices. It does not delete historical
+          orders.
+        </p>
+      </AdminDialog>
       {canManage ? (
         <AdminDialog
           open={open}
