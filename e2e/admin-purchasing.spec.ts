@@ -531,6 +531,7 @@ for (const viewport of [
       path: `test-results/admin-stage1-supplier-${viewport.name}.png`,
       fullPage: true,
     });
+    await capturePremiumScreenshot(page, 'supplier-dialog');
     await page.keyboard.press('Escape');
     await expect(supplier).toBeHidden();
     await openPurchaseOrders(page);
@@ -551,6 +552,7 @@ for (const viewport of [
       path: `test-results/admin-stage1-purchase-order-${viewport.name}.png`,
       fullPage: true,
     });
+    await capturePremiumScreenshot(page, 'po-dialog');
   });
 }
 
