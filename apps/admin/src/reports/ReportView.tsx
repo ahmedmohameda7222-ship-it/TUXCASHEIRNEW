@@ -9,6 +9,13 @@ import type { ReportFilters, ReportResponse } from './useReports';
 function amountLabel(amount: number | null): string {
   return amount === null ? 'Cost data incomplete' : formatEgp(amount);
 }
+/** Pagination is truthful even when a filtered report has no rows. */
+export function reportPaginationLabel(offset: number, rowCount: number, total: number): string {
+  if (total === 0) return '0 results';
+  if (rowCount === 0) return 'No rows on this page';
+  return `Showing ${offset + 1}–${offset + rowCount} of ${total}`;
+}
+
 export function reportDrilldownHref(target: ReportDrilldown | null): string | null {
   if (!target) return null;
   switch (target.type) {
@@ -160,7 +167,7 @@ export function ReportView({
           Previous
         </button>
         <span>
-          Showing {filters.offset + 1}–{filters.offset + data.rows.length} of {summary.eventCount}
+          {reportPaginationLabel(filters.offset, data.rows.length, summary.eventCount)}
         </span>
         <button
           type="button"
