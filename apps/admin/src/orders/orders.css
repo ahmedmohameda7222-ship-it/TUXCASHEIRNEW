@@ -1,0 +1,71 @@
+/* Order-list CSS lives with its lazy-loaded route, never Inventory. */
+.admin-orders-list {
+  overflow: hidden;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
+.admin-order-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 86px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border: 0;
+  border-bottom: 1px solid var(--tux-border-subtle);
+  background: transparent;
+  text-align: start;
+  color: inherit;
+  cursor: pointer;
+}
+.admin-order-row:last-child { border-bottom: 0; }
+.admin-order-row:hover, .admin-order-row.is-selected {
+  background: var(--tux-surface-subtle);
+}
+.admin-order-row:focus-visible {
+  outline: 2px solid var(--tux-accent);
+  outline-offset: -3px;
+}
+.admin-order-row__identity, .admin-order-row__summary {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: .3rem;
+}
+.admin-order-row__identity strong {
+  overflow-wrap: anywhere;
+  font-size: 1rem;
+}
+.admin-order-row__identity small, .admin-order-row__summary time {
+  color: var(--tux-text-secondary);
+}
+.admin-order-row__summary {
+  align-items: flex-end;
+  text-align: end;
+  flex-shrink: 0;
+}
+.admin-order-row__amount {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.admin-order-row__status {
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 999px;
+  padding: .15rem .5rem;
+  font-size: .78rem;
+  font-weight: 700;
+}
+@media (max-width: 480px) {
+  .admin-order-row { align-items: flex-start; flex-wrap: wrap; }
+  .admin-order-row__identity, .admin-order-row__summary { flex: 1 1 100%; }
+  .admin-order-row__summary {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    text-align: start;
+  }
+}
