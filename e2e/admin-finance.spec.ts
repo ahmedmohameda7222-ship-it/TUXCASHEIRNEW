@@ -348,3 +348,21 @@ for (const vp of [
     ).toBe(true);
   });
 }
+
+test('end-day workspaces expose keyboard-reachable X, cashier, Z, and history tasks without posting', async ({
+  page,
+}) => {
+  const commands = await mockFinance(page, 'CLOSED', { pendingCashier: true });
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.goto('/finance/end-day');
+  const tasks = page.getByRole('navigation', { name: 'End day workflow' });
+  await expect(tasks.getByRole('link')).toHaveCount(4);
+  await tasks.getByRole('link', { name: /Cashier counts/ }).click();
+  await expect(page).toHaveURL(/#end-day-cashier$/);
+  await expect(page.locator('#end-day-cashier')).toBeVisible();
+  await tasks.getByRole('link', { name: /Financial Z/ }).click();
+  await expect(page.locator('#end-day-z')).toContainText('Finalization requires');
+  await tasks.getByRole('link', { name: /History/ }).click();
+  await expect(page.getByRole('heading', { name: 'Financial Z history' })).toBeVisible();
+  expect(commands).toHaveLength(0);
+});

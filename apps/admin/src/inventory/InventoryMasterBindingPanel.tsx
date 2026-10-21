@@ -59,6 +59,7 @@ export function InventoryMasterBindingPanel({
   const masters = mastersQuery.data?.masters ?? [];
   const item = eligible.find((candidate) => candidate.id === itemId) ?? null;
   const existing = masters.find((master) => master.inventoryItemId === item?.id);
+  const selectedMaster = masters.find((master) => master.id === masterId);
   const compatible = masters.filter(
     (master) =>
       master.baseUnitLabel === item?.unitLabel &&
@@ -219,6 +220,33 @@ export function InventoryMasterBindingPanel({
                     </select>
                   </label>
                 )}
+                <section className="admin-inventory-binding-preview" aria-label="Mapping review">
+                  <h3>Review this explicit mapping</h3>
+                  <dl>
+                    <div>
+                      <dt>Source · current shop inventory item</dt>
+                      <dd>
+                        {item ? `${item.name} (${item.unitLabel})` : 'Choose an inventory item'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Target · business-wide master identity</dt>
+                      <dd>
+                        {mode === 'attach'
+                          ? selectedMaster
+                            ? `${selectedMaster.canonicalName} (${selectedMaster.baseUnitLabel})`
+                            : 'Select a verified compatible master'
+                          : name.trim()
+                            ? `${name.trim()} (new master)`
+                            : 'Name a new master'}
+                      </dd>
+                    </div>
+                  </dl>
+                  <p>
+                    Only this shop item will be mapped. Stock quantities, purchase units, costs and
+                    existing recipe usage are not copied or changed by this action.
+                  </p>
+                </section>
                 <button
                   type="submit"
                   className="admin-primary-button"

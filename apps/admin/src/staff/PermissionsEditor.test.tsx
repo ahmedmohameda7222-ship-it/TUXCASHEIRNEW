@@ -39,6 +39,10 @@ describe('PermissionsEditor', () => {
       />,
     );
     expect(html).toContain('Access &amp; Permissions');
+    expect(html).toContain('1 explicit allowance(s)');
+    expect(html).toContain('override(s)');
+    expect(html).toContain('<details');
+    expect(html).toContain('<summary>');
     expect(html).toContain('Role default');
     expect(html).toContain('Allowed');
     expect(html).toContain('Not allowed');

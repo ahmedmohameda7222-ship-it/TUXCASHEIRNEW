@@ -295,3 +295,23 @@
     flex: 1 1 100%;
   }
 }
+
+.admin-inventory-binding-preview {
+  padding: 1rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 0.875rem;
+}
+.admin-inventory-binding-preview dl {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+.admin-inventory-binding-preview dt {
+  font-size: 0.8125rem;
+  color: var(--tux-text-secondary);
+}
+.admin-inventory-binding-preview dd {
+  margin: 0.25rem 0 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}

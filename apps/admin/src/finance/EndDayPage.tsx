@@ -99,6 +99,25 @@ export function EndDayPage() {
       description="X is always read-only. Operations closes the Business Day; Admin only reconciles and finalizes financial Z afterward."
     >
       <FinanceSectionNav active="end-day" />
+      <nav className="tux-finance-endday-tasks" aria-label="End day workflow">
+        <a href="#end-day-x-report">
+          <strong>01 · X report</strong>
+          <span>Read-only business-day snapshot</span>
+        </a>
+        <a href="#end-day-cashier">
+          <strong>02 · Cashier counts</strong>
+          <span>Review and reconcile differences</span>
+        </a>
+        <a href="#end-day-z">
+          <strong>03 · Financial Z</strong>
+          <span>Check prerequisites before finalization</span>
+        </a>
+        <a href="#end-day-history">
+          <strong>04 · History</strong>
+          <span>Inspect finalized days and corrections</span>
+        </a>
+      </nav>
+
       {operations.daysQuery.isLoading ? <LoadingState title="Loading business days" /> : null}
       {operations.daysQuery.isError ? (
         <ErrorState
@@ -150,7 +169,11 @@ export function EndDayPage() {
         />
       ) : null}
       {report ? (
-        <section className="tux-finance-x-report" aria-label="Non-closing X report">
+        <section
+          id="end-day-x-report"
+          className="tux-finance-x-report"
+          aria-label="Non-closing X report"
+        >
           <div className="tux-finance-x-report__heading">
             <h2>Non-closing X report</h2>
             <strong>{report.businessDayStatus}</strong>
@@ -202,57 +225,77 @@ export function EndDayPage() {
               </div>
             ))}
           </dl>
-          <h3>Cashier counts</h3>
-          {report.cashierReconciliations.length === 0 ? (
-            <p>No cashier reconciliation has been posted for this day.</p>
-          ) : (
-            <ul className="tux-finance-ledger-list">
-              {report.cashierReconciliations.map((entry) => (
-                <li key={entry.cashierWorkerId}>
-                  <div>
-                    <strong>{cashierNames.get(entry.cashierWorkerId) ?? 'Cashier'}</strong>
-                    <small>
-                      Expected: {amount(entry.expectedMinor)} · Actual: {amount(entry.actualMinor)}
-                    </small>
-                  </div>
-                  <strong>{amount(entry.varianceMinor)}</strong>
-                </li>
-              ))}
-            </ul>
-          )}
-          {blockReasons.length > 0 ? (
-            <div className="tux-finance-attention" role="status">
-              <strong>Financial finalization conditions</strong>
-              <ul>
-                {blockReasons.map((r) => (
-                  <li key={r}>{r}</li>
+          <section id="end-day-cashier" className="tux-finance-endday-task">
+            <h3>Cashier counts</h3>
+            {report.cashierReconciliations.length === 0 ? (
+              <p>No cashier reconciliation has been posted for this day.</p>
+            ) : (
+              <ul className="tux-finance-ledger-list">
+                {report.cashierReconciliations.map((entry) => (
+                  <li key={entry.cashierWorkerId}>
+                    <div>
+                      <strong>{cashierNames.get(entry.cashierWorkerId) ?? 'Cashier'}</strong>
+                      <small>
+                        Expected: {amount(entry.expectedMinor)} · Actual:{' '}
+                        {amount(entry.actualMinor)}
+                      </small>
+                    </div>
+                    <strong>{amount(entry.varianceMinor)}</strong>
+                  </li>
                 ))}
               </ul>
-            </div>
-          ) : null}
-          {canReconcile && report.businessDayStatus === 'CLOSED' && !report.financialFinalized ? (
-            <div className="tux-finance-toolbar">
-              <button
-                className="admin-secondary-button"
-                type="button"
-                onClick={() => setCashierOpen(true)}
-              >
-                Record cashier count
-              </button>
-              <button
-                className="admin-primary-button"
-                type="button"
-                disabled={!canFinalize}
-                onClick={() => setFinalizeOpen(true)}
-              >
-                Finalize financial Z
-              </button>
-            </div>
-          ) : null}
+            )}
+          </section>
+          <section
+            id="end-day-z"
+            className="tux-finance-endday-task"
+            aria-label="Financial Z finalization"
+          >
+            <h3>Financial Z · finalization</h3>
+            <p>
+              Financial Z is distinct from the non-closing X report. Finalization requires a closed
+              Operations day, resolved cashier counts, complete inventory cost and authorized PIN.
+            </p>
+            {blockReasons.length > 0 ? (
+              <div className="tux-finance-attention" role="status">
+                <strong>Financial finalization conditions</strong>
+                <ul>
+                  {blockReasons.map((r) => (
+                    <li key={r}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {canReconcile && report.businessDayStatus === 'CLOSED' && !report.financialFinalized ? (
+              <div className="tux-finance-toolbar">
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  onClick={() => setCashierOpen(true)}
+                >
+                  Record cashier count
+                </button>
+                <button
+                  className="admin-primary-button"
+                  type="button"
+                  disabled={!canFinalize}
+                  onClick={() => setFinalizeOpen(true)}
+                >
+                  Finalize financial Z
+                </button>
+              </div>
+            ) : null}
+          </section>
         </section>
       ) : null}
 
-      <EndDayHistoryPage shopId={shopId} canAdjust={canAdjust} />
+      <section
+        id="end-day-history"
+        className="tux-finance-endday-task"
+        aria-label="Financial Z history and corrections"
+      >
+        <EndDayHistoryPage shopId={shopId} canAdjust={canAdjust} />
+      </section>
       {dayId ? (
         <CashierReconciliation
           shopId={shopId}
