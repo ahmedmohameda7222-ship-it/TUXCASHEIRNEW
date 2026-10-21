@@ -9,6 +9,7 @@ import { AdminDialog } from '../components/overlay/AdminDialog';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { EmployeeDetailPage, type StaffDetailSection } from './EmployeeDetailPage';
 import { useStaff, type StaffApiCommandDraft } from './useStaff';
+import './staff.css';
 
 function readableError(error: unknown): string | null {
   if (!error) return null;
@@ -125,7 +126,8 @@ export function StaffPage() {
     >
       {actionError ? <p role="alert">{actionError}</p> : null}
 
-      <ResponsiveMasterDetail
+      <div className="admin-staff-workspace">
+        <ResponsiveMasterDetail
         listLabel="Employees"
         detailLabel="Employee detail"
         detailActive={selectedId !== null}
@@ -174,11 +176,13 @@ export function StaffPage() {
                     {employee.shopIds.length === 1 ? '' : 's'}
                   </small>
                 </span>
-                <span>
-                  {employee.active ? 'Active' : 'Suspended'}
-                  {employee.operationsSetupRequiredShopIds.length > 0
-                    ? ' · Operations setup required'
-                    : ''}
+                <span className="admin-staff-row__states">
+                  <span>{employee.active ? 'Active' : 'Suspended'}</span>
+                  {employee.operationsSetupRequiredShopIds.length > 0 ? (
+                    <span className="admin-staff-row__setup" title="Operations setup is still required in assigned shops">
+                      Setup needed
+                    </span>
+                  ) : null}
                 </span>
               </button>
             ))}
@@ -227,7 +231,8 @@ export function StaffPage() {
             description="Review profile, schedule, attendance, leave, pay and permissions."
           />
         }
-      />
+        />
+      </div>
 
       {canManage ? (
         <AdminDialog
