@@ -7,11 +7,13 @@ import { PageScaffold } from '../components/layout/PageScaffold';
 import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { useShopScope } from '../shops/ShopScopeProvider';
+import { formatEgp } from '../finance/money';
 import { CancelOrderSheet } from './CancelOrderSheet';
 import { OrderDetailPage } from './OrderDetailPage';
 import { RefundReturnPage } from './RefundReturnPage';
 import { useOrders, type OrderSearchFilters } from './useOrders';
 import { toOrderTimeRange } from './orderDateRange';
+import './orders.css';
 
 type ActionMode = 'cancel' | 'refund' | 'return' | null;
 
@@ -174,7 +176,7 @@ export function OrdersPage() {
         detailActive={selectedId !== null}
         backHref="/orders"
         list={
-          <div className="admin-inventory-list">
+          <div className="admin-orders-list">
             {ordersApi.searchQuery.isLoading ? <LoadingState title="Loading orders" /> : null}
             {ordersApi.searchQuery.isError ? (
               <ErrorState
@@ -201,9 +203,7 @@ export function OrdersPage() {
             ) : null}
             {rows.map((row) => (
               <button
-                className={
-                  row.id === selectedId ? 'admin-inventory-row is-selected' : 'admin-inventory-row'
-                }
+                className={row.id === selectedId ? 'admin-order-row is-selected' : 'admin-order-row'}
                 aria-current={row.id === selectedId ? 'true' : undefined}
                 key={row.id}
                 type="button"
@@ -212,14 +212,21 @@ export function OrdersPage() {
                   setAction(null);
                 }}
               >
-                <span>
+                <span className="admin-order-row__identity">
                   <strong>{row.displayOrderLabel ?? `#${row.displayOrderNo}`}</strong>
-                  <small>
-                    {row.customerName ?? row.normalizedPhone ?? 'Walk-in'} · {row.orderTypeLabel}
-                  </small>
+                  <small>{row.customerName ?? row.normalizedPhone ?? 'Walk-in'}</small>
+                  <small>{row.orderTypeLabel} · {orderSourceLabel(row.source)}</small>
                 </span>
-                <span>
-                  {orderStatusLabel(row.status)} · {orderSourceLabel(row.source)}
+                <span className="admin-order-row__summary">
+                  <b className="admin-order-row__amount">{formatEgp(row.totalMinor)}</b>
+                  <span className="admin-order-row__status">{orderStatusLabel(row.status)}</span>
+                  <time dateTime={row.createdAt}>
+                    {new Intl.DateTimeFormat('en-EG', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                      timeZone: 'Africa/Cairo',
+                    }).format(new Date(row.createdAt))}
+                  </time>
                 </span>
               </button>
             ))}
