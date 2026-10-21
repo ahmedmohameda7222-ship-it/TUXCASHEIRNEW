@@ -13,7 +13,7 @@
   gap: 1rem;
   width: 100%;
   min-height: 72px;
-  padding: .9rem 1rem;
+  padding: 0.9rem 1rem;
   border: 0;
   border-bottom: 1px solid var(--tux-border-subtle);
   background: transparent;
@@ -21,17 +21,45 @@
   text-align: start;
   cursor: pointer;
 }
-.admin-customer-row:last-child { border-bottom: 0; }
-.admin-customer-row:hover, .admin-customer-row.is-selected { background: var(--tux-surface-subtle); }
-.admin-customer-row:focus-visible { outline: 2px solid var(--tux-accent); outline-offset: -3px; }
-.admin-customer-row > span:first-child { display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
-.admin-customer-row strong, .admin-customer-row small { overflow-wrap: anywhere; }
-.admin-customer-row small { color: var(--tux-text-secondary); }
-.admin-customer-row > span:last-child { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.admin-customer-row:last-child {
+  border-bottom: 0;
+}
+.admin-customer-row:hover,
+.admin-customer-row.is-selected {
+  background: var(--tux-surface-subtle);
+}
+.admin-customer-row:focus-visible {
+  outline: 2px solid var(--tux-accent);
+  outline-offset: -3px;
+}
+.admin-customer-row > span:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.admin-customer-row strong,
+.admin-customer-row small {
+  overflow-wrap: anywhere;
+}
+.admin-customer-row small {
+  color: var(--tux-text-secondary);
+}
+.admin-customer-row > span:last-child {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
 @media (min-width: 48rem) {
-  .admin-customers-master-detail:not([data-detail-active='true']) { grid-template-columns: minmax(0, 1fr); }
-  .admin-customers-master-detail:not([data-detail-active='true']) .admin-master-detail__detail { display: none; }
+  .admin-customers-master-detail:not([data-detail-active='true']) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-customers-master-detail:not([data-detail-active='true']) .admin-master-detail__detail {
+    display: none;
+  }
 }
 @media (max-width: 480px) {
-  .admin-customer-row { flex-wrap: wrap; align-items: flex-start; }
+  .admin-customer-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
 }

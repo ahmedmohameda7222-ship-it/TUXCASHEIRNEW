@@ -166,9 +166,7 @@ export function ReportView({
         >
           Previous
         </button>
-        <span>
-          {reportPaginationLabel(filters.offset, data.rows.length, summary.eventCount)}
-        </span>
+        <span>{reportPaginationLabel(filters.offset, data.rows.length, summary.eventCount)}</span>
         <button
           type="button"
           className="admin-secondary-button"

@@ -203,7 +203,9 @@ export function OrdersPage() {
             ) : null}
             {rows.map((row) => (
               <button
-                className={row.id === selectedId ? 'admin-order-row is-selected' : 'admin-order-row'}
+                className={
+                  row.id === selectedId ? 'admin-order-row is-selected' : 'admin-order-row'
+                }
                 aria-current={row.id === selectedId ? 'true' : undefined}
                 key={row.id}
                 type="button"
@@ -215,7 +217,9 @@ export function OrdersPage() {
                 <span className="admin-order-row__identity">
                   <strong>{row.displayOrderLabel ?? `#${row.displayOrderNo}`}</strong>
                   <small>{row.customerName ?? row.normalizedPhone ?? 'Walk-in'}</small>
-                  <small>{row.orderTypeLabel} · {orderSourceLabel(row.source)}</small>
+                  <small>
+                    {row.orderTypeLabel} · {orderSourceLabel(row.source)}
+                  </small>
                 </span>
                 <span className="admin-order-row__summary">
                   <b className="admin-order-row__amount">{formatEgp(row.totalMinor)}</b>
