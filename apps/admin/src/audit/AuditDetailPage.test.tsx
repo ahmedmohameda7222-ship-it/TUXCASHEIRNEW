@@ -79,6 +79,8 @@ describe('AuditDetailPage', () => {
     expect(html).toContain('Approver One');
     expect(html).toContain('Executed');
     expect(html).toContain('Technical details');
+    expect(html).toContain('admin-audit-detail__eyebrow');
+    expect(html).not.toContain('admin-catalog-editor__eyebrow');
     expect(html).toContain('session-123');
     expect(html).toContain('approval-executor');
     expect(html).toContain('2');

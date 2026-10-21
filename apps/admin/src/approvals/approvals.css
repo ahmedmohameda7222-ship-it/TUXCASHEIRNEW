@@ -91,3 +91,67 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* P03: Approval status and request context belong to this feature, not Catalog. */
+.admin-approval-detail__eyebrow {
+  margin: 0 0 0.4rem;
+  color: var(--tux-text-secondary);
+  font-size: var(--tux-font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-approvals-context,
+.admin-approval-list__meta,
+.admin-approval-list__consequence {
+  color: var(--tux-text-secondary);
+  font-size: 0.875rem;
+}
+
+.admin-approval-list__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+}
+
+.admin-approval-list__heading strong,
+.admin-approval-list__shop {
+  overflow-wrap: anywhere;
+}
+
+.admin-approval-list__shop {
+  font-weight: 600;
+}
+
+.admin-approval-status {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 999px;
+  background: var(--tux-surface-subtle);
+  color: var(--tux-text-primary);
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: nowrap;
+}
+
+.admin-approval-status--pending,
+.admin-approval-status--executing {
+  border-style: dashed;
+}
+
+.admin-approval-status--failed,
+.admin-approval-status--rejected,
+.admin-approval-status--expired {
+  border-width: 2px;
+}
+
+.admin-approval-list__item,
+.admin-approval-detail {
+  min-width: 0;
+}

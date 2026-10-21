@@ -100,11 +100,11 @@ export function AuditDetailPage({ event }: { event: AuditDetailViewModel }) {
   return (
     <article className="admin-audit-detail" aria-labelledby={`audit-${event.id}`}>
       <header>
-        <p className="admin-catalog-editor__eyebrow">Audit event</p>
+        <p className="admin-audit-detail__eyebrow">Audit event</p>
         <h2 id={`audit-${event.id}`}>
           {event.actorLabel} · {auditLabel(event.actionType)}
         </h2>
-        <p>{event.createdAtLabel}</p>
+        <p className="admin-audit-detail__time">{event.createdAtLabel}</p>
       </header>
       <dl className="admin-audit-facts">
         <div>
@@ -139,7 +139,12 @@ export function AuditDetailPage({ event }: { event: AuditDetailViewModel }) {
           </dd>
         </div>
       </dl>
-      {event.reason ? <p>Reason: {event.reason}</p> : null}
+      {event.reason ? (
+        <div className="admin-audit-detail__reason">
+          <strong>Reason</strong>
+          <p>{event.reason}</p>
+        </div>
+      ) : null}
       <div className="admin-audit-change-grid">
         <ChangeList title="Before" value={event.beforeValue} />
         <ChangeList title="After" value={event.afterValue} />

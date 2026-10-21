@@ -6,6 +6,7 @@ import { useAdminSession } from '../auth/useAdminSession';
 import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { adminFetch } from '../lib/adminApi';
+import './approvalRules.css';
 
 type ThresholdKind = 'none' | 'minimumMinor' | 'minimumQuantityImpact';
 
@@ -145,6 +146,16 @@ export function ApprovalRulesPage() {
     session.state.status === 'authenticated' ? session.state.session.principal : null;
   const mayManageBusiness = principal?.role === 'OWNER' || principal?.role === 'ADMIN';
   const authorizedShops = principal?.shopIds ?? [];
+  const authorizedShopNames = new Map(
+    (principal?.shopSummaries ?? [])
+      .filter((shop) => authorizedShops.includes(shop.id))
+      .map((shop) => [shop.id, shop.name]),
+  );
+  const shopLabel = (shopId: string | null) =>
+    shopId === null
+      ? 'Business-wide'
+      : (authorizedShopNames.get(shopId) ??
+        `Authorized shop ${authorizedShops.indexOf(shopId) + 1}`);
   const [form, setForm] = useState<RuleForm>(() =>
     initialForm(
       session.state.status === 'authenticated'
@@ -230,14 +241,25 @@ export function ApprovalRulesPage() {
           const ruleLabel = supportedAction
             ? thresholdLabel(rule)
             : 'Unsupported legacy action — editing disabled';
+          const legacy = candidate === null;
           return (
             <div className="admin-record-row" key={rule.id}>
               <div>
-                <strong>{rule.actionType}</strong>
+                <strong>{supportedAction?.label ?? 'Legacy approval policy'}</strong>
                 <span>
-                  {rule.shopId === null ? 'Business-wide' : `Shop: ${rule.shopId}`} ·{' '}
-                  {rule.active ? 'Enabled' : 'Disabled'} · {ruleLabel} · Revision {rule.editVersion}
+                  {shopLabel(rule.shopId)} · {rule.active ? 'Enabled' : 'Disabled'} · {ruleLabel}
                 </span>
+                {legacy ? (
+                  <p className="admin-approval-rule__legacy">
+                    <strong>Legacy / cannot edit.</strong> Ask an authorized administrator to create
+                    a supported rule after reviewing the existing policy. This legacy rule remains
+                    unchanged.
+                  </p>
+                ) : null}
+                <details className="admin-approval-rule__technical">
+                  <summary>Technical policy details</summary>
+                  <code>{rule.actionType}</code> · Revision {rule.editVersion}
+                </details>
               </div>
               <button
                 type="button"
@@ -258,9 +280,14 @@ export function ApprovalRulesPage() {
         })}
       </div>
 
-      <section className="admin-form-section">
+      <section className="admin-form-section admin-approval-rule-builder">
         <h2>{editing ? 'Edit approval rule' : 'Add approval rule'}</h2>
+        <p className="admin-approval-rule-builder__intro">
+          Set a supported action, choose an authorized scope and review the exact approval
+          requirements before saving.
+        </p>
         <form onSubmit={submit} className="admin-form-section admin-form-section--compact">
+          <p className="admin-approval-rule-builder__connector">When</p>
           <label className="admin-field">
             <span>Scope</span>
             <select
@@ -277,7 +304,7 @@ export function ApprovalRulesPage() {
               {mayManageBusiness ? <option value="business">Business-wide</option> : null}
               {authorizedShops.map((id) => (
                 <option key={id} value={id}>
-                  Shop {id}
+                  {shopLabel(id)}
                 </option>
               ))}
             </select>
@@ -310,9 +337,13 @@ export function ApprovalRulesPage() {
               ))}
             </select>
           </label>
-          <p className="admin-field__help">
-            Requester permission: {selectedAction?.requesterPermission ?? 'Select an action'}
-          </p>
+          <div className="admin-approval-rule-builder__authority">
+            <strong>Authorization</strong>
+            <p className="admin-field__help">
+              Requester permission: {selectedAction?.requesterPermission ?? 'Select an action'}
+            </p>
+            <p className="admin-field__help">An authorized reviewer needs approvals.review.</p>
+          </div>
           <p className="admin-field__help">
             The selected action determines the required requester permission, not the rule editor.
           </p>
@@ -372,7 +403,7 @@ export function ApprovalRulesPage() {
               />
             </label>
           ) : null}
-          <label className="admin-field">
+          <label className="admin-approval-rule-builder__toggle">
             <input
               type="checkbox"
               checked={form.requiresSecondPerson}
@@ -386,7 +417,7 @@ export function ApprovalRulesPage() {
             />
             <span>Require different approver</span>
           </label>
-          <label className="admin-field">
+          <label className="admin-approval-rule-builder__toggle">
             <input
               type="checkbox"
               checked={form.requiresRequesterRepin}
@@ -400,7 +431,7 @@ export function ApprovalRulesPage() {
             />
             <span>Require requester re-PIN</span>
           </label>
-          <label className="admin-field">
+          <label className="admin-approval-rule-builder__toggle">
             <input
               type="checkbox"
               checked={form.active}
@@ -411,6 +442,31 @@ export function ApprovalRulesPage() {
             />
             <span>Rule enabled</span>
           </label>
+          <section className="admin-approval-rule-preview" aria-label="Rule preview">
+            <h3>Rule preview</h3>
+            <p>
+              When {selectedAction?.label ?? 'a supported action'} is requested in{' '}
+              <strong>{shopLabel(form.shopId)}</strong>, an authorized reviewer with
+              approvals.review decides the request.
+            </p>
+            <p>
+              {form.thresholdKind === 'none'
+                ? 'Applies to every matching action.'
+                : form.thresholdKind === 'minimumMinor'
+                  ? `Applies from ${(Number(form.thresholdValue || 0) / 100).toFixed(2)} EGP.`
+                  : `Applies at quantity impact ${form.thresholdValue || '—'} or above.`}{' '}
+              Expires after {form.expiresAfterSeconds || '—'} seconds.
+            </p>
+            <p>
+              {form.requiresSecondPerson
+                ? 'Requires a different approver.'
+                : 'Second-person requirement not selected.'}{' '}
+              {form.requiresRequesterRepin
+                ? 'Requester must re-enter PIN.'
+                : 'Requester re-PIN not required by this rule.'}{' '}
+              {form.active ? 'Enabled when saved.' : 'Disabled when saved.'}
+            </p>
+          </section>
           {formError ? <p role="alert">{formError}</p> : null}
           {write.isError ? (
             <p role="alert">

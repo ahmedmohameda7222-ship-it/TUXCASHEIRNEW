@@ -13,6 +13,7 @@ const ownerSession = {
     role: 'OWNER',
     permissions: ['approvals.review', 'audit.view'],
     shopIds: [shopId],
+    shopSummaries: [{ id: shopId, name: 'TUX Downtown', active: true, temporaryClosed: false }],
   },
   csrfToken: 'a'.repeat(64),
 };
@@ -233,7 +234,7 @@ test('stages audit filters until apply and discards an escaped draft', async ({ 
     path: 'test-results/admin-stage1-audit-filters-phone.png',
     fullPage: true,
   });
-  await page.getByRole('button', { name: 'Show results' }).click();
+  await page.getByRole('button', { name: 'Apply filters' }).click();
   await expect(page.getByLabel('Applied audit filters')).toContainText('Approval: Approved');
   await expect
     .poll(() => requestedUrls.some((url) => url.includes('approvalStatus=APPROVED')))
@@ -280,4 +281,245 @@ test('captures dark mode Audit filters with the shared modal surface', async ({ 
   await page.screenshot({
     path: 'test-results/admin-stage1-audit-filters-dark-desktop.png',
   });
+});
+
+test('audit advanced filters support explicit cancel and clear actions', async ({ page }) => {
+  await mockAdmin(page);
+  await page.goto('/audit');
+  const trigger = page.getByRole('button', { name: /^Filters/ });
+  await trigger.click();
+  await page.getByLabel('Approval status').selectOption('APPROVED');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Audit filters' })).toBeHidden();
+  await trigger.click();
+  await expect(page.getByLabel('Approval status')).toHaveValue('');
+  await page.getByLabel('Approval status').selectOption('APPROVED');
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page.getByLabel('Applied audit filters')).toContainText('Approval: Approved');
+  await trigger.click();
+  await page.getByRole('button', { name: 'Clear advanced filters' }).click();
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page.getByLabel('Applied audit filters')).toHaveCount(0);
+});
+
+for (const width of [320, 375, 390, 768, 1280, 1440]) {
+  test(`P03 screenshot approvals and audit mocked Chromium at ${width}`, async ({ page }) => {
+    test.skip(process.env['P03_CAPTURE'] !== '1', 'Visual evidence runs in the exact-head job');
+    await page.setViewportSize({ width, height: width < 500 ? 844 : 960 });
+    await mockAdmin(page);
+    await page.goto('/approvals');
+    await expect(page.getByRole('heading', { name: 'Approvals' })).toBeVisible();
+    await page.screenshot({ path: `artifacts/p03/approvals-inbox-${width}.png` });
+    await page.getByRole('button', { name: /Emergency inventory adjustment/ }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Emergency inventory adjustment' }),
+    ).toBeVisible();
+    await page.screenshot({ path: `artifacts/p03/approval-detail-${width}.png` });
+    await page.getByRole('button', { name: 'Approve', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Enter PIN to approve' })).toBeVisible();
+    await page.screenshot({ path: `artifacts/p03/pin-decision-modal-${width}.png` });
+    await page.keyboard.press('Escape');
+    await page.goto('/audit');
+    await expect(page.getByRole('heading', { name: 'Audit log' })).toBeVisible();
+    await page.screenshot({ path: `artifacts/p03/audit-list-${width}.png` });
+    await page.getByLabel('Audit events').getByRole('button').first().click();
+    await expect(page.getByRole('heading', { name: 'Before' })).toBeVisible();
+    await page.screenshot({ path: `artifacts/p03/audit-detail-${width}.png` });
+    await page.goto('/audit');
+    await page.getByRole('button', { name: /^Filters/ }).click();
+    await expect(page.getByRole('dialog', { name: 'Audit filters' })).toBeVisible();
+    await page.screenshot({ path: `artifacts/p03/audit-filters-before-${width}.png` });
+    await page.getByLabel('Approval status').selectOption('APPROVED');
+    await page.getByRole('button', { name: 'Apply filters' }).click();
+    await expect(page.getByLabel('Applied audit filters')).toContainText('Approval: Approved');
+    await page.screenshot({ path: `artifacts/p03/audit-filters-applied-${width}.png` });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+}
+
+test('P03 screenshot empty and error approval states with mocked APIs', async ({ page }) => {
+  test.skip(process.env['P03_CAPTURE'] !== '1', 'Visual evidence runs in the exact-head job');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockAdmin(page);
+  await page.route('**/api/admin/approvals*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ approvals: [] }),
+    }),
+  );
+  await page.goto('/approvals');
+  await expect(page.getByText('No approval requests')).toBeVisible();
+  await page.screenshot({ path: 'artifacts/p03/approvals-empty-390.png' });
+  await page.unroute('**/api/admin/approvals*');
+  await page.route('**/api/admin/approvals*', (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'unavailable' }),
+    }),
+  );
+  await page.reload();
+  await expect(page.getByText('Approvals could not be loaded')).toBeVisible();
+  await page.screenshot({ path: 'artifacts/p03/approvals-error-390.png' });
+});
+
+test('P03 screenshot dark audit filter modal with mocked APIs', async ({ page }) => {
+  test.skip(process.env['P03_CAPTURE'] !== '1', 'Visual evidence runs in the exact-head job');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockAdmin(page);
+  await page.goto('/audit');
+  await page.getByRole('button', { name: /^Filters/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Audit filters' })).toBeVisible();
+  await page.screenshot({ path: 'artifacts/p03/audit-filters-dark-1440.png' });
+});
+
+test('P03 screenshot role-scoped manager approval inbox', async ({ page }) => {
+  test.skip(process.env['P03_CAPTURE'] !== '1', 'Visual evidence runs in the exact-head job');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockAdmin(page);
+  await page.route('**/api/admin/session', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...ownerSession,
+        principal: {
+          ...ownerSession.principal,
+          role: 'MANAGER',
+          permissions: ['approvals.review'],
+          employeeId: 'manager-reviewer',
+        },
+      }),
+    }),
+  );
+  await page.goto('/approvals');
+  await expect(page.getByRole('heading', { name: 'Approvals' })).toBeVisible();
+  await page.screenshot({ path: 'artifacts/p03/approvals-manager-390.png' });
+});
+
+test('P03 screenshot all seven server-returned approval states', async ({ page }) => {
+  test.skip(process.env['P03_CAPTURE'] !== '1', 'Visual evidence runs in the exact-head job');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockAdmin(page);
+  const states = [
+    'PENDING',
+    'APPROVED',
+    'REJECTED',
+    'EXPIRED',
+    'EXECUTING',
+    'EXECUTED',
+    'FAILED',
+  ] as const;
+
+  let activeState: (typeof states)[number] = 'PENDING';
+  await page.route('**/api/admin/approvals*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        approvals: [
+          {
+            id: approvalId,
+            requesterName: 'Owner One',
+            requesterEmployeeId: 'owner-1',
+            approverName: activeState === 'PENDING' ? null : 'Manager Two',
+            shopId,
+            shopName: 'TUX',
+            actionLabel: 'Emergency inventory adjustment',
+            valueSummary: 'quantityImpact: -3',
+            reason: 'Cycle count mismatch',
+            consequence: 'The persisted command executes after a valid approval.',
+            status: activeState === 'EXPIRED' ? 'PENDING' : activeState,
+            displayStatus: activeState,
+            canDecide: activeState === 'PENDING',
+            executionLabel: activeState === 'FAILED' ? 'Execution failed' : activeState,
+            expiresAt: '2099-01-01T00:00:00.000Z',
+            createdAt: '2026-09-16T16:30:00.000Z',
+            decidedAt: activeState === 'PENDING' ? null : '2026-09-16T16:40:00.000Z',
+            failureMessage: activeState === 'FAILED' ? 'The command did not complete.' : undefined,
+            recoveryMessage:
+              activeState === 'FAILED' ? 'Review and submit a new request if needed.' : undefined,
+          },
+        ],
+      }),
+    }),
+  );
+
+  for (const status of states) {
+    activeState = status;
+    await page.goto(`/approvals/${approvalId}`);
+    await expect(
+      page.getByRole('heading', { name: 'Emergency inventory adjustment' }),
+    ).toBeVisible();
+    const statusLabel =
+      status === 'EXECUTING'
+        ? 'In progress'
+        : status === 'EXECUTED'
+          ? 'Completed'
+          : status === 'FAILED'
+            ? 'Needs attention'
+            : status.charAt(0) + status.slice(1).toLowerCase();
+    await expect(page.locator('.admin-approval-detail .admin-approval-status')).toHaveText(
+      statusLabel,
+    );
+    if (status !== 'PENDING') {
+      await expect(page.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
+    }
+    await page.screenshot({
+      path: `artifacts/p03/approval-status-${status.toLowerCase()}-390.png`,
+    });
+  }
+});
+
+test('P03 screenshot denied approval deep link with insufficient permissions', async ({ page }) => {
+  test.skip(process.env['P03_CAPTURE'] !== '1', 'Visual evidence runs in the exact-head job');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockAdmin(page);
+  await page.route('**/api/admin/session', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...ownerSession,
+        principal: {
+          ...ownerSession.principal,
+          role: 'MANAGER',
+          permissions: ['orders.view'],
+          employeeId: 'manager-without-review',
+        },
+      }),
+    }),
+  );
+  await page.goto('/approvals');
+  await expect(page.getByRole('heading', { name: 'Not available' })).toBeVisible();
+  await expect(
+    page.getByText('This area is not included in your current Admin access.'),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
+  await page.screenshot({ path: 'artifacts/p03/approvals-denied-390.png' });
+});
+
+test('P03 screenshot the loading approval inbox with unresolved mocked fetch', async ({ page }) => {
+  test.skip(process.env['P03_CAPTURE'] !== '1', 'Visual evidence runs in the exact-head job');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockAdmin(page);
+  let finishLoading: () => void = () => undefined;
+  const pendingRequest = new Promise<void>((resolve) => {
+    finishLoading = resolve;
+  });
+  await page.route('**/api/admin/approvals*', async (route) => {
+    await pendingRequest;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ approvals: [] }),
+    });
+  });
+  await page.goto('/approvals');
+  await expect(page.getByText('Loading approvals')).toBeVisible();
+  await page.screenshot({ path: 'artifacts/p03/approvals-loading-390.png' });
+  finishLoading();
 });

@@ -1,0 +1,83 @@
+/* Route-local rules styles: explicitly loaded with the lazy ApprovalRulesPage. */
+.admin-approval-rule__legacy {
+  max-width: 65ch;
+  margin: 0.5rem 0 0;
+  color: var(--tux-text-secondary);
+  line-height: 1.5;
+}
+
+.admin-approval-rule__technical {
+  margin-top: 0.5rem;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+}
+
+.admin-approval-rule__technical summary {
+  cursor: pointer;
+}
+
+.admin-approval-rule-builder {
+  min-width: 0;
+  max-width: 54rem;
+}
+
+.admin-approval-rule-builder__intro,
+.admin-approval-rule-builder__authority,
+.admin-approval-rule-preview {
+  max-width: 68ch;
+  line-height: 1.5;
+}
+
+.admin-approval-rule-builder__connector {
+  margin: 0;
+  font-weight: 700;
+}
+
+.admin-approval-rule-builder__authority,
+.admin-approval-rule-preview {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-subtle);
+}
+
+.admin-approval-rule-preview h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.admin-approval-rule-preview p {
+  margin: 0.5rem 0;
+  overflow-wrap: anywhere;
+}
+
+/* Keep native approval safety toggles accessible and compact at every width. */
+.admin-approval-rule-builder__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.45rem 0;
+  cursor: pointer;
+}
+
+.admin-approval-rule-builder__toggle input[type='checkbox'] {
+  appearance: auto;
+  box-sizing: border-box;
+  flex: 0 0 1.125rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  min-width: 1.125rem;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--tux-text-primary);
+}
+
+.admin-approval-rule-builder__toggle span {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  line-height: 1.4;
+}
