@@ -233,12 +233,20 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
       .toBe(true);
 
-    if (viewport.width <= 480) {
+    if (process.env['P04_P07_CAPTURE'] === '1') {
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog', { name: 'Add shift' })).toBeHidden();
+      await capturePremiumScreenshot(page, 'workforce');
+      await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+      await capturePremiumScreenshot(page, 'workforce-permissions');
+      await page.goto('/staff');
+      await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
+      await capturePremiumScreenshot(page, 'workforce-list');
+    } else if (viewport.width <= 480) {
       await page.keyboard.press('Escape');
       await page.getByRole('link', { name: /back/i }).click();
       await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
     }
-    await capturePremiumScreenshot(page, 'workforce');
   });
 }
 

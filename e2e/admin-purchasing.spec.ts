@@ -471,6 +471,14 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     const list = page.locator('.admin-master-detail__list');
     await list.getByRole('button', { name: /PO-100/ }).click();
     await expect(page.locator('.admin-master-detail__detail')).toBeVisible();
+    const header = page.locator('.admin-purchasing-order-header');
+    await expect(header).toBeVisible();
+    expect(await header.evaluate((node) => getComputedStyle(node).display)).toBe('flex');
+    expect(
+      await header
+        .locator('.admin-purchasing-order-header__identity')
+        .evaluate((node) => getComputedStyle(node).flexDirection),
+    ).toBe('column');
 
     if (viewport.width <= 480) {
       await expect(list).toBeHidden();

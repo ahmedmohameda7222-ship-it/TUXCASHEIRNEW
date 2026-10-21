@@ -1,0 +1,48 @@
+/* The lazy Delivery route owns its own accessible tab styling. */
+.tux-delivery-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.375rem;
+  min-width: 0;
+  padding: 0.375rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-subtle);
+}
+.tux-delivery-tab {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+  min-height: var(--tux-touch-target);
+  padding: 0.45rem 0.65rem;
+  border: 0;
+  border-radius: var(--tux-radius-md);
+  background: transparent;
+  color: var(--tux-text-secondary);
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.tux-delivery-tab[aria-selected='true'] {
+  color: var(--tux-text-primary);
+  background: var(--tux-surface-panel);
+  box-shadow: var(--tux-shadow-xs);
+}
+.tux-delivery-tab:focus-visible {
+  outline: 2px solid var(--tux-border-strong);
+  outline-offset: 2px;
+}
+@media (max-width: 360px) {
+  .tux-delivery-tabs {
+    gap: 0.25rem;
+    padding: 0.25rem;
+  }
+  .tux-delivery-tab {
+    padding: 0.375rem 0.25rem;
+    font-size: 0.8125rem;
+  }
+}

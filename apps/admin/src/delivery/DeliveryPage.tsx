@@ -1,3 +1,4 @@
+import './delivery.css';
 import type {
   AdminDeliveryConfigMutationResult,
   AdminDeliveryMutationResult,
@@ -207,14 +208,14 @@ export function DeliveryPage() {
         />
       ) : null}
 
-      <div className="admin-tabs__list" role="tablist" aria-label="Delivery workspace">
+      <div className="tux-delivery-tabs" role="tablist" aria-label="Delivery workspace">
         {[
           { id: 'active' as const, label: 'Active deliveries', href: '/delivery' },
           { id: 'zones' as const, label: 'Zones', href: '/delivery/zones' },
           { id: 'riders' as const, label: 'Riders', href: '/delivery/riders' },
         ].map((item) => (
           <button
-            className="admin-tabs__tab"
+            className="tux-delivery-tab"
             role="tab"
             aria-selected={section === item.id}
             aria-current={section === item.id ? 'page' : undefined}

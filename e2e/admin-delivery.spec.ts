@@ -204,6 +204,17 @@ test('delivery uses business-facing copy and stays usable across phone, tablet, 
     await expect(page.getByText('Maadi Core')).toBeVisible();
     await page.getByRole('tab', { name: 'Riders' }).click();
     await expect(page.getByText('Omar Rider')).toBeVisible();
+    const deliveryTabs = page.getByRole('tablist', { name: 'Delivery workspace' });
+    expect(await deliveryTabs.evaluate((node) => getComputedStyle(node).display)).toBe('grid');
+    await expect(deliveryTabs.getByRole('tab', { name: 'Riders' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(
+      await deliveryTabs.evaluate(
+        (node) => node.getBoundingClientRect().right <= window.innerWidth,
+      ),
+    ).toBe(true);
     await expect(page.getByText(/server-authoritative/i)).toHaveCount(0);
     await expect(page.getByText(/append-only/i)).toHaveCount(0);
     await expect(page.getByText(/canonical fee/i)).toHaveCount(0);
