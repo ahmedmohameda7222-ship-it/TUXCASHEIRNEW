@@ -638,3 +638,19 @@ test('shared Supplier and PO surfaces use dark theme tokens', async ({ page }) =
   await expect(page.getByRole('dialog', { name: 'New purchase order' })).toBeVisible();
   await page.screenshot({ path: 'test-results/admin-stage1-purchase-order-dark-phone.png' });
 });
+
+test('supplier archive requires named confirmation before issuing the preserved command', async ({
+  page,
+}) => {
+  const fixture = await mockPurchasing(page);
+  await page.goto('/purchasing');
+  await page.getByRole('button', { name: 'Archive Prime Foods' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Archive supplier?' });
+  await expect(dialog).toContainText('Prime Foods');
+  expect(fixture.commands.filter((command) => command.type === 'supplier.archive')).toHaveLength(0);
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  expect(fixture.commands.filter((command) => command.type === 'supplier.archive')).toHaveLength(0);
+  await page.getByRole('button', { name: 'Archive Prime Foods' }).click();
+  await dialog.getByRole('button', { name: 'Archive supplier' }).click();
+  await expect.poll(() => fixture.commands.filter((command) => command.type === 'supplier.archive').length).toBe(1);
+});
