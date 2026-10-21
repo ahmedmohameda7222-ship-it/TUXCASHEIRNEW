@@ -141,6 +141,9 @@ test('renders separate delivery, zone, and rider workspaces', async ({ page }) =
   await expect(page.getByLabel('Delivery order #1042')).toContainText('Rider assigned');
   await page.getByRole('tab', { name: 'Zones' }).click();
   await expect(page.getByText('Maadi Core')).toBeVisible();
+  const zone = page.locator('.tux-delivery-zone-row').first();
+  await expect(zone).toBeVisible();
+  expect(await zone.evaluate((node) => getComputedStyle(node).display)).toBe('flex');
   await expect(page.getByText('25.00 EGP')).toBeVisible();
   await expect(page.getByText('120.00 EGP minimum')).toBeVisible();
   await page.getByRole('tab', { name: 'Riders' }).click();

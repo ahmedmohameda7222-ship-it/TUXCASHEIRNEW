@@ -98,7 +98,7 @@ export function ReorderSuggestionsPage({
       </div>
 
       {suggestions.length === 0 ? (
-        <div className="admin-empty-state">
+        <div className="admin-inventory-empty-state">
           <strong>No replenishment policies yet</strong>
           <span>Configure a par level to produce a reorder recommendation.</span>
         </div>

@@ -76,3 +76,48 @@
     align-items: flex-start;
   }
 }
+
+/* Delivery zone list / records are route-owned rather than Inventory CSS. */
+.tux-delivery-zone-list {
+  overflow: hidden;
+  min-width: 0;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
+.tux-delivery-zone-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  min-width: 0;
+  width: 100%;
+  min-height: 4.25rem;
+  gap: 0.75rem 1rem;
+  padding: 0.875rem;
+  border: 0;
+  border-bottom: 1px solid var(--tux-border-subtle);
+  background: transparent;
+  color: inherit;
+  text-align: start;
+}
+.tux-delivery-zone-row:last-child {
+  border-bottom: 0;
+}
+button.tux-delivery-zone-row {
+  cursor: pointer;
+}
+button.tux-delivery-zone-row:hover,
+button.tux-delivery-zone-row:focus-visible {
+  background: var(--tux-surface-subtle);
+}
+.tux-delivery-zone-row > span {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 10rem;
+  gap: 0.2rem;
+}
+.tux-delivery-zone-row small {
+  color: var(--tux-text-secondary);
+  overflow-wrap: anywhere;
+}

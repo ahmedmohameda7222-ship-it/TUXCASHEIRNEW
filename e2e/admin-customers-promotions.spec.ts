@@ -290,6 +290,9 @@ test('exposes controlled merge, loyalty configuration and full promotion editor'
 
   await page.getByLabel('Customer detail').getByRole('button', { name: 'Merge customer' }).click();
   await page.getByLabel('Search merge candidates').fill('Nour');
+  const candidates = page.locator('.admin-customer-merge-list');
+  await expect(candidates).toBeVisible();
+  expect(await candidates.evaluate((node) => getComputedStyle(node).display)).toBe('grid');
   await page.getByLabel('Merge candidates').getByRole('button', { name: /Nour/ }).click();
   await page.getByLabel('I reviewed both customers and want to merge them.').check();
   const mergeButton = page.getByRole('dialog').getByRole('button', { name: 'Merge customer' });

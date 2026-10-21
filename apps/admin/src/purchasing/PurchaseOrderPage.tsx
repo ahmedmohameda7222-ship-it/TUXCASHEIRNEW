@@ -118,7 +118,7 @@ export function PurchaseOrderPage({
                 onChange={(event) => setExpectedDate(event.currentTarget.value)}
               />
             </label>
-            <div className="admin-inventory-page-actions">
+            <div className="admin-purchasing-page-actions">
               <button className="admin-primary-button" type="submit" disabled={updating}>
                 Save draft
               </button>
@@ -170,7 +170,7 @@ export function PurchaseOrderPage({
           </article>
         ))}
       </div>
-      <div className="admin-inventory-page-actions">
+      <div className="admin-purchasing-page-actions">
         {(order.status === 'DRAFT' || order.status === 'ORDERED') && canManage ? (
           confirmCancel ? (
             <div className="admin-form-grid">

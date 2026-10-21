@@ -164,3 +164,51 @@
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
+
+/* Merge candidate selection and controls are CRM-owned on direct deep links. */
+.admin-customer-merge-list {
+  display: grid;
+  overflow: hidden;
+  min-width: 0;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+}
+.admin-customer-merge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+  gap: 0.75rem;
+  min-height: 4.25rem;
+  padding: 0.875rem;
+  border: 0;
+  border-bottom: 1px solid var(--tux-border-subtle);
+  background: var(--tux-surface-panel);
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.admin-customer-merge-row:last-child {
+  border-bottom: 0;
+}
+.admin-customer-merge-row:hover,
+.admin-customer-merge-row.is-selected {
+  background: var(--tux-surface-subtle);
+}
+.admin-customer-merge-row > span {
+  display: grid;
+  gap: 0.25rem;
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+.admin-customer-merge-row small {
+  color: var(--tux-text-secondary);
+}
+.admin-customer-merge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}

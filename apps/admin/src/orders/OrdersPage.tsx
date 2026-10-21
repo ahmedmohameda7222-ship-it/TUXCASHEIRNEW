@@ -102,7 +102,7 @@ export function OrdersPage() {
         open={Boolean(query || status || source || fromInput || toInput)}
       >
         <summary>Search and filters</summary>
-        <section className="admin-catalog-editor__section is-compact" aria-label="Order filters">
+        <section className="admin-order-task-section is-compact" aria-label="Order filters">
           <label className="admin-field">
             <span>Search</span>
             <input

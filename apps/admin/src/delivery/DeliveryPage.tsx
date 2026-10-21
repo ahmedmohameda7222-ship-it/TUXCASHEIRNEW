@@ -289,11 +289,11 @@ export function DeliveryPage() {
                   }
                 />
               ) : (
-                <div className="admin-inventory-list">
+                <div className="tux-delivery-zone-list">
                   {workspace.zones.map((zone) =>
                     canManage ? (
                       <button
-                        className="admin-inventory-row"
+                        className="tux-delivery-zone-row"
                         type="button"
                         key={zone.id}
                         onClick={() => setEditingZoneId(zone.id)}
@@ -310,7 +310,7 @@ export function DeliveryPage() {
                         </span>
                       </button>
                     ) : (
-                      <article className="admin-inventory-row" key={zone.id}>
+                      <article className="tux-delivery-zone-row" key={zone.id}>
                         <span>
                           <strong>{zone.name}</strong>
                           <small>

@@ -315,3 +315,20 @@
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+
+.admin-inventory-empty-state {
+  display: grid;
+  gap: 0.5rem;
+  align-content: center;
+  justify-items: center;
+  min-height: 7.5rem;
+  padding: 1rem;
+  border: 1px dashed var(--tux-border-strong);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-subtle);
+  color: var(--tux-text-secondary);
+  text-align: center;
+}
+.admin-inventory-empty-state strong {
+  color: var(--tux-text-primary);
+}

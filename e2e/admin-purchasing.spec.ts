@@ -479,6 +479,9 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
         .locator('.admin-purchasing-order-header__identity')
         .evaluate((node) => getComputedStyle(node).flexDirection),
     ).toBe('column');
+    const actions = page.locator('.admin-purchasing-page-actions').first();
+    await expect(actions).toBeVisible();
+    expect(await actions.evaluate((node) => getComputedStyle(node).display)).toBe('flex');
 
     if (viewport.width <= 480) {
       await expect(list).toBeHidden();
