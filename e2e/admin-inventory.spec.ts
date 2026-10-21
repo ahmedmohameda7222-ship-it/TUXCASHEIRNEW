@@ -439,88 +439,95 @@ test('inventory can receive a sent inter-shop transfer without using purchasing 
   });
 });
 
-test('authorized owner explicitly creates an audited recipe inventory master binding', async ({
-  page,
-}) => {
-  await mockInventory(page);
-  await page.route('**/api/admin/session', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ...ownerSession,
-        principal: {
-          ...ownerSession.principal,
-          permissions: [...ownerSession.principal.permissions, 'catalog.edit'],
-        },
-      }),
-    });
-  });
-  const recorded: Record<string, unknown>[] = [];
-  const masterId = '88888888-8888-4888-8888-888888888888';
-  await page.route('**/api/admin/inventory**', async (route) => {
-    const req = route.request();
-    const url = new URL(req.url());
-    if (req.method() === 'GET' && url.searchParams.get('view') === 'master-bindings') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          ok: true,
-          shopId,
-          masters: recorded.length
-            ? [
-                {
-                  id: masterId,
-                  canonicalName: 'Business-wide beef',
-                  baseUnitLabel: 'kg',
-                  trackingMode: 'RECIPE_TRACKED',
-                  inventoryItemId: itemId,
-                  inventoryItemName: 'Beef',
-                },
-              ]
-            : [],
-        }),
+for (const viewport of premiumVisualViewports([{ name: 'desktop', width: 1440, height: 900 }])) {
+  test(
+    'authorized owner explicitly creates an audited recipe inventory master binding at ' +
+      viewport.width +
+      'px',
+    async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await mockInventory(page);
+      await page.route('**/api/admin/session', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ...ownerSession,
+            principal: {
+              ...ownerSession.principal,
+              permissions: [...ownerSession.principal.permissions, 'catalog.edit'],
+            },
+          }),
+        });
       });
-      return;
-    }
-    if (req.method() !== 'POST' || req.postDataJSON().type !== 'master.bind') {
-      await route.fallback();
-      return;
-    }
-    expect(req.headers()['x-tux-admin-csrf']).toBe(csrfToken);
-    recorded.push(req.postDataJSON() as Record<string, unknown>);
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ok: true,
-        masterInventoryItemId: masterId,
-        inventoryItemId: itemId,
+      const recorded: Record<string, unknown>[] = [];
+      const masterId = '88888888-8888-4888-8888-888888888888';
+      await page.route('**/api/admin/inventory**', async (route) => {
+        const req = route.request();
+        const url = new URL(req.url());
+        if (req.method() === 'GET' && url.searchParams.get('view') === 'master-bindings') {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              ok: true,
+              shopId,
+              masters: recorded.length
+                ? [
+                    {
+                      id: masterId,
+                      canonicalName: 'Business-wide beef',
+                      baseUnitLabel: 'kg',
+                      trackingMode: 'RECIPE_TRACKED',
+                      inventoryItemId: itemId,
+                      inventoryItemName: 'Beef',
+                    },
+                  ]
+                : [],
+            }),
+          });
+          return;
+        }
+        if (req.method() !== 'POST' || req.postDataJSON().type !== 'master.bind') {
+          await route.fallback();
+          return;
+        }
+        expect(req.headers()['x-tux-admin-csrf']).toBe(csrfToken);
+        recorded.push(req.postDataJSON() as Record<string, unknown>);
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            masterInventoryItemId: masterId,
+            inventoryItemId: itemId,
+            shopId,
+            createdMaster: true,
+          }),
+        });
+      });
+      await page.goto('/inventory');
+      await page.getByText('More actions', { exact: true }).click();
+      await page.getByRole('button', { name: 'Manage recipe master bindings' }).click();
+      await expect(
+        page.getByRole('heading', { name: 'Recipe inventory master bindings' }),
+      ).toBeVisible();
+      await page.getByLabel('Master name').fill('Business-wide beef');
+      await capturePremiumScreenshot(page, 'recipe-binding');
+      await page.getByRole('button', { name: 'Save explicit mapping' }).click();
+      await expect(page.getByText(/Already bound to Business-wide beef/)).toBeVisible();
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0]).toMatchObject({
+        type: 'master.bind',
         shopId,
-        createdMaster: true,
-      }),
-    });
-  });
-  await page.goto('/inventory');
-  await page.getByText('More actions', { exact: true }).click();
-  await page.getByRole('button', { name: 'Manage recipe master bindings' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Recipe inventory master bindings' }),
-  ).toBeVisible();
-  await page.getByLabel('Master name').fill('Business-wide beef');
-  await page.getByRole('button', { name: 'Save explicit mapping' }).click();
-  await expect(page.getByText(/Already bound to Business-wide beef/)).toBeVisible();
-  expect(recorded).toHaveLength(1);
-  expect(recorded[0]).toMatchObject({
-    type: 'master.bind',
-    shopId,
-    inventoryItemId: itemId,
-    masterInventoryItemId: null,
-    canonicalName: 'Business-wide beef',
-  });
-  expect(recorded[0]?.commandId).toMatch(/^[0-9a-f-]{36}$/);
-});
+        inventoryItemId: itemId,
+        masterInventoryItemId: null,
+        canonicalName: 'Business-wide beef',
+      });
+      expect(recorded[0]?.commandId).toMatch(/^[0-9a-f-]{36}$/);
+    },
+  );
+}
 
 for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   test(`inventory master-detail remains usable at ${viewport.name} width`, async ({ page }) => {
@@ -550,6 +557,23 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     ).toBe(true);
     await capturePremiumScreenshot(page, 'inventory');
   });
+}
+
+if (process.env['P04_P07_CAPTURE'] === '1') {
+  for (const viewport of PREMIUM_EVIDENCE_VIEWPORTS) {
+    test('inventory More actions menu scene at ' + viewport.width + 'px', async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await mockInventory(page);
+      await page.goto('/inventory');
+      await page.getByText('More actions', { exact: true }).click();
+      await expect(page.locator('details.admin-inventory-more-actions')).toHaveAttribute(
+        'open',
+        '',
+      );
+      await expect(page.getByRole('button', { name: 'Reorder suggestions' })).toBeVisible();
+      await capturePremiumScreenshot(page, 'inventory-more-actions');
+    });
+  }
 }
 
 test('inventory More actions closes on Escape, outside click and workflow selection', async ({
