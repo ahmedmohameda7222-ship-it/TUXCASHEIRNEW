@@ -67,6 +67,8 @@ export function ReorderSuggestionsPage({
   ) => void;
 }) {
   const [drafts, setDrafts] = useState<Record<string, ReplenishmentDraft>>({});
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   function draftFor(row: AdminInventoryReorderSuggestion): ReplenishmentDraft {
     return (
@@ -126,6 +128,10 @@ export function ReorderSuggestionsPage({
                     <dd>{quantity(row.incomingMicros, row.unitLabel)}</dd>
                   </div>
                   <div>
+                    <dt>Reorder trigger</dt>
+                    <dd>{quantity(row.reorderPointMicros, row.unitLabel)}</dd>
+                  </div>
+                  <div>
                     <dt>Par</dt>
                     <dd>{quantity(row.parLevelMicros, row.unitLabel)}</dd>
                   </div>
@@ -140,16 +146,58 @@ export function ReorderSuggestionsPage({
                   </p>
                 ) : null}
                 {canManage ? (
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    aria-expanded={editingItemId === row.inventoryItemId}
+                    aria-controls={'inventory-policy-' + row.inventoryItemId}
+                    onClick={() => {
+                      setValidationError(null);
+                      setEditingItemId((current) =>
+                        current === row.inventoryItemId ? null : row.inventoryItemId,
+                      );
+                    }}
+                  >
+                    {editingItemId === row.inventoryItemId
+                      ? 'Close policy editor'
+                      : 'Edit policy for ' + row.itemName}
+                  </button>
+                ) : null}
+                {canManage && editingItemId === row.inventoryItemId ? (
                   <form
+                    id={'inventory-policy-' + row.inventoryItemId}
+                    aria-label={'Replenishment policy for ' + row.itemName}
                     className="admin-inventory-policy-form"
                     onSubmit={(event) => {
                       event.preventDefault();
+                      const par = quantityMicros(draft.parLevelMicros);
+                      const reorder = quantityMicros(draft.reorderPointMicros);
+                      const leadDays = Number(draft.leadTimeDays);
+                      const optionalQuantities = [
+                        draft.minimumOrderMicros,
+                        draft.orderMultipleMicros,
+                      ];
+                      if (
+                        par === null ||
+                        reorder === null ||
+                        !Number.isSafeInteger(leadDays) ||
+                        leadDays < 0 ||
+                        optionalQuantities.some(
+                          (value) => value.trim() !== '' && quantityMicros(value) === null,
+                        )
+                      ) {
+                        setValidationError(
+                          'Use valid non-negative quantities and whole lead-time days.',
+                        );
+                        return;
+                      }
+                      setValidationError(null);
                       onSave(row.inventoryItemId, {
                         expectedVersion: row.version,
-                        parLevelMicros: quantityMicros(draft.parLevelMicros) ?? 0,
-                        reorderPointMicros: quantityMicros(draft.reorderPointMicros) ?? 0,
+                        parLevelMicros: par,
+                        reorderPointMicros: reorder,
                         preferredPurchaseUnit: draft.preferredPurchaseUnit.trim() || null,
-                        leadTimeDays: Number(draft.leadTimeDays),
+                        leadTimeDays: leadDays,
                         minimumOrderMicros: quantityMicros(draft.minimumOrderMicros),
                         orderMultipleMicros: quantityMicros(draft.orderMultipleMicros),
                       });
@@ -160,6 +208,14 @@ export function ReorderSuggestionsPage({
                         <span>{kind === 'quantity' ? `${label} (${row.unitLabel})` : label}</span>
                         <input
                           inputMode={kind === 'quantity' ? 'decimal' : 'numeric'}
+                          type="number"
+                          step={kind === 'quantity' ? 'any' : '1'}
+                          min="0"
+                          required={
+                            key === 'parLevelMicros' ||
+                            key === 'reorderPointMicros' ||
+                            key === 'leadTimeDays'
+                          }
                           value={draft[key as keyof ReplenishmentDraft]}
                           onChange={(event) =>
                             setDrafts((current) => ({
@@ -188,9 +244,23 @@ export function ReorderSuggestionsPage({
                         }
                       />
                     </label>
-                    <button className="admin-primary-button" disabled={saving} type="submit">
-                      {saving ? 'Saving…' : 'Save policy'}
-                    </button>
+                    {validationError ? <p role="alert">{validationError}</p> : null}
+                    <div className="admin-inventory-policy-actions">
+                      <button
+                        className="admin-secondary-button"
+                        type="button"
+                        disabled={saving}
+                        onClick={() => {
+                          setValidationError(null);
+                          setEditingItemId(null);
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button className="admin-primary-button" disabled={saving} type="submit">
+                        {saving ? 'Saving…' : 'Save policy'}
+                      </button>
+                    </div>
                   </form>
                 ) : null}
               </article>

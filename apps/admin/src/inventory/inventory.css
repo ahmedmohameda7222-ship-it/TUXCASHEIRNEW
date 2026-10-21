@@ -279,3 +279,19 @@
   border-radius: var(--tux-radius-control);
   background: var(--tux-surface-panel);
 }
+
+.admin-inventory-policy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tux-space-3);
+  grid-column: 1 / -1;
+}
+.admin-inventory-policy-actions > button {
+  min-height: var(--tux-touch-target);
+}
+@media (max-width: 480px) {
+  .admin-inventory-policy-actions > button {
+    flex: 1 1 100%;
+  }
+}
