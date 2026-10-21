@@ -1,3 +1,4 @@
+import { capturePremiumScreenshot, premiumVisualViewports } from './premiumVisualEvidence';
 import { expect, test, type Page } from '@playwright/test';
 import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
 
@@ -367,14 +368,14 @@ test('hydrates canonical loyalty values and preserves hidden multi-shop scopes o
   });
 });
 
-for (const viewport of ADMIN_CORE_VIEWPORTS) {
+for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   test(`customer CRM remains usable at ${viewport.name} width`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.goto('/customers');
     const list = page.locator('.admin-master-detail__list');
     await list.getByRole('button', { name: /Mona/ }).click();
     await expect(page.locator('.admin-master-detail__detail')).toBeVisible();
-    if (viewport.name === 'phone') {
+    if (viewport.width <= 480) {
       await expect(list).toBeHidden();
       await expect(page.getByRole('link', { name: /back to customers/i })).toBeVisible();
     } else {
@@ -383,5 +384,6 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+    await capturePremiumScreenshot(page, 'crm');
   });
 }

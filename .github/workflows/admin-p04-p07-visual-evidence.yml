@@ -1,0 +1,82 @@
+name: P04-P07 Chromium Visual Evidence
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/**'
+      - 'e2e/admin-*.spec.ts'
+      - 'e2e/premiumVisualEvidence.ts'
+      - '.github/workflows/admin-p04-p07-visual-evidence.yml'
+permissions:
+  contents: read
+jobs:
+  exact-head-p04-p07:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      CI: '1'
+      TZ: Africa/Cairo
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      P04_P07_CAPTURE: '1'
+      P04_P07_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact PR HEAD
+        run: test "$(git rev-parse HEAD)" = "$P04_P07_HEAD_SHA"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Capture mocked six-width wave scenes
+        run: |
+          mkdir -p artifacts/p04-p07
+          npx playwright test --config playwright.admin.config.ts \
+            e2e/admin-inventory.spec.ts e2e/admin-purchasing.spec.ts \
+            e2e/admin-orders.spec.ts e2e/admin-customers-promotions.spec.ts \
+            e2e/admin-delivery.spec.ts e2e/admin-workforce.spec.ts \
+            e2e/admin-finance.spec.ts e2e/admin-reports.spec.ts \
+            --grep 'inventory master-detail remains usable|purchasing master-detail remains usable|orders remain usable|customer CRM remains usable|staff keeps focused tasks|delivery uses business-facing copy|finance viewport|report table viewport'
+      - name: Verify 48 actual PNGs and SHA256
+        if: always()
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs'), crypto = require('node:crypto');
+          const dir = 'artifacts/p04-p07';
+          fs.mkdirSync(dir, { recursive: true });
+          const scenes = ['inventory','purchasing','orders','crm','delivery','workforce','finance','reports'];
+          const viewports = ['1440x900','1280x800','768x1024','390x844','375x844','320x720'];
+          const missing = [], screenshots = [];
+          for (const scene of scenes) for (const viewport of viewports) {
+            const file = scene + '-' + viewport + '.png', path = dir + '/' + file;
+            if (!fs.existsSync(path)) { missing.push(file); continue; }
+            const bytes = fs.readFileSync(path);
+            if (bytes.length < 100 || bytes.subarray(0,8).toString('hex') !== '89504e470d0a1a0a') throw Error('Invalid PNG ' + file);
+            const [width,height] = viewport.split('x').map(Number), actualWidth = bytes.readUInt32BE(16), actualHeight = bytes.readUInt32BE(20);
+            if (actualWidth !== width || actualHeight < height) throw Error('Unexpected dimensions '+file);
+            screenshots.push({ file, scene, viewport, width: actualWidth, height: actualHeight, sha256: crypto.createHash('sha256').update(bytes).digest('hex') });
+          }
+          const manifest = {
+            exactHeadSha: process.env.P04_P07_HEAD_SHA,
+            source: 'Actual Chromium with mocked Admin auth and API; not hosted Owner UAT',
+            generatedAt: new Date().toISOString(),
+            expectedCount: 48, observedCount: screenshots.length, missing, screenshots,
+          };
+          fs.writeFileSync(dir+'/SCREENSHOT_MANIFEST.json', JSON.stringify(manifest,null,2)+'\n');
+          fs.writeFileSync(dir+'/SHA256SUMS.txt',screenshots.map(s=>s.sha256+'  '+s.file).join('\n')+'\n');
+          if (missing.length) throw Error('Missing '+missing.length+' screenshots: '+missing.join(', '));
+          NODE
+      - name: Upload screenshot ZIP with SHA256 manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tux-p04-p07-chromium-${{ github.event.pull_request.head.sha }}
+          path: |
+            artifacts/p04-p07/
+            playwright-report-admin/
+            test-results/
+          if-no-files-found: error

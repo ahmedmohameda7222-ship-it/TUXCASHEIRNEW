@@ -1,3 +1,4 @@
+import { capturePremiumScreenshot, premiumVisualViewports } from './premiumVisualEvidence';
 import type { EmployeeDetail, StaffWorkspace } from '@tux/admin-contracts';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
@@ -214,7 +215,7 @@ test('attendance correction posts a separate audited correction command', async 
   expect(commands[0]).not.toHaveProperty('originalOccurredAt');
 });
 
-for (const viewport of ADMIN_CORE_VIEWPORTS) {
+for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   test(`staff keeps focused tasks reachable without horizontal overflow on ${viewport.name}`, async ({
     page,
   }) => {
@@ -232,11 +233,12 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
       .toBe(true);
 
-    if (viewport.name === 'phone') {
+    if (viewport.width <= 480) {
       await page.keyboard.press('Escape');
       await page.getByRole('link', { name: /back/i }).click();
       await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
     }
+    await capturePremiumScreenshot(page, 'workforce');
   });
 }
 

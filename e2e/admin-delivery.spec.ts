@@ -1,3 +1,4 @@
+import { capturePremiumScreenshot, premiumVisualViewports } from './premiumVisualEvidence';
 import { expect, test, type Page } from '@playwright/test';
 import type { AdminDeliveryWorkspace } from '@tux/admin-contracts';
 import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
@@ -193,7 +194,7 @@ test('delivery uses business-facing copy and stays usable across phone, tablet, 
 }) => {
   await mockDelivery(page);
 
-  for (const viewport of ADMIN_CORE_VIEWPORTS) {
+  for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     await page.setViewportSize(viewport);
     await page.goto('/delivery');
 
@@ -211,6 +212,7 @@ test('delivery uses business-facing copy and stays usable across phone, tablet, 
       () => document.documentElement.scrollWidth > window.innerWidth + 1,
     );
     expect(hasHorizontalOverflow).toBe(false);
+    await capturePremiumScreenshot(page, 'delivery');
   }
 });
 

@@ -1,3 +1,4 @@
+import { capturePremiumScreenshot, premiumVisualViewports } from './premiumVisualEvidence';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
 
@@ -513,7 +514,7 @@ test('authorized owner explicitly creates an audited recipe inventory master bin
   expect(recorded[0]?.commandId).toMatch(/^[0-9a-f-]{36}$/);
 });
 
-for (const viewport of ADMIN_CORE_VIEWPORTS) {
+for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   test(`inventory master-detail remains usable at ${viewport.name} width`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await mockInventory(page);
@@ -523,7 +524,7 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     await list.getByRole('button', { name: /Beef/ }).click();
     await expect(page.getByLabel('Inventory item detail')).toBeVisible();
 
-    if (viewport.name === 'phone') {
+    if (viewport.width <= 480) {
       await expect(list).toBeHidden();
       await expect(page.getByRole('link', { name: /back to inventory/i })).toBeVisible();
     } else {
@@ -533,6 +534,7 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+    await capturePremiumScreenshot(page, 'inventory');
   });
 }
 

@@ -362,15 +362,15 @@ export function FinancePage() {
             detailActive={selectedAccountId !== null}
             backHref="/finance"
             list={
-              <div className="admin-inventory-list">
+              <div className="tux-finance-account-list">
                 {accounts.map((account) => (
                   <button
                     type="button"
                     key={account.id}
                     className={
                       selectedAccountId === account.id
-                        ? 'admin-inventory-row is-selected'
-                        : 'admin-inventory-row'
+                        ? 'tux-finance-account-row is-selected'
+                        : 'tux-finance-account-row'
                     }
                     onClick={() => navigate(detailPath('/finance', account.id))}
                   >

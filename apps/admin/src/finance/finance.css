@@ -332,3 +332,72 @@
 .tux-finance-endday-task + .tux-finance-endday-task {
   border-top: 1px solid var(--tux-border-subtle);
 }
+
+/* Finance owns its account row layout: the inventory stylesheet is not loaded on a cold /finance route. */
+.tux-finance-account-list {
+  display: grid;
+  min-width: 0;
+}
+.tux-finance-account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  width: 100%;
+  min-height: 4.25rem;
+  gap: 0.75rem 1rem;
+  padding: 0.875rem 1rem;
+  border: 0;
+  border-bottom: 1px solid var(--tux-border-subtle);
+  background: transparent;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.tux-finance-account-row:last-child {
+  border-bottom: 0;
+}
+.tux-finance-account-row:hover,
+.tux-finance-account-row.is-selected {
+  background: var(--tux-surface-subtle);
+}
+.tux-finance-account-row:focus-visible {
+  outline: 2px solid var(--tux-accent);
+  outline-offset: -2px;
+}
+.tux-finance-account-row > span:first-child {
+  display: grid;
+  flex: 1 1 10rem;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.tux-finance-account-row strong,
+.tux-finance-account-row small {
+  overflow-wrap: anywhere;
+}
+.tux-finance-account-row small {
+  color: var(--tux-text-secondary);
+}
+.tux-finance-account-row > span:last-child {
+  flex: 0 0 auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+  .tux-finance-section-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+    gap: 0.5rem;
+  }
+  .tux-finance-section-nav a {
+    min-width: 0;
+    padding: 0.65rem 0.35rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .tux-finance-account-row {
+    align-items: flex-start;
+  }
+}

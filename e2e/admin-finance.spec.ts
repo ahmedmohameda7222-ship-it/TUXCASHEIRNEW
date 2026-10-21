@@ -1,3 +1,4 @@
+import { capturePremiumScreenshot, premiumVisualViewports } from './premiumVisualEvidence';
 import { expect, test, type Page } from '@playwright/test';
 
 const shopId = '11111111-1111-4111-8111-111111111111';
@@ -332,11 +333,11 @@ test('an OPEN Operations Business Day exposes non-closing X and never a Financia
   expect(commands).toHaveLength(0);
 });
 
-for (const vp of [
+for (const vp of premiumVisualViewports([
   { width: 390, height: 844 },
   { width: 768, height: 1024 },
   { width: 1440, height: 960 },
-]) {
+])) {
   test(`finance viewport ${vp.width}x${vp.height}`, async ({ page }) => {
     await page.setViewportSize(vp);
     await mockFinance(page);
@@ -346,6 +347,7 @@ for (const vp of [
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+    await capturePremiumScreenshot(page, 'finance');
   });
 }
 

@@ -1,3 +1,4 @@
+import { capturePremiumScreenshot, premiumVisualViewports } from './premiumVisualEvidence';
 import type { AdminOrderDetail, AdminOrderSummary } from '@tux/admin-contracts';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
@@ -559,7 +560,7 @@ test('DONE refund and return preserve reason snapshots and pending approval stat
   await expect(detail.getByText(/Posted · Quality issue/)).toBeVisible();
 });
 
-for (const viewport of ADMIN_CORE_VIEWPORTS) {
+for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   test(`orders remain usable at ${viewport.name} width`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await mockOrders(page);
@@ -568,7 +569,7 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     const list = page.locator('.admin-master-detail__list');
     await list.getByRole('button', { name: /#101/ }).click();
     await expect(page.locator('.admin-master-detail__detail')).toBeVisible();
-    if (viewport.name === 'phone') {
+    if (viewport.width <= 480) {
       await expect(list).toBeHidden();
       await expect(page.getByRole('link', { name: /back to orders/i })).toBeVisible();
     } else {
@@ -577,5 +578,6 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+    await capturePremiumScreenshot(page, 'orders');
   });
 }

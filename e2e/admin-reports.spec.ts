@@ -1,3 +1,4 @@
+import { capturePremiumScreenshot, premiumVisualViewports } from './premiumVisualEvidence';
 import { expect, test, type Page } from '@playwright/test';
 
 const shopId = '11111111-1111-4111-8111-111111111111';
@@ -183,17 +184,22 @@ test('phone report presentation', async ({ page }) => {
   );
 });
 
-for (const vp of [
+for (const vp of premiumVisualViewports([
   { width: 768, height: 1024 },
   { width: 1440, height: 960 },
-]) {
+])) {
   test(`report table viewport ${vp.width}x${vp.height}`, async ({ page }) => {
     await page.setViewportSize(vp);
     await mockReports(page);
     await page.goto('/reports');
-    await expect(page.getByRole('table')).toBeVisible();
+    if (vp.width <= 480) {
+      await expect(page.getByRole('list', { name: 'Report entries' })).toBeVisible();
+    } else {
+      await expect(page.getByRole('table')).toBeVisible();
+    }
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+    await capturePremiumScreenshot(page, 'reports');
   });
 }
