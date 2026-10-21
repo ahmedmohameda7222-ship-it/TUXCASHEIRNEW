@@ -249,6 +249,10 @@ test('cashier variance approval remains pending without falsely posting a count'
   await page.setViewportSize({ width: 390, height: 844 });
   const commands = await mockFinance(page, 'CLOSED', { pendingCashier: true });
   await page.goto('/finance/end-day');
+  await page
+    .getByRole('navigation', { name: 'End day workflow' })
+    .getByRole('link', { name: /Cashier counts/ })
+    .click();
   await page.getByRole('button', { name: 'Record cashier count' }).click();
   const dialog = page.getByRole('dialog', { name: 'Cashier cash count' });
   await dialog.getByLabel('Cashier', { exact: true }).selectOption(cashierWorkerId);
@@ -310,6 +314,10 @@ test('Finance Z correction shows pending approval without claiming a posted adju
   await page.setViewportSize({ width: 390, height: 844 });
   const commands = await mockFinance(page, 'CLOSED', { pendingSnapshot: true });
   await page.goto('/finance/end-day');
+  await page
+    .getByRole('navigation', { name: 'End day workflow' })
+    .getByRole('link', { name: /History/ })
+    .click();
   await expect(page.getByRole('heading', { name: 'Financial Z history' })).toBeVisible();
   await page.getByRole('button', { name: 'Append correction' }).first().click();
   await page.getByLabel('Adjustment amount (EGP, signed)').fill('5.00');
@@ -340,6 +348,10 @@ test('an OPEN Operations Business Day exposes non-closing X and never a Financia
   await page.goto('/finance/end-day');
   await expect(page.getByRole('heading', { name: 'X Report / Financial End Day' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Non-closing X report' })).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'End day workflow' })
+    .getByRole('link', { name: /Financial Z/ })
+    .click();
   await expect(page.getByText('Operations must close this Business Day first.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Finalize financial Z' })).toHaveCount(0);
   expect(commands).toHaveLength(0);
@@ -371,13 +383,32 @@ test('end-day workspaces expose keyboard-reachable X, cashier, Z, and history ta
   await page.goto('/finance/end-day');
   const tasks = page.getByRole('navigation', { name: 'End day workflow' });
   await expect(tasks.getByRole('link')).toHaveCount(4);
+  await expect(tasks.getByRole('link', { name: /X report/ })).toHaveAttribute(
+    'aria-current',
+    'location',
+  );
   await tasks.getByRole('link', { name: /Cashier counts/ }).click();
+  await expect(page.getByRole('heading', { name: 'Non-closing X report' })).toBeHidden();
   await expect(page).toHaveURL(/#end-day-cashier$/);
   await expect(page.locator('#end-day-cashier')).toBeVisible();
   await tasks.getByRole('link', { name: /Financial Z/ }).click();
   await expect(page.locator('#end-day-z')).toContainText('Finalization requires');
   await tasks.getByRole('link', { name: /History/ }).click();
   await expect(page.getByRole('heading', { name: 'Financial Z history' })).toBeVisible();
+  expect(commands).toHaveLength(0);
+});
+
+test('cold End Day history hash directly opens the read-only history workspace', async ({
+  page,
+}) => {
+  const commands = await mockFinance(page, 'CLOSED');
+  await page.goto('/finance/end-day#end-day-history');
+  await expect(page.getByRole('heading', { name: 'Financial Z history' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Non-closing X report' })).toBeHidden();
+  await expect(page.getByRole('link', { name: /History/ })).toHaveAttribute(
+    'aria-current',
+    'location',
+  );
   expect(commands).toHaveLength(0);
 });
 
@@ -422,6 +453,37 @@ if (process.env['P04_P07_CAPTURE'] === '1') {
           await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
         ).toBe(true);
         await capturePremiumScreenshot(page, scene.id);
+      });
+    }
+  }
+}
+
+// Mock-finance Chromium scenes: no actual ledger command is invoked.
+if (process.env['P04_P07_CAPTURE'] === '1') {
+  for (const viewport of PREMIUM_EVIDENCE_VIEWPORTS) {
+    for (const scenario of [
+      { label: 'cashier', link: 'Cashier counts', heading: 'Cashier counts' },
+      { label: 'z', link: 'Financial Z', heading: 'Financial Z · finalization' },
+      { label: 'history', link: 'History', heading: 'Financial Z history' },
+    ] as const) {
+      test(`end day task scene ${scenario.label} at ${viewport.width}x${viewport.height}`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(viewport);
+        const commands = await mockFinance(page, 'CLOSED');
+        await page.goto('/finance/end-day');
+        await page
+          .getByRole('navigation', { name: 'End day workflow' })
+          .getByRole('link', { name: new RegExp(scenario.link) })
+          .click();
+        await expect(
+          page.getByRole('heading', { name: scenario.heading, exact: true }),
+        ).toBeVisible();
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        ).toBe(true);
+        expect(commands).toHaveLength(0);
+        await capturePremiumScreenshot(page, 'end-day-' + scenario.label);
       });
     }
   }

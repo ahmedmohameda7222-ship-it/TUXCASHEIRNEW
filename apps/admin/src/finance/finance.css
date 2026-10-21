@@ -449,3 +449,22 @@
   border: 1px solid var(--tux-border-subtle);
   border-radius: 0.75rem;
 }
+
+/* Only one End Day risk context is visible. User-selected task links remain real hash routes. */
+.tux-finance-endday-tasks a[aria-current='location'] {
+  border-color: var(--tux-border-strong);
+  background: var(--tux-surface-subtle);
+  box-shadow: var(--tux-shadow-xs);
+}
+.tux-finance-x-report[hidden],
+.tux-finance-endday-task[hidden] {
+  display: none;
+}
+#end-day-cashier,
+#end-day-z,
+#end-day-history {
+  padding: 1rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}

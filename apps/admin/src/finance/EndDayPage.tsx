@@ -1,6 +1,6 @@
 import './finance.css';
 import { FinanceSectionNav } from './FinanceSectionNav';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearch } from 'wouter';
 
 import {
@@ -17,6 +17,15 @@ import { EndDayHistoryPage } from './EndDayHistoryPage';
 import { formatEgp } from './money';
 import { useFinanceOperations } from './useFinanceOperations';
 
+type EndDayTask = 'x' | 'cashier' | 'z' | 'history';
+
+function taskFromHash(hash: string): EndDayTask {
+  if (hash === '#end-day-cashier') return 'cashier';
+  if (hash === '#end-day-z') return 'z';
+  if (hash === '#end-day-history') return 'history';
+  return 'x';
+}
+
 function amount(value: number | null | undefined): string {
   return value === null || value === undefined ? 'Not available' : formatEgp(value);
 }
@@ -29,6 +38,14 @@ export function EndDayPage() {
   const [cashierOpen, setCashierOpen] = useState(false);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [pin, setPin] = useState('');
+  const [activeTask, setActiveTask] = useState<EndDayTask>(() =>
+    typeof window === 'undefined' ? 'x' : taskFromHash(window.location.hash),
+  );
+  useEffect(() => {
+    const syncTask = () => setActiveTask(taskFromHash(window.location.hash));
+    window.addEventListener('hashchange', syncTask);
+    return () => window.removeEventListener('hashchange', syncTask);
+  }, []);
   const operations = useFinanceOperations(shopId, undefined, ['days']);
   const days = operations.daysQuery.data?.days ?? [];
   const dayId =
@@ -100,19 +117,35 @@ export function EndDayPage() {
     >
       <FinanceSectionNav active="end-day" />
       <nav className="tux-finance-endday-tasks" aria-label="End day workflow">
-        <a href="#end-day-x-report">
+        <a
+          href="#end-day-x-report"
+          aria-current={activeTask === 'x' ? 'location' : undefined}
+          onClick={() => setActiveTask('x')}
+        >
           <strong>01 · X report</strong>
           <span>Read-only business-day snapshot</span>
         </a>
-        <a href="#end-day-cashier">
+        <a
+          href="#end-day-cashier"
+          aria-current={activeTask === 'cashier' ? 'location' : undefined}
+          onClick={() => setActiveTask('cashier')}
+        >
           <strong>02 · Cashier counts</strong>
           <span>Review and reconcile differences</span>
         </a>
-        <a href="#end-day-z">
+        <a
+          href="#end-day-z"
+          aria-current={activeTask === 'z' ? 'location' : undefined}
+          onClick={() => setActiveTask('z')}
+        >
           <strong>03 · Financial Z</strong>
           <span>Check prerequisites before finalization</span>
         </a>
-        <a href="#end-day-history">
+        <a
+          href="#end-day-history"
+          aria-current={activeTask === 'history' ? 'location' : undefined}
+          onClick={() => setActiveTask('history')}
+        >
           <strong>04 · History</strong>
           <span>Inspect finalized days and corrections</span>
         </a>
@@ -169,63 +202,70 @@ export function EndDayPage() {
         />
       ) : null}
       {report ? (
-        <section
-          id="end-day-x-report"
-          className="tux-finance-x-report"
-          aria-label="Non-closing X report"
-        >
-          <div className="tux-finance-x-report__heading">
-            <h2>Non-closing X report</h2>
-            <strong>{report.businessDayStatus}</strong>
-          </div>
-          <p>This report does not close or modify the Operations Business Day.</p>
-          <dl className="tux-finance-x-grid">
-            {[
-              ['Orders', report.orderCount.toLocaleString('en-EG')],
-              ['Net sales', amount(report.netSalesMinor)],
-              ['Posted refunds', amount(report.postedRefundsMinor)],
-              ['Cash sales net', amount(report.cashSalesNetMinor)],
-              ['Expenses including staff pay', amount(report.totalExpensesMinor)],
-              ['COGS', amount(report.cogsMinor)],
-              ['Estimated operating profit', amount(report.estimatedOperatingProfitMinor)],
-            ].map(([key, value]) => (
-              <div key={key}>
-                <dt>{key}</dt>
-                <dd>{value}</dd>
-              </div>
-            ))}
-          </dl>
-          <h3>Cash and treasury movements</h3>
-          <dl className="tux-finance-x-grid">
-            {[
-              ['Opening float', report.openingFloatMinor],
-              ['Pay in', report.cashPayInsMinor],
-              ['Pay out', report.cashPayOutsMinor],
-              ['Cash expenses', report.cashExpensesMinor],
-              ['Bank deposits', report.bankDepositsMinor],
-              ['Transfers out', report.transfersOutMinor],
-              ['Transfers in', report.transfersInMinor],
-              ['Closing cash', report.closingCashMinor],
-              ['Closing bank', report.closingBankMinor],
-              ['Closing wallet', report.closingWalletMinor],
-              ['Pending settlement', report.closingPendingSettlementMinor],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd>{amount(typeof value === 'number' ? value : null)}</dd>
-              </div>
-            ))}
-          </dl>
-          <h3>Payment breakdown</h3>
-          <dl className="tux-finance-x-grid">
-            {Object.entries(report.paymentBreakdown).map(([key, value]) => (
-              <div key={key}>
-                <dt>{key}</dt>
-                <dd>{amount(value)}</dd>
-              </div>
-            ))}
-          </dl>
-          <section id="end-day-cashier" className="tux-finance-endday-task">
+        <>
+          <section
+            hidden={activeTask !== 'x'}
+            id="end-day-x-report"
+            className="tux-finance-x-report"
+            aria-label="Non-closing X report"
+          >
+            <div className="tux-finance-x-report__heading">
+              <h2>Non-closing X report</h2>
+              <strong>{report.businessDayStatus}</strong>
+            </div>
+            <p>This report does not close or modify the Operations Business Day.</p>
+            <dl className="tux-finance-x-grid">
+              {[
+                ['Orders', report.orderCount.toLocaleString('en-EG')],
+                ['Net sales', amount(report.netSalesMinor)],
+                ['Posted refunds', amount(report.postedRefundsMinor)],
+                ['Cash sales net', amount(report.cashSalesNetMinor)],
+                ['Expenses including staff pay', amount(report.totalExpensesMinor)],
+                ['COGS', amount(report.cogsMinor)],
+                ['Estimated operating profit', amount(report.estimatedOperatingProfitMinor)],
+              ].map(([key, value]) => (
+                <div key={key}>
+                  <dt>{key}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+            <h3>Cash and treasury movements</h3>
+            <dl className="tux-finance-x-grid">
+              {[
+                ['Opening float', report.openingFloatMinor],
+                ['Pay in', report.cashPayInsMinor],
+                ['Pay out', report.cashPayOutsMinor],
+                ['Cash expenses', report.cashExpensesMinor],
+                ['Bank deposits', report.bankDepositsMinor],
+                ['Transfers out', report.transfersOutMinor],
+                ['Transfers in', report.transfersInMinor],
+                ['Closing cash', report.closingCashMinor],
+                ['Closing bank', report.closingBankMinor],
+                ['Closing wallet', report.closingWalletMinor],
+                ['Pending settlement', report.closingPendingSettlementMinor],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{amount(typeof value === 'number' ? value : null)}</dd>
+                </div>
+              ))}
+            </dl>
+            <h3>Payment breakdown</h3>
+            <dl className="tux-finance-x-grid">
+              {Object.entries(report.paymentBreakdown).map(([key, value]) => (
+                <div key={key}>
+                  <dt>{key}</dt>
+                  <dd>{amount(value)}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+          <section
+            hidden={activeTask !== 'cashier'}
+            id="end-day-cashier"
+            className="tux-finance-endday-task"
+          >
             <h3>Cashier counts</h3>
             {report.cashierReconciliations.length === 0 ? (
               <p>No cashier reconciliation has been posted for this day.</p>
@@ -245,8 +285,18 @@ export function EndDayPage() {
                 ))}
               </ul>
             )}
+            {canReconcile && report.businessDayStatus === 'CLOSED' && !report.financialFinalized ? (
+              <button
+                className="admin-secondary-button"
+                type="button"
+                onClick={() => setCashierOpen(true)}
+              >
+                Record cashier count
+              </button>
+            ) : null}
           </section>
           <section
+            hidden={activeTask !== 'z'}
             id="end-day-z"
             className="tux-finance-endday-task"
             aria-label="Financial Z finalization"
@@ -269,13 +319,6 @@ export function EndDayPage() {
             {canReconcile && report.businessDayStatus === 'CLOSED' && !report.financialFinalized ? (
               <div className="tux-finance-toolbar">
                 <button
-                  className="admin-secondary-button"
-                  type="button"
-                  onClick={() => setCashierOpen(true)}
-                >
-                  Record cashier count
-                </button>
-                <button
                   className="admin-primary-button"
                   type="button"
                   disabled={!canFinalize}
@@ -286,10 +329,11 @@ export function EndDayPage() {
               </div>
             ) : null}
           </section>
-        </section>
+        </>
       ) : null}
 
       <section
+        hidden={activeTask !== 'history'}
         id="end-day-history"
         className="tux-finance-endday-task"
         aria-label="Financial Z history and corrections"
