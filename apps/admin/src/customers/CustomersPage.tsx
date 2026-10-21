@@ -23,6 +23,7 @@ import { useShopScope } from '../shops/ShopScopeProvider';
 import { CustomerDetailPage } from './CustomerDetailPage';
 import { CustomerMergeDialog } from './CustomerMergeDialog';
 import { LoyaltyPanel, type LoyaltyAdjustmentInput } from './LoyaltyPanel';
+import './customers.css';
 
 type CrmSection = 'customers' | 'settings';
 
@@ -249,12 +250,13 @@ export function CustomersPage() {
                   />
                 </label>
                 <ResponsiveMasterDetail
+                  className="admin-customers-master-detail"
                   listLabel="Customers"
                   detailLabel="Customer detail"
                   detailActive={selectedId !== null}
                   backHref="/customers"
                   list={
-                    <div className="admin-inventory-list">
+                    <div className="admin-customers-list">
                       {customersQuery.isLoading ? <LoadingState title="Loading customers" /> : null}
                       {customersQuery.isError ? (
                         <ErrorState
@@ -282,8 +284,8 @@ export function CustomersPage() {
                         <button
                           className={
                             customer.id === selectedId
-                              ? 'admin-inventory-row is-selected'
-                              : 'admin-inventory-row'
+                              ? 'admin-customer-row is-selected'
+                              : 'admin-customer-row'
                           }
                           aria-current={customer.id === selectedId ? 'true' : undefined}
                           key={customer.id}
