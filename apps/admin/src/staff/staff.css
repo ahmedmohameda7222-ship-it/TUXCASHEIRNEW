@@ -1,0 +1,45 @@
+/* Staff task pages own their layout independently of other lazy Admin routes. */
+.admin-staff-workspace { min-width: 0; }
+.admin-staff-workspace .admin-master-detail {
+  display: block;
+  min-width: 0;
+}
+.admin-staff-workspace .admin-master-detail__detail {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+.admin-staff-workspace .admin-master-detail[data-detail-active='true'] .admin-master-detail__list {
+  display: none;
+}
+.admin-staff-workspace .admin-master-detail[data-detail-active='true'] .admin-master-detail__detail {
+  display: block;
+}
+.admin-staff-workspace .admin-master-detail:not([data-detail-active='true']) .admin-master-detail__list {
+  display: block;
+}
+.admin-staff-workspace .admin-master-detail:not([data-detail-active='true']) .admin-master-detail__detail {
+  display: none;
+}
+.admin-staff-row__states {
+  display: inline-flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: .3rem;
+  flex-shrink: 0;
+  text-align: end;
+}
+.admin-staff-row__setup {
+  display: inline-flex;
+  max-width: 100%;
+  padding: .2rem .5rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+@media (max-width: 480px) {
+  .admin-staff-row__states { align-items: flex-start; text-align: start; }
+  .admin-staff-workspace .admin-master-detail__detail { overflow-wrap: anywhere; }
+}
