@@ -204,6 +204,9 @@ test('delivery uses business-facing copy and stays usable across phone, tablet, 
     await expect(page.getByText('Maadi Core')).toBeVisible();
     await page.getByRole('tab', { name: 'Riders' }).click();
     await expect(page.getByText('Omar Rider')).toBeVisible();
+    const rider = page.locator('.tux-delivery-rider-summary').first();
+    await expect(rider).toBeVisible();
+    expect(await rider.evaluate((node) => getComputedStyle(node).display)).toBe('flex');
     const deliveryTabs = page.getByRole('tablist', { name: 'Delivery workspace' });
     expect(await deliveryTabs.evaluate((node) => getComputedStyle(node).display)).toBe('grid');
     await expect(deliveryTabs.getByRole('tab', { name: 'Riders' })).toHaveAttribute(

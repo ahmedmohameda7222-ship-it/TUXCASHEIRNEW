@@ -375,6 +375,9 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     const list = page.locator('.admin-master-detail__list');
     await list.getByRole('button', { name: /Mona/ }).click();
     await expect(page.locator('.admin-master-detail__detail')).toBeVisible();
+    const metrics = page.locator('.admin-customer-detail__metrics').first();
+    await expect(metrics).toBeVisible();
+    expect(await metrics.evaluate((node) => getComputedStyle(node).display)).toBe('grid');
     if (viewport.width <= 480) {
       await expect(list).toBeHidden();
       await expect(page.getByRole('link', { name: /back to customers/i })).toBeVisible();
