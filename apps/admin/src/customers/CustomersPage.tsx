@@ -353,78 +353,145 @@ export function CustomersPage() {
             content: (
               <div className="admin-card-grid">
                 {canManageLoyalty ? (
-                  <form className="admin-card" onSubmit={(event) => saveProgram.mutate(event)}>
+                  <form
+                    className="admin-card admin-crm-loyalty-form"
+                    onSubmit={(event) => saveProgram.mutate(event)}
+                  >
                     <h2>Loyalty program</h2>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={programDraft.enabled}
-                        onChange={(event) =>
-                          setProgramDraft((current) => ({
-                            ...current,
-                            enabled: event.target.checked,
-                          }))
-                        }
-                      />{' '}
-                      Enabled
-                    </label>
-                    <label className="admin-field">
-                      <span>Points earned per 1 EGP</span>
-                      <input
-                        inputMode="numeric"
-                        value={programDraft.earnPointsPer100Minor}
-                        onChange={(event) =>
-                          setProgramDraft((current) => ({
-                            ...current,
-                            earnPointsPer100Minor: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className="admin-field">
-                      <span>Point value (EGP)</span>
-                      <input
-                        inputMode="decimal"
-                        value={programDraft.pointValueEgp}
-                        onChange={(event) =>
-                          setProgramDraft((current) => ({
-                            ...current,
-                            pointValueEgp: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                    <p>1 point = EGP {Number(programDraft.pointValueEgp || 0).toFixed(2)}</p>
-                    <label className="admin-field">
-                      <span>Minimum points to redeem</span>
-                      <input
-                        inputMode="numeric"
-                        value={programDraft.minimumRedemptionPoints}
-                        onChange={(event) =>
-                          setProgramDraft((current) => ({
-                            ...current,
-                            minimumRedemptionPoints: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className="admin-field">
-                      <span>Point expiry (days)</span>
-                      <input
-                        inputMode="numeric"
-                        value={programDraft.pointExpiryDays}
-                        onChange={(event) =>
-                          setProgramDraft((current) => ({
-                            ...current,
-                            pointExpiryDays: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
+                    <p>
+                      Changes below are editable settings, not the currently saved values. Save to
+                      apply a change to this shop through the server.
+                    </p>
+                    <section
+                      className="admin-crm-saved-policy"
+                      aria-label="Current saved loyalty settings"
+                    >
+                      <h3>Current saved settings</h3>
+                      {programQuery.isLoading ? (
+                        <p role="status">Loading current loyalty settings…</p>
+                      ) : null}
+                      {programQuery.isError ? (
+                        <p role="alert">
+                          Current loyalty settings are unavailable. Retry before changing this
+                          policy.
+                        </p>
+                      ) : null}
+                      {programQuery.isSuccess && !programQuery.data ? (
+                        <p>No loyalty policy has been saved for this shop.</p>
+                      ) : null}
+                      {programQuery.data ? (
+                        <dl>
+                          <div>
+                            <dt>Status</dt>
+                            <dd>{programQuery.data.enabled ? 'Enabled' : 'Disabled'}</dd>
+                          </div>
+                          <div>
+                            <dt>Earn rate</dt>
+                            <dd>{programQuery.data.earnPointsPer100Minor} points per EGP</dd>
+                          </div>
+                          <div>
+                            <dt>Redemption value</dt>
+                            <dd>
+                              EGP {(programQuery.data.redemptionMinorPerPoint / 100).toFixed(2)} per
+                              point
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Minimum redemption</dt>
+                            <dd>{programQuery.data.minimumRedemptionPoints} points</dd>
+                          </div>
+                          <div>
+                            <dt>Expiry</dt>
+                            <dd>
+                              {programQuery.data.pointExpiryDays === null
+                                ? 'No expiry'
+                                : `${programQuery.data.pointExpiryDays} days`}
+                            </dd>
+                          </div>
+                        </dl>
+                      ) : null}
+                    </section>
+                    <fieldset className="admin-crm-loyalty-fields">
+                      <legend>Activation</legend>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={programDraft.enabled}
+                          onChange={(event) =>
+                            setProgramDraft((current) => ({
+                              ...current,
+                              enabled: event.target.checked,
+                            }))
+                          }
+                        />{' '}
+                        Enabled
+                      </label>
+                    </fieldset>
+                    <fieldset className="admin-crm-loyalty-fields">
+                      <legend>Earning and redemption</legend>
+                      <label className="admin-field">
+                        <span>Points earned per 1 EGP</span>
+                        <input
+                          inputMode="numeric"
+                          value={programDraft.earnPointsPer100Minor}
+                          onChange={(event) =>
+                            setProgramDraft((current) => ({
+                              ...current,
+                              earnPointsPer100Minor: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className="admin-field">
+                        <span>Point value (EGP)</span>
+                        <input
+                          inputMode="decimal"
+                          value={programDraft.pointValueEgp}
+                          onChange={(event) =>
+                            setProgramDraft((current) => ({
+                              ...current,
+                              pointValueEgp: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <p>1 point = EGP {Number(programDraft.pointValueEgp || 0).toFixed(2)}</p>
+                      <label className="admin-field">
+                        <span>Minimum points to redeem</span>
+                        <input
+                          inputMode="numeric"
+                          value={programDraft.minimumRedemptionPoints}
+                          onChange={(event) =>
+                            setProgramDraft((current) => ({
+                              ...current,
+                              minimumRedemptionPoints: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    </fieldset>
+                    <fieldset className="admin-crm-loyalty-fields">
+                      <legend>Validity</legend>
+                      <label className="admin-field">
+                        <span>Point expiry (days)</span>
+                        <input
+                          inputMode="numeric"
+                          value={programDraft.pointExpiryDays}
+                          onChange={(event) =>
+                            setProgramDraft((current) => ({
+                              ...current,
+                              pointExpiryDays: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    </fieldset>
                     <button
                       className="admin-primary-button"
                       type="submit"
-                      disabled={saveProgram.isPending}
+                      disabled={
+                        saveProgram.isPending || programQuery.isLoading || programQuery.isError
+                      }
                     >
                       {saveProgram.isPending ? 'Saving…' : 'Save loyalty program'}
                     </button>

@@ -324,8 +324,12 @@ test('hydrates canonical loyalty values and preserves hidden multi-shop scopes o
   await expect(page.getByLabel('Point value (EGP)')).toHaveValue('0.17');
   await expect(page.getByLabel('Minimum points to redeem')).toHaveValue('75');
   await expect(page.getByLabel('Point expiry (days)')).toHaveValue('180');
+  const savedPolicy = page.getByRole('region', { name: 'Current saved loyalty settings' });
+  await expect(savedPolicy).toContainText('75 points');
+  await expect(savedPolicy).toContainText('Disabled');
 
   await page.getByLabel('Minimum points to redeem').fill('80');
+  await expect(savedPolicy).toContainText('75 points');
   await page.getByRole('button', { name: 'Save loyalty program' }).click();
 
   await expect

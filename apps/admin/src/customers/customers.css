@@ -63,3 +63,57 @@
     align-items: flex-start;
   }
 }
+
+/* CRM settings own their grouped controls on both cold and warmed deep links. */
+.admin-crm-loyalty-form {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+}
+.admin-crm-loyalty-form > p {
+  color: var(--tux-text-secondary);
+}
+.admin-crm-loyalty-fields {
+  display: grid;
+  gap: 0.875rem;
+  min-width: 0;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+}
+.admin-crm-loyalty-fields legend {
+  padding-inline: 0.375rem;
+  font-weight: 700;
+}
+.admin-crm-loyalty-fields .admin-field {
+  min-width: 0;
+}
+.admin-crm-saved-policy {
+  padding: 1rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-subtle);
+}
+.admin-crm-saved-policy h3 {
+  margin: 0 0 0.75rem;
+}
+.admin-crm-saved-policy dl {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+.admin-crm-saved-policy dl > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.admin-crm-saved-policy dt {
+  color: var(--tux-text-secondary);
+}
+.admin-crm-saved-policy dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
