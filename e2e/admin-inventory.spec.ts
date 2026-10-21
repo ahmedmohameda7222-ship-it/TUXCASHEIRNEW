@@ -329,6 +329,7 @@ test('replenishment save submits the workspace version the admin actually edited
 
   await page.getByText('More actions', { exact: true }).click();
   await page.getByRole('button', { name: 'Reorder suggestions' }).click();
+  await page.getByRole('button', { name: 'Edit policy for Beef' }).click();
   await page.getByLabel('Par level (kg)').fill('3.5');
   await page.getByRole('button', { name: 'Save policy' }).click();
 

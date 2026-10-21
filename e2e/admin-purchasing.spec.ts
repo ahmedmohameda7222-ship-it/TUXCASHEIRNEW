@@ -45,6 +45,7 @@ async function mockPurchasing(
             id: supplierId,
             businessId: session.principal.businessId,
             name: 'Prime Foods',
+            version: 1,
             contactName: 'Sara',
             phone: '01000000000',
             email: 'orders@prime.test',

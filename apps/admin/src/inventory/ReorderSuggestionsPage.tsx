@@ -217,15 +217,13 @@ export function ReorderSuggestionsPage({
                             key === 'leadTimeDays'
                           }
                           value={draft[key as keyof ReplenishmentDraft]}
-                          onChange={(event) =>
+                          onChange={(event) => {
+                            const value = event.currentTarget.value;
                             setDrafts((current) => ({
                               ...current,
-                              [row.inventoryItemId]: {
-                                ...draft,
-                                [key]: event.currentTarget.value,
-                              },
-                            }))
-                          }
+                              [row.inventoryItemId]: { ...draft, [key]: value },
+                            }));
+                          }}
                         />
                       </label>
                     ))}
@@ -233,14 +231,12 @@ export function ReorderSuggestionsPage({
                       <span>Preferred purchase unit</span>
                       <input
                         value={draft.preferredPurchaseUnit}
-                        onChange={(event) =>
+                        onChange={(event) => {
+                          const value = event.currentTarget.value;
                           setDrafts((current) => ({
                             ...current,
-                            [row.inventoryItemId]: {
-                              ...draft,
-                              preferredPurchaseUnit: event.currentTarget.value,
-                            },
-                          }))
+                            [row.inventoryItemId]: { ...draft, preferredPurchaseUnit: value },
+                          }));
                         }
                       />
                     </label>

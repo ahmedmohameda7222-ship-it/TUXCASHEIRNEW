@@ -56,3 +56,9 @@
     overflow-wrap: anywhere;
   }
 }
+
+/* Full-width workforce task detail always needs a visible return control,
+   including desktop where the generic master-detail back link is hidden. */
+.admin-staff-workspace .admin-master-detail__back {
+  display: inline-flex;
+}

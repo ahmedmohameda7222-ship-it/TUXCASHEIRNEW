@@ -317,6 +317,9 @@ test('switching employees resets local profile editor state to the selected empl
   const monaProfile = page.getByRole('article', { name: 'Employee Mona Ali' });
   await expect(monaProfile.getByLabel('Name')).toHaveValue('Mona Ali');
 
+  // Workforce detail is a full-width task surface; navigate back before
+  // changing employees, then verify the replacement editor state is clean.
+  await page.getByRole('link', { name: /back to employees/i }).click();
   await selectEmployee(page, 'Youssef Hassan');
 
   const youssefProfile = page.getByRole('article', { name: 'Employee Youssef Hassan' });
