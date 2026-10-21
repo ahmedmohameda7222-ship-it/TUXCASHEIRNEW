@@ -138,11 +138,11 @@ test('renders separate delivery, zone, and rider workspaces', async ({ page }) =
 
   await expect(page.getByRole('heading', { name: 'Delivery', exact: true })).toBeVisible();
   await expect(page.getByLabel('Delivery order #1042')).toContainText('Rider assigned');
-  await page.getByRole('button', { name: 'Zones' }).click();
+  await page.getByRole('tab', { name: 'Zones' }).click();
   await expect(page.getByText('Maadi Core')).toBeVisible();
   await expect(page.getByText('25.00 EGP')).toBeVisible();
   await expect(page.getByText('120.00 EGP minimum')).toBeVisible();
-  await page.getByRole('button', { name: 'Riders' }).click();
+  await page.getByRole('tab', { name: 'Riders' }).click();
   await expect(page.getByText(/Omar Rider/)).toBeVisible();
 });
 
@@ -152,7 +152,7 @@ test('routes delivery mutations through the trusted BFF and clears rider on unas
   const { commands } = await mockDelivery(page);
   await page.goto('/delivery');
 
-  await page.getByRole('button', { name: 'Zones' }).click();
+  await page.getByRole('tab', { name: 'Zones' }).click();
   await page.getByRole('button', { name: /Maadi Core/ }).click();
   await page.getByLabel('Delivery fee (EGP)').fill('30.00');
   await page.getByRole('button', { name: 'Save delivery zone' }).click();
@@ -168,7 +168,7 @@ test('routes delivery mutations through the trusted BFF and clears rider on unas
     priority: 20,
   });
 
-  await page.getByRole('button', { name: 'Active deliveries' }).click();
+  await page.getByRole('tab', { name: 'Active deliveries' }).click();
   await page
     .getByLabel('Delivery order #1042')
     .getByRole('button', {
@@ -199,9 +199,9 @@ test('delivery uses business-facing copy and stays usable across phone, tablet, 
 
     await expect(page.getByRole('heading', { name: 'Delivery', exact: true })).toBeVisible();
     await expect(page.getByText('#1042')).toBeVisible();
-    await page.getByRole('button', { name: 'Zones' }).click();
+    await page.getByRole('tab', { name: 'Zones' }).click();
     await expect(page.getByText('Maadi Core')).toBeVisible();
-    await page.getByRole('button', { name: 'Riders' }).click();
+    await page.getByRole('tab', { name: 'Riders' }).click();
     await expect(page.getByText('Omar Rider')).toBeVisible();
     await expect(page.getByText(/server-authoritative/i)).toHaveCount(0);
     await expect(page.getByText(/append-only/i)).toHaveCount(0);
@@ -219,14 +219,14 @@ test('delivery view-only users do not receive mutation controls', async ({ page 
   await page.goto('/delivery');
 
   await expect(page.getByText('#1042')).toBeVisible();
-  await page.getByRole('button', { name: 'Zones' }).click();
+  await page.getByRole('tab', { name: 'Zones' }).click();
   await expect(page.getByText('Maadi Core')).toBeVisible();
-  await page.getByRole('button', { name: 'Riders' }).click();
+  await page.getByRole('tab', { name: 'Riders' }).click();
   await expect(page.getByText('Omar Rider')).toBeVisible();
   await expect(page.getByRole('button', { name: 'New delivery zone' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'New rider' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Save rider' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Active deliveries' }).click();
+  await page.getByRole('tab', { name: 'Active deliveries' }).click();
   await expect(page.getByLabel('Delivery order')).toContainText('Rider assigned');
 });
 
@@ -234,7 +234,7 @@ test('delivery zone editor uses EGP amounts and named fallback choices', async (
   const { commands } = await mockDelivery(page);
   await page.goto('/delivery');
 
-  await page.getByRole('button', { name: 'Zones' }).click();
+  await page.getByRole('tab', { name: 'Zones' }).click();
   await page.getByRole('button', { name: /Maadi Core/ }).click();
   await expect(page.getByLabel('Delivery fee (EGP)')).toHaveValue('25.00');
   await expect(page.getByLabel('Minimum order (EGP)')).toHaveValue('120.00');
@@ -254,4 +254,19 @@ test('delivery zone editor uses EGP amounts and named fallback choices', async (
     fallbackEnabled: true,
     fallbackShopId: backupShopId,
   });
+});
+
+test('delivery tabs expose selection and support keyboard arrow navigation', async ({ page }) => {
+  await mockDelivery(page);
+  await page.goto('/delivery');
+  const tabs = page.getByRole('tablist', { name: 'Delivery workspace' });
+  await expect(tabs).toBeVisible();
+  await expect(tabs.getByRole('tab', { name: 'Active deliveries' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await tabs.getByRole('tab', { name: 'Active deliveries' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(tabs.getByRole('tab', { name: 'Zones' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page).toHaveURL(/\/delivery\/zones$/);
 });

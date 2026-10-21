@@ -1,6 +1,7 @@
 import './finance.css';
+import { FinanceSectionNav } from './FinanceSectionNav';
 import { useState } from 'react';
-import { Link, useSearch } from 'wouter';
+import { useSearch } from 'wouter';
 
 import {
   EmptyState,
@@ -97,17 +98,7 @@ export function EndDayPage() {
       title="X Report / Financial End Day"
       description="X is always read-only. Operations closes the Business Day; Admin only reconciles and finalizes financial Z afterward."
     >
-      <nav className="tux-finance-toolbar" aria-label="Finance sections">
-        <Link className="admin-secondary-button" href="/finance">
-          Bank & Cash
-        </Link>
-        <Link className="admin-secondary-button" href="/finance/expenses">
-          Expenses
-        </Link>
-        <Link className="admin-secondary-button" href="/finance/settlements">
-          Settlements
-        </Link>
-      </nav>
+      <FinanceSectionNav active="end-day" />
       {operations.daysQuery.isLoading ? <LoadingState title="Loading business days" /> : null}
       {operations.daysQuery.isError ? (
         <ErrorState

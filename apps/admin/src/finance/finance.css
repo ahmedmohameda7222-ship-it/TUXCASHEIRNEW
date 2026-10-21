@@ -271,3 +271,24 @@
   width: auto;
   min-height: 24px;
 }
+
+.tux-finance-section-nav {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 0.15rem 0 0.65rem;
+}
+.tux-finance-section-nav a {
+  min-height: var(--tux-touch-target);
+  white-space: nowrap;
+}
+.tux-finance-section-nav a[aria-current='page'] {
+  border-color: var(--tux-accent);
+  background: var(--tux-surface-subtle);
+  color: var(--tux-text-primary);
+  box-shadow: inset 0 -3px var(--tux-accent);
+}
+@media (max-width: 480px) {
+  .tux-finance-section-nav {
+    flex-wrap: nowrap;
+  }
+}

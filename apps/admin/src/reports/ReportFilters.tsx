@@ -26,6 +26,41 @@ export const REPORT_LABELS: Readonly<Record<AdminReportArea, string>> = {
   segments: 'Customer segments',
   attendance: 'Staff attendance',
 };
+export const REPORT_TOPICS = [
+  {
+    label: 'Sales & customers',
+    areas: [
+      'sales',
+      'products',
+      'customers',
+      'payments',
+      'refunds',
+      'tax',
+      'loyalty',
+      'promotions',
+      'segments',
+    ],
+  },
+  {
+    label: 'Stock & purchasing',
+    areas: [
+      'inventory-consumption',
+      'waste',
+      'theoretical-variance',
+      'margin-variance',
+      'purchasing',
+    ],
+  },
+  {
+    label: 'Staff & operations',
+    areas: ['staff', 'attendance', 'delivery', 'shop-comparison'],
+  },
+  {
+    label: 'Finance & performance',
+    areas: ['profit', 'expenses', 'end-day', 'bank-cash'],
+  },
+] as const satisfies readonly { label: string; areas: readonly AdminReportArea[] }[];
+
 export function ReportFilters({
   value,
   onChange,
@@ -113,10 +148,14 @@ export function ReportFilters({
           value={value.area}
           onChange={(event) => set('area', event.target.value as AdminReportArea)}
         >
-          {Object.entries(REPORT_LABELS).map(([area, label]) => (
-            <option key={area} value={area}>
-              {label}
-            </option>
+          {REPORT_TOPICS.map((topic) => (
+            <optgroup label={topic.label} key={topic.label}>
+              {topic.areas.map((area) => (
+                <option key={area} value={area}>
+                  {REPORT_LABELS[area]}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </label>

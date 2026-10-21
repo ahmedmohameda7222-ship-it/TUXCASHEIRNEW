@@ -237,7 +237,7 @@ export function ReorderSuggestionsPage({
                             ...current,
                             [row.inventoryItemId]: { ...draft, preferredPurchaseUnit: value },
                           }));
-                        }
+                        }}
                       />
                     </label>
                     {validationError ? <p role="alert">{validationError}</p> : null}

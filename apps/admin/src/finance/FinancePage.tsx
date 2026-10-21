@@ -5,7 +5,7 @@ import type {
   ProfitSummary,
 } from '@tux/admin-contracts';
 import { useState } from 'react';
-import { Link, useLocation, useSearch } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 
 import {
   EmptyState,
@@ -22,6 +22,7 @@ import { formatEgp, parseEgpMinor } from './money';
 import { useFinance } from './useFinance';
 import { MoneyMovementSheet } from './MoneyMovementSheet';
 import './finance.css';
+import { FinanceSectionNav } from './FinanceSectionNav';
 
 const accountTypeLabels: Record<FinanceAccountType, string> = {
   CASH: 'Cash',
@@ -309,20 +310,7 @@ export function FinancePage() {
         ) : undefined
       }
     >
-      <nav className="tux-finance-toolbar" aria-label="Finance sections">
-        <Link className="admin-secondary-button" href="/finance">
-          Bank & Cash
-        </Link>
-        <Link className="admin-secondary-button" href="/finance/expenses">
-          Expenses
-        </Link>
-        <Link className="admin-secondary-button" href="/finance/settlements">
-          Settlements
-        </Link>
-        <Link className="admin-secondary-button" href="/finance/end-day">
-          End Day
-        </Link>
-      </nav>
+      <FinanceSectionNav active="accounts" />
       {actionError ? <InlineError>{actionError}</InlineError> : null}
       {finance.workspaceQuery.isLoading ? <LoadingState title="Loading finance" /> : null}
       {finance.workspaceQuery.isError ? (
