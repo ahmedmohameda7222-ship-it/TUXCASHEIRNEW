@@ -1,4 +1,5 @@
-import { capturePremiumScreenshot, premiumVisualViewports   captureTargetedAcceptance,
+import { capturePremiumScreenshot, premiumVisualViewports,
+  captureTargetedAcceptance,
   verifyTargetedVisualLayout,
 } from './premiumVisualEvidence';
 import { expect, test, type Page } from '@playwright/test';
