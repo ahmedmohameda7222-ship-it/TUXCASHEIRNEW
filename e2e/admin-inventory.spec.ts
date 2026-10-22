@@ -650,7 +650,6 @@ if (process.env['P04_P07_CAPTURE'] === '1') {
   }
 }
 
-
 if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
   for (const width of [390, 1440] as const) {
     for (const theme of ['light', 'dark'] as const) {
@@ -659,7 +658,10 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
           await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
           await mockInventory(page);
           await verifyTargetedVisualLayout(page, {
-            route: '/inventory', heading: 'Inventory', theme, entry,
+            route: '/inventory',
+            heading: 'Inventory',
+            theme,
+            entry,
           });
           await captureTargetedAcceptance(page, 'p04', 'inventory', theme, entry);
         });

@@ -55,9 +55,10 @@ export function OrdersPage() {
     if (selectedId) navigate('/orders');
   }, [shopId, selectedId, navigate]);
 
-  const authorizedShop = shopId && principal.shopIds.includes(shopId)
-    ? principal.shopSummaries?.find((shop) => shop.id === shopId)
-    : undefined;
+  const authorizedShop =
+    shopId && principal.shopIds.includes(shopId)
+      ? principal.shopSummaries?.find((shop) => shop.id === shopId)
+      : undefined;
   const shopName = authorizedShop?.name?.trim() || (shopId ? `Shop ${shopId}` : '');
   const hasActiveFilters = Boolean(query.trim() || status || source || fromInput || toInput);
   const clearFilters = () => {
@@ -231,7 +232,9 @@ export function OrdersPage() {
             !ordersApi.searchQuery.isError &&
             !timeRange.error ? (
               <EmptyState
-                title={hasActiveFilters ? 'No orders match these filters' : 'No orders in this shop yet'}
+                title={
+                  hasActiveFilters ? 'No orders match these filters' : 'No orders in this shop yet'
+                }
                 description={
                   hasActiveFilters
                     ? `No results in ${shopName}. Clear the filters to return to its complete order history.`
@@ -299,7 +302,11 @@ export function OrdersPage() {
               title="Order unavailable"
               description={`This order may not exist or may not be accessible in ${shopName}. Return to the current shop's orders.`}
               action={
-                <button className="admin-secondary-button" type="button" onClick={() => navigate('/orders')}>
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  onClick={() => navigate('/orders')}
+                >
                   Back to shop orders
                 </button>
               }
@@ -362,7 +369,11 @@ export function OrdersPage() {
               title="Order unavailable in this shop"
               description={`This order is not available in ${shopName}. Open an order from the current shop's history instead.`}
               action={
-                <button className="admin-secondary-button" type="button" onClick={() => navigate('/orders')}>
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  onClick={() => navigate('/orders')}
+                >
                   Back to shop orders
                 </button>
               }

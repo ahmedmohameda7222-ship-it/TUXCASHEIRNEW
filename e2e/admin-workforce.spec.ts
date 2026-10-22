@@ -1,4 +1,9 @@
-import { capturePremiumScreenshot, premiumVisualViewports, captureTargetedAcceptance, verifyTargetedVisualLayout } from './premiumVisualEvidence';
+import {
+  capturePremiumScreenshot,
+  premiumVisualViewports,
+  captureTargetedAcceptance,
+  verifyTargetedVisualLayout,
+} from './premiumVisualEvidence';
 import type { EmployeeDetail, StaffWorkspace } from '@tux/admin-contracts';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
@@ -385,7 +390,6 @@ test('switching employees resets local profile editor state to the selected empl
   await expect(youssefProfile.getByLabel('Phone')).toHaveValue('+201011111111');
 });
 
-
 if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
   for (const width of [390, 1440] as const) {
     for (const theme of ['light', 'dark'] as const) {
@@ -395,7 +399,10 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
             await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
             await mockWorkforce(page);
             await verifyTargetedVisualLayout(page, {
-              route: '/staff', heading: 'Staff', theme, entry,
+              route: '/staff',
+              heading: 'Staff',
+              theme,
+              entry,
             });
             if (scene === 'permissions') {
               await selectEmployee(page, 'Mona Ali');

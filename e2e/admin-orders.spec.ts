@@ -577,7 +577,6 @@ test('DONE refund and return preserve reason snapshots and pending approval stat
   await expect(detail.getByText(/Posted · Quality issue/)).toBeVisible();
 });
 
-
 const otherShopId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const otherShopOrderId = 'aaaaaaaa-1111-4111-8111-aaaaaaaa1111';
 
@@ -653,11 +652,7 @@ async function mockScopedOrderHistory(
       return;
     }
     const records =
-      requestedShopId === shopId
-        ? [firstOrder]
-        : options.emptySecondShop
-          ? []
-          : [secondOrder];
+      requestedShopId === shopId ? [firstOrder] : options.emptySecondShop ? [] : [secondOrder];
     const requestedOrderId = url.searchParams.get('orderId');
     if (requestedOrderId) {
       details.push(url);
@@ -676,11 +671,12 @@ async function mockScopedOrderHistory(
     const rows = records
       .filter((order) => statuses.length === 0 || statuses.includes(order.status))
       .filter((order) => !source || source === order.source)
-      .filter((order) =>
-        !term ||
-        [order.displayOrderLabel, order.customer?.name, order.customer?.normalizedPhone]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(term)),
+      .filter(
+        (order) =>
+          !term ||
+          [order.displayOrderLabel, order.customer?.name, order.customer?.normalizedPhone]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(term)),
       )
       .map(summary);
     await route.fulfill({
@@ -706,12 +702,16 @@ test('TUX-006 Owner sees authorized shop, scoped data reload and no stale select
   await expect(page.getByRole('button', { name: /#902/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /#101/ })).toHaveCount(0);
   await expect(page.getByLabel('Order detail').getByText('Select an order')).toBeVisible();
-  await expect.poll(() => requests.searches.some((url) =>
-    url.searchParams.get('shopId') === otherShopId,
-  )).toBe(true);
+  await expect
+    .poll(() => requests.searches.some((url) => url.searchParams.get('shopId') === otherShopId))
+    .toBe(true);
   await page.getByRole('button', { name: /#902/ }).click();
   await expect(page.getByLabel('Order detail').getByText('Mona Zamalek')).toBeVisible();
-  expect(requests.details.every((url) => [shopId, otherShopId].includes(url.searchParams.get('shopId') ?? ''))).toBe(true);
+  expect(
+    requests.details.every((url) =>
+      [shopId, otherShopId].includes(url.searchParams.get('shopId') ?? ''),
+    ),
+  ).toBe(true);
   expect(requests.commands).toHaveLength(0);
 });
 
@@ -754,10 +754,13 @@ test('TUX-006 restricted Manager cannot operate on another shop or a foreign dir
   await expect(page.getByRole('button', { name: 'Cancel order' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Refund payment' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Return items' })).toHaveCount(0);
-  expect(requests.details.some((url) =>
-    url.searchParams.get('shopId') === shopId &&
-    url.searchParams.get('orderId') === otherShopOrderId,
-  )).toBe(true);
+  expect(
+    requests.details.some(
+      (url) =>
+        url.searchParams.get('shopId') === shopId &&
+        url.searchParams.get('orderId') === otherShopOrderId,
+    ),
+  ).toBe(true);
   expect(requests.commands).toHaveLength(0);
 });
 
@@ -796,7 +799,6 @@ if (process.env['P04_P07_CAPTURE'] === '1') {
   }
 }
 
-
 if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
   for (const width of [390, 1440] as const) {
     for (const theme of ['light', 'dark'] as const) {
@@ -805,7 +807,10 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
           await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
           await mockOrders(page);
           await verifyTargetedVisualLayout(page, {
-            route: '/orders', heading: 'Orders', theme, entry,
+            route: '/orders',
+            heading: 'Orders',
+            theme,
+            entry,
           });
           await captureTargetedAcceptance(page, 'p05', 'orders', theme, entry);
         });

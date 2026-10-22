@@ -60,15 +60,21 @@ function rgbLuminance(color: string): number {
   const hex = /^#([0-9a-f]{6})$/i.exec(color.trim());
   const channels = hex
     ? [0, 2, 4].map((index) => Number.parseInt(hex[1]!.slice(index, index + 2), 16))
-    : color.match(/[\d.]+/g)?.slice(0, 3).map(Number);
+    : color
+        .match(/[\d.]+/g)
+        ?.slice(0, 3)
+        .map(Number);
   if (!channels || channels.length !== 3) throw new Error(`Unexpected CSS color: ${color}`);
-  return 0.2126 * channelLuminance(channels[0]!) +
+  return (
+    0.2126 * channelLuminance(channels[0]!) +
     0.7152 * channelLuminance(channels[1]!) +
-    0.0722 * channelLuminance(channels[2]!);
+    0.0722 * channelLuminance(channels[2]!)
+  );
 }
 
 function contrastRatio(first: string, second: string): number {
-  const a = rgbLuminance(first), b = rgbLuminance(second);
+  const a = rgbLuminance(first),
+    b = rgbLuminance(second);
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
@@ -83,7 +89,9 @@ export async function verifyTargetedVisualLayout(
 ): Promise<void> {
   await page.emulateMedia({ colorScheme: target.theme });
   // Force CSS theme on direct navigation too, without touching local storage.
-  await page.addInitScript((theme) => { document.documentElement.dataset.theme = theme; }, target.theme);
+  await page.addInitScript((theme) => {
+    document.documentElement.dataset.theme = theme;
+  }, target.theme);
   if (target.entry === 'cold') {
     await page.goto(target.route);
   } else {
@@ -95,7 +103,9 @@ export async function verifyTargetedVisualLayout(
       window.dispatchEvent(new PopStateEvent('popstate'));
     }, target.route);
   }
-  await expect(page.getByRole('heading', { name: target.heading, exact: true }).first()).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: target.heading, exact: true }).first(),
+  ).toBeVisible();
   await expect(page.locator('.admin-page').first()).toBeVisible();
 
   const computed = await page.evaluate(() => {
@@ -107,9 +117,14 @@ export async function verifyTargetedVisualLayout(
       .filter((element) => {
         const bounds = element.getBoundingClientRect();
         const style = getComputedStyle(element);
-        return bounds.width > 0 && bounds.height > 0 &&
-          bounds.top < window.innerHeight && bounds.bottom > 0 &&
-          style.display !== 'none' && style.visibility !== 'hidden';
+        return (
+          bounds.width > 0 &&
+          bounds.height > 0 &&
+          bounds.top < window.innerHeight &&
+          bounds.bottom > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden'
+        );
       })
       .find((element) => {
         const bounds = element.getBoundingClientRect();

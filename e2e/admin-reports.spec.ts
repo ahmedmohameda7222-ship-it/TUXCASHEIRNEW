@@ -1,4 +1,6 @@
-import { capturePremiumScreenshot, premiumVisualViewports,
+import {
+  capturePremiumScreenshot,
+  premiumVisualViewports,
   captureTargetedAcceptance,
   verifyTargetedVisualLayout,
 } from './premiumVisualEvidence';
@@ -208,7 +210,6 @@ for (const vp of premiumVisualViewports([
   });
 }
 
-
 if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
   for (const width of [390, 1440] as const) {
     for (const theme of ['light', 'dark'] as const) {
@@ -217,7 +218,10 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
           await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
           await mockReports(page);
           await verifyTargetedVisualLayout(page, {
-            route: '/reports', heading: 'Reports', theme, entry,
+            route: '/reports',
+            heading: 'Reports',
+            theme,
+            entry,
           });
           await captureTargetedAcceptance(page, 'p07', 'reports', theme, entry);
         });

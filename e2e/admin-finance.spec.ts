@@ -492,7 +492,6 @@ if (process.env['P04_P07_CAPTURE'] === '1') {
   }
 }
 
-
 if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
   for (const width of [390, 1440] as const) {
     for (const theme of ['light', 'dark'] as const) {
@@ -501,7 +500,10 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
           await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
           await mockFinance(page);
           await verifyTargetedVisualLayout(page, {
-            route: '/finance', heading: 'Bank & Cash', theme, entry,
+            route: '/finance',
+            heading: 'Bank & Cash',
+            theme,
+            entry,
           });
           await captureTargetedAcceptance(page, 'p07', 'finance', theme, entry);
         });
