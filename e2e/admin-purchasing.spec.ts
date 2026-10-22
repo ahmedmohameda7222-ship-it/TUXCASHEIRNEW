@@ -1,4 +1,6 @@
-import { capturePremiumScreenshot, premiumVisualViewports } from './premiumVisualEvidence';
+import { capturePremiumScreenshot, premiumVisualViewports   captureTargetedAcceptance,
+  verifyTargetedVisualLayout,
+} from './premiumVisualEvidence';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { AdminSupplier } from '@tux/admin-contracts';
 import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
@@ -684,4 +686,22 @@ for (const viewport of premiumVisualViewports([{ name: 'desktop', width: 1440, h
         .toBe(1);
     },
   );
+}
+
+
+if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
+  for (const width of [390, 1440] as const) {
+    for (const theme of ['light', 'dark'] as const) {
+      for (const entry of ['cold', 'warm'] as const) {
+        test(`targeted P04 purchasing ${theme} ${entry} ${width}px`, async ({ page }) => {
+          await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+          await mockPurchasing(page);
+          await verifyTargetedVisualLayout(page, {
+            route: '/purchasing', heading: 'Purchasing', theme, entry,
+          });
+          await captureTargetedAcceptance(page, 'p04', 'purchasing', theme, entry);
+        });
+      }
+    }
+  }
 }
