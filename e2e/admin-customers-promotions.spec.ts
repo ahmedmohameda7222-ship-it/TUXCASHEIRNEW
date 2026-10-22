@@ -386,6 +386,23 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     const metrics = page.locator('.admin-customer-detail__metrics').first();
     await expect(metrics).toBeVisible();
     expect(await metrics.evaluate((node) => getComputedStyle(node).display)).toBe('grid');
+    const tabs = page.getByRole('tablist', { name: 'Customer detail sections' });
+    await expect(tabs.getByRole('tab')).toHaveCount(5);
+    expect(
+      await tabs.evaluate((node) => {
+        const bounds = node.getBoundingClientRect();
+        return [...node.querySelectorAll('[role="tab"]')].every((tab) => {
+          const r = tab.getBoundingClientRect();
+          return r.left >= bounds.left - 1 && r.right <= bounds.right + 1;
+        });
+      }),
+    ).toBe(true);
+    const segmentTags = page.locator('.admin-customer-segments__tag');
+    await expect(segmentTags.first()).toBeVisible();
+    // Flex items are blockified by the browser, so inline-flex computes as flex.
+    expect(await segmentTags.first().evaluate((node) => getComputedStyle(node).display)).toMatch(
+      /^(inline-)?flex$/,
+    );
     if (viewport.width <= 480) {
       await expect(list).toBeHidden();
       await expect(page.getByRole('link', { name: /back to customers/i })).toBeVisible();
