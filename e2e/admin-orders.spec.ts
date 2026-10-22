@@ -701,7 +701,7 @@ test('TUX-006 Owner sees authorized shop, scoped data reload and no stale select
   await expect(page.getByLabel('Order detail').getByText('Ahmed Maadi')).toBeVisible();
 
   await page.locator('.shop-switcher select').selectOption(otherShopId);
-  await expect(page).toHaveURL(/\\/orders$/);
+  await expect(page).toHaveURL(/\/orders$/);
   await expect(page.getByLabel('Current order shop')).toContainText('TUX Zamalek');
   await expect(page.getByRole('button', { name: /#902/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /#101/ })).toHaveCount(0);
