@@ -816,6 +816,12 @@ export default async function handler(
   response: AdminResponse,
 ): Promise<void> {
   const routedUrl = new URL(request.url ?? '/', 'http://admin.local');
+  if (routedUrl.searchParams.get('__adminResource') === 'alerts') {
+    routedUrl.searchParams.delete('__adminResource');
+    request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
+    await (await import('../../server/alerts/alertsApi.js')).handleAlertsRequest(request, response);
+    return;
+  }
   if (routedUrl.searchParams.get('__adminResource') === 'finance') {
     routedUrl.searchParams.delete('__adminResource');
     request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');

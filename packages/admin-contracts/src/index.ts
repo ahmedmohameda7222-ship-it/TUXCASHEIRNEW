@@ -16,3 +16,4 @@ export * from './staff';
 export * from './finance';
 export * from './endDay';
 export * from './reports';
+export * from './alerts.js';

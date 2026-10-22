@@ -10,6 +10,9 @@ const ApprovalRulesPage = lazy(() =>
 const ApprovalsPage = lazy(() =>
   import('../approvals/ApprovalsPage').then((module) => ({ default: module.ApprovalsPage })),
 );
+const AlertsPage = lazy(() =>
+  import('../alerts/AlertsPage').then((module) => ({ default: module.AlertsPage })),
+);
 const AuditPage = lazy(() =>
   import('../audit/AuditPage').then((module) => ({ default: module.AuditPage })),
 );
@@ -96,6 +99,7 @@ export const ADMIN_NAV_GROUPS = [
   },
   { label: 'People', paths: ['/staff', '/customers'] },
   { label: 'Business', paths: ['/finance', '/reports'] },
+  { label: 'Monitoring & messaging', paths: ['/alerts', '/devices', '/whatsapp'] },
   { label: 'Administration', paths: ['/settings', '/approvals', '/approvals/rules', '/audit'] },
 ] as const;
 
@@ -139,6 +143,7 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   if (route.path === '/settings') return <SettingsPage />;
   if (route.path === '/approvals/rules') return <ApprovalRulesPage />;
   if (route.path === '/approvals') return <ApprovalsPage />;
+  if (route.path === '/alerts') return <AlertsPage />;
   if (route.path === '/audit') return <AuditPage />;
   if (route.path === '/inventory') return <InventoryPage />;
   if (route.path === '/orders') return <OrdersPage />;
@@ -159,9 +164,7 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
       (candidate) =>
         !new Set(['/', '/orders', '/catalog/products', '/inventory', '/more']).has(
           candidate.path,
-        ) &&
-        !new Set(['/alerts', '/devices', '/whatsapp']).has(candidate.path) &&
-        routeIsPermitted(principal, candidate.path),
+        ) && routeIsPermitted(principal, candidate.path),
     );
     return (
       <PageScaffold

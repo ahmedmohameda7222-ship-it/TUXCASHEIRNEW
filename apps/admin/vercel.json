@@ -51,6 +51,10 @@
       "dest": "/api/admin/orders?__adminResource=reports"
     },
     {
+      "src": "/api/admin/alerts",
+      "dest": "/api/admin/orders?__adminResource=alerts"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }

@@ -207,7 +207,9 @@ test('200% page zoom keeps the Admin header and shop scope usable', async ({ pag
   await page.screenshot({ path: 'test-results/admin-stage1-zoom-200-percent-css.png' });
 });
 
-test('P01 secondary routes keep More active while hiding unshipped modules', async ({ page }) => {
+test('final Admin modules are discoverable from More while secondary routes keep More active', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockSession(page);
   await page.goto('/staff');
@@ -220,9 +222,9 @@ test('P01 secondary routes keep More active while hiding unshipped modules', asy
   await mobile.getByRole('link', { name: 'More' }).click();
   await expect(page.getByRole('heading', { name: 'More' })).toBeVisible();
   await expect(page.getByRole('link', { name: /Staff/ }).first()).toBeVisible();
-  await expect(page.getByText('WhatsApp')).toHaveCount(0);
-  await expect(page.getByText('Devices / Operations')).toHaveCount(0);
-  await expect(page.getByText('Alerts')).toHaveCount(0);
+  for (const label of ['WhatsApp', 'Devices / Operations', 'Alerts']) {
+    await expect(page.locator('.admin-more-card').filter({ hasText: label })).toBeVisible();
+  }
   await page.screenshot({ path: 'test-results/p01-mobile-more-390.png' });
 });
 
@@ -236,17 +238,23 @@ test('P01 desktop navigation groups Catalog under Operations and preserves selec
   await expect(main.getByRole('heading', { name: 'Catalog' })).toBeVisible();
   const nav = page.locator('[data-admin-desktop-nav]');
   await expect(nav.getByRole('link', { name: 'Catalog' })).toHaveAttribute('aria-current', 'page');
-  await expect(nav.getByText('Operations')).toBeVisible();
+  await expect(nav.getByRole('heading', { name: 'Operations', exact: true })).toBeVisible();
   await expect(nav.getByRole('link', { name: 'Catalog' })).toBeVisible();
-  await expect(nav.getByText('WhatsApp')).toHaveCount(0);
-  await expect(nav.getByText('Devices / Operations')).toHaveCount(0);
-  await expect(nav.getByText('Alerts')).toHaveCount(0);
+  await expect(nav.getByRole('heading', { name: 'Monitoring & messaging' })).toBeVisible();
+  await expect(nav.getByRole('link', { name: 'WhatsApp' })).toBeVisible();
+  await expect(nav.getByRole('link', { name: 'Devices / Operations' })).toBeVisible();
+  await expect(nav.getByRole('link', { name: 'Alerts' })).toBeVisible();
   await page.screenshot({ path: 'test-results/p01-desktop-sidebar-catalog-active.png' });
 });
 
-test('P01 future-module deep links are honest instead of acting shipped', async ({ page }) => {
+test('P08 Alerts deep link renders the shipped page while later checkpoint routes stay honest', async ({
+  page,
+}) => {
   await mockSession(page);
   await page.goto('/alerts');
+  await expect(page.getByRole('heading', { name: 'Alerts' })).toBeVisible();
+  await expect(page.getByText('Planned capability')).toHaveCount(0);
+  await page.goto('/devices');
   await expect(page.getByText('Planned capability')).toBeVisible();
   await expect(page.getByText(/not available in the current TUX Admin release/i)).toBeVisible();
 });
