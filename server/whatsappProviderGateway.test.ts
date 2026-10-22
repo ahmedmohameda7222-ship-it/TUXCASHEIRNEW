@@ -149,6 +149,44 @@ describe('Task 8D template provider payload', () => {
       },
     });
   });
+
+  it('adds only bounded canonical body parameters for an automatic template', async () => {
+    let capturedInit: RequestInit | undefined;
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      capturedInit = init;
+      return new Response(JSON.stringify({ messages: [{ id: 'wamid.template-2' }] }), {
+        status: 200,
+      });
+    });
+    const gateway = createWhatsAppProviderGateway(
+      { graphVersion: 'v23.0', accessToken: 'server-secret' },
+      fetchMock as unknown as typeof fetch,
+    );
+    await gateway.sendMessage({
+      providerPhoneNumberId: 'provider-phone-1',
+      to: '01012345678',
+      kind: 'TEMPLATE',
+      providerTemplateName: 'order_accepted',
+      languageCode: 'ar_EG',
+      variables: ['Ahmed', '42', 'ACCEPTED', 'TUX Maadi', 'Maadi'],
+    });
+    expect(JSON.parse(String(capturedInit?.body))).toMatchObject({
+      template: {
+        components: [
+          {
+            type: 'body',
+            parameters: [
+              { type: 'text', text: 'Ahmed' },
+              { type: 'text', text: '42' },
+              { type: 'text', text: 'ACCEPTED' },
+              { type: 'text', text: 'TUX Maadi' },
+              { type: 'text', text: 'Maadi' },
+            ],
+          },
+        ],
+      },
+    });
+  });
 });
 
 describe('Task 9B inbound provider media fetch', () => {
