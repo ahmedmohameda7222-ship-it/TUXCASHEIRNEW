@@ -1,4 +1,6 @@
-import { capturePremiumScreenshot, premiumVisualViewports } from './premiumVisualEvidence';
+import { capturePremiumScreenshot, premiumVisualViewports   captureTargetedAcceptance,
+  verifyTargetedVisualLayout,
+} from './premiumVisualEvidence';
 import { expect, test, type Page } from '@playwright/test';
 
 const shopId = '11111111-1111-4111-8111-111111111111';
@@ -203,4 +205,22 @@ for (const vp of premiumVisualViewports([
     ).toBe(true);
     await capturePremiumScreenshot(page, 'reports');
   });
+}
+
+
+if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
+  for (const width of [390, 1440] as const) {
+    for (const theme of ['light', 'dark'] as const) {
+      for (const entry of ['cold', 'warm'] as const) {
+        test(`targeted P07 reports ${theme} ${entry} ${width}px`, async ({ page }) => {
+          await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+          await mockReports(page);
+          await verifyTargetedVisualLayout(page, {
+            route: '/reports', heading: 'Reports', theme, entry,
+          });
+          await captureTargetedAcceptance(page, 'p07', 'reports', theme, entry);
+        });
+      }
+    }
+  }
 }
