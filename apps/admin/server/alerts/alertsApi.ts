@@ -44,7 +44,15 @@ function parseQuery(request: AdminRequest): AlertsReadInput {
     }
     values[key] = url.searchParams.get(key)!;
   }
-  return querySchema.parse(values);
+  const parsed = querySchema.parse(values);
+  return {
+    shopId: parsed.shopId,
+    limit: parsed.limit,
+    ...(parsed.source === undefined ? {} : { source: parsed.source }),
+    ...(parsed.severity === undefined ? {} : { severity: parsed.severity }),
+    ...(parsed.state === undefined ? {} : { state: parsed.state }),
+    ...(parsed.cursor === undefined ? {} : { cursor: parsed.cursor }),
+  };
 }
 
 function errorShape(error: unknown): { name?: string; code?: string; status?: number } {
