@@ -19,3 +19,4 @@ export * from './reports';
 export * from './alerts.js';
 export * from './operationsHealth.js';
 export * from './operationsDaily.js';
+export * from './whatsapp.js';

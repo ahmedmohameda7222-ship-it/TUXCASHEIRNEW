@@ -66,7 +66,7 @@ create function auth.uid() returns uuid language sql stable as $$ select nullif(
 `], 'fixture reset');
 
 const migrations = readdirSync(resolve('supabase/migrations')).filter((name) => /^\d+_.+\.sql$/.test(name)).sort();
-const target = migrations.find((name) => name.endsWith('_admin_whatsapp_control.sql'));
+const target = migrations.find((name) => name.endsWith('_admin_whatsapp_commands.sql'));
 if (!target) throw new Error('Admin WhatsApp control migration missing.');
 for (const migration of migrations.slice(0, migrations.indexOf(target) + 1)) {
   psql(['-f', resolve('supabase/migrations', migration)], migration);
@@ -129,6 +129,13 @@ if (leaseOne.length !== 1 || leaseTwo.length !== 0) throw new Error('Lease owner
 psql(['-c', `update public.whatsapp_event_send_intents set status='UNCERTAIN',lease_owner=null,lease_token=null,lease_until=null where id='${intentA}'`], 'mark uncertain');
 const uncertainLease = JSON.parse(scalar(`select coalesce(jsonb_agg(x),'[]'::jsonb)::text from public.lease_whatsapp_event_send_intents_v1('worker-c','token-c',10,60) x`, 'uncertain lease'));
 if (uncertainLease.length !== 0) throw new Error('UNCERTAIN intent became eligible for resend.');
+
+const staleCommand = JSON.parse(scalar(`select public.manage_admin_whatsapp_v1('${B1}','${A1}','${S1}','channel-stale',99,'channel.assign',jsonb_build_object('channelId','${CH1}'))::text`, 'stale CAS'));
+if (staleCommand.ok !== false || staleCommand.code !== 'stale_version') throw new Error('Stale Admin WhatsApp CAS was not rejected.');
+const channelCommand = JSON.parse(scalar(`select public.manage_admin_whatsapp_v1('${B1}','${A1}','${S1}','channel-1',1,'channel.assign',jsonb_build_object('channelId','${CH1}'))::text`, 'channel assignment'));
+const channelReplay = JSON.parse(scalar(`select public.manage_admin_whatsapp_v1('${B1}','${A1}','${S1}','channel-1',1,'channel.assign',jsonb_build_object('channelId','${CH1}'))::text`, 'channel replay'));
+if (!channelCommand.ok || channelCommand.version !== 2 || channelReplay.replayed !== true) throw new Error('Admin WhatsApp command CAS/replay failed.');
+if (scalar(`select count(*) from public.admin_audit_events where business_id='${B1}' and action_type='WHATSAPP_CHANNEL_ASSIGN'`, 'WhatsApp audit count') !== '1') throw new Error('WhatsApp command audit was not append-only/idempotent.');
 
 if (scalar(`select has_table_privilege('authenticated','public.whatsapp_event_send_intents','SELECT')`, 'least privilege') !== 'f') throw new Error('Authenticated role unexpectedly has direct intent access.');
 console.log('Admin WhatsApp control PostgreSQL isolation, attribution, dedupe and lease invariants passed; provider calls: 0.');
