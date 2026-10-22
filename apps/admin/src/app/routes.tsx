@@ -13,6 +13,24 @@ const ApprovalsPage = lazy(() =>
 const AlertsPage = lazy(() =>
   import('../alerts/AlertsPage').then((module) => ({ default: module.AlertsPage })),
 );
+const ShopHealthPage = lazy(() =>
+  import('../operations/ShopHealthPage').then((module) => ({ default: module.ShopHealthPage })),
+);
+const DevicesPage = lazy(() =>
+  import('../operations/DevicesPage').then((module) => ({ default: module.DevicesPage })),
+);
+const DeviceDetailPage = lazy(() =>
+  import('../operations/DeviceDetailPage').then((module) => ({ default: module.DeviceDetailPage })),
+);
+const PrintersPage = lazy(() =>
+  import('../operations/PrintersPage').then((module) => ({ default: module.PrintersPage })),
+);
+const OpeningClosingPage = lazy(() =>
+  import('../operations/OpeningClosingPage').then((module) => ({ default: module.OpeningClosingPage })),
+);
+const ManagerLogPage = lazy(() =>
+  import('../operations/ManagerLogPage').then((module) => ({ default: module.ManagerLogPage })),
+);
 const AuditPage = lazy(() =>
   import('../audit/AuditPage').then((module) => ({ default: module.AuditPage })),
 );
@@ -144,6 +162,14 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   if (route.path === '/approvals/rules') return <ApprovalRulesPage />;
   if (route.path === '/approvals') return <ApprovalsPage />;
   if (route.path === '/alerts') return <AlertsPage />;
+  if (route.path === '/devices') {
+    if (location === '/devices') return <ShopHealthPage />;
+    if (location === '/devices/list') return <DevicesPage />;
+    if (location === '/devices/printers') return <PrintersPage />;
+    if (location === '/devices/opening-closing') return <OpeningClosingPage />;
+    if (location === '/devices/manager-log') return <ManagerLogPage />;
+    return <DeviceDetailPage />;
+  }
   if (route.path === '/audit') return <AuditPage />;
   if (route.path === '/inventory') return <InventoryPage />;
   if (route.path === '/orders') return <OrdersPage />;

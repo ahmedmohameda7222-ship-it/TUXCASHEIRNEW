@@ -41,3 +41,4 @@ Thumbs.db
 # temporary
 .tmp/
 temp/
+supabase/.temp/

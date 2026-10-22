@@ -822,6 +822,14 @@ export default async function handler(
     await (await import('../../server/alerts/alertsApi.js')).handleAlertsRequest(request, response);
     return;
   }
+  if (routedUrl.searchParams.get('__adminResource') === 'operations-health') {
+    routedUrl.searchParams.delete('__adminResource');
+    request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
+    await (
+      await import('../../server/operations/operationsHealthApi.js')
+    ).handleOperationsHealthRequest(request, response);
+    return;
+  }
   if (routedUrl.searchParams.get('__adminResource') === 'finance') {
     routedUrl.searchParams.delete('__adminResource');
     request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');

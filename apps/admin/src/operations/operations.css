@@ -1,0 +1,54 @@
+.admin-operations-workspace { min-width: 0; display: grid; gap: 18px; }
+.admin-health-hero { display: flex; justify-content: space-between; gap: 18px; padding: 20px; border: 1px solid var(--tux-border-subtle); border-radius: var(--tux-radius-lg); background: var(--tux-surface-panel); }
+.admin-health-hero > div { display: grid; gap: 7px; }
+.admin-health-hero > div:last-child { text-align: right; color: var(--tux-text-secondary); }
+.admin-operations-links { display: flex; flex-wrap: wrap; gap: 10px; }
+.admin-health-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.admin-health-card { min-width: 0; display: grid; gap: 12px; padding: 18px; border: 1px solid var(--tux-border-subtle); border-radius: var(--tux-radius-lg); background: var(--tux-surface-panel); }
+.admin-health-card > div { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.admin-health-card h2, .admin-health-card p { margin: 0; overflow-wrap: anywhere; }
+.admin-health-card h2 { font-size: 18px; }
+.admin-health-card p, .admin-health-card time, .admin-health-card__unknown { color: var(--tux-text-secondary); }
+.admin-health-state { display: inline-flex; width: fit-content; max-width: 100%; padding: 5px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; text-transform: capitalize; overflow-wrap: anywhere; }
+.admin-health-state--healthy, .admin-health-state--active { color: var(--tux-success); background: color-mix(in srgb, var(--tux-success) 12%, var(--tux-surface-panel)); }
+.admin-health-state--critical, .admin-health-state--revoked { color: var(--tux-destructive); background: color-mix(in srgb, var(--tux-destructive) 12%, var(--tux-surface-panel)); }
+.admin-health-state--attention, .admin-health-state--stale, .admin-health-state--expired { color: var(--tux-warning); background: color-mix(in srgb, var(--tux-warning) 12%, var(--tux-surface-panel)); }
+.admin-health-state--unknown, .admin-health-state--not_configured { color: var(--tux-text-secondary); background: var(--tux-surface-muted); }
+.admin-device-search { max-width: 520px; }
+.admin-device-search input { width: 100%; }
+.admin-device-list { display: grid; gap: 10px; }
+.admin-device-row { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; border: 1px solid var(--tux-border-subtle); border-radius: var(--tux-radius-lg); background: var(--tux-surface-panel); color: inherit; text-decoration: none; }
+.admin-device-row:hover { border-color: var(--tux-accent); }
+.admin-device-row > div { min-width: 0; display: grid; gap: 5px; }
+.admin-device-row > div:last-child { justify-items: end; text-align: right; color: var(--tux-text-secondary); }
+.admin-device-row code, .admin-device-detail code { overflow-wrap: anywhere; white-space: normal; }
+.admin-device-detail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.admin-device-detail > div { min-width: 0; padding: 16px; border: 1px solid var(--tux-border-subtle); border-radius: var(--tux-radius-lg); background: var(--tux-surface-panel); }
+.admin-device-detail dt { color: var(--tux-text-secondary); font-size: 13px; }
+.admin-device-detail dd { margin: 6px 0 0; font-weight: 700; overflow-wrap: anywhere; }
+.admin-device-controls, .admin-printer-status { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px; border: 1px solid var(--tux-border-subtle); border-radius: var(--tux-radius-lg); background: var(--tux-surface-panel); }
+.admin-device-controls h2, .admin-device-controls p, .admin-printer-status h2, .admin-printer-status p { margin: 0; }
+.admin-device-controls > div:first-child, .admin-printer-status > div { display: grid; gap: 7px; min-width: 0; }
+.admin-device-controls > div:last-child { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.admin-device-controls p, .admin-printer-status p { color: var(--tux-text-secondary); overflow-wrap: anywhere; }
+@media (max-width: 700px) { .admin-health-hero, .admin-device-row { display: grid; } .admin-health-hero > div:last-child, .admin-device-row > div:last-child { justify-items: start; text-align: left; } .admin-health-grid, .admin-device-detail { grid-template-columns: minmax(0, 1fr); } .admin-operations-links .admin-secondary-button { width: 100%; text-align: center; } }
+@media (max-width: 700px) { .admin-device-controls, .admin-printer-status { display: grid; } .admin-device-controls > div:last-child { display: grid; justify-content: stretch; } .admin-device-controls button, .admin-printer-status button { width: 100%; } }
+.admin-checklist-tabs { display: flex; gap: 8px; }
+.admin-checklist-tabs button { min-height: 42px; padding: 8px 14px; border: 1px solid var(--tux-border-subtle); border-radius: 999px; background: var(--tux-surface-panel); color: var(--tux-text-primary); }
+.admin-checklist-tabs button[aria-pressed='true'] { border-color: var(--tux-accent); background: var(--tux-accent-soft); color: var(--tux-accent-text); }
+.admin-checklist-panel, .admin-manager-note { display: grid; gap: 16px; padding: 18px; border: 1px solid var(--tux-border-subtle); border-radius: var(--tux-radius-lg); background: var(--tux-surface-panel); }
+.admin-checklist-panel > header, .admin-manager-note > div { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+.admin-checklist-panel h2, .admin-checklist-panel p { margin: 0; }
+.admin-checklist-panel header > div { display: grid; gap: 4px; }
+.admin-checklist-items { display: grid; gap: 8px; }
+.admin-checklist-items label { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: var(--tux-radius-md); background: var(--tux-surface-muted); }
+.admin-checklist-items input { width: 20px; height: 20px; flex: 0 0 auto; }
+.admin-checklist-items span { display: grid; gap: 3px; overflow-wrap: anywhere; }
+.admin-checklist-items small, .admin-manager-note > div > span { color: var(--tux-text-secondary); }
+.admin-checklist-warning { color: var(--tux-destructive); }
+.admin-manager-note textarea { width: 100%; resize: vertical; }
+.admin-manager-log { display: grid; gap: 10px; }
+.admin-manager-log article { min-width: 0; display: grid; gap: 12px; padding: 16px; border: 1px solid var(--tux-border-subtle); border-radius: var(--tux-radius-lg); background: var(--tux-surface-panel); }
+.admin-manager-log p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.admin-manager-log footer { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--tux-text-secondary); font-size: 13px; }
+@media (max-width: 500px) { .admin-checklist-panel > header, .admin-manager-note > div { align-items: stretch; display: grid; } .admin-manager-note button, .admin-checklist-panel > button { width: 100%; } }

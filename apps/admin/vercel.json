@@ -55,6 +55,10 @@
       "dest": "/api/admin/orders?__adminResource=alerts"
     },
     {
+      "src": "/api/admin/operations-health",
+      "dest": "/api/admin/orders?__adminResource=operations-health"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
