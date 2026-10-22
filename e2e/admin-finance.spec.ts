@@ -2,6 +2,8 @@ import {
   capturePremiumScreenshot,
   premiumVisualViewports,
   PREMIUM_EVIDENCE_VIEWPORTS,
+  captureTargetedAcceptance,
+  verifyTargetedVisualLayout,
 } from './premiumVisualEvidence';
 import { expect, test, type Page } from '@playwright/test';
 
@@ -486,6 +488,24 @@ if (process.env['P04_P07_CAPTURE'] === '1') {
         expect(commands).toHaveLength(0);
         await capturePremiumScreenshot(page, 'end-day-' + scenario.label);
       });
+    }
+  }
+}
+
+
+if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
+  for (const width of [390, 1440] as const) {
+    for (const theme of ['light', 'dark'] as const) {
+      for (const entry of ['cold', 'warm'] as const) {
+        test(`targeted P07 finance ${theme} ${entry} ${width}px`, async ({ page }) => {
+          await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+          await mockFinance(page);
+          await verifyTargetedVisualLayout(page, {
+            route: '/finance', heading: 'Finance', theme, entry,
+          });
+          await captureTargetedAcceptance(page, 'p07', 'finance', theme, entry);
+        });
+      }
     }
   }
 }
