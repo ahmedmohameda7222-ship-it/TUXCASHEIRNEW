@@ -29,7 +29,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Verify exact PR HEAD
-        run: test "$(git rev-parse HEAD)" = "$P04_P07_HEAD_SHA"
+        # Checkout on the host is owned by the runner, not the container user.
+        # Trust only this checkout path for this single git invocation.
+        run: test "$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)" = "$P04_P07_HEAD_SHA"
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
