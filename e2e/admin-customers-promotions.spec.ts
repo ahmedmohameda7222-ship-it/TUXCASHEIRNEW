@@ -418,3 +418,27 @@ if (process.env['P04_P07_CAPTURE'] === '1') {
     });
   }
 }
+
+if (process.env['P04_P07_CAPTURE'] === '1') {
+  for (const viewport of PREMIUM_EVIDENCE_VIEWPORTS) {
+    test('customer empty scene at ' + viewport.width + 'px', async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.route('**/api/admin/customers**', async (route) => {
+        const url = new URL(route.request().url());
+        if (route.request().method() === 'GET' && url.searchParams.get('view') === 'customers') {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ customers: [] }),
+          });
+          return;
+        }
+        await route.fallback();
+      });
+      await page.goto('/customers');
+      await expect(page.getByText('No matching customers')).toBeVisible();
+      await expect(page.getByRole('button', { name: /Mona/ })).toHaveCount(0);
+      await capturePremiumScreenshot(page, 'crm-empty');
+    });
+  }
+}

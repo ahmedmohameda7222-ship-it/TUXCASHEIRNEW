@@ -1,4 +1,8 @@
-import { capturePremiumScreenshot, premiumVisualViewports } from './premiumVisualEvidence';
+import {
+  capturePremiumScreenshot,
+  premiumVisualViewports,
+  PREMIUM_EVIDENCE_VIEWPORTS,
+} from './premiumVisualEvidence';
 import type { AdminOrderDetail, AdminOrderSummary } from '@tux/admin-contracts';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
@@ -117,7 +121,10 @@ function summary(order: AdminOrderDetail): AdminOrderSummary {
   };
 }
 
-async function mockOrders(page: Page, options: { staleCancellation?: boolean } = {}) {
+async function mockOrders(
+  page: Page,
+  options: { staleCancellation?: boolean; emptyOrders?: boolean } = {},
+) {
   let active = detail({
     id: activeOrderId,
     status: 'ACTIVE',
@@ -228,7 +235,7 @@ async function mockOrders(page: Page, options: { staleCancellation?: boolean } =
       const term = (url.searchParams.get('q') ?? '').toLowerCase();
       const statuses = url.searchParams.getAll('status');
       const source = url.searchParams.get('source');
-      const rows = [active, done]
+      const rows = (options.emptyOrders ? [] : [active, done])
         .filter((order) => statuses.length === 0 || statuses.includes(order.status))
         .filter((order) => !source || order.source === source)
         .filter((order) => {
@@ -588,4 +595,17 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     ).toBe(true);
     await capturePremiumScreenshot(page, 'orders');
   });
+}
+
+if (process.env['P04_P07_CAPTURE'] === '1') {
+  for (const viewport of PREMIUM_EVIDENCE_VIEWPORTS) {
+    test('orders empty shop scope scene at ' + viewport.width + 'px', async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await mockOrders(page, { emptyOrders: true });
+      await page.goto('/orders');
+      await expect(page.getByText('No matching orders')).toBeVisible();
+      await expect(page.getByRole('button', { name: /#101/ })).toHaveCount(0);
+      await capturePremiumScreenshot(page, 'orders-empty');
+    });
+  }
 }

@@ -1,3 +1,4 @@
+import './reorderSuggestions.css';
 import type { AdminInventoryReorderSuggestion } from '@tux/admin-contracts';
 import { useState } from 'react';
 

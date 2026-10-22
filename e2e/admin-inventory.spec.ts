@@ -612,10 +612,37 @@ if (process.env['P04_P07_CAPTURE'] === '1') {
       await page.getByRole('button', { name: 'Reorder suggestions' }).click();
       await page.getByRole('button', { name: 'Edit policy for Beef' }).click();
       await expect(page.getByLabel('Par level (kg)')).toBeVisible();
+      const policyForm = page.locator('.admin-inventory-policy-form');
+      await expect(policyForm).toBeVisible();
+      expect(await policyForm.evaluate((node) => getComputedStyle(node).display)).toBe('grid');
+      const parField = policyForm.getByLabel('Par level (kg)');
+      expect(await parField.evaluate((node) => getComputedStyle(node).width)).not.toBe('auto');
+      const savePolicy = policyForm.getByRole('button', { name: 'Save policy' });
+      await savePolicy.scrollIntoViewIfNeeded();
+      if (viewport.width <= 390) {
+        const occluded = await page.evaluate(() => {
+          const action = document.querySelector(
+            '.admin-inventory-policy-form button[type="submit"]',
+          );
+          const nav = document.querySelector('.admin-mobile-tabs');
+          if (!action || !nav) return true;
+          const rect = action.getBoundingClientRect();
+          const navRect = nav.getBoundingClientRect();
+          return rect.bottom > navRect.top || rect.top < 0 || rect.right > window.innerWidth;
+        });
+        expect(occluded).toBe(false);
+      }
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true);
       expect(fixture.commands).toHaveLength(0);
+      // Capture from the top after checking that the last action is accessible.
+      // Fixed shell chrome would otherwise appear halfway down full-page PNGs.
+      await page.evaluate(() => {
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+        window.scrollTo(0, 0);
+      });
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
       await capturePremiumScreenshot(page, 'reorder-policy');
     });
   }
