@@ -11,6 +11,12 @@ permissions:
 jobs:
   exact-head-p04-p07:
     runs-on: ubuntu-24.04
+    # Official Microsoft Playwright image pins the browser and system dependencies
+    # to the project's @playwright/test version. Avoid flaky CDN downloads,
+    # without disabling TLS verification or altering the mocked browser tests.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --ipc=host
     timeout-minutes: 40
     env:
       CI: '1'
@@ -30,8 +36,6 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
       - name: Capture mocked six-width wave scenes
         run: |
           mkdir -p artifacts/p04-p07
