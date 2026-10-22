@@ -501,7 +501,7 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
           await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
           await mockFinance(page);
           await verifyTargetedVisualLayout(page, {
-            route: '/finance', heading: 'Finance', theme, entry,
+            route: '/finance', heading: 'Bank & Cash', theme, entry,
           });
           await captureTargetedAcceptance(page, 'p07', 'finance', theme, entry);
         });
