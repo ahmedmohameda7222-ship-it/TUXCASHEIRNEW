@@ -57,7 +57,8 @@ function channelLuminance(c: number) {
 }
 
 function rgbLuminance(color: string): number {
-  const hex = /^#([0-9a-f]{6})$/i.exec(color.trim());
+  const expanded = color.replace(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i, '#$1$1$2$2$3$3');
+  const hex = /^#([0-9a-f]{6})$/i.exec(expanded.trim());
   const channels = hex
     ? [0, 2, 4].map((index) => Number.parseInt(hex[1]!.slice(index, index + 2), 16))
     : color
