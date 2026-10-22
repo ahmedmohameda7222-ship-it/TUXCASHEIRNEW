@@ -57,7 +57,10 @@ function channelLuminance(c: number) {
 }
 
 function rgbLuminance(color: string): number {
-  const channels = color.match(/[\\d.]+/g)?.slice(0, 3).map(Number);
+  const hex = /^#([0-9a-f]{6})$/i.exec(color.trim());
+  const channels = hex
+    ? [0, 2, 4].map((index) => Number.parseInt(hex[1]!.slice(index, index + 2), 16))
+    : color.match(/[\d.]+/g)?.slice(0, 3).map(Number);
   if (!channels || channels.length !== 3) throw new Error(`Unexpected CSS color: ${color}`);
   return 0.2126 * channelLuminance(channels[0]!) +
     0.7152 * channelLuminance(channels[1]!) +
