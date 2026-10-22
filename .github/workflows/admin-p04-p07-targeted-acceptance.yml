@@ -1,0 +1,104 @@
+name: P04-P07 Targeted Final Acceptance
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/**'
+      - 'e2e/admin-*.spec.ts'
+      - 'e2e/premiumVisualEvidence.ts'
+      - '.github/workflows/admin-p04-p07-targeted-acceptance.yml'
+permissions:
+  contents: read
+jobs:
+  focused-light-dark-cold-warm:
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --ipc=host
+    timeout-minutes: 45
+    env:
+      CI: '1'
+      TZ: Africa/Cairo
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      P04_P07_TARGETED_CAPTURE: '1'
+      P04_P07_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Confirm exact PR HEAD
+        run: test "$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)" = "$P04_P07_HEAD_SHA"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install pinned dependencies
+        run: npm ci
+      - name: Run focused Chromium acceptance for all four waves
+        run: |
+          mkdir -p artifacts/p04-p07-targeted
+          npx playwright test --config playwright.admin.config.ts \
+            e2e/admin-inventory.spec.ts e2e/admin-purchasing.spec.ts \
+            e2e/admin-orders.spec.ts e2e/admin-customers-promotions.spec.ts \
+            e2e/admin-workforce.spec.ts e2e/admin-finance.spec.ts e2e/admin-reports.spec.ts \
+            --grep 'targeted P0[4-7]'
+      - name: Verify actual screenshots, dimensions and SHA256 hashes
+        if: always()
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const crypto = require('node:crypto');
+          const directory = 'artifacts/p04-p07-targeted';
+          fs.mkdirSync(directory, {recursive: true});
+          const waves = {
+            p04: ['inventory', 'purchasing'],
+            p05: ['orders', 'crm'],
+            p06: ['staff', 'permissions'],
+            p07: ['finance', 'reports'],
+          };
+          const screenshots = [];
+          const missing = [];
+          for (const [wave, scenes] of Object.entries(waves)) {
+            for (const scene of scenes) {
+              for (const theme of ['light', 'dark']) {
+                for (const entry of ['cold', 'warm']) {
+                  for (const [width, height] of [[390,844],[1440,900]]) {
+                    const file = [wave, scene, theme, entry, width+'x'+height].join('-') + '.png';
+                    const path = directory + '/' + file;
+                    if (!fs.existsSync(path)) { missing.push(file); continue; }
+                    const bytes = fs.readFileSync(path);
+                    if (bytes.length < 100 || bytes.subarray(0,8).toString('hex') !== '89504e470d0a1a0a')
+                      throw Error('Invalid PNG ' + file);
+                    const actualWidth = bytes.readUInt32BE(16);
+                    const actualHeight = bytes.readUInt32BE(20);
+                    if (actualWidth !== width || actualHeight < height)
+                      throw Error('Unexpected screenshot dimensions ' + file);
+                    screenshots.push({file, wave, scene, theme, entry, width:actualWidth,
+                      height:actualHeight, sha256:crypto.createHash('sha256').update(bytes).digest('hex')});
+                  }
+                }
+              }
+            }
+          }
+          const extra = fs.readdirSync(directory).filter(
+            f => f.endsWith('.png') && !screenshots.some(s => s.file === f)
+          );
+          const manifest = {exactHeadSha:process.env.P04_P07_HEAD_SHA,
+            source:'Mock-authenticated Chromium; not hosted Owner UAT',
+            expectedCount:64, observedCount:screenshots.length, missing, extra, screenshots};
+          fs.writeFileSync(directory+'/SCREENSHOT_MANIFEST.json',JSON.stringify(manifest,null,2)+'\n');
+          fs.writeFileSync(directory+'/SHA256SUMS.txt',
+            screenshots.map(s=>s.sha256+'  '+s.file).join('\n')+'\n');
+          if (missing.length || extra.length || screenshots.length !== 64)
+            throw Error('Targeted visual evidence incomplete: expected 64, got '+screenshots.length+
+              ' missing '+missing.length+' extra '+extra.length);
+          NODE
+      - name: Upload exact-head targeted Chromium evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tux-p04-p07-final-targeted-${{ github.event.pull_request.head.sha }}
+          path: |
+            artifacts/p04-p07-targeted/
+            playwright-report-admin/
+            test-results/
+          if-no-files-found: error
