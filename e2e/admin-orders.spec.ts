@@ -2,6 +2,8 @@ import {
   capturePremiumScreenshot,
   premiumVisualViewports,
   PREMIUM_EVIDENCE_VIEWPORTS,
+  captureTargetedAcceptance,
+  verifyTargetedVisualLayout,
 } from './premiumVisualEvidence';
 import type { AdminOrderDetail, AdminOrderSummary } from '@tux/admin-contracts';
 import { expect, test, type Page, type Route } from '@playwright/test';
@@ -791,5 +793,23 @@ if (process.env['P04_P07_CAPTURE'] === '1') {
       await expect(page.getByRole('button', { name: /#101/ })).toHaveCount(0);
       await capturePremiumScreenshot(page, 'orders-empty');
     });
+  }
+}
+
+
+if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
+  for (const width of [390, 1440] as const) {
+    for (const theme of ['light', 'dark'] as const) {
+      for (const entry of ['cold', 'warm'] as const) {
+        test(`targeted P05 orders ${theme} ${entry} ${width}px`, async ({ page }) => {
+          await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+          await mockOrders(page);
+          await verifyTargetedVisualLayout(page, {
+            route: '/orders', heading: 'Orders', theme, entry,
+          });
+          await captureTargetedAcceptance(page, 'p05', 'orders', theme, entry);
+        });
+      }
+    }
   }
 }
