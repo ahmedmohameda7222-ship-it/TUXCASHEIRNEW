@@ -1,3 +1,9 @@
+import {
+  capturePremiumScreenshot,
+  premiumVisualViewports,
+  captureTargetedAcceptance,
+  verifyTargetedVisualLayout,
+} from './premiumVisualEvidence';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { AdminSupplier } from '@tux/admin-contracts';
 import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
@@ -18,6 +24,7 @@ const session = {
     role: 'OWNER',
     permissions: ['purchasing.view', 'purchasing.manage', 'purchasing.receive', 'inventory.view'],
     shopIds: [shopId],
+    shopSummaries: [{ id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false }],
   },
   csrfToken,
 };
@@ -45,6 +52,7 @@ async function mockPurchasing(
             id: supplierId,
             businessId: session.principal.businessId,
             name: 'Prime Foods',
+            version: 1,
             contactName: 'Sara',
             phone: '01000000000',
             email: 'orders@prime.test',
@@ -460,7 +468,7 @@ test('purchasing posts partial receiving and purchase returns without pretending
   );
 });
 
-for (const viewport of ADMIN_CORE_VIEWPORTS) {
+for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   test(`purchasing master-detail remains usable at ${viewport.name} width`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await mockPurchasing(page);
@@ -469,8 +477,19 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     const list = page.locator('.admin-master-detail__list');
     await list.getByRole('button', { name: /PO-100/ }).click();
     await expect(page.locator('.admin-master-detail__detail')).toBeVisible();
+    const header = page.locator('.admin-purchasing-order-header');
+    await expect(header).toBeVisible();
+    expect(await header.evaluate((node) => getComputedStyle(node).display)).toBe('flex');
+    expect(
+      await header
+        .locator('.admin-purchasing-order-header__identity')
+        .evaluate((node) => getComputedStyle(node).flexDirection),
+    ).toBe('column');
+    const actions = page.locator('.admin-purchasing-page-actions').first();
+    await expect(actions).toBeVisible();
+    expect(await actions.evaluate((node) => getComputedStyle(node).display)).toBe('flex');
 
-    if (viewport.name === 'phone') {
+    if (viewport.width <= 480) {
       await expect(list).toBeHidden();
       await expect(page.getByRole('link', { name: /back to purchasing/i })).toBeVisible();
     } else {
@@ -480,6 +499,7 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+    await capturePremiumScreenshot(page, 'purchasing');
   });
 }
 
@@ -528,6 +548,7 @@ for (const viewport of [
       path: `test-results/admin-stage1-supplier-${viewport.name}.png`,
       fullPage: true,
     });
+    await capturePremiumScreenshot(page, 'supplier-dialog');
     await page.keyboard.press('Escape');
     await expect(supplier).toBeHidden();
     await openPurchaseOrders(page);
@@ -548,6 +569,7 @@ for (const viewport of [
       path: `test-results/admin-stage1-purchase-order-${viewport.name}.png`,
       fullPage: true,
     });
+    await capturePremiumScreenshot(page, 'po-dialog');
   });
 }
 
@@ -638,3 +660,53 @@ test('shared Supplier and PO surfaces use dark theme tokens', async ({ page }) =
   await expect(page.getByRole('dialog', { name: 'New purchase order' })).toBeVisible();
   await page.screenshot({ path: 'test-results/admin-stage1-purchase-order-dark-phone.png' });
 });
+
+for (const viewport of premiumVisualViewports([{ name: 'desktop', width: 1440, height: 900 }])) {
+  test(
+    'supplier archive requires named confirmation at ' + viewport.width + 'px',
+    async ({ page }) => {
+      await page.setViewportSize(viewport);
+      const fixture = await mockPurchasing(page);
+      await page.goto('/purchasing');
+      await openSuppliers(page);
+      await page.getByRole('button', { name: 'Archive Prime Foods' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Archive supplier?' });
+      await expect(dialog).toContainText('Prime Foods');
+      await capturePremiumScreenshot(page, 'supplier-archive');
+      expect(
+        fixture.commands.filter((command) => command.type === 'supplier.archive'),
+      ).toHaveLength(0);
+      await dialog.getByRole('button', { name: 'Cancel' }).click();
+      expect(
+        fixture.commands.filter((command) => command.type === 'supplier.archive'),
+      ).toHaveLength(0);
+      await page.getByRole('button', { name: 'Archive Prime Foods' }).click();
+      await dialog.getByRole('button', { name: 'Archive supplier' }).click();
+      await expect
+        .poll(
+          () => fixture.commands.filter((command) => command.type === 'supplier.archive').length,
+        )
+        .toBe(1);
+    },
+  );
+}
+
+if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
+  for (const width of [390, 1440] as const) {
+    for (const theme of ['light', 'dark'] as const) {
+      for (const entry of ['cold', 'warm'] as const) {
+        test(`targeted P04 purchasing ${theme} ${entry} ${width}px`, async ({ page }) => {
+          await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+          await mockPurchasing(page);
+          await verifyTargetedVisualLayout(page, {
+            route: '/purchasing',
+            heading: 'Purchasing',
+            theme,
+            entry,
+          });
+          await captureTargetedAcceptance(page, 'p04', 'purchasing', theme, entry);
+        });
+      }
+    }
+  }
+}

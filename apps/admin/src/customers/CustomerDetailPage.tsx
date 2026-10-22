@@ -24,7 +24,10 @@ export function CustomerDetailPage({
   const [section, setSection] = useState<CustomerDetailSection>('overview');
 
   return (
-    <article aria-label={`Customer ${customer.displayName ?? customer.normalizedPhone}`}>
+    <article
+      className="admin-customer-detail"
+      aria-label={`Customer ${customer.displayName ?? customer.normalizedPhone}`}
+    >
       <header>
         <p className="admin-entry__eyebrow">Customer profile</p>
         <h2>{customer.displayName ?? 'Unnamed customer'}</h2>
@@ -41,7 +44,7 @@ export function CustomerDetailPage({
             label: 'Overview',
             content: (
               <>
-                <dl>
+                <dl className="admin-customer-detail__metrics">
                   <div>
                     <dt>Order history</dt>
                     <dd>
@@ -73,7 +76,7 @@ export function CustomerDetailPage({
             id: 'orders',
             label: 'Orders',
             content: (
-              <dl>
+              <dl className="admin-customer-detail__metrics">
                 <div>
                   <dt>All orders</dt>
                   <dd>{customer.orderCount}</dd>

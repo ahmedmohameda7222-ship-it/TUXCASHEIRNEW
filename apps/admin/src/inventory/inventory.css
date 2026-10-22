@@ -279,3 +279,56 @@
   border-radius: var(--tux-radius-control);
   background: var(--tux-surface-panel);
 }
+
+.admin-inventory-policy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tux-space-3);
+  grid-column: 1 / -1;
+}
+.admin-inventory-policy-actions > button {
+  min-height: var(--tux-touch-target);
+}
+@media (max-width: 480px) {
+  .admin-inventory-policy-actions > button {
+    flex: 1 1 100%;
+  }
+}
+
+.admin-inventory-binding-preview {
+  padding: 1rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 0.875rem;
+}
+.admin-inventory-binding-preview dl {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+.admin-inventory-binding-preview dt {
+  font-size: 0.8125rem;
+  color: var(--tux-text-secondary);
+}
+.admin-inventory-binding-preview dd {
+  margin: 0.25rem 0 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.admin-inventory-empty-state {
+  display: grid;
+  gap: 0.5rem;
+  align-content: center;
+  justify-items: center;
+  min-height: 7.5rem;
+  padding: 1rem;
+  border: 1px dashed var(--tux-border-strong);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-subtle);
+  color: var(--tux-text-secondary);
+  text-align: center;
+}
+.admin-inventory-empty-state strong {
+  color: var(--tux-text-primary);
+}

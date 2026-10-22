@@ -40,5 +40,8 @@ describe('ReorderSuggestionsPage', () => {
     expect(html.toLowerCase()).toContain('3 days');
     expect(html.toLowerCase()).toContain('recommendation only');
     expect(html.toLowerCase()).toContain('does not create a purchase order');
+    expect(html).toContain('Edit policy');
+    expect(html).toContain('Reorder trigger');
+    expect(html).not.toContain('admin-inventory-policy-form');
   });
 });

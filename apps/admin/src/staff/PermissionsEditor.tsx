@@ -96,37 +96,56 @@ export function PermissionsEditor({
         Role defaults provide the normal access level. Use an override only when this employee needs
         an exception.
       </p>
+      <p role="status">
+        {employee.customPermissions.length} explicit allowance(s) and{' '}
+        {employee.customDeniedPermissions?.length ?? 0} explicit denial(s). Other capabilities
+        follow the assigned role default for this shop.
+      </p>
       <div className="admin-more-grid">
-        {permissionGroups.map(([group, permissions]) => (
-          <section className="admin-more-card" key={group}>
-            <h4>{groupLabels[group] ?? group}</h4>
-            {permissions.map((permission) => {
-              const value = employee.customPermissions.includes(permission)
-                ? 'ALLOW'
-                : employee.customDeniedPermissions?.includes(permission)
-                  ? 'DENY'
-                  : 'INHERIT';
-              return (
-                <label className="admin-field" key={permission}>
-                  <span>{permissionLabel(permission)}</span>
-                  <select
-                    value={value}
-                    disabled={!canManage}
-                    onChange={(event) => {
-                      const effect = event.target.value as 'ALLOW' | 'DENY' | 'INHERIT';
-                      if (onSensitiveCommand) setPendingChange({ permission, effect });
-                      else onCommand?.(command(permission, effect));
-                    }}
-                  >
-                    <option value="INHERIT">Role default</option>
-                    <option value="ALLOW">Allowed</option>
-                    <option value="DENY">Not allowed</option>
-                  </select>
-                </label>
-              );
-            })}
-          </section>
-        ))}
+        {permissionGroups.map(([group, permissions]) => {
+          const overrideCount = permissions.filter(
+            (permission) =>
+              employee.customPermissions.includes(permission) ||
+              employee.customDeniedPermissions?.includes(permission),
+          ).length;
+          return (
+            <details
+              className="admin-more-card admin-permission-group"
+              key={group}
+              open={overrideCount > 0}
+            >
+              <summary>
+                <strong>{groupLabels[group] ?? group}</strong>
+                <span>{overrideCount ? `${overrideCount} override(s)` : 'Role defaults'}</span>
+              </summary>
+              {permissions.map((permission) => {
+                const value = employee.customPermissions.includes(permission)
+                  ? 'ALLOW'
+                  : employee.customDeniedPermissions?.includes(permission)
+                    ? 'DENY'
+                    : 'INHERIT';
+                return (
+                  <label className="admin-field" key={permission}>
+                    <span>{permissionLabel(permission)}</span>
+                    <select
+                      value={value}
+                      disabled={!canManage}
+                      onChange={(event) => {
+                        const effect = event.target.value as 'ALLOW' | 'DENY' | 'INHERIT';
+                        if (onSensitiveCommand) setPendingChange({ permission, effect });
+                        else onCommand?.(command(permission, effect));
+                      }}
+                    >
+                      <option value="INHERIT">Role default</option>
+                      <option value="ALLOW">Allowed</option>
+                      <option value="DENY">Not allowed</option>
+                    </select>
+                  </label>
+                );
+              })}
+            </details>
+          );
+        })}
       </div>
       <AdminDialog
         open={pendingChange !== null}

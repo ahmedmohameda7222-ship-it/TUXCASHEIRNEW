@@ -1,0 +1,259 @@
+/* Customer list and empty-detail layout are owned by the lazy CRM route. */
+.admin-customers-list {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
+.admin-customer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  min-height: 72px;
+  padding: 0.9rem 1rem;
+  border: 0;
+  border-bottom: 1px solid var(--tux-border-subtle);
+  background: transparent;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.admin-customer-row:last-child {
+  border-bottom: 0;
+}
+.admin-customer-row:hover,
+.admin-customer-row.is-selected {
+  background: var(--tux-surface-subtle);
+}
+.admin-customer-row:focus-visible {
+  outline: 2px solid var(--tux-accent);
+  outline-offset: -3px;
+}
+.admin-customer-row > span:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.admin-customer-row strong,
+.admin-customer-row small {
+  overflow-wrap: anywhere;
+}
+.admin-customer-row small {
+  color: var(--tux-text-secondary);
+}
+.admin-customer-row > span:last-child {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+@media (min-width: 48rem) {
+  .admin-customers-master-detail:not([data-detail-active='true']) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-customers-master-detail:not([data-detail-active='true']) .admin-master-detail__detail {
+    display: none;
+  }
+}
+@media (max-width: 480px) {
+  .admin-customer-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+}
+
+/* CRM settings own their grouped controls on both cold and warmed deep links. */
+.admin-crm-loyalty-form {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+}
+.admin-crm-loyalty-form > p {
+  color: var(--tux-text-secondary);
+}
+.admin-crm-loyalty-fields {
+  display: grid;
+  gap: 0.875rem;
+  min-width: 0;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+}
+.admin-crm-loyalty-fields legend {
+  padding-inline: 0.375rem;
+  font-weight: 700;
+}
+.admin-crm-loyalty-fields .admin-field {
+  min-width: 0;
+}
+.admin-crm-saved-policy {
+  padding: 1rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-subtle);
+}
+.admin-crm-saved-policy h3 {
+  margin: 0 0 0.75rem;
+}
+.admin-crm-saved-policy dl {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+.admin-crm-saved-policy dl > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.admin-crm-saved-policy dt {
+  color: var(--tux-text-secondary);
+}
+.admin-crm-saved-policy dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Readable identity and metrics on cold Customer detail routes. */
+.admin-customer-detail {
+  min-width: 0;
+}
+.admin-customer-detail > header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+.admin-customer-detail > header h2,
+.admin-customer-detail > header p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.admin-customer-detail > header > p:last-child {
+  color: var(--tux-text-secondary);
+}
+.admin-customer-detail__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 0.75rem;
+  min-width: 0;
+  margin: 1rem 0;
+  padding: 0;
+}
+.admin-customer-detail__metrics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.875rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
+.admin-customer-detail__metrics dt {
+  color: var(--tux-text-secondary);
+  font-size: 0.8125rem;
+}
+.admin-customer-detail__metrics dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* Merge candidate selection and controls are CRM-owned on direct deep links. */
+.admin-customer-merge-list {
+  display: grid;
+  overflow: hidden;
+  min-width: 0;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+}
+.admin-customer-merge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+  gap: 0.75rem;
+  min-height: 4.25rem;
+  padding: 0.875rem;
+  border: 0;
+  border-bottom: 1px solid var(--tux-border-subtle);
+  background: var(--tux-surface-panel);
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.admin-customer-merge-row:last-child {
+  border-bottom: 0;
+}
+.admin-customer-merge-row:hover,
+.admin-customer-merge-row.is-selected {
+  background: var(--tux-surface-subtle);
+}
+.admin-customer-merge-row > span {
+  display: grid;
+  gap: 0.25rem;
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+.admin-customer-merge-row small {
+  color: var(--tux-text-secondary);
+}
+.admin-customer-merge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Customer tabs and segment identities belong to CRM, not route-order-dependent
+   shared More/grid styles. Fit every tab in the actual detail pane at 320–1440. */
+.admin-customer-detail .admin-tabs__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
+  gap: 0.375rem;
+  overflow: visible;
+}
+.admin-customer-detail .admin-tabs__tab {
+  min-width: 0;
+  flex: auto;
+  padding: 0.625rem 0.375rem;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.admin-customer-segments {
+  display: grid;
+  gap: 0.625rem;
+  min-width: 0;
+}
+.admin-customer-segments h3 {
+  margin: 0;
+}
+.admin-customer-segments__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.admin-customer-segments__tag {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 1.875rem;
+  padding: 0.3rem 0.625rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 0.625rem;
+  background: var(--tux-surface-subtle);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}

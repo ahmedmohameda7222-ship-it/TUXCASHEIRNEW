@@ -1,3 +1,9 @@
+import {
+  capturePremiumScreenshot,
+  premiumVisualViewports,
+  captureTargetedAcceptance,
+  verifyTargetedVisualLayout,
+} from './premiumVisualEvidence';
 import { expect, test, type Page } from '@playwright/test';
 
 const shopId = '11111111-1111-4111-8111-111111111111';
@@ -9,6 +15,7 @@ const session = {
     role: 'OWNER',
     permissions: ['reports.view', 'settings.manage'],
     shopIds: [shopId],
+    shopSummaries: [{ id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false }],
   },
   csrfToken,
 };
@@ -183,17 +190,42 @@ test('phone report presentation', async ({ page }) => {
   );
 });
 
-for (const vp of [
+for (const vp of premiumVisualViewports([
   { width: 768, height: 1024 },
   { width: 1440, height: 960 },
-]) {
+])) {
   test(`report table viewport ${vp.width}x${vp.height}`, async ({ page }) => {
     await page.setViewportSize(vp);
     await mockReports(page);
     await page.goto('/reports');
-    await expect(page.getByRole('table')).toBeVisible();
+    if (vp.width <= 480) {
+      await expect(page.getByRole('list', { name: 'Report entries' })).toBeVisible();
+    } else {
+      await expect(page.getByRole('table')).toBeVisible();
+    }
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+    await capturePremiumScreenshot(page, 'reports');
   });
+}
+
+if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
+  for (const width of [390, 1440] as const) {
+    for (const theme of ['light', 'dark'] as const) {
+      for (const entry of ['cold', 'warm'] as const) {
+        test(`targeted P07 reports ${theme} ${entry} ${width}px`, async ({ page }) => {
+          await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+          await mockReports(page);
+          await verifyTargetedVisualLayout(page, {
+            route: '/reports',
+            heading: 'Reports',
+            theme,
+            entry,
+          });
+          await captureTargetedAcceptance(page, 'p07', 'reports', theme, entry);
+        });
+      }
+    }
+  }
 }

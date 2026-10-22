@@ -1,3 +1,4 @@
+import './purchasing.css';
 import { useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
 

@@ -314,6 +314,7 @@ test('switching shops requires explicit discard for a dirty product editor', asy
   });
   await confirmation.getByRole('button', { name: 'Keep editing' }).click();
   await expect(confirmation).toBeHidden();
+  await expect(shopSwitcher).toHaveValue(shopId);
   await expect(productName).toHaveValue('Unsaved operator edit');
   expect(fixture.commands).toHaveLength(0);
 

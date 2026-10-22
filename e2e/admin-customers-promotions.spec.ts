@@ -1,3 +1,10 @@
+import {
+  capturePremiumScreenshot,
+  premiumVisualViewports,
+  PREMIUM_EVIDENCE_VIEWPORTS,
+  captureTargetedAcceptance,
+  verifyTargetedVisualLayout,
+} from './premiumVisualEvidence';
 import { expect, test, type Page } from '@playwright/test';
 import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
 
@@ -15,6 +22,7 @@ const session = {
     role: 'OWNER',
     permissions: ['customers.view', 'customers.merge', 'loyalty.manage', 'promotions.manage'],
     shopIds: [shopId],
+    shopSummaries: [{ id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false }],
   },
   csrfToken,
 };
@@ -285,6 +293,9 @@ test('exposes controlled merge, loyalty configuration and full promotion editor'
 
   await page.getByLabel('Customer detail').getByRole('button', { name: 'Merge customer' }).click();
   await page.getByLabel('Search merge candidates').fill('Nour');
+  const candidates = page.locator('.admin-customer-merge-list');
+  await expect(candidates).toBeVisible();
+  expect(await candidates.evaluate((node) => getComputedStyle(node).display)).toBe('grid');
   await page.getByLabel('Merge candidates').getByRole('button', { name: /Nour/ }).click();
   await page.getByLabel('I reviewed both customers and want to merge them.').check();
   const mergeButton = page.getByRole('dialog').getByRole('button', { name: 'Merge customer' });
@@ -324,8 +335,12 @@ test('hydrates canonical loyalty values and preserves hidden multi-shop scopes o
   await expect(page.getByLabel('Point value (EGP)')).toHaveValue('0.17');
   await expect(page.getByLabel('Minimum points to redeem')).toHaveValue('75');
   await expect(page.getByLabel('Point expiry (days)')).toHaveValue('180');
+  const savedPolicy = page.getByRole('region', { name: 'Current saved loyalty settings' });
+  await expect(savedPolicy).toContainText('75 points');
+  await expect(savedPolicy).toContainText('Disabled');
 
   await page.getByLabel('Minimum points to redeem').fill('80');
+  await expect(savedPolicy).toContainText('75 points');
   await page.getByRole('button', { name: 'Save loyalty program' }).click();
 
   await expect
@@ -363,14 +378,34 @@ test('hydrates canonical loyalty values and preserves hidden multi-shop scopes o
   });
 });
 
-for (const viewport of ADMIN_CORE_VIEWPORTS) {
+for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   test(`customer CRM remains usable at ${viewport.name} width`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.goto('/customers');
     const list = page.locator('.admin-master-detail__list');
     await list.getByRole('button', { name: /Mona/ }).click();
     await expect(page.locator('.admin-master-detail__detail')).toBeVisible();
-    if (viewport.name === 'phone') {
+    const metrics = page.locator('.admin-customer-detail__metrics').first();
+    await expect(metrics).toBeVisible();
+    expect(await metrics.evaluate((node) => getComputedStyle(node).display)).toBe('grid');
+    const tabs = page.getByRole('tablist', { name: 'Customer detail sections' });
+    await expect(tabs.getByRole('tab')).toHaveCount(5);
+    expect(
+      await tabs.evaluate((node) => {
+        const bounds = node.getBoundingClientRect();
+        return [...node.querySelectorAll('[role="tab"]')].every((tab) => {
+          const r = tab.getBoundingClientRect();
+          return r.left >= bounds.left - 1 && r.right <= bounds.right + 1;
+        });
+      }),
+    ).toBe(true);
+    const segmentTags = page.locator('.admin-customer-segments__tag');
+    await expect(segmentTags.first()).toBeVisible();
+    // Flex items are blockified by the browser, so inline-flex computes as flex.
+    expect(await segmentTags.first().evaluate((node) => getComputedStyle(node).display)).toMatch(
+      /^(inline-)?flex$/,
+    );
+    if (viewport.width <= 480) {
       await expect(list).toBeHidden();
       await expect(page.getByRole('link', { name: /back to customers/i })).toBeVisible();
     } else {
@@ -379,5 +414,70 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+    await capturePremiumScreenshot(page, 'crm');
   });
+}
+
+if (process.env['P04_P07_CAPTURE'] === '1') {
+  for (const viewport of PREMIUM_EVIDENCE_VIEWPORTS) {
+    test(`CRM settings saved vs draft scene at ${viewport.width}x${viewport.height}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.goto('/customers');
+      await page.getByRole('tab', { name: 'CRM settings' }).click();
+      await expect(
+        page.getByRole('region', { name: 'Current saved loyalty settings' }),
+      ).toContainText('75 points');
+      await expect(page.getByLabel('Minimum points to redeem')).toHaveValue('75');
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      await capturePremiumScreenshot(page, 'crm-settings');
+    });
+  }
+}
+
+if (process.env['P04_P07_CAPTURE'] === '1') {
+  for (const viewport of PREMIUM_EVIDENCE_VIEWPORTS) {
+    test('customer empty scene at ' + viewport.width + 'px', async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.route('**/api/admin/customers**', async (route) => {
+        const url = new URL(route.request().url());
+        if (route.request().method() === 'GET' && url.searchParams.get('view') === 'customers') {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ customers: [] }),
+          });
+          return;
+        }
+        await route.fallback();
+      });
+      await page.goto('/customers');
+      await expect(page.getByText('No matching customers')).toBeVisible();
+      await expect(page.getByRole('button', { name: /Mona/ })).toHaveCount(0);
+      await capturePremiumScreenshot(page, 'crm-empty');
+    });
+  }
+}
+
+if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
+  for (const width of [390, 1440] as const) {
+    for (const theme of ['light', 'dark'] as const) {
+      for (const entry of ['cold', 'warm'] as const) {
+        test(`targeted P05 crm ${theme} ${entry} ${width}px`, async ({ page }) => {
+          await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+
+          await verifyTargetedVisualLayout(page, {
+            route: '/customers',
+            heading: 'Customers',
+            theme,
+            entry,
+          });
+          await captureTargetedAcceptance(page, 'p05', 'crm', theme, entry);
+        });
+      }
+    }
+  }
 }

@@ -188,7 +188,7 @@ export function DraftPurchaseOrderLinesEditor({
         Add line
       </button>
       {error || validationError ? <p role="alert">{error ?? validationError}</p> : null}
-      <div className="admin-inventory-page-actions">
+      <div className="admin-purchasing-page-actions">
         <button
           className="admin-primary-button"
           type="submit"

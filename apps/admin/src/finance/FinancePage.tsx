@@ -5,7 +5,7 @@ import type {
   ProfitSummary,
 } from '@tux/admin-contracts';
 import { useState } from 'react';
-import { Link, useLocation, useSearch } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 
 import {
   EmptyState,
@@ -22,6 +22,7 @@ import { formatEgp, parseEgpMinor } from './money';
 import { useFinance } from './useFinance';
 import { MoneyMovementSheet } from './MoneyMovementSheet';
 import './finance.css';
+import { FinanceSectionNav } from './FinanceSectionNav';
 
 const accountTypeLabels: Record<FinanceAccountType, string> = {
   CASH: 'Cash',
@@ -309,20 +310,7 @@ export function FinancePage() {
         ) : undefined
       }
     >
-      <nav className="tux-finance-toolbar" aria-label="Finance sections">
-        <Link className="admin-secondary-button" href="/finance">
-          Bank & Cash
-        </Link>
-        <Link className="admin-secondary-button" href="/finance/expenses">
-          Expenses
-        </Link>
-        <Link className="admin-secondary-button" href="/finance/settlements">
-          Settlements
-        </Link>
-        <Link className="admin-secondary-button" href="/finance/end-day">
-          End Day
-        </Link>
-      </nav>
+      <FinanceSectionNav active="accounts" />
       {actionError ? <InlineError>{actionError}</InlineError> : null}
       {finance.workspaceQuery.isLoading ? <LoadingState title="Loading finance" /> : null}
       {finance.workspaceQuery.isError ? (
@@ -374,15 +362,15 @@ export function FinancePage() {
             detailActive={selectedAccountId !== null}
             backHref="/finance"
             list={
-              <div className="admin-inventory-list">
+              <div className="tux-finance-account-list">
                 {accounts.map((account) => (
                   <button
                     type="button"
                     key={account.id}
                     className={
                       selectedAccountId === account.id
-                        ? 'admin-inventory-row is-selected'
-                        : 'admin-inventory-row'
+                        ? 'tux-finance-account-row is-selected'
+                        : 'tux-finance-account-row'
                     }
                     onClick={() => navigate(detailPath('/finance', account.id))}
                   >

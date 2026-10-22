@@ -1,3 +1,10 @@
+import {
+  capturePremiumScreenshot,
+  premiumVisualViewports,
+  PREMIUM_EVIDENCE_VIEWPORTS,
+  captureTargetedAcceptance,
+  verifyTargetedVisualLayout,
+} from './premiumVisualEvidence';
 import { expect, test, type Page } from '@playwright/test';
 
 const shopId = '11111111-1111-4111-8111-111111111111';
@@ -20,6 +27,7 @@ const session = {
       'settings.manage',
     ],
     shopIds: [shopId],
+    shopSummaries: [{ id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false }],
   },
   csrfToken,
 };
@@ -188,6 +196,14 @@ async function mockFinance(
         : { workers: [], cashiers: [], reconciliations: [] };
     } else if (view === 'owner-summary') {
       data = { summaries: [] };
+    } else if (view === 'expenses') {
+      data = { expenses: [] };
+    } else if (view === 'categories') {
+      data = { categories: [] };
+    } else if (view === 'recurring') {
+      data = { rules: [], due: [] };
+    } else if (view === 'settlements') {
+      data = { settlements: [] };
     }
     await route.fulfill({
       status: 200,
@@ -236,6 +252,10 @@ test('cashier variance approval remains pending without falsely posting a count'
   await page.setViewportSize({ width: 390, height: 844 });
   const commands = await mockFinance(page, 'CLOSED', { pendingCashier: true });
   await page.goto('/finance/end-day');
+  await page
+    .getByRole('navigation', { name: 'End day workflow' })
+    .getByRole('link', { name: /Cashier counts/ })
+    .click();
   await page.getByRole('button', { name: 'Record cashier count' }).click();
   const dialog = page.getByRole('dialog', { name: 'Cashier cash count' });
   await dialog.getByLabel('Cashier', { exact: true }).selectOption(cashierWorkerId);
@@ -297,6 +317,10 @@ test('Finance Z correction shows pending approval without claiming a posted adju
   await page.setViewportSize({ width: 390, height: 844 });
   const commands = await mockFinance(page, 'CLOSED', { pendingSnapshot: true });
   await page.goto('/finance/end-day');
+  await page
+    .getByRole('navigation', { name: 'End day workflow' })
+    .getByRole('link', { name: /History/ })
+    .click();
   await expect(page.getByRole('heading', { name: 'Financial Z history' })).toBeVisible();
   await page.getByRole('button', { name: 'Append correction' }).first().click();
   await page.getByLabel('Adjustment amount (EGP, signed)').fill('5.00');
@@ -327,16 +351,20 @@ test('an OPEN Operations Business Day exposes non-closing X and never a Financia
   await page.goto('/finance/end-day');
   await expect(page.getByRole('heading', { name: 'X Report / Financial End Day' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Non-closing X report' })).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'End day workflow' })
+    .getByRole('link', { name: /Financial Z/ })
+    .click();
   await expect(page.getByText('Operations must close this Business Day first.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Finalize financial Z' })).toHaveCount(0);
   expect(commands).toHaveLength(0);
 });
 
-for (const vp of [
+for (const vp of premiumVisualViewports([
   { width: 390, height: 844 },
   { width: 768, height: 1024 },
   { width: 1440, height: 960 },
-]) {
+])) {
   test(`finance viewport ${vp.width}x${vp.height}`, async ({ page }) => {
     await page.setViewportSize(vp);
     await mockFinance(page);
@@ -346,5 +374,140 @@ for (const vp of [
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+    await capturePremiumScreenshot(page, 'finance');
   });
+}
+
+test('end-day workspaces expose keyboard-reachable X, cashier, Z, and history tasks without posting', async ({
+  page,
+}) => {
+  const commands = await mockFinance(page, 'CLOSED', { pendingCashier: true });
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.goto('/finance/end-day');
+  const tasks = page.getByRole('navigation', { name: 'End day workflow' });
+  await expect(tasks.getByRole('link')).toHaveCount(4);
+  await expect(tasks.getByRole('link', { name: /X report/ })).toHaveAttribute(
+    'aria-current',
+    'location',
+  );
+  await tasks.getByRole('link', { name: /Cashier counts/ }).click();
+  await expect(page.getByRole('heading', { name: 'Non-closing X report' })).toBeHidden();
+  await expect(page).toHaveURL(/#end-day-cashier$/);
+  await expect(page.locator('#end-day-cashier')).toBeVisible();
+  await tasks.getByRole('link', { name: /Financial Z/ }).click();
+  await expect(page.locator('#end-day-z')).toContainText('Finalization requires');
+  await tasks.getByRole('link', { name: /History/ }).click();
+  await expect(page.getByRole('heading', { name: 'Financial Z history' })).toBeVisible();
+  expect(commands).toHaveLength(0);
+});
+
+test('cold End Day history hash directly opens the read-only history workspace', async ({
+  page,
+}) => {
+  const commands = await mockFinance(page, 'CLOSED');
+  await page.goto('/finance/end-day#end-day-history');
+  await expect(page.getByRole('heading', { name: 'Financial Z history' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Non-closing X report' })).toBeHidden();
+  await expect(page.getByRole('link', { name: /History/ })).toHaveAttribute(
+    'aria-current',
+    'location',
+  );
+  expect(commands).toHaveLength(0);
+});
+
+test('expense due workspaces separate recurring, history and category setup without posting', async ({
+  page,
+}) => {
+  const commands = await mockFinance(page);
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.goto('/finance/expenses');
+  const tasks = page.getByRole('navigation', { name: 'Expense workspaces' });
+  await expect(tasks.getByRole('link')).toHaveCount(3);
+  await tasks.getByRole('link', { name: /Due & recurring/ }).click();
+  await expect(page).toHaveURL(/#expense-recurring$/);
+  await expect(page.getByRole('region', { name: 'Due and recurring expenses' })).toContainText(
+    'Recurring expenses',
+  );
+  await tasks.getByRole('link', { name: /Expense history/ }).click();
+  await expect(page.getByRole('region', { name: 'Posted expense history' })).toBeVisible();
+  await tasks.getByRole('link', { name: /Categories/ }).click();
+  await page.getByRole('button', { name: 'Add expense category' }).click();
+  await expect(page.getByRole('dialog', { name: 'New expense category' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  expect(commands).toHaveLength(0);
+});
+
+// These scenes use the same isolated finance fixture as the command-regression tests.
+if (process.env['P04_P07_CAPTURE'] === '1') {
+  for (const viewport of PREMIUM_EVIDENCE_VIEWPORTS) {
+    for (const scene of [
+      { route: '/finance/expenses', id: 'expenses', heading: 'Expenses' },
+      { route: '/finance/settlements', id: 'settlements', heading: 'Settlements' },
+      { route: '/finance/end-day', id: 'end-day', heading: 'X Report / Financial End Day' },
+    ] as const) {
+      test(`finance scene ${scene.id} at ${viewport.width}x${viewport.height}`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(viewport);
+        await mockFinance(page, 'CLOSED');
+        await page.goto(scene.route);
+        await expect(page.getByRole('heading', { name: scene.heading, exact: true })).toBeVisible();
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        ).toBe(true);
+        await capturePremiumScreenshot(page, scene.id);
+      });
+    }
+  }
+}
+
+// Mock-finance Chromium scenes: no actual ledger command is invoked.
+if (process.env['P04_P07_CAPTURE'] === '1') {
+  for (const viewport of PREMIUM_EVIDENCE_VIEWPORTS) {
+    for (const scenario of [
+      { label: 'cashier', link: 'Cashier counts', heading: 'Cashier counts' },
+      { label: 'z', link: 'Financial Z', heading: 'Financial Z · finalization' },
+      { label: 'history', link: 'History', heading: 'Financial Z history' },
+    ] as const) {
+      test(`end day task scene ${scenario.label} at ${viewport.width}x${viewport.height}`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(viewport);
+        const commands = await mockFinance(page, 'CLOSED');
+        await page.goto('/finance/end-day');
+        await page
+          .getByRole('navigation', { name: 'End day workflow' })
+          .getByRole('link', { name: new RegExp(scenario.link) })
+          .click();
+        await expect(
+          page.getByRole('heading', { name: scenario.heading, exact: true }),
+        ).toBeVisible();
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        ).toBe(true);
+        expect(commands).toHaveLength(0);
+        await capturePremiumScreenshot(page, 'end-day-' + scenario.label);
+      });
+    }
+  }
+}
+
+if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
+  for (const width of [390, 1440] as const) {
+    for (const theme of ['light', 'dark'] as const) {
+      for (const entry of ['cold', 'warm'] as const) {
+        test(`targeted P07 finance ${theme} ${entry} ${width}px`, async ({ page }) => {
+          await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+          await mockFinance(page);
+          await verifyTargetedVisualLayout(page, {
+            route: '/finance',
+            heading: 'Bank & Cash',
+            theme,
+            entry,
+          });
+          await captureTargetedAcceptance(page, 'p07', 'finance', theme, entry);
+        });
+      }
+    }
+  }
 }

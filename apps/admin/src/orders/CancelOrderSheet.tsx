@@ -48,7 +48,7 @@ export function CancelOrderSheet({
       }}
     >
       <form
-        className="admin-catalog-editor__section is-compact"
+        className="admin-order-task-section is-compact"
         onSubmit={(event) => void submit(event)}
       >
         <label className="admin-field">

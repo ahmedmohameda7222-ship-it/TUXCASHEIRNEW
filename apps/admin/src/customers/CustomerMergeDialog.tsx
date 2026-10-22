@@ -120,11 +120,13 @@ export function CustomerMergeDialog({
         <EmptyState title="No merge candidates" description="Try another name or phone number." />
       ) : null}
       {!loading && !error && candidates.length > 0 ? (
-        <div className="admin-inventory-list" aria-label="Merge candidates">
+        <div className="admin-customer-merge-list" aria-label="Merge candidates">
           {candidates.map((item) => (
             <button
               className={
-                item.id === candidateId ? 'admin-inventory-row is-selected' : 'admin-inventory-row'
+                item.id === candidateId
+                  ? 'admin-customer-merge-row is-selected'
+                  : 'admin-customer-merge-row'
               }
               type="button"
               key={item.id}
@@ -166,7 +168,7 @@ export function CustomerMergeDialog({
             />{' '}
             I reviewed both customers and want to merge them.
           </label>
-          <div className="admin-inventory-page-actions">
+          <div className="admin-customer-merge-actions">
             <button
               className="admin-secondary-button"
               type="button"

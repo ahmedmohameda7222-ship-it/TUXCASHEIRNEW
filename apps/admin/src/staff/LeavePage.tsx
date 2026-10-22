@@ -40,7 +40,7 @@ export function LeavePage({
       <h3>Leave</h3>
       {employee.leaveRequests.length === 0 ? <p>No leave requests.</p> : null}
       {employee.leaveRequests.map((request) => (
-        <article className="admin-inventory-row" key={request.id}>
+        <article className="admin-staff-record-row" key={request.id}>
           <span>
             <strong>{leaveTypeLabel(request.leaveType)}</strong>
             <small>

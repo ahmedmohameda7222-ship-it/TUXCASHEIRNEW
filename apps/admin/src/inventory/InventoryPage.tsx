@@ -1,5 +1,5 @@
 import type { AdminStocktakeSnapshot } from '@tux/admin-contracts';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 
 import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
@@ -71,6 +71,34 @@ export function InventoryPage() {
   const selectedItemId = detailIdFromPath(location, '/inventory');
   const inventory = useInventory(shopId, selectedItemId);
   const [mode, setMode] = useState<WorkspaceMode>('detail');
+  const moreActionsRef = useRef<HTMLDetailsElement>(null);
+
+  // A native details menu is a disclosure, not a persistent route selection.
+  useEffect(() => {
+    if (moreActionsRef.current) moreActionsRef.current.open = false;
+  }, [location, mode, shopId]);
+
+  useEffect(() => {
+    const dismissOutside = (event: PointerEvent) => {
+      if (!moreActionsRef.current?.contains(event.target as Node)) {
+        if (moreActionsRef.current) moreActionsRef.current.open = false;
+      }
+    };
+    const dismissEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && moreActionsRef.current?.open) {
+        moreActionsRef.current.open = false;
+        moreActionsRef.current.querySelector('summary')?.focus();
+        event.stopPropagation();
+      }
+    };
+    document.addEventListener('pointerdown', dismissOutside);
+    document.addEventListener('keydown', dismissEscape);
+    return () => {
+      document.removeEventListener('pointerdown', dismissOutside);
+      document.removeEventListener('keydown', dismissEscape);
+    };
+  }, []);
+
   const [itemAction, setItemAction] = useState<ItemAction>(null);
   const [adjustmentApprovalPending, setAdjustmentApprovalPending] = useState(false);
   const [definitionItemId, setDefinitionItemId] = useState<string | null>(null);
@@ -237,7 +265,7 @@ export function InventoryPage() {
               Transfer stock
             </button>
           ) : null}
-          <details className="admin-inventory-more-actions">
+          <details className="admin-inventory-more-actions" ref={moreActionsRef}>
             <summary className="admin-secondary-button">More actions</summary>
             <div>
               <button

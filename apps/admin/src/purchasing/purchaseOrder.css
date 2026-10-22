@@ -1,0 +1,39 @@
+/* Purchase order detail owns its own cold-route styles, not inventory.css. */
+.admin-purchasing-order-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 0.5rem 1rem;
+  padding: 0.875rem 0;
+  border-bottom: 1px solid var(--tux-border-subtle);
+}
+.admin-purchasing-order-header__identity {
+  display: flex;
+  flex: 1 1 10rem;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.25rem;
+}
+.admin-purchasing-order-header__identity strong,
+.admin-purchasing-order-header__identity small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.admin-purchasing-order-header__identity small {
+  color: var(--tux-text-secondary);
+}
+.admin-purchasing-order-header > strong {
+  flex: 0 0 auto;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 0.5rem;
+  background: var(--tux-surface-subtle);
+  font-size: 0.8125rem;
+}
+@media (max-width: 480px) {
+  .admin-purchasing-order-header {
+    flex-direction: column;
+  }
+}

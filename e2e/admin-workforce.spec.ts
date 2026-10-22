@@ -1,3 +1,9 @@
+import {
+  capturePremiumScreenshot,
+  premiumVisualViewports,
+  captureTargetedAcceptance,
+  verifyTargetedVisualLayout,
+} from './premiumVisualEvidence';
 import type { EmployeeDetail, StaffWorkspace } from '@tux/admin-contracts';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
@@ -14,6 +20,7 @@ const session = {
     role: 'OWNER',
     permissions: ['staff.view', 'staff.manage', 'staff.payments'],
     shopIds: [shopId],
+    shopSummaries: [{ id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false }],
   },
   csrfToken,
 };
@@ -157,7 +164,18 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
   await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
   await selectEmployee(page, 'Mona Ali');
   await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+  const accessWorkspaces = page.getByRole('navigation', { name: 'Employee access workspaces' });
+  await expect(accessWorkspaces.getByRole('link')).toHaveCount(3);
+  await accessWorkspaces.getByRole('link', { name: /Role & permissions/ }).click();
+  await expect(page).toHaveURL(/#staff-permission-policy$/);
+  await expect(page.getByRole('region', { name: 'Permissions' })).toBeVisible();
   await expect(page.getByText('Operations setup required', { exact: true })).toBeVisible();
+  const setup = page.locator('.admin-staff-readiness-state').first();
+  await expect(setup).toBeVisible();
+  expect(await setup.evaluate((node) => getComputedStyle(node).display)).toBe('grid');
+  expect(await setup.evaluate((node) => parseFloat(getComputedStyle(node).rowGap))).toBeGreaterThan(
+    0,
+  );
 
   await page.getByRole('tab', { name: 'Pay / Compensation' }).click();
   await expect(page.getByLabel('Payment account')).toHaveValue(accountId);
@@ -214,7 +232,7 @@ test('attendance correction posts a separate audited correction command', async 
   expect(commands[0]).not.toHaveProperty('originalOccurredAt');
 });
 
-for (const viewport of ADMIN_CORE_VIEWPORTS) {
+for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   test(`staff keeps focused tasks reachable without horizontal overflow on ${viewport.name}`, async ({
     page,
   }) => {
@@ -232,11 +250,56 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
       .toBe(true);
 
-    if (viewport.name === 'phone') {
+    if (process.env['P04_P07_CAPTURE'] === '1') {
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog', { name: 'Add shift' })).toBeHidden();
+      await capturePremiumScreenshot(page, 'workforce');
+      await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+      await capturePremiumScreenshot(page, 'workforce-permissions');
+      await page.goto('/staff');
+      await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
+      await capturePremiumScreenshot(page, 'workforce-list');
+    } else if (viewport.width <= 480) {
       await page.keyboard.press('Escape');
       await page.getByRole('link', { name: /back/i }).click();
       await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
     }
+  });
+}
+
+for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
+  test(`restricted workforce access stays read-only at ${viewport.name}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const commands = await mockWorkforce(page);
+    await page.route('**/api/admin/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...session,
+          principal: {
+            ...session.principal,
+            role: 'MANAGER',
+            permissions: ['staff.view'],
+          },
+        }),
+      });
+    });
+    await page.goto('/staff');
+    await selectEmployee(page, 'Mona Ali');
+    await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+    const tasks = page.getByRole('navigation', { name: 'Employee access workspaces' });
+    await expect(tasks.getByRole('link')).toHaveCount(2);
+    await expect(page.getByRole('region', { name: 'Permissions' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Change role' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Reset employee PIN' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Complete Operations setup' })).toHaveCount(0);
+    await expect(page.locator('.admin-permission-group select').first()).toBeDisabled();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    expect(commands).toHaveLength(0);
+    await capturePremiumScreenshot(page, 'workforce-readonly');
   });
 }
 
@@ -317,9 +380,39 @@ test('switching employees resets local profile editor state to the selected empl
   const monaProfile = page.getByRole('article', { name: 'Employee Mona Ali' });
   await expect(monaProfile.getByLabel('Name')).toHaveValue('Mona Ali');
 
+  // Workforce detail is a full-width task surface; navigate back before
+  // changing employees, then verify the replacement editor state is clean.
+  await page.getByRole('link', { name: /back to employees/i }).click();
   await selectEmployee(page, 'Youssef Hassan');
 
   const youssefProfile = page.getByRole('article', { name: 'Employee Youssef Hassan' });
   await expect(youssefProfile.getByLabel('Name')).toHaveValue('Youssef Hassan');
   await expect(youssefProfile.getByLabel('Phone')).toHaveValue('+201011111111');
 });
+
+if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
+  for (const width of [390, 1440] as const) {
+    for (const theme of ['light', 'dark'] as const) {
+      for (const entry of ['cold', 'warm'] as const) {
+        for (const scene of ['staff', 'permissions'] as const) {
+          test(`targeted P06 ${scene} ${theme} ${entry} ${width}px`, async ({ page }) => {
+            await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+            await mockWorkforce(page);
+            await verifyTargetedVisualLayout(page, {
+              route: '/staff',
+              heading: 'Staff',
+              theme,
+              entry,
+            });
+            if (scene === 'permissions') {
+              await selectEmployee(page, 'Mona Ali');
+              await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+              await expect(page.getByRole('region', { name: 'Permissions' })).toBeVisible();
+            }
+            await captureTargetedAcceptance(page, 'p06', scene, theme, entry);
+          });
+        }
+      }
+    }
+  }
+}

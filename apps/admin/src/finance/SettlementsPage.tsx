@@ -1,5 +1,5 @@
 import './finance.css';
-import { Link } from 'wouter';
+import { FinanceSectionNav } from './FinanceSectionNav';
 import { useState } from 'react';
 
 import {
@@ -106,17 +106,7 @@ export function SettlementsPage() {
         ) : undefined
       }
     >
-      <nav className="tux-finance-toolbar" aria-label="Finance sections">
-        <Link className="admin-secondary-button" href="/finance">
-          Bank & Cash
-        </Link>
-        <Link className="admin-secondary-button" href="/finance/expenses">
-          Expenses
-        </Link>
-        <Link className="admin-secondary-button" href="/finance/end-day">
-          End Day
-        </Link>
-      </nav>
+      <FinanceSectionNav active="settlements" />
       {operations.settlementsQuery.isLoading ? <LoadingState title="Loading settlements" /> : null}
       {operations.settlementsQuery.isError ? (
         <ErrorState

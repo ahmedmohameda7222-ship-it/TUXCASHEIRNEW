@@ -9,6 +9,7 @@ import { AdminDialog } from '../components/overlay/AdminDialog';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { EmployeeDetailPage, type StaffDetailSection } from './EmployeeDetailPage';
 import { useStaff, type StaffApiCommandDraft } from './useStaff';
+import './staff.css';
 
 function readableError(error: unknown): string | null {
   if (!error) return null;
@@ -125,109 +126,116 @@ export function StaffPage() {
     >
       {actionError ? <p role="alert">{actionError}</p> : null}
 
-      <ResponsiveMasterDetail
-        listLabel="Employees"
-        detailLabel="Employee detail"
-        detailActive={selectedId !== null}
-        backHref="/staff"
-        list={
-          <div className="admin-record-list">
-            {staff.workspaceQuery.isLoading ? <LoadingState title="Loading staff" /> : null}
-            {staff.workspaceQuery.isError ? (
+      <div className="admin-staff-workspace">
+        <ResponsiveMasterDetail
+          listLabel="Employees"
+          detailLabel="Employee detail"
+          detailActive={selectedId !== null}
+          backHref="/staff"
+          list={
+            <div className="admin-record-list">
+              {staff.workspaceQuery.isLoading ? <LoadingState title="Loading staff" /> : null}
+              {staff.workspaceQuery.isError ? (
+                <ErrorState
+                  title="Staff could not be loaded"
+                  action={
+                    <button
+                      className="admin-secondary-button"
+                      type="button"
+                      onClick={() => void staff.workspaceQuery.refetch()}
+                    >
+                      Retry
+                    </button>
+                  }
+                />
+              ) : null}
+              {rows.length === 0 &&
+              !staff.workspaceQuery.isLoading &&
+              !staff.workspaceQuery.isError ? (
+                <EmptyState
+                  title="No employees assigned to this shop"
+                  description="Add or assign a staff profile to begin."
+                />
+              ) : null}
+              {rows.map((employee) => (
+                <button
+                  className={
+                    employee.id === selectedId
+                      ? 'admin-record-row admin-record-row--button is-selected'
+                      : 'admin-record-row admin-record-row--button'
+                  }
+                  aria-current={employee.id === selectedId ? 'true' : undefined}
+                  key={employee.id}
+                  type="button"
+                  onClick={() => navigate(detailPath('/staff', employee.id))}
+                >
+                  <span>
+                    <strong>{employee.displayName}</strong>
+                    <small>
+                      {roleLabel(employee.role)} · {employee.shopIds.length} shop
+                      {employee.shopIds.length === 1 ? '' : 's'}
+                    </small>
+                  </span>
+                  <span className="admin-staff-row__states">
+                    <span>{employee.active ? 'Active' : 'Suspended'}</span>
+                    {employee.operationsSetupRequiredShopIds.length > 0 ? (
+                      <span
+                        className="admin-staff-row__setup"
+                        title="Operations setup is still required in assigned shops"
+                      >
+                        Setup needed
+                      </span>
+                    ) : null}
+                  </span>
+                </button>
+              ))}
+            </div>
+          }
+          detail={
+            staff.detailQuery.isLoading ? (
+              <LoadingState title="Loading employee" />
+            ) : staff.detailQuery.isError ? (
               <ErrorState
-                title="Staff could not be loaded"
-                action={
-                  <button
-                    className="admin-secondary-button"
-                    type="button"
-                    onClick={() => void staff.workspaceQuery.refetch()}
-                  >
-                    Retry
-                  </button>
-                }
+                title="Employee unavailable"
+                description="This employee may not exist or may not be available in your current shop scope."
               />
-            ) : null}
-            {rows.length === 0 &&
-            !staff.workspaceQuery.isLoading &&
-            !staff.workspaceQuery.isError ? (
+            ) : detail ? (
+              <EmployeeDetailPage
+                key={`${detail.id}:${shopId}`}
+                employee={detail}
+                section={selectedSection}
+                onSectionChange={(section) => {
+                  if (!selectedId) return;
+                  const path = detailPath('/staff', selectedId);
+                  navigate(section === 'profile' ? path : `${path}?section=${section}`);
+                }}
+                shopId={shopId}
+                canManage={canManage}
+                canProvisionWorker={
+                  canManage && (principal.role === 'OWNER' || principal.role === 'ADMIN')
+                }
+                canPay={canPay}
+                financeAccounts={staff.workspaceQuery.data?.financeAccounts ?? []}
+                workers={staff.workspaceQuery.data?.workers ?? []}
+                shops={shopChoices}
+                onCommand={execute}
+                onSensitiveCommand={executeSensitive}
+              />
+            ) : (
               <EmptyState
-                title="No employees assigned to this shop"
-                description="Add or assign a staff profile to begin."
+                title="Employee unavailable"
+                description="Choose another employee from the list."
               />
-            ) : null}
-            {rows.map((employee) => (
-              <button
-                className={
-                  employee.id === selectedId
-                    ? 'admin-record-row admin-record-row--button is-selected'
-                    : 'admin-record-row admin-record-row--button'
-                }
-                aria-current={employee.id === selectedId ? 'true' : undefined}
-                key={employee.id}
-                type="button"
-                onClick={() => navigate(detailPath('/staff', employee.id))}
-              >
-                <span>
-                  <strong>{employee.displayName}</strong>
-                  <small>
-                    {roleLabel(employee.role)} · {employee.shopIds.length} shop
-                    {employee.shopIds.length === 1 ? '' : 's'}
-                  </small>
-                </span>
-                <span>
-                  {employee.active ? 'Active' : 'Suspended'}
-                  {employee.operationsSetupRequiredShopIds.length > 0
-                    ? ' · Operations setup required'
-                    : ''}
-                </span>
-              </button>
-            ))}
-          </div>
-        }
-        detail={
-          staff.detailQuery.isLoading ? (
-            <LoadingState title="Loading employee" />
-          ) : staff.detailQuery.isError ? (
-            <ErrorState
-              title="Employee unavailable"
-              description="This employee may not exist or may not be available in your current shop scope."
-            />
-          ) : detail ? (
-            <EmployeeDetailPage
-              key={`${detail.id}:${shopId}`}
-              employee={detail}
-              section={selectedSection}
-              onSectionChange={(section) => {
-                if (!selectedId) return;
-                const path = detailPath('/staff', selectedId);
-                navigate(section === 'profile' ? path : `${path}?section=${section}`);
-              }}
-              shopId={shopId}
-              canManage={canManage}
-              canProvisionWorker={
-                canManage && (principal.role === 'OWNER' || principal.role === 'ADMIN')
-              }
-              canPay={canPay}
-              financeAccounts={staff.workspaceQuery.data?.financeAccounts ?? []}
-              workers={staff.workspaceQuery.data?.workers ?? []}
-              shops={shopChoices}
-              onCommand={execute}
-              onSensitiveCommand={executeSensitive}
-            />
-          ) : (
+            )
+          }
+          emptyDetail={
             <EmptyState
-              title="Employee unavailable"
-              description="Choose another employee from the list."
+              title="Select an employee"
+              description="Review profile, schedule, attendance, leave, pay and permissions."
             />
-          )
-        }
-        emptyDetail={
-          <EmptyState
-            title="Select an employee"
-            description="Review profile, schedule, attendance, leave, pay and permissions."
-          />
-        }
-      />
+          }
+        />
+      </div>
 
       {canManage ? (
         <AdminDialog

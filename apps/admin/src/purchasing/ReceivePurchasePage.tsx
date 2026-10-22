@@ -129,7 +129,7 @@ export function ReceivePurchasePage({
             ) : null}
           </div>
         ))}
-        <div className="admin-inventory-page-actions">
+        <div className="admin-purchasing-page-actions">
           <button
             className="admin-secondary-button"
             type="button"

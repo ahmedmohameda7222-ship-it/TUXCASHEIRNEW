@@ -1,3 +1,4 @@
+import './delivery.css';
 import type {
   AdminDeliveryConfigMutationResult,
   AdminDeliveryMutationResult,
@@ -207,23 +208,53 @@ export function DeliveryPage() {
         />
       ) : null}
 
-      <nav className="admin-tabs__list" aria-label="Delivery workspace">
+      <div className="tux-delivery-tabs" role="tablist" aria-label="Delivery workspace">
         {[
           { id: 'active' as const, label: 'Active deliveries', href: '/delivery' },
           { id: 'zones' as const, label: 'Zones', href: '/delivery/zones' },
           { id: 'riders' as const, label: 'Riders', href: '/delivery/riders' },
         ].map((item) => (
           <button
-            className="admin-tabs__tab"
+            className="tux-delivery-tab"
+            role="tab"
+            aria-selected={section === item.id}
             aria-current={section === item.id ? 'page' : undefined}
+            tabIndex={section === item.id ? 0 : -1}
             type="button"
             key={item.id}
             onClick={() => navigate(item.href)}
+            onKeyDown={(event) => {
+              const tabs = [
+                { href: '/delivery', id: 'active' },
+                { href: '/delivery/zones', id: 'zones' },
+                { href: '/delivery/riders', id: 'riders' },
+              ];
+              const index = tabs.findIndex((tab) => tab.id === item.id);
+              const nextIndex =
+                event.key === 'ArrowRight'
+                  ? (index + 1) % tabs.length
+                  : event.key === 'ArrowLeft'
+                    ? (index + tabs.length - 1) % tabs.length
+                    : event.key === 'Home'
+                      ? 0
+                      : event.key === 'End'
+                        ? tabs.length - 1
+                        : -1;
+              if (nextIndex === -1) return;
+              event.preventDefault();
+              const next = tabs[nextIndex]!;
+              navigate(next.href);
+              const nextTab =
+                event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                  '[role="tab"]',
+                )[nextIndex];
+              nextTab?.focus();
+            }}
           >
             {item.label}
           </button>
         ))}
-      </nav>
+      </div>
 
       {workspace && !workspaceQuery.isError ? (
         <>
@@ -258,11 +289,11 @@ export function DeliveryPage() {
                   }
                 />
               ) : (
-                <div className="admin-inventory-list">
+                <div className="tux-delivery-zone-list">
                   {workspace.zones.map((zone) =>
                     canManage ? (
                       <button
-                        className="admin-inventory-row"
+                        className="tux-delivery-zone-row"
                         type="button"
                         key={zone.id}
                         onClick={() => setEditingZoneId(zone.id)}
@@ -279,7 +310,7 @@ export function DeliveryPage() {
                         </span>
                       </button>
                     ) : (
-                      <article className="admin-inventory-row" key={zone.id}>
+                      <article className="tux-delivery-zone-row" key={zone.id}>
                         <span>
                           <strong>{zone.name}</strong>
                           <small>

@@ -157,7 +157,7 @@ export function RefundReturnPage({
 
       {mode === 'refund' ? (
         <form
-          className="admin-catalog-editor__section is-compact"
+          className="admin-order-task-section is-compact"
           onSubmit={(event) => void submitRefund(event)}
         >
           <label className="admin-field">
@@ -205,7 +205,7 @@ export function RefundReturnPage({
 
       {mode === 'return' ? (
         <form
-          className="admin-catalog-editor__section is-compact"
+          className="admin-order-task-section is-compact"
           onSubmit={(event) => void submitReturn(event)}
         >
           {order.items.map((item) => (

@@ -1,3 +1,10 @@
+import {
+  capturePremiumScreenshot,
+  premiumVisualViewports,
+  PREMIUM_EVIDENCE_VIEWPORTS,
+  captureTargetedAcceptance,
+  verifyTargetedVisualLayout,
+} from './premiumVisualEvidence';
 import type { AdminOrderDetail, AdminOrderSummary } from '@tux/admin-contracts';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
@@ -21,6 +28,7 @@ const ownerSession = {
     role: 'OWNER',
     permissions: ['orders.view', 'orders.cancel', 'orders.refund'],
     shopIds: [shopId],
+    shopSummaries: [{ id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false }],
   },
   csrfToken,
 };
@@ -115,7 +123,10 @@ function summary(order: AdminOrderDetail): AdminOrderSummary {
   };
 }
 
-async function mockOrders(page: Page, options: { staleCancellation?: boolean } = {}) {
+async function mockOrders(
+  page: Page,
+  options: { staleCancellation?: boolean; emptyOrders?: boolean } = {},
+) {
   let active = detail({
     id: activeOrderId,
     status: 'ACTIVE',
@@ -226,7 +237,7 @@ async function mockOrders(page: Page, options: { staleCancellation?: boolean } =
       const term = (url.searchParams.get('q') ?? '').toLowerCase();
       const statuses = url.searchParams.getAll('status');
       const source = url.searchParams.get('source');
-      const rows = [active, done]
+      const rows = (options.emptyOrders ? [] : [active, done])
         .filter((order) => statuses.length === 0 || statuses.includes(order.status))
         .filter((order) => !source || order.source === source)
         .filter((order) => {
@@ -474,40 +485,47 @@ test('orders search filters real Admin list and exposes status-contextual action
   await expect(page.getByRole('button', { name: /#101/ })).toHaveCount(0);
 });
 
-test('ACTIVE cancellation uses a valid central reason and refreshes immutable reason history', async ({
-  page,
-}) => {
-  const fixture = await mockOrders(page);
-  await page.goto('/orders');
-  await page.getByRole('button', { name: /#101/ }).click();
+for (const viewport of premiumVisualViewports([{ name: 'desktop', width: 1440, height: 900 }])) {
+  test(
+    'ACTIVE cancellation uses a valid central reason at ' + viewport.width + 'px',
+    async ({ page }) => {
+      await page.setViewportSize(viewport);
+      const fixture = await mockOrders(page);
+      await page.goto('/orders');
+      await page.getByRole('button', { name: /#101/ }).click();
 
-  await page.getByRole('button', { name: 'Cancel order' }).click();
-  const reason = page.getByLabel('Cancellation reason');
-  await expect(reason.locator('option')).toHaveCount(1);
-  await expect(reason.locator(`option[value="${cancellationReasonId}"]`)).toHaveText(
-    'Customer request',
+      await page.getByRole('button', { name: 'Cancel order' }).click();
+      const reason = page.getByLabel('Cancellation reason');
+      await expect(reason.locator('option')).toHaveCount(1);
+      await expect(reason.locator(`option[value="${cancellationReasonId}"]`)).toHaveText(
+        'Customer request',
+      );
+      await expect(reason.locator(`option[value="${refundReasonId}"]`)).toHaveCount(0);
+      await expect(reason.locator(`option[value="${inactiveCancellationReasonId}"]`)).toHaveCount(
+        0,
+      );
+
+      await page.getByLabel('Note').fill('Customer called the shop');
+      await capturePremiumScreenshot(page, 'order-cancel');
+      await page.getByLabel('Admin PIN').fill('1234');
+      await page.getByRole('button', { name: 'Confirm cancellation' }).click();
+
+      await expect.poll(() => fixture.commands.length).toBe(1);
+      expect(fixture.commands[0]).toMatchObject({
+        type: 'order.cancel',
+        shopId,
+        orderId: activeOrderId,
+        expectedOperationalRevision: 4,
+        reasonCodeId: cancellationReasonId,
+        note: 'Customer called the shop',
+      });
+
+      const detail = page.getByLabel('Order detail');
+      await expect(detail.getByText(/Cancelled · In-store/).last()).toBeVisible();
+      await expect(detail.getByText(/Customer request/)).toBeVisible();
+    },
   );
-  await expect(reason.locator(`option[value="${refundReasonId}"]`)).toHaveCount(0);
-  await expect(reason.locator(`option[value="${inactiveCancellationReasonId}"]`)).toHaveCount(0);
-
-  await page.getByLabel('Note').fill('Customer called the shop');
-  await page.getByLabel('Admin PIN').fill('1234');
-  await page.getByRole('button', { name: 'Confirm cancellation' }).click();
-
-  await expect.poll(() => fixture.commands.length).toBe(1);
-  expect(fixture.commands[0]).toMatchObject({
-    type: 'order.cancel',
-    shopId,
-    orderId: activeOrderId,
-    expectedOperationalRevision: 4,
-    reasonCodeId: cancellationReasonId,
-    note: 'Customer called the shop',
-  });
-
-  const detail = page.getByLabel('Order detail');
-  await expect(detail.getByText(/Cancelled · In-store/).last()).toBeVisible();
-  await expect(detail.getByText(/Customer request/)).toBeVisible();
-});
+}
 
 test('stale operational revision conflict is surfaced without pretending cancellation succeeded', async ({
   page,
@@ -559,7 +577,194 @@ test('DONE refund and return preserve reason snapshots and pending approval stat
   await expect(detail.getByText(/Posted · Quality issue/)).toBeVisible();
 });
 
-for (const viewport of ADMIN_CORE_VIEWPORTS) {
+const otherShopId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const otherShopOrderId = 'aaaaaaaa-1111-4111-8111-aaaaaaaa1111';
+
+// These responses deliberately model two independently authorized shops. They
+// never write an order or call production endpoints.
+async function mockScopedOrderHistory(
+  page: Page,
+  options: { role?: 'OWNER' | 'MANAGER'; emptySecondShop?: boolean } = {},
+) {
+  const role = options.role ?? 'OWNER';
+  const principal = {
+    ...ownerSession.principal,
+    role,
+    permissions: role === 'OWNER' ? ownerSession.principal.permissions : ['orders.view'],
+    shopIds: [shopId, otherShopId],
+    shopSummaries: [
+      { id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false },
+      { id: otherShopId, name: 'TUX Zamalek', active: true, temporaryClosed: false },
+    ],
+  };
+  const firstOrder = detail({
+    id: activeOrderId,
+    status: 'ACTIVE',
+    source: 'POS',
+    displayOrderNo: 101,
+    customerName: 'Ahmed Maadi',
+    phone: '+201000000001',
+    itemId: activeItemId,
+  });
+  const secondOrder: AdminOrderDetail = {
+    ...detail({
+      id: otherShopOrderId,
+      status: 'DONE',
+      source: 'ONLINE',
+      displayOrderNo: 902,
+      customerName: 'Mona Zamalek',
+      phone: '+201000000002',
+      itemId: doneItemId,
+    }),
+    shopId: otherShopId,
+  };
+  const searches: URL[] = [];
+  const details: URL[] = [];
+  const commands: unknown[] = [];
+
+  await page.route('**/api/admin/session', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ principal, csrfToken }),
+    }),
+  );
+  await page.route('**/api/admin/orders**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const requestedShopId = url.searchParams.get('shopId');
+    expect(principal.shopIds).toContain(requestedShopId);
+    if (request.method() !== 'GET') {
+      commands.push(request.postDataJSON());
+      await route.fulfill({
+        status: 403,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'read_only_test_fixture' }),
+      });
+      return;
+    }
+    if (url.searchParams.get('view') === 'action-reasons') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ reasons: [] }),
+      });
+      return;
+    }
+    const records =
+      requestedShopId === shopId ? [firstOrder] : options.emptySecondShop ? [] : [secondOrder];
+    const requestedOrderId = url.searchParams.get('orderId');
+    if (requestedOrderId) {
+      details.push(url);
+      const selected = records.find((order) => order.id === requestedOrderId);
+      await route.fulfill({
+        status: selected ? 200 : 404,
+        contentType: 'application/json',
+        body: JSON.stringify(selected ?? { error: 'order_not_found_in_scope' }),
+      });
+      return;
+    }
+    searches.push(url);
+    const term = (url.searchParams.get('q') ?? '').toLowerCase();
+    const statuses = url.searchParams.getAll('status');
+    const source = url.searchParams.get('source');
+    const rows = records
+      .filter((order) => statuses.length === 0 || statuses.includes(order.status))
+      .filter((order) => !source || source === order.source)
+      .filter(
+        (order) =>
+          !term ||
+          [order.displayOrderLabel, order.customer?.name, order.customer?.normalizedPhone]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(term)),
+      )
+      .map(summary);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ shopId: requestedShopId, rows, nextCursor: null }),
+    });
+  });
+  return { searches, details, commands };
+}
+
+test('TUX-006 Owner sees authorized shop, scoped data reload and no stale selected order on switch', async ({
+  page,
+}) => {
+  const requests = await mockScopedOrderHistory(page);
+  await page.goto(`/orders/${activeOrderId}`);
+  await expect(page.getByLabel('Current order shop')).toContainText('TUX Maadi');
+  await expect(page.getByLabel('Order detail').getByText('Ahmed Maadi')).toBeVisible();
+
+  await page.locator('.shop-switcher select').selectOption(otherShopId);
+  await expect(page).toHaveURL(/\/orders$/);
+  await expect(page.getByLabel('Current order shop')).toContainText('TUX Zamalek');
+  await expect(page.getByRole('button', { name: /#902/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /#101/ })).toHaveCount(0);
+  await expect(page.getByLabel('Order detail').getByText('Select an order')).toBeVisible();
+  await expect
+    .poll(() => requests.searches.some((url) => url.searchParams.get('shopId') === otherShopId))
+    .toBe(true);
+  await page.getByRole('button', { name: /#902/ }).click();
+  await expect(page.getByLabel('Order detail').getByText('Mona Zamalek')).toBeVisible();
+  expect(
+    requests.details.every((url) =>
+      [shopId, otherShopId].includes(url.searchParams.get('shopId') ?? ''),
+    ),
+  ).toBe(true);
+  expect(requests.commands).toHaveLength(0);
+});
+
+test('TUX-006 empty shop history differs from empty search and filters can be reset', async ({
+  page,
+}) => {
+  const requests = await mockScopedOrderHistory(page, { emptySecondShop: true });
+  await page.goto('/orders');
+  await expect(page.getByRole('button', { name: /#101/ })).toBeVisible();
+  await page.getByText('Search and filters', { exact: true }).click();
+  await page.getByLabel('Search').fill('never-matches');
+  await expect(page.getByText('No orders match these filters')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Clear order filters' })).toBeVisible();
+  await page.getByRole('button', { name: 'Clear order filters' }).click();
+  await expect(page.getByRole('button', { name: /#101/ })).toBeVisible();
+
+  await page.locator('.shop-switcher select').selectOption(otherShopId);
+  await expect(page.getByLabel('Current order shop')).toContainText('TUX Zamalek');
+  await expect(page.getByText('No orders in this shop yet')).toBeVisible();
+  await expect(page.getByText(/New orders will appear here/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Clear order filters' })).toHaveCount(0);
+  expect(requests.commands).toHaveLength(0);
+});
+
+test('TUX-006 restricted Manager cannot operate on another shop or a foreign direct detail link', async ({
+  page,
+}) => {
+  const requests = await mockScopedOrderHistory(page, { role: 'MANAGER' });
+  // A fresh direct detail navigation is scoped to the manager's initial shop A.
+  await page.goto(`/orders/${otherShopOrderId}`);
+  await expect(page.getByLabel('Current order shop')).toContainText('TUX Maadi');
+  await expect(page.getByText('Order unavailable', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Order detail').getByText('Mona Zamalek')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Back to shop orders' }).click();
+
+  await page.locator('.shop-switcher select').selectOption(otherShopId);
+  await expect(page.getByRole('button', { name: /#902/ })).toBeVisible();
+  await page.getByRole('button', { name: /#902/ }).click();
+  await expect(page.getByLabel('Order detail').getByText('Mona Zamalek')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cancel order' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Refund payment' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Return items' })).toHaveCount(0);
+  expect(
+    requests.details.some(
+      (url) =>
+        url.searchParams.get('shopId') === shopId &&
+        url.searchParams.get('orderId') === otherShopOrderId,
+    ),
+  ).toBe(true);
+  expect(requests.commands).toHaveLength(0);
+});
+
+for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   test(`orders remain usable at ${viewport.name} width`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await mockOrders(page);
@@ -568,7 +773,7 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     const list = page.locator('.admin-master-detail__list');
     await list.getByRole('button', { name: /#101/ }).click();
     await expect(page.locator('.admin-master-detail__detail')).toBeVisible();
-    if (viewport.name === 'phone') {
+    if (viewport.width <= 480) {
       await expect(list).toBeHidden();
       await expect(page.getByRole('link', { name: /back to orders/i })).toBeVisible();
     } else {
@@ -577,5 +782,39 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+    await capturePremiumScreenshot(page, 'orders');
   });
+}
+
+if (process.env['P04_P07_CAPTURE'] === '1') {
+  for (const viewport of PREMIUM_EVIDENCE_VIEWPORTS) {
+    test('orders empty shop scope scene at ' + viewport.width + 'px', async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await mockOrders(page, { emptyOrders: true });
+      await page.goto('/orders');
+      await expect(page.getByText('No orders in this shop yet')).toBeVisible();
+      await expect(page.getByRole('button', { name: /#101/ })).toHaveCount(0);
+      await capturePremiumScreenshot(page, 'orders-empty');
+    });
+  }
+}
+
+if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
+  for (const width of [390, 1440] as const) {
+    for (const theme of ['light', 'dark'] as const) {
+      for (const entry of ['cold', 'warm'] as const) {
+        test(`targeted P05 orders ${theme} ${entry} ${width}px`, async ({ page }) => {
+          await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+          await mockOrders(page);
+          await verifyTargetedVisualLayout(page, {
+            route: '/orders',
+            heading: 'Orders',
+            theme,
+            entry,
+          });
+          await captureTargetedAcceptance(page, 'p05', 'orders', theme, entry);
+        });
+      }
+    }
+  }
 }

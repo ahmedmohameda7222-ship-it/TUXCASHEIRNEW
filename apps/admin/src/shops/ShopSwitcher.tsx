@@ -18,6 +18,7 @@ function shopOptionLabel(shop: AdminShopIdentitySummary | undefined): string {
 export function ShopSwitcher() {
   const { principal, scope, setScope, hasUnsavedDrafts } = useShopScope();
   const [pendingScope, setPendingScope] = useState<ShopScope | null>(null);
+  const [selectionRevision, setSelectionRevision] = useState(0);
 
   // Only the authenticated principal provides display names. Never re-query
   // Settings or accept a label for a shop outside principal.shopIds.
@@ -33,6 +34,7 @@ export function ShopSwitcher() {
       <label className="shop-switcher">
         <span>Shop</span>
         <select
+          key={selectionRevision}
           value={scopeValue(scope)}
           onChange={(event) => {
             const nextScope: ShopScope =
@@ -40,8 +42,9 @@ export function ShopSwitcher() {
                 ? { kind: 'all-shops' }
                 : { kind: 'shop', shopId: event.currentTarget.value };
             if (hasUnsavedDrafts()) {
-              // Keep the controlled select on its actual scope until the operator decides.
-              event.currentTarget.value = scopeValue(scope);
+              // Updating pendingScope re-renders this controlled select with the current
+              // authorized scope. Do not imperatively set .value: React's input value
+              // tracker can swallow a second change after "Keep editing".
               setPendingScope(nextScope);
               return;
             }
@@ -71,7 +74,13 @@ export function ShopSwitcher() {
           setPendingScope(null);
         }}
         onOpenChange={(open) => {
-          if (!open) setPendingScope(null);
+          if (!open) {
+            setPendingScope(null);
+            // React's select value tracker can otherwise retain the attempted
+            // option after cancel and swallow the next identical change event.
+            // Remount the select at the authorized scope instead of trusting DOM state.
+            setSelectionRevision((revision) => revision + 1);
+          }
         }}
       />
     </>

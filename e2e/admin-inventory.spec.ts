@@ -1,3 +1,10 @@
+import {
+  capturePremiumScreenshot,
+  premiumVisualViewports,
+  PREMIUM_EVIDENCE_VIEWPORTS,
+  captureTargetedAcceptance,
+  verifyTargetedVisualLayout,
+} from './premiumVisualEvidence';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
 
@@ -22,6 +29,10 @@ const ownerSession = {
       'purchasing.manage',
     ],
     shopIds: [shopId, otherShopId],
+    shopSummaries: [
+      { id: shopId, name: 'TUX Maadi', active: true, temporaryClosed: false },
+      { id: otherShopId, name: 'TUX QA Shop B', active: true, temporaryClosed: true },
+    ],
   },
   csrfToken,
 };
@@ -329,6 +340,7 @@ test('replenishment save submits the workspace version the admin actually edited
 
   await page.getByText('More actions', { exact: true }).click();
   await page.getByRole('button', { name: 'Reorder suggestions' }).click();
+  await page.getByRole('button', { name: 'Edit policy for Beef' }).click();
   await page.getByLabel('Par level (kg)').fill('3.5');
   await page.getByRole('button', { name: 'Save policy' }).click();
 
@@ -429,100 +441,113 @@ test('inventory can receive a sent inter-shop transfer without using purchasing 
   });
 });
 
-test('authorized owner explicitly creates an audited recipe inventory master binding', async ({
-  page,
-}) => {
-  await mockInventory(page);
-  await page.route('**/api/admin/session', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ...ownerSession,
-        principal: {
-          ...ownerSession.principal,
-          permissions: [...ownerSession.principal.permissions, 'catalog.edit'],
-        },
-      }),
-    });
-  });
-  const recorded: Record<string, unknown>[] = [];
-  const masterId = '88888888-8888-4888-8888-888888888888';
-  await page.route('**/api/admin/inventory**', async (route) => {
-    const req = route.request();
-    const url = new URL(req.url());
-    if (req.method() === 'GET' && url.searchParams.get('view') === 'master-bindings') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          ok: true,
-          shopId,
-          masters: recorded.length
-            ? [
-                {
-                  id: masterId,
-                  canonicalName: 'Business-wide beef',
-                  baseUnitLabel: 'kg',
-                  trackingMode: 'RECIPE_TRACKED',
-                  inventoryItemId: itemId,
-                  inventoryItemName: 'Beef',
-                },
-              ]
-            : [],
-        }),
+for (const viewport of premiumVisualViewports([{ name: 'desktop', width: 1440, height: 900 }])) {
+  test(
+    'authorized owner explicitly creates an audited recipe inventory master binding at ' +
+      viewport.width +
+      'px',
+    async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await mockInventory(page);
+      await page.route('**/api/admin/session', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ...ownerSession,
+            principal: {
+              ...ownerSession.principal,
+              permissions: [...ownerSession.principal.permissions, 'catalog.edit'],
+            },
+          }),
+        });
       });
-      return;
-    }
-    if (req.method() !== 'POST' || req.postDataJSON().type !== 'master.bind') {
-      await route.fallback();
-      return;
-    }
-    expect(req.headers()['x-tux-admin-csrf']).toBe(csrfToken);
-    recorded.push(req.postDataJSON() as Record<string, unknown>);
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ok: true,
-        masterInventoryItemId: masterId,
-        inventoryItemId: itemId,
+      const recorded: Record<string, unknown>[] = [];
+      const masterId = '88888888-8888-4888-8888-888888888888';
+      await page.route('**/api/admin/inventory**', async (route) => {
+        const req = route.request();
+        const url = new URL(req.url());
+        if (req.method() === 'GET' && url.searchParams.get('view') === 'master-bindings') {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              ok: true,
+              shopId,
+              masters: recorded.length
+                ? [
+                    {
+                      id: masterId,
+                      canonicalName: 'Business-wide beef',
+                      baseUnitLabel: 'kg',
+                      trackingMode: 'RECIPE_TRACKED',
+                      inventoryItemId: itemId,
+                      inventoryItemName: 'Beef',
+                    },
+                  ]
+                : [],
+            }),
+          });
+          return;
+        }
+        if (req.method() !== 'POST' || req.postDataJSON().type !== 'master.bind') {
+          await route.fallback();
+          return;
+        }
+        expect(req.headers()['x-tux-admin-csrf']).toBe(csrfToken);
+        recorded.push(req.postDataJSON() as Record<string, unknown>);
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            masterInventoryItemId: masterId,
+            inventoryItemId: itemId,
+            shopId,
+            createdMaster: true,
+          }),
+        });
+      });
+      await page.goto('/inventory');
+      await page.getByText('More actions', { exact: true }).click();
+      await page.getByRole('button', { name: 'Manage recipe master bindings' }).click();
+      await expect(
+        page.getByRole('heading', { name: 'Recipe inventory master bindings' }),
+      ).toBeVisible();
+      await page.getByLabel('Master name').fill('Business-wide beef');
+      await capturePremiumScreenshot(page, 'recipe-binding');
+      await page.getByRole('button', { name: 'Save explicit mapping' }).click();
+      await expect(page.getByText(/Already bound to Business-wide beef/)).toBeVisible();
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0]).toMatchObject({
+        type: 'master.bind',
         shopId,
-        createdMaster: true,
-      }),
-    });
-  });
-  await page.goto('/inventory');
-  await page.getByText('More actions', { exact: true }).click();
-  await page.getByRole('button', { name: 'Manage recipe master bindings' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Recipe inventory master bindings' }),
-  ).toBeVisible();
-  await page.getByLabel('Master name').fill('Business-wide beef');
-  await page.getByRole('button', { name: 'Save explicit mapping' }).click();
-  await expect(page.getByText(/Already bound to Business-wide beef/)).toBeVisible();
-  expect(recorded).toHaveLength(1);
-  expect(recorded[0]).toMatchObject({
-    type: 'master.bind',
-    shopId,
-    inventoryItemId: itemId,
-    masterInventoryItemId: null,
-    canonicalName: 'Business-wide beef',
-  });
-  expect(recorded[0]?.commandId).toMatch(/^[0-9a-f-]{36}$/);
-});
+        inventoryItemId: itemId,
+        masterInventoryItemId: null,
+        canonicalName: 'Business-wide beef',
+      });
+      expect(recorded[0]?.commandId).toMatch(/^[0-9a-f-]{36}$/);
+    },
+  );
+}
 
-for (const viewport of ADMIN_CORE_VIEWPORTS) {
+for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   test(`inventory master-detail remains usable at ${viewport.name} width`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await mockInventory(page);
     await page.goto('/inventory');
+    await expect(page.locator('.shop-switcher select option[value="' + shopId + '"]')).toHaveText(
+      'TUX Maadi',
+    );
+    await expect(
+      page.locator('.shop-switcher select option[value="' + otherShopId + '"]'),
+    ).toContainText('TUX QA Shop B');
 
     const list = page.getByRole('region', { name: 'Inventory items' });
     await list.getByRole('button', { name: /Beef/ }).click();
     await expect(page.getByLabel('Inventory item detail')).toBeVisible();
 
-    if (viewport.name === 'phone') {
+    if (viewport.width <= 480) {
       await expect(list).toBeHidden();
       await expect(page.getByRole('link', { name: /back to inventory/i })).toBeVisible();
     } else {
@@ -532,5 +557,115 @@ for (const viewport of ADMIN_CORE_VIEWPORTS) {
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+    await capturePremiumScreenshot(page, 'inventory');
   });
+}
+
+if (process.env['P04_P07_CAPTURE'] === '1') {
+  for (const viewport of PREMIUM_EVIDENCE_VIEWPORTS) {
+    test('inventory More actions menu scene at ' + viewport.width + 'px', async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await mockInventory(page);
+      await page.goto('/inventory');
+      await page.getByText('More actions', { exact: true }).click();
+      await expect(page.locator('details.admin-inventory-more-actions')).toHaveAttribute(
+        'open',
+        '',
+      );
+      await expect(page.getByRole('button', { name: 'Reorder suggestions' })).toBeVisible();
+      await capturePremiumScreenshot(page, 'inventory-more-actions');
+    });
+  }
+}
+
+test('inventory More actions closes on Escape, outside click and workflow selection', async ({
+  page,
+}) => {
+  await mockInventory(page);
+  await page.goto('/inventory');
+  const disclosure = page.locator('details.admin-inventory-more-actions');
+  const more = page.getByText('More actions', { exact: true });
+
+  await more.click();
+  await expect(disclosure).toHaveAttribute('open', '');
+  await page.keyboard.press('Escape');
+  await expect(disclosure).not.toHaveAttribute('open');
+  await expect(more).toBeFocused();
+
+  await more.click();
+  await page.getByRole('heading', { name: 'Inventory', exact: true }).click();
+  await expect(disclosure).not.toHaveAttribute('open');
+
+  await more.click();
+  await page.getByRole('button', { name: 'Reorder suggestions' }).click();
+  await expect(disclosure).not.toHaveAttribute('open');
+  await expect(page.getByRole('heading', { name: 'Reorder suggestions' })).toBeVisible();
+});
+
+if (process.env['P04_P07_CAPTURE'] === '1') {
+  for (const viewport of PREMIUM_EVIDENCE_VIEWPORTS) {
+    test(`reorder policy editor scene at ${viewport.width}x${viewport.height}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      const fixture = await mockInventory(page);
+      await page.goto('/inventory');
+      await page.getByText('More actions', { exact: true }).click();
+      await page.getByRole('button', { name: 'Reorder suggestions' }).click();
+      await page.getByRole('button', { name: 'Edit policy for Beef' }).click();
+      await expect(page.getByLabel('Par level (kg)')).toBeVisible();
+      const policyForm = page.locator('.admin-inventory-policy-form');
+      await expect(policyForm).toBeVisible();
+      expect(await policyForm.evaluate((node) => getComputedStyle(node).display)).toBe('grid');
+      const parField = policyForm.getByLabel('Par level (kg)');
+      expect(await parField.evaluate((node) => getComputedStyle(node).width)).not.toBe('auto');
+      const savePolicy = policyForm.getByRole('button', { name: 'Save policy' });
+      await savePolicy.scrollIntoViewIfNeeded();
+      if (viewport.width <= 390) {
+        const occluded = await page.evaluate(() => {
+          const action = document.querySelector(
+            '.admin-inventory-policy-form button[type="submit"]',
+          );
+          const nav = document.querySelector('.admin-mobile-tabs');
+          if (!action || !nav) return true;
+          const rect = action.getBoundingClientRect();
+          const navRect = nav.getBoundingClientRect();
+          return rect.bottom > navRect.top || rect.top < 0 || rect.right > window.innerWidth;
+        });
+        expect(occluded).toBe(false);
+      }
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      expect(fixture.commands).toHaveLength(0);
+      // Capture from the top after checking that the last action is accessible.
+      // Fixed shell chrome would otherwise appear halfway down full-page PNGs.
+      await page.evaluate(() => {
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+        window.scrollTo(0, 0);
+      });
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+      await capturePremiumScreenshot(page, 'reorder-policy');
+    });
+  }
+}
+
+if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
+  for (const width of [390, 1440] as const) {
+    for (const theme of ['light', 'dark'] as const) {
+      for (const entry of ['cold', 'warm'] as const) {
+        test(`targeted P04 inventory ${theme} ${entry} ${width}px`, async ({ page }) => {
+          await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+          await mockInventory(page);
+          await verifyTargetedVisualLayout(page, {
+            route: '/inventory',
+            heading: 'Inventory',
+            theme,
+            entry,
+          });
+          await captureTargetedAcceptance(page, 'p04', 'inventory', theme, entry);
+        });
+      }
+    }
+  }
 }

@@ -48,7 +48,7 @@ export function SchedulePage({
       <h3>Schedule</h3>
       {shifts.length === 0 ? <p>No scheduled shifts for this shop.</p> : null}
       {shifts.map((shift) => (
-        <article className="admin-inventory-row" key={shift.id}>
+        <article className="admin-staff-record-row" key={shift.id}>
           <span>
             <strong>{formatBusinessDateTime(shift.startsAt)}</strong>
             <small>
@@ -175,7 +175,7 @@ export function SchedulePage({
             </button>
           </AdminDialog>
 
-          <section className="admin-catalog-editor__section is-compact">
+          <section className="admin-staff-section is-compact">
             <h4>Copy Previous Week</h4>
             <label className="admin-field">
               <span>Target week start</span>

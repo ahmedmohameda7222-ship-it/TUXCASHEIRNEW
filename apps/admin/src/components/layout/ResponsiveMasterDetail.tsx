@@ -3,6 +3,7 @@ import { Link } from 'wouter';
 
 type ResponsiveMasterDetailProps = {
   list: ReactNode;
+  className?: string;
   detail?: ReactNode;
   listLabel: string;
   detailLabel: string;
@@ -13,6 +14,7 @@ type ResponsiveMasterDetailProps = {
 
 export function ResponsiveMasterDetail({
   list,
+  className,
   detail,
   listLabel,
   detailLabel,
@@ -22,7 +24,7 @@ export function ResponsiveMasterDetail({
 }: ResponsiveMasterDetailProps) {
   return (
     <div
-      className="admin-master-detail"
+      className={className ? `admin-master-detail ${className}` : 'admin-master-detail'}
       data-detail-active={detailActive ? 'true' : 'false'}
       data-admin-master-detail
     >

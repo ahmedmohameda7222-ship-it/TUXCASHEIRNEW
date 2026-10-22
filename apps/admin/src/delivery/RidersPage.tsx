@@ -84,19 +84,26 @@ export function RidersPage({
             <li key={rider.id}>
               {canManage ? (
                 <button
-                  className="admin-secondary-button"
+                  className="admin-secondary-button tux-delivery-rider-summary"
                   type="button"
                   onClick={() => begin(rider)}
                 >
-                  {rider.displayName} ·{' '}
-                  {rider.state === 'AVAILABLE' ? 'Available for delivery' : 'Not available'} ·{' '}
-                  {rider.active ? 'Active' : 'Inactive'}
+                  <strong>{rider.displayName}</strong>
+                  <small>
+                    {rider.state === 'AVAILABLE' ? 'Available for delivery' : 'Not available'}
+                  </small>
+                  <span>{rider.active ? 'Active' : 'Inactive'}</span>
                 </button>
               ) : (
-                <span className="admin-secondary-button" aria-disabled="true">
-                  {rider.displayName} ·{' '}
-                  {rider.state === 'AVAILABLE' ? 'Available for delivery' : 'Not available'} ·{' '}
-                  {rider.active ? 'Active' : 'Inactive'}
+                <span
+                  className="admin-secondary-button tux-delivery-rider-summary"
+                  aria-disabled="true"
+                >
+                  <strong>{rider.displayName}</strong>
+                  <small>
+                    {rider.state === 'AVAILABLE' ? 'Available for delivery' : 'Not available'}
+                  </small>
+                  <span>{rider.active ? 'Active' : 'Inactive'}</span>
                 </span>
               )}
             </li>

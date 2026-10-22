@@ -1,5 +1,5 @@
 import type { AdminOrderSource, AdminOrderStatus } from '@tux/admin-contracts';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 
 import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
@@ -7,11 +7,13 @@ import { PageScaffold } from '../components/layout/PageScaffold';
 import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { useShopScope } from '../shops/ShopScopeProvider';
+import { formatEgp } from '../finance/money';
 import { CancelOrderSheet } from './CancelOrderSheet';
 import { OrderDetailPage } from './OrderDetailPage';
 import { RefundReturnPage } from './RefundReturnPage';
 import { useOrders, type OrderSearchFilters } from './useOrders';
 import { toOrderTimeRange } from './orderDateRange';
+import './orders.css';
 
 type ActionMode = 'cancel' | 'refund' | 'return' | null;
 
@@ -43,6 +45,29 @@ export function OrdersPage() {
   const [toInput, setToInput] = useState('');
   const timeRange = useMemo(() => toOrderTimeRange(fromInput, toInput), [fromInput, toInput]);
   const [action, setAction] = useState<ActionMode>(null);
+  // The route is not shop-qualified. Clear a previous shop's selection and open
+  // action when the authorized scope changes, but preserve initial deep links.
+  const previousShopId = useRef(shopId);
+  useEffect(() => {
+    if (previousShopId.current === shopId) return;
+    previousShopId.current = shopId;
+    setAction(null);
+    if (selectedId) navigate('/orders');
+  }, [shopId, selectedId, navigate]);
+
+  const authorizedShop =
+    shopId && principal.shopIds.includes(shopId)
+      ? principal.shopSummaries?.find((shop) => shop.id === shopId)
+      : undefined;
+  const shopName = authorizedShop?.name?.trim() || (shopId ? `Shop ${shopId}` : '');
+  const hasActiveFilters = Boolean(query.trim() || status || source || fromInput || toInput);
+  const clearFilters = () => {
+    setQuery('');
+    setStatus('');
+    setSource('');
+    setFromInput('');
+    setToInput('');
+  };
 
   const filters = useMemo<OrderSearchFilters>(
     () => ({
@@ -69,12 +94,19 @@ export function OrdersPage() {
       <PageScaffold
         eyebrow="Orders"
         title="Orders"
-        description="Select a shop to review orders, cancellations, refunds and returns."
-      />
+        description="Orders require a single authorized shop."
+      >
+        <EmptyState
+          title="Select a shop to view orders"
+          description="Use the Shop selector above to choose an authorized shop. All Shops is not an order-history scope."
+        />
+      </PageScaffold>
     );
   }
 
-  const detail = ordersApi.detailQuery.data;
+  // Defense in depth: never render or mutate detail returned for another shop.
+  const receivedDetail = ordersApi.detailQuery.data;
+  const detail = receivedDetail?.shopId === shopId ? receivedDetail : undefined;
   const reasons = ordersApi.actionReasonsQuery.data?.reasons ?? [];
   const cancellationReasons = reasons.filter(
     (reason) => reason.active && reason.family === 'CANCELLATION',
@@ -93,14 +125,19 @@ export function OrdersPage() {
     <PageScaffold
       eyebrow="Order supervision"
       title="Orders"
-      description="Search order history and complete controlled cancellation, refund or return actions."
+      description={`Search order history for ${shopName} and complete authorized order actions.`}
     >
+      <div className="admin-orders-shop-context" aria-label="Current order shop">
+        <span>Current shop</span>
+        <strong>{shopName}</strong>
+        <span>Only orders belonging to this authorized shop are shown.</span>
+      </div>
       <details
         className="admin-orders-filters"
         open={Boolean(query || status || source || fromInput || toInput)}
       >
         <summary>Search and filters</summary>
-        <section className="admin-catalog-editor__section is-compact" aria-label="Order filters">
+        <section className="admin-order-task-section is-compact" aria-label="Order filters">
           <label className="admin-field">
             <span>Search</span>
             <input
@@ -174,7 +211,7 @@ export function OrdersPage() {
         detailActive={selectedId !== null}
         backHref="/orders"
         list={
-          <div className="admin-inventory-list">
+          <div className="admin-orders-list">
             {ordersApi.searchQuery.isLoading ? <LoadingState title="Loading orders" /> : null}
             {ordersApi.searchQuery.isError ? (
               <ErrorState
@@ -195,14 +232,27 @@ export function OrdersPage() {
             !ordersApi.searchQuery.isError &&
             !timeRange.error ? (
               <EmptyState
-                title="No matching orders"
-                description="Adjust the search or filters for this shop."
+                title={
+                  hasActiveFilters ? 'No orders match these filters' : 'No orders in this shop yet'
+                }
+                description={
+                  hasActiveFilters
+                    ? `No results in ${shopName}. Clear the filters to return to its complete order history.`
+                    : `No order history exists for ${shopName} yet. New orders will appear here. To review another shop, use the Shop selector above.`
+                }
+                action={
+                  hasActiveFilters ? (
+                    <button type="button" className="admin-secondary-button" onClick={clearFilters}>
+                      Clear order filters
+                    </button>
+                  ) : undefined
+                }
               />
             ) : null}
             {rows.map((row) => (
               <button
                 className={
-                  row.id === selectedId ? 'admin-inventory-row is-selected' : 'admin-inventory-row'
+                  row.id === selectedId ? 'admin-order-row is-selected' : 'admin-order-row'
                 }
                 aria-current={row.id === selectedId ? 'true' : undefined}
                 key={row.id}
@@ -212,14 +262,23 @@ export function OrdersPage() {
                   setAction(null);
                 }}
               >
-                <span>
+                <span className="admin-order-row__identity">
                   <strong>{row.displayOrderLabel ?? `#${row.displayOrderNo}`}</strong>
+                  <small>{row.customerName ?? row.normalizedPhone ?? 'Walk-in'}</small>
                   <small>
-                    {row.customerName ?? row.normalizedPhone ?? 'Walk-in'} · {row.orderTypeLabel}
+                    {row.orderTypeLabel} · {orderSourceLabel(row.source)}
                   </small>
                 </span>
-                <span>
-                  {orderStatusLabel(row.status)} · {orderSourceLabel(row.source)}
+                <span className="admin-order-row__summary">
+                  <b className="admin-order-row__amount">{formatEgp(row.totalMinor)}</b>
+                  <span className="admin-order-row__status">{orderStatusLabel(row.status)}</span>
+                  <time dateTime={row.createdAt}>
+                    {new Intl.DateTimeFormat('en-EG', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                      timeZone: 'Africa/Cairo',
+                    }).format(new Date(row.createdAt))}
+                  </time>
                 </span>
               </button>
             ))}
@@ -241,7 +300,16 @@ export function OrdersPage() {
           ) : ordersApi.detailQuery.isError ? (
             <ErrorState
               title="Order unavailable"
-              description="This order may not exist or may not be available in your current shop scope."
+              description={`This order may not exist or may not be accessible in ${shopName}. Return to the current shop's orders.`}
+              action={
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  onClick={() => navigate('/orders')}
+                >
+                  Back to shop orders
+                </button>
+              }
             />
           ) : detail ? (
             <>
@@ -298,8 +366,17 @@ export function OrdersPage() {
             </>
           ) : (
             <EmptyState
-              title="Order unavailable"
-              description="Choose another order from the list."
+              title="Order unavailable in this shop"
+              description={`This order is not available in ${shopName}. Open an order from the current shop's history instead.`}
+              action={
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  onClick={() => navigate('/orders')}
+                >
+                  Back to shop orders
+                </button>
+              }
             />
           )
         }

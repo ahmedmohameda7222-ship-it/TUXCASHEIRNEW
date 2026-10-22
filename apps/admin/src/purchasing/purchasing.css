@@ -1,0 +1,11 @@
+/* Deterministic Purchasing action grouping on cold route loads. */
+.admin-purchasing-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.admin-purchasing-page-actions > * {
+  max-width: 100%;
+}

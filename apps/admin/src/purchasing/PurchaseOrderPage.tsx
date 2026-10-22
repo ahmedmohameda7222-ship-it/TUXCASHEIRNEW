@@ -1,3 +1,4 @@
+import './purchaseOrder.css';
 import type { AdminPurchaseOrder, AdminPurchasingInventoryItem } from '@tux/admin-contracts';
 import { DraftPurchaseOrderLinesEditor } from './DraftPurchaseOrderLinesEditor';
 import { useEffect, useState } from 'react';
@@ -76,11 +77,11 @@ export function PurchaseOrderPage({
 
   return (
     <section className="admin-card" aria-label="Purchase order detail">
-      <div className="admin-inventory-list__header">
-        <span>
+      <div className="admin-purchasing-order-header">
+        <div className="admin-purchasing-order-header__identity">
           <strong>{order.reference ?? `Purchase order · ${order.supplierName}`}</strong>
           <small>{order.supplierName}</small>
-        </span>
+        </div>
         <strong>{statusLabel(order.status)}</strong>
       </div>
       <dl className="admin-definition-grid">
@@ -117,7 +118,7 @@ export function PurchaseOrderPage({
                 onChange={(event) => setExpectedDate(event.currentTarget.value)}
               />
             </label>
-            <div className="admin-inventory-page-actions">
+            <div className="admin-purchasing-page-actions">
               <button className="admin-primary-button" type="submit" disabled={updating}>
                 Save draft
               </button>
@@ -169,7 +170,7 @@ export function PurchaseOrderPage({
           </article>
         ))}
       </div>
-      <div className="admin-inventory-page-actions">
+      <div className="admin-purchasing-page-actions">
         {(order.status === 'DRAFT' || order.status === 'ORDERED') && canManage ? (
           confirmCancel ? (
             <div className="admin-form-grid">

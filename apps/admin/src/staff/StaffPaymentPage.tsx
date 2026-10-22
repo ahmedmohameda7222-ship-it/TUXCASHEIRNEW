@@ -40,7 +40,7 @@ export function StaffPaymentPage({
     <section aria-label="Pay">
       <h3>Pay</h3>
       {employee.payments.map((payment) => (
-        <article className="admin-inventory-row" key={payment.id}>
+        <article className="admin-staff-record-row" key={payment.id}>
           <span>
             <strong>{(payment.paidAmountMinor / 100).toFixed(2)} EGP</strong>
             <small>
@@ -52,13 +52,13 @@ export function StaffPaymentPage({
       ))}
       {!canPay ? <p>Staff payment access is not included in your permissions.</p> : null}
       {canPay && available.length === 0 ? (
-        <div className="admin-empty-state">
+        <div className="admin-staff-readiness-state">
           <strong>No active payment account</strong>
           <span>Create or activate a scoped finance account before recording staff payment.</span>
         </div>
       ) : null}
       {canPay && available.length > 0 ? (
-        <section className="admin-catalog-editor__section is-compact">
+        <section className="admin-staff-section is-compact">
           <label className="admin-field">
             <span>Payment account</span>
             <select value={accountId} onChange={(event) => setAccountId(event.target.value)}>
