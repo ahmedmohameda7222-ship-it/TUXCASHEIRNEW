@@ -1,0 +1,51 @@
+# Temporary one-shot CI formatting of the Owner-authorized P04-P07 acceptance patch.
+# Only PR #127 from this repository is permitted; remove this workflow after it executes.
+name: P04-P07 Acceptance Format Once
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/admin-p04-p07-format-once.yml'
+permissions:
+  contents: write
+jobs:
+  format-exact-pr-127:
+    if: github.event.pull_request.number == 127 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/admin-premium-p04-p07-combined'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Format ONLY targeted acceptance files and push to same Draft PR
+        run: |
+          npx prettier --write \
+            apps/admin/src/orders/OrdersPage.tsx \
+            apps/admin/src/orders/orders.css \
+            e2e/admin-inventory.spec.ts \
+            e2e/admin-purchasing.spec.ts \
+            e2e/admin-orders.spec.ts \
+            e2e/admin-customers-promotions.spec.ts \
+            e2e/admin-workforce.spec.ts \
+            e2e/admin-finance.spec.ts \
+            e2e/admin-reports.spec.ts \
+            e2e/premiumVisualEvidence.ts \
+            .github/workflows/admin-p04-p07-targeted-acceptance.yml
+          git diff --check
+          git add -- \
+            apps/admin/src/orders/OrdersPage.tsx apps/admin/src/orders/orders.css \
+            e2e/admin-inventory.spec.ts e2e/admin-purchasing.spec.ts \
+            e2e/admin-orders.spec.ts e2e/admin-customers-promotions.spec.ts \
+            e2e/admin-workforce.spec.ts e2e/admin-finance.spec.ts \
+            e2e/admin-reports.spec.ts e2e/premiumVisualEvidence.ts \
+            .github/workflows/admin-p04-p07-targeted-acceptance.yml
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'style(admin): prettier final P04-P07 acceptance corrections'
+            git push origin HEAD:refs/heads/feat/admin-premium-p04-p07-combined
+          fi
