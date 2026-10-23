@@ -52,6 +52,7 @@ import type {
 import { startBrowserAutomaticSync } from './automaticSync';
 import { VercelBrowserRemoteGateway } from './browserRemote';
 import { selectBrowserShop } from './browserShopScope';
+import { fenceStaleBrowserSession } from './browserSessionScope';
 import { BrowserOrderPrinter } from './browserOrderPrinter';
 import { BrowserOrderRewardAuthority } from './browserOrderRewards';
 import { VercelBrowserWhatsAppRemote } from './browserWhatsAppRemote';
@@ -432,8 +433,13 @@ async function browserRuntime(): Promise<BrowserRuntime> {
             });
           }
           await selectBrowserShop(database, readModel, bootstrap.shop, bootstrap.worker);
-          startRemoteRuntime(bootstrap.shopId);
-          return session.submitPin(pin);
+          const signedIn = await session.submitPin(pin);
+          // The remote cookie and the local PIN result must both be valid before
+          // background sync is permitted to run under this shop.
+          if (signedIn.ok && signedIn.value.status === 'ACTIVE') {
+            startRemoteRuntime(signedIn.value.shopId);
+          }
+          return signedIn;
         } catch (cause) {
           return err({
             code: 'REMOTE_SYNC_ERROR',
@@ -468,7 +474,11 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       };
 
       const getState = async (): Promise<OperationsSessionResult> => {
-        const result = await session.getState();
+        const result = await fenceStaleBrowserSession(
+          await session.getState(),
+          async () => (await remoteGateway.currentSession())?.shopId ?? null,
+          () => session.signOut(),
+        );
         trackWorkerIdentity(result);
         return result;
       };
