@@ -14,6 +14,8 @@ describe('Operations shop-scoped background sync lifecycle', () => {
   it('stops the background sync at sign out and when a stale server session is fenced', () => {
     expect(source).toContain('const stopRemoteRuntime = (): void => {');
     expect(source).toContain('stopRemoteRuntime();');
-    expect(source).toContain('if (!result.ok || result.value.status !== \'ACTIVE\') stopRemoteRuntime();');
+    expect(source).toContain(
+      "if (!result.ok || result.value.status !== 'ACTIVE') stopRemoteRuntime();",
+    );
   });
 });
