@@ -41,7 +41,7 @@ jobs:
           git diff --exit-code
       - name: Install Operations browser test
         run: |
-          npm run build -w @tux/operations
+          npm run build -w @tux/operations -- --mode e2e-operations
           npx playwright install chromium
       - name: Chromium branch picker Desktop + Mobile
         run: npx playwright test e2e/operations-branch-login.e2e.ts --project=desktop-browser-fallback --project=mobile-browser-fallback
