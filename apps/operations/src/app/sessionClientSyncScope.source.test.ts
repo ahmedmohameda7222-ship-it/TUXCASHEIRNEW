@@ -11,6 +11,11 @@ describe('Operations shop-scoped background sync lifecycle', () => {
     expect(source).toContain('activeSyncShopId = shopId;');
   });
 
+  it('restarts the right shop sync if an authenticated state recovers after a transient failure', () => {
+    expect(source).toContain("if (result.ok && result.value.status === 'ACTIVE') {");
+    expect(source).toContain('startRemoteRuntime(result.value.shopId);');
+  });
+
   it('stops the background sync at sign out and when a stale server session is fenced', () => {
     expect(source).toContain('const stopRemoteRuntime = (): void => {');
     expect(source).toContain('stopRemoteRuntime();');
