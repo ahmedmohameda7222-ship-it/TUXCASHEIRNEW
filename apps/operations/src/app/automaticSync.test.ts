@@ -192,6 +192,23 @@ describe('startBrowserAutomaticSync', () => {
     await vi.waitFor(() => expect(reconcileClaims).toHaveBeenCalledTimes(1));
   });
 
+  it('ignores an in-flight sync completion from a shop that has signed out', () => {
+    const handle = startBrowserAutomaticSync({
+      database: {} as OperationsDatabase,
+      now: () => '2026-08-24T06:00:00.000Z' as Instant,
+      shopId: '14000000-0000-4000-8000-000000000001' as never,
+    });
+    const priorOnStart = harness.schedulerOptions?.onStart;
+    const priorOnResult = harness.schedulerOptions?.onResult;
+    handle.stop();
+
+    priorOnStart?.();
+    priorOnResult?.(cleanSummary);
+
+    expect(harness.markSyncStarted).not.toHaveBeenCalled();
+    expect(harness.markSyncFinished).not.toHaveBeenCalled();
+  });
+
   it('tears down shop-scoped timers and listeners when the authenticated shop ends', () => {
     const callbacks: Array<() => void> = [];
     const setIntervalMock = vi.fn((callback: () => void) => {
