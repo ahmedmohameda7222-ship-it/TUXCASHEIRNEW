@@ -494,7 +494,11 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           async () => (await remoteGateway.currentSession())?.shopId ?? null,
           () => session.signOut(),
         );
-        if (!result.ok || result.value.status !== 'ACTIVE') stopRemoteRuntime();
+        if (result.ok && result.value.status === 'ACTIVE') {
+          startRemoteRuntime(result.value.shopId);
+        } else {
+          stopRemoteRuntime();
+        }
         trackWorkerIdentity(result);
         return result;
       };
