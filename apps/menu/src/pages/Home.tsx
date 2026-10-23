@@ -285,6 +285,9 @@ export default function Home() {
           <img
             src={truckImg}
             alt="TUX Truck"
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
             className="w-full h-full object-cover object-center"
           />
           <div className="absolute inset-0 bg-[#0D0D0D]/80" />
