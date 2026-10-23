@@ -45,7 +45,10 @@ test('E2E TypeScript changes must typecheck even without app changes', () => {
 });
 
 test('Admin order and shared sync changes are both in scope', () => {
-  const scope = classifyFiles(['apps/admin/src/orders/useOrders.ts', 'packages/sync/src/outboxSync.ts']);
+  const scope = classifyFiles([
+    'apps/admin/src/orders/useOrders.ts',
+    'packages/sync/src/outboxSync.ts',
+  ]);
   assert.equal(scope.admin, true);
   assert.equal(scope.operations, true);
   assert.equal(scope.shared, true);

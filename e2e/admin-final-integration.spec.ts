@@ -405,4 +405,3 @@ test('keeps device controls honest and unavailable without a safe transport', as
   await expect(page.getByRole('button', { name: 'Revoke' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Test print' })).toBeDisabled();
 });
-
