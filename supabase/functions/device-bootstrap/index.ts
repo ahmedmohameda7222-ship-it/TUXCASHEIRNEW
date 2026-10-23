@@ -8,6 +8,7 @@ const DERIVED_KEY_BYTES = 32;
 const MAX_ATTEMPTS = 8;
 const WINDOW_SECONDS = 15 * 60;
 const BOOTSTRAP_PROVENANCE_VERSION = 'tux-device-bootstrap:v1';
+const SHOP_SCOPED_BOOTSTRAP_PROVENANCE_VERSION = 'tux-device-bootstrap:v2';
 const BOOTSTRAP_PROVENANCE_MAX_SKEW_SECONDS = 5 * 60;
 const MIN_BOOTSTRAP_HMAC_SECRET_BYTES = 32;
 
@@ -16,6 +17,7 @@ interface TrustedBootstrapBody {
   readonly deviceId: string;
   readonly deviceLabel: string;
   readonly rateLimitKey: string;
+  readonly shopId?: string;
 }
 
 function jsonResponse(status: number, body: unknown, retryAfter?: number): Response {
@@ -59,13 +61,16 @@ function canonicalBootstrapRequest(
   nonce: string,
 ): string {
   return JSON.stringify([
-    BOOTSTRAP_PROVENANCE_VERSION,
+    body.shopId === undefined
+      ? BOOTSTRAP_PROVENANCE_VERSION
+      : SHOP_SCOPED_BOOTSTRAP_PROVENANCE_VERSION,
     timestamp,
     nonce,
     body.rateLimitKey.toLowerCase(),
     body.deviceId.toLowerCase(),
     body.deviceLabel,
     body.pin,
+    ...(body.shopId === undefined ? [] : [body.shopId.toLowerCase()]),
   ]);
 }
 
@@ -202,10 +207,13 @@ Deno.serve(async (request) => {
   const requestedLabel =
     typeof body['deviceLabel'] === 'string' ? body['deviceLabel'].trim().slice(0, 120) : '';
   const rateKey = typeof body['rateLimitKey'] === 'string' ? body['rateLimitKey'].trim() : '';
+  const rawShopId = body['shopId'];
+  const shopId = typeof rawShopId === 'string' ? rawShopId.trim().toLowerCase() : null;
   if (
     !/^\d{4,12}$/.test(pin) ||
     !UUID_PATTERN.test(deviceId) ||
-    !RATE_KEY_PATTERN.test(rateKey)
+    !RATE_KEY_PATTERN.test(rateKey) ||
+    (rawShopId !== undefined && (shopId === null || !UUID_PATTERN.test(shopId)))
   ) {
     return jsonResponse(400, { error: 'invalid_bootstrap_request' });
   }
@@ -215,6 +223,7 @@ Deno.serve(async (request) => {
     deviceId,
     deviceLabel: requestedLabel,
     rateLimitKey: rateKey.toLowerCase(),
+    ...(shopId === null ? {} : { shopId }),
   };
   const provenanceNonce = await verifiedProvenanceNonce(request, trustedBody, hmacSecret);
   if (provenanceNonce === null) {
@@ -259,19 +268,38 @@ Deno.serve(async (request) => {
     return jsonResponse(429, { error: 'too_many_pin_attempts' }, retryAfter);
   }
 
-  const { data: shops, error: shopError } = await service
-    .from('shops')
-    .select('id,name,active')
-    .eq('active', true)
-    .limit(2);
-  if (shopError) {
-    console.error('worker PIN bootstrap shop lookup failed', shopError);
-    return jsonResponse(500, { error: 'shop_lookup_failed' });
+  // Explicit, HMAC-bound shop selection replaces global single-shop assumptions.
+  // An unknown shop and an unknown worker must not disclose different details.
+  // v1 is retained solely for backward compatibility with single-shop installs.
+  let shop: { id: string; name: string; active: boolean };
+  if (trustedBody.shopId !== undefined) {
+    const { data: selected, error: shopError } = await service
+      .from('shops')
+      .select('id,name,active')
+      .eq('id', trustedBody.shopId)
+      .eq('active', true)
+      .maybeSingle();
+    if (shopError) {
+      console.error('worker PIN bootstrap shop lookup failed', shopError);
+      return jsonResponse(500, { error: 'shop_lookup_failed' });
+    }
+    if (!selected) return jsonResponse(401, { error: 'invalid_pin' });
+    shop = selected as { id: string; name: string; active: boolean };
+  } else {
+    const { data: shops, error: shopError } = await service
+      .from('shops')
+      .select('id,name,active')
+      .eq('active', true)
+      .limit(2);
+    if (shopError) {
+      console.error('worker PIN bootstrap shop lookup failed', shopError);
+      return jsonResponse(500, { error: 'shop_lookup_failed' });
+    }
+    if (!Array.isArray(shops) || shops.length !== 1) {
+      return jsonResponse(503, { error: 'single_active_shop_required' });
+    }
+    shop = shops[0] as { id: string; name: string; active: boolean };
   }
-  if (!Array.isArray(shops) || shops.length !== 1) {
-    return jsonResponse(503, { error: 'single_active_shop_required' });
-  }
-  const shop = shops[0] as { id: string; name: string; active: boolean };
 
   const { data: workers, error: workerError } = await service
     .from('workers')

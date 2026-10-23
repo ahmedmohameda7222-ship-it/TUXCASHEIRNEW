@@ -14,6 +14,7 @@ const COOKIE_SHOP = 'tux_ops_shop';
 const COOKIE_DEVICE = 'tux_ops_device';
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const BOOTSTRAP_PROVENANCE_VERSION = 'tux-device-bootstrap:v1';
+const SHOP_SCOPED_BOOTSTRAP_PROVENANCE_VERSION = 'tux-device-bootstrap:v2';
 const MIN_BOOTSTRAP_HMAC_SECRET_BYTES = 32;
 
 interface TrustedBootstrapBody {
@@ -21,6 +22,7 @@ interface TrustedBootstrapBody {
   readonly deviceId: string;
   readonly deviceLabel: string;
   readonly rateLimitKey: string;
+  readonly shopId?: string;
 }
 
 function firstHeader(value: string | string[] | undefined): string {
@@ -86,13 +88,16 @@ function canonicalBootstrapRequest(
   nonce: string,
 ): string {
   return JSON.stringify([
-    BOOTSTRAP_PROVENANCE_VERSION,
+    body.shopId === undefined
+      ? BOOTSTRAP_PROVENANCE_VERSION
+      : SHOP_SCOPED_BOOTSTRAP_PROVENANCE_VERSION,
     timestamp,
     nonce,
     body.rateLimitKey.toLowerCase(),
     body.deviceId.toLowerCase(),
     body.deviceLabel,
     body.pin,
+    ...(body.shopId === undefined ? [] : [body.shopId.toLowerCase()]),
   ]);
 }
 
@@ -136,13 +141,16 @@ export async function bootstrapDeviceWithWorkerPin(
 
   const pin = requiredString(body['pin']);
   const deviceId = requiredString(body['deviceId']);
+  const rawShopId = body['shopId'];
+  const shopId = rawShopId === undefined ? undefined : requiredString(rawShopId);
   const deviceLabel =
     typeof body['deviceLabel'] === 'string' ? body['deviceLabel'].trim().slice(0, 120) : '';
   if (
     pin === null ||
     !/^\d{4,12}$/.test(pin) ||
     deviceId === null ||
-    !UUID_PATTERN.test(deviceId)
+    !UUID_PATTERN.test(deviceId) ||
+    (rawShopId !== undefined && (shopId === null || !UUID_PATTERN.test(shopId)))
   ) {
     sendJson(response, 400, { error: 'invalid_bootstrap_request' });
     return;
@@ -153,6 +161,7 @@ export async function bootstrapDeviceWithWorkerPin(
     deviceId,
     deviceLabel,
     rateLimitKey: rateLimitKey(request),
+    ...(shopId === undefined ? {} : { shopId }),
   };
   const timestamp = Math.floor(Date.now() / 1000);
   const nonce = randomUUID();
