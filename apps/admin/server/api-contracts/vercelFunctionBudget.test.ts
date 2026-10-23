@@ -11,7 +11,7 @@ describe('Hobby deployment API entrypoint budget', () => {
     expect(entries).toHaveLength(12);
   });
 
-  it('routes the four correction commands through existing trusted server handlers', () => {
+  it('routes correction commands and bounded feature reads through existing trusted server handlers', () => {
     const config = JSON.parse(readFileSync(join(appRoot, 'vercel.json'), 'utf8')) as {
       routes: Array<{ src?: string; dest?: string }>;
     };
@@ -20,6 +20,9 @@ describe('Hobby deployment API entrypoint budget', () => {
       '/api/admin/shop-copy-preview': '/api/admin/settings?__adminResource=shop-copy-preview',
       '/api/admin/payment-zone-rules': '/api/admin/settings?__adminResource=payment-zone-rules',
       '/api/admin/approval-rules': '/api/admin/approvals?__adminResource=approval-rules',
+      '/api/admin/alerts': '/api/admin/orders?__adminResource=alerts',
+      '/api/admin/operations-health': '/api/admin/orders?__adminResource=operations-health',
+      '/api/admin/whatsapp': '/api/admin/orders?__adminResource=whatsapp',
     };
     for (const [src, dest] of Object.entries(required)) {
       expect(config.routes).toContainEqual({ src, dest });

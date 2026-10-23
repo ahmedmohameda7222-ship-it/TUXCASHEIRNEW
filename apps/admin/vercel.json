@@ -51,6 +51,18 @@
       "dest": "/api/admin/orders?__adminResource=reports"
     },
     {
+      "src": "/api/admin/alerts",
+      "dest": "/api/admin/orders?__adminResource=alerts"
+    },
+    {
+      "src": "/api/admin/operations-health",
+      "dest": "/api/admin/orders?__adminResource=operations-health"
+    },
+    {
+      "src": "/api/admin/whatsapp",
+      "dest": "/api/admin/orders?__adminResource=whatsapp"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }

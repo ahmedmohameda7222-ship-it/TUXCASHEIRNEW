@@ -1,0 +1,52 @@
+import { useShopScope } from '../shops/ShopScopeProvider';
+import { useWhatsApp, useWhatsAppMutation } from './useWhatsApp';
+import { WhatsAppFrame } from './WhatsAppPage';
+export function AutomaticMessagesPage() {
+  const { scope } = useShopScope();
+  const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
+  const q = useWhatsApp(shopId, 'automatic-messages');
+  const d = q.data?.view === 'automatic-messages' ? q.data : undefined;
+  const m = useWhatsAppMutation();
+  return (
+    <WhatsAppFrame
+      title="Automatic Messages"
+      description="Automation is off by default and only verified canonical events may create deduplicated intents."
+    >
+      <p className="admin-whatsapp-banner">
+        <strong>Master automation: {d?.automationEnabled ? 'On' : 'Off'}</strong>
+      </p>
+      <div className="admin-whatsapp-list">
+        {d?.rows.map((r) => (
+          <article key={r.id}>
+            <strong>{r.eventType.replaceAll('_', ' ')}</strong>
+            <span>Template: {r.templateState ?? 'Unavailable'}</span>
+            <span>{r.supported ? 'Canonical source available' : r.unsupportedReason}</span>
+            <span>{r.enabled ? 'On' : 'Off'}</span>
+            {d.canManage && shopId ? (
+              <button
+                className="admin-secondary-button"
+                disabled={!r.supported || r.templateState !== 'APPROVED' || m.isPending}
+                onClick={() =>
+                  m.mutate({
+                    type: 'event-rule.set',
+                    shopId,
+                    commandId: crypto.randomUUID(),
+                    expectedVersion: r.version,
+                    payload: {
+                      id: r.id,
+                      templateId: r.templateId,
+                      languageCode: r.languageCode,
+                      enabled: !r.enabled,
+                    },
+                  })
+                }
+              >
+                {r.enabled ? 'Turn off' : 'Turn on'}
+              </button>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </WhatsAppFrame>
+  );
+}

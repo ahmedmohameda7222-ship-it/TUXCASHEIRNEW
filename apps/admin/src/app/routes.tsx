@@ -10,6 +10,62 @@ const ApprovalRulesPage = lazy(() =>
 const ApprovalsPage = lazy(() =>
   import('../approvals/ApprovalsPage').then((module) => ({ default: module.ApprovalsPage })),
 );
+const AlertsPage = lazy(() =>
+  import('../alerts/AlertsPage').then((module) => ({ default: module.AlertsPage })),
+);
+const ShopHealthPage = lazy(() =>
+  import('../operations/ShopHealthPage').then((module) => ({ default: module.ShopHealthPage })),
+);
+const DevicesPage = lazy(() =>
+  import('../operations/DevicesPage').then((module) => ({ default: module.DevicesPage })),
+);
+const DeviceDetailPage = lazy(() =>
+  import('../operations/DeviceDetailPage').then((module) => ({ default: module.DeviceDetailPage })),
+);
+const PrintersPage = lazy(() =>
+  import('../operations/PrintersPage').then((module) => ({ default: module.PrintersPage })),
+);
+const OpeningClosingPage = lazy(() =>
+  import('../operations/OpeningClosingPage').then((module) => ({
+    default: module.OpeningClosingPage,
+  })),
+);
+const ManagerLogPage = lazy(() =>
+  import('../operations/ManagerLogPage').then((module) => ({ default: module.ManagerLogPage })),
+);
+const WhatsAppPage = lazy(() =>
+  import('../whatsapp/WhatsAppPage').then((module) => ({ default: module.WhatsAppPage })),
+);
+const ConversationsPage = lazy(() =>
+  import('../whatsapp/ConversationsPage').then((module) => ({ default: module.ConversationsPage })),
+);
+const ConversationDetailPage = lazy(() =>
+  import('../whatsapp/ConversationDetailPage').then((module) => ({
+    default: module.ConversationDetailPage,
+  })),
+);
+const TemplatesPage = lazy(() =>
+  import('../whatsapp/TemplatesPage').then((module) => ({ default: module.TemplatesPage })),
+);
+const QuickRepliesPage = lazy(() =>
+  import('../whatsapp/QuickRepliesPage').then((module) => ({ default: module.QuickRepliesPage })),
+);
+const AutomaticMessagesPage = lazy(() =>
+  import('../whatsapp/AutomaticMessagesPage').then((module) => ({
+    default: module.AutomaticMessagesPage,
+  })),
+);
+const AnalyticsPage = lazy(() =>
+  import('../whatsapp/AnalyticsPage').then((module) => ({ default: module.AnalyticsPage })),
+);
+const ChannelsPage = lazy(() =>
+  import('../whatsapp/ChannelsPage').then((module) => ({ default: module.ChannelsPage })),
+);
+const WhatsAppHealthPage = lazy(() =>
+  import('../whatsapp/WhatsAppHealthPage').then((module) => ({
+    default: module.WhatsAppHealthPage,
+  })),
+);
 const AuditPage = lazy(() =>
   import('../audit/AuditPage').then((module) => ({ default: module.AuditPage })),
 );
@@ -96,6 +152,7 @@ export const ADMIN_NAV_GROUPS = [
   },
   { label: 'People', paths: ['/staff', '/customers'] },
   { label: 'Business', paths: ['/finance', '/reports'] },
+  { label: 'Monitoring & messaging', paths: ['/alerts', '/devices', '/whatsapp'] },
   { label: 'Administration', paths: ['/settings', '/approvals', '/approvals/rules', '/audit'] },
 ] as const;
 
@@ -139,6 +196,31 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   if (route.path === '/settings') return <SettingsPage />;
   if (route.path === '/approvals/rules') return <ApprovalRulesPage />;
   if (route.path === '/approvals') return <ApprovalsPage />;
+  if (route.path === '/alerts') return <AlertsPage />;
+  if (route.path === '/devices') {
+    if (location === '/devices') return <ShopHealthPage />;
+    if (location === '/devices/list') return <DevicesPage />;
+    if (location === '/devices/printers') return <PrintersPage />;
+    if (location === '/devices/opening-closing') return <OpeningClosingPage />;
+    if (location === '/devices/manager-log') return <ManagerLogPage />;
+    return <DeviceDetailPage />;
+  }
+  if (route.path === '/whatsapp') {
+    if (location === '/whatsapp') return <WhatsAppPage />;
+    if (location === '/whatsapp/conversations') return <ConversationsPage />;
+    if (location.startsWith('/whatsapp/conversations/'))
+      return (
+        <ConversationDetailPage
+          conversationId={location.slice('/whatsapp/conversations/'.length)}
+        />
+      );
+    if (location === '/whatsapp/templates') return <TemplatesPage />;
+    if (location === '/whatsapp/quick-replies') return <QuickRepliesPage />;
+    if (location === '/whatsapp/automatic-messages') return <AutomaticMessagesPage />;
+    if (location === '/whatsapp/analytics') return <AnalyticsPage />;
+    if (location === '/whatsapp/channels') return <ChannelsPage />;
+    if (location === '/whatsapp/health') return <WhatsAppHealthPage />;
+  }
   if (route.path === '/audit') return <AuditPage />;
   if (route.path === '/inventory') return <InventoryPage />;
   if (route.path === '/orders') return <OrdersPage />;
@@ -159,9 +241,7 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
       (candidate) =>
         !new Set(['/', '/orders', '/catalog/products', '/inventory', '/more']).has(
           candidate.path,
-        ) &&
-        !new Set(['/alerts', '/devices', '/whatsapp']).has(candidate.path) &&
-        routeIsPermitted(principal, candidate.path),
+        ) && routeIsPermitted(principal, candidate.path),
     );
     return (
       <PageScaffold

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -20,9 +20,22 @@ if (migrations.length === 0) throw new Error('No repository migrations were foun
 const productDescriptionMigration = '20260827010000_tux_menu_product_descriptions.sql';
 
 function psql(args, label) {
-  const result = spawnSync('psql', [databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', ...args], {
+  const dockerContainer = process.env.TEST_PSQL_DOCKER_CONTAINER;
+  const normalizedArgs = [...args];
+  let input;
+  const fileIndex = normalizedArgs.indexOf('-f');
+  if (fileIndex >= 0 && dockerContainer) {
+    input = readFileSync(normalizedArgs[fileIndex + 1], 'utf8');
+    normalizedArgs.splice(fileIndex, 2, '-f', '-');
+  }
+  const command = dockerContainer ? 'docker' : 'psql';
+  const commandArgs = dockerContainer
+    ? ['exec', '-i', dockerContainer, 'psql', 'postgresql://postgres:postgres@127.0.0.1:5432/tux_daily', '-X', '-v', 'ON_ERROR_STOP=1', ...normalizedArgs]
+    : [databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', ...normalizedArgs];
+  const result = spawnSync(command, commandArgs, {
     encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
+    input,
+    stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
   });
   if (result.status !== 0) {
     process.stderr.write(result.stdout ?? '');
@@ -342,7 +355,9 @@ function assertWorkerPreferenceRpcCompatibility() {
 psql(
   [
     '-c',
-    `drop schema if exists public cascade;
+    `drop schema if exists private cascade;
+     create schema private;
+     drop schema if exists public cascade;
      create schema public;
      drop schema if exists auth cascade;
      create schema auth;

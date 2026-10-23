@@ -1,0 +1,84 @@
+import { useState } from 'react';
+import { useShopScope, useUnsavedShopDraft } from '../shops/ShopScopeProvider';
+import { useWhatsApp, useWhatsAppMutation } from './useWhatsApp';
+import { WhatsAppFrame } from './WhatsAppPage';
+export function QuickRepliesPage() {
+  const { scope } = useShopScope();
+  const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
+  const q = useWhatsApp(shopId, 'quick-replies');
+  const d = q.data?.view === 'quick-replies' ? q.data : undefined;
+  const m = useWhatsAppMutation();
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  useUnsavedShopDraft(Boolean(title || body));
+  return (
+    <WhatsAppFrame
+      title="Quick Replies"
+      description="Manage bounded plain-text snippets for Operations workers."
+    >
+      {d?.canManage && shopId ? (
+        <form
+          className="admin-whatsapp-editor"
+          onSubmit={(e) => {
+            e.preventDefault();
+            m.mutate({
+              type: 'quick-reply.upsert',
+              shopId,
+              commandId: crypto.randomUUID(),
+              expectedVersion: 0,
+              payload: { id: null, title, body, sortPosition: d.rows.length },
+            });
+          }}
+        >
+          <label>
+            Title
+            <input
+              maxLength={120}
+              value={title}
+              onChange={(e) => setTitle(e.currentTarget.value)}
+            />
+          </label>
+          <label>
+            Body
+            <textarea
+              maxLength={1024}
+              value={body}
+              onChange={(e) => setBody(e.currentTarget.value)}
+            />
+          </label>
+          <button
+            className="admin-primary-button"
+            disabled={!title.trim() || !body.trim() || m.isPending}
+          >
+            Save quick reply
+          </button>
+        </form>
+      ) : null}
+      <div className="admin-whatsapp-list">
+        {d?.rows.map((r) => (
+          <article key={r.id}>
+            <strong>{r.title}</strong>
+            <p>{r.body}</p>
+            <span>{r.enabled ? 'Enabled' : 'Disabled'}</span>
+            {d.canManage && r.enabled && shopId ? (
+              <button
+                className="admin-secondary-button"
+                onClick={() =>
+                  m.mutate({
+                    type: 'quick-reply.disable',
+                    shopId,
+                    commandId: crypto.randomUUID(),
+                    expectedVersion: r.version,
+                    payload: { id: r.id },
+                  })
+                }
+              >
+                Disable
+              </button>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </WhatsAppFrame>
+  );
+}

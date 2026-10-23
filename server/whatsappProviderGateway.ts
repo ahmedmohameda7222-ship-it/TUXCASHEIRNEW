@@ -13,6 +13,7 @@ export type SendWhatsAppProviderMessageInput =
       readonly kind: 'TEMPLATE';
       readonly providerTemplateName: string;
       readonly languageCode: string;
+      readonly variables?: readonly string[];
     };
 
 export interface WhatsAppProviderMedia {
@@ -136,6 +137,18 @@ export function createWhatsAppProviderGateway(
         input.languageCode.trim().length === 0
       ) {
         throw new Error('WhatsApp template metadata is invalid.');
+      } else if (
+        input.variables !== undefined &&
+        (input.variables.length > 5 ||
+          input.variables.some((value) => {
+            const hasControl = Array.from(value).some((character) => {
+              const code = character.charCodeAt(0);
+              return code <= 0x1f || code === 0x7f;
+            });
+            return value.trim().length === 0 || value.length > 256 || hasControl;
+          }))
+      ) {
+        throw new Error('WhatsApp template variables are invalid.');
       }
 
       const phone = normalizeEgyptianPhone(input.to);
@@ -171,6 +184,19 @@ export function createWhatsAppProviderGateway(
                     template: {
                       name: input.providerTemplateName,
                       language: { code: input.languageCode },
+                      ...(input.variables === undefined || input.variables.length === 0
+                        ? {}
+                        : {
+                            components: [
+                              {
+                                type: 'body',
+                                parameters: input.variables.map((value) => ({
+                                  type: 'text',
+                                  text: value,
+                                })),
+                              },
+                            ],
+                          }),
                     },
                   },
             ),

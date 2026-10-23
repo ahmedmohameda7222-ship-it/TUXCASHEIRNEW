@@ -1,4 +1,5 @@
-import { readdir, readFile } from 'node:fs/promises';
+/* global process, console */
+import { access, readdir, readFile } from 'node:fs/promises';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -95,7 +96,10 @@ for (const path of requestBoundaryFiles) {
   if (!text.includes('/api/whatsapp')) {
     fail(`${path} does not route WhatsApp authority through /api/whatsapp.`);
   }
-  if (!text.includes("action: 'CREATE_MEDIA_UPLOAD'") || !text.includes("action: 'FINALIZE_MEDIA_SEND'")) {
+  if (
+    !text.includes("action: 'CREATE_MEDIA_UPLOAD'") ||
+    !text.includes("action: 'FINALIZE_MEDIA_SEND'")
+  ) {
     fail(`${path} does not keep sendMedia behind the server-authorized media flow.`);
   }
 }
@@ -103,6 +107,53 @@ for (const path of requestBoundaryFiles) {
 const desktopRemote = await source('apps/operations-desktop/src/main/desktopWhatsAppRemote.ts');
 if (!desktopRemote.includes("'x-tux-device-id': deviceId")) {
   fail('Desktop WhatsApp device authority is not carried by the authentication header.');
+}
+
+const eventHandler = await source('server/whatsappEventDispatchHandler.ts');
+for (const expected of [
+  'timingSafeEqual',
+  "TUX_WHATSAPP_EVENT_DISPATCH_ENABLED']?.trim() === '1'",
+  'TUX_WHATSAPP_EVENT_DISPATCH_SECRET',
+  'expected.length < 32',
+]) {
+  if (!eventHandler.includes(expected)) fail(`event dispatcher does not enforce ${expected}.`);
+}
+for (const forbidden of ['requireDeviceSession', 'resolveOperationsDeviceAuthority']) {
+  if (eventHandler.includes(forbidden)) fail(`event dispatcher incorrectly trusts ${forbidden}.`);
+}
+
+const whatsappApi = await source('api/whatsapp.ts');
+if (!whatsappApi.includes("url.searchParams.get('__internalTask') === 'event-dispatch'")) {
+  fail('existing /api/whatsapp entrypoint does not explicitly route the internal dispatcher.');
+}
+if (!whatsappApi.includes('handleWhatsAppOperations(request, response)')) {
+  fail('existing Operations WhatsApp handler is no longer the default route.');
+}
+for (const forbiddenPath of [
+  'api/whatsapp-event-dispatch.ts',
+  'apps/operations/api/whatsapp-event-dispatch.ts',
+]) {
+  try {
+    await access(resolve(repoRoot, forbiddenPath));
+    fail(`${forbiddenPath} adds a forbidden public function entrypoint.`);
+  } catch {
+    // Expected: dispatcher shares the reviewed /api/whatsapp boundary.
+  }
+}
+
+const eventMigration = await source(
+  'supabase/migrations/20261022153000_whatsapp_event_dispatch.sql',
+);
+for (const expected of [
+  'provider_attempted_at is null',
+  "status='UNCERTAIN'",
+  'for update skip locked',
+  'sender_kind,system_event_intent_id',
+  'revoke execute on function public.lease_whatsapp_event_send_intents_v1',
+]) {
+  if (!eventMigration.toLowerCase().includes(expected.toLowerCase())) {
+    fail(`event dispatch migration is missing invariant: ${expected}.`);
+  }
 }
 
 const electronSecurity = await source('apps/operations-desktop/src/main/security.ts');
@@ -119,5 +170,7 @@ for (const expected of [
 }
 
 if (process.exitCode === undefined) {
-  console.log(`WhatsApp security gate passed (${productionSources.length} production source files scanned).`);
+  console.log(
+    `WhatsApp security gate passed (${productionSources.length} production source files scanned).`,
+  );
 }
