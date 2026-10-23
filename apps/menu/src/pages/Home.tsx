@@ -15,6 +15,7 @@ function BestSellersCarousel() {
   const autoPlayRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const touchStartX = useRef<number | null>(null);
   const total = bestSellers.length || 1;
+  const safeCurrent = current % total;
 
   const next = useCallback(() => {
     if (bestSellers.length <= 1) return;
@@ -63,7 +64,7 @@ function BestSellersCarousel() {
   const getVisibleItems = () => {
     if (bestSellers.length === 0) return [];
     if (bestSellers.length <= 3) return bestSellers;
-    return [0, 1, 2].map((offset) => bestSellers[(current + offset) % total]);
+    return [0, 1, 2].map((offset) => bestSellers[(safeCurrent + offset) % total]);
   };
 
   const visibleItems = getVisibleItems();
@@ -95,13 +96,13 @@ function BestSellersCarousel() {
       <div className="md:hidden">
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.div
-            key={`${bestSellers[current].id}-mobile`}
+            key={`${bestSellers[safeCurrent].id}-mobile`}
             initial={{ opacity: 0, x: direction === 'left' ? 60 : -60 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: direction === 'left' ? -60 : 60 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           >
-            <BestSellerCard item={bestSellers[current]} />
+            <BestSellerCard item={bestSellers[safeCurrent]} />
           </motion.div>
         </AnimatePresence>
       </div>
@@ -120,11 +121,11 @@ function BestSellersCarousel() {
             <button
               key={i}
               onClick={() => {
-                setDirection(i > current ? 'left' : 'right');
+                setDirection(i > safeCurrent ? 'left' : 'right');
                 setCurrent(i);
                 resetAutoPlay();
               }}
-              className={`h-2 rounded-full transition-all ${i === current ? 'bg-[#C9A84C] w-6' : 'bg-[#C9A84C]/20 w-2'}`}
+              className={`h-2 rounded-full transition-all ${i === safeCurrent ? 'bg-[#C9A84C] w-6' : 'bg-[#C9A84C]/20 w-2'}`}
             />
           ))}
         </div>
@@ -285,6 +286,9 @@ export default function Home() {
           <img
             src={truckImg}
             alt="TUX Truck"
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
             className="w-full h-full object-cover object-center"
           />
           <div className="absolute inset-0 bg-[#0D0D0D]/80" />

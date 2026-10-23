@@ -268,12 +268,16 @@ export async function buildPublicCatalogSnapshotV2(
   shopId: string,
   store: PublicCatalogStore,
 ): Promise<PublicCatalogSnapshotV2> {
-  const v1 = await buildPublicCatalogSnapshot(shopId, store);
   const loadProjection = store.getPublishedOrderingProjection;
   if (!loadProjection) {
     throw new CatalogUnavailableError('published ordering projection is unavailable');
   }
-  const projection = await loadProjection.call(store, shopId);
+  // The public catalog and immutable published ordering policy are independent.
+  // Start both RPC reads together, after the requested shop has been authorized.
+  const [v1, projection] = await Promise.all([
+    buildPublicCatalogSnapshot(shopId, store),
+    loadProjection.call(store, shopId),
+  ]);
   if (projection === null) {
     throw new CatalogUnavailableError('published ordering projection is unavailable');
   }

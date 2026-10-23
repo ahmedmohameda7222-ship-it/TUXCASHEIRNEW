@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { AdminApiError } from '../lib/adminApi';
-import { shouldRetryAdminQuery } from './queryClient';
+import { queryClient, shouldRetryAdminQuery } from './queryClient';
 
 describe('Admin query retry policy', () => {
+  it('refreshes stale workspaces on tab focus or reconnect after external changes', () => {
+    expect(queryClient.getDefaultOptions().queries?.refetchOnWindowFocus).toBe(true);
+    expect(queryClient.getDefaultOptions().queries?.refetchOnReconnect).toBe(true);
+  });
+
   it.each([400, 401, 403, 404, 409, 422])('does not retry HTTP %i', (status) => {
     expect(shouldRetryAdminQuery(0, new AdminApiError(status, 'rejected'))).toBe(false);
   });

@@ -2,6 +2,8 @@ import { defineConfig } from '@playwright/test';
 
 const menuLayoutTouchSpec = /menu-layout-editor\.touch\.e2e\.ts/;
 const menuSuiteSpec = /(?:^|[\\/])menu[\\/]/;
+const branchLoginSpec = /operations-branch-login\.e2e\.ts/;
+const branchLoginIgnore = process.env['TUX_OPERATIONS_BRANCH_E2E'] === '1' ? [] : [branchLoginSpec];
 
 export default defineConfig({
   testDir: './e2e',
@@ -26,23 +28,23 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop-browser-fallback',
-      testIgnore: [menuLayoutTouchSpec, menuSuiteSpec],
+      testIgnore: [menuLayoutTouchSpec, menuSuiteSpec, ...branchLoginIgnore],
       use: { browserName: 'chromium', viewport: { width: 1440, height: 960 } },
     },
     {
       name: 'mobile-tablet-browser-fallback',
-      testIgnore: [menuLayoutTouchSpec, menuSuiteSpec],
+      testIgnore: [menuLayoutTouchSpec, menuSuiteSpec, ...branchLoginIgnore],
       use: { browserName: 'chromium', viewport: { width: 768, height: 1024 } },
     },
     {
       name: 'mobile-browser-fallback',
-      testIgnore: [menuLayoutTouchSpec, menuSuiteSpec],
+      testIgnore: [menuLayoutTouchSpec, menuSuiteSpec, ...branchLoginIgnore],
       use: { browserName: 'chromium', viewport: { width: 375, height: 812 } },
     },
     {
       name: 'touch-mobile-browser-fallback',
       testMatch: menuLayoutTouchSpec,
-      testIgnore: menuSuiteSpec,
+      testIgnore: [menuSuiteSpec, ...branchLoginIgnore],
       use: {
         browserName: 'chromium',
         viewport: { width: 375, height: 812 },

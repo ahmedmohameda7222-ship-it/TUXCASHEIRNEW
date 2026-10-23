@@ -89,6 +89,17 @@ interface BrowserRuntime {
   signOut(): Promise<OperationsSessionResult>;
 }
 
+// Only the intentionally named E2E fixture build running on loopback can
+// exercise legacy IndexedDB worker credentials without the server BFF.
+// Production, staging and authenticated branch-picker E2E retain the full
+// server-verified cookie + worker authentication boundary.
+const LEGACY_BROWSER_E2E =
+  import.meta.env.MODE === 'e2e-browser-fallback' &&
+  typeof window !== 'undefined' &&
+  (window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === 'localhost' ||
+    window.location.hostname.endsWith('.localhost'));
+
 let browserRuntimePromise: Promise<BrowserRuntime> | null = null;
 let browserWhatsAppPromise: Promise<TuxWhatsAppApi> | null = null;
 
@@ -174,13 +185,28 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         menuLayoutService,
         () => activeMenuLayoutIdentity,
       );
-      let automaticSyncStarted = false;
-      let configurationTimerStarted = false;
+      let activeSyncShopId: ShopId | null = null;
+      let automaticSyncHandle: ReturnType<typeof startBrowserAutomaticSync> | null = null;
+      let configurationTimer: number | null = null;
       let preferenceRetryStarted = false;
       let menuLayoutRetryStarted = false;
 
       const retryPreferences = (): void => {
         void preferencesRetry.syncActive();
+      };
+
+      // The reserved .localhost fixture exercises the actual preference
+      // subscription without enabling outbox, inventory or shop configuration
+      // polling. Production and the authenticated Branch + PIN E2E never enter
+      // this branch.
+      const startLegacyRemotePreferenceFixture = (): void => {
+        if (!LEGACY_BROWSER_E2E || !window.location.hostname.endsWith('.localhost')) return;
+        if (!preferenceRetryStarted) {
+          preferencesRetry.start();
+          preferenceRetryStarted = true;
+          window.addEventListener('online', retryPreferences);
+        }
+        retryPreferences();
       };
       const retryMenuLayout = (): void => {
         void menuLayoutRetry.syncActive();
@@ -190,19 +216,32 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         retryMenuLayout();
       };
 
+      const stopRemoteRuntime = (): void => {
+        automaticSyncHandle?.stop();
+        automaticSyncHandle = null;
+        if (configurationTimer !== null) {
+          window.clearInterval(configurationTimer);
+          configurationTimer = null;
+        }
+        activeSyncShopId = null;
+      };
+
       const startRemoteRuntime = (shopId: ShopId): void => {
-        if (!automaticSyncStarted) {
-          startBrowserAutomaticSync({
+        // A browser can change branches after signing out. Never leave Shop A's
+        // outbox, inventory or configuration polls active under Shop B's cookie.
+        if (activeSyncShopId !== shopId) {
+          stopRemoteRuntime();
+          automaticSyncHandle = startBrowserAutomaticSync({
             database,
             now: runtime.now,
             shopId,
             rewardClaims: rewardAuthority,
           });
-          automaticSyncStarted = true;
-        }
-        if (!configurationTimerStarted) {
-          window.setInterval(() => void configurationService.sync(shopId), 5 * 60 * 1000);
-          configurationTimerStarted = true;
+          configurationTimer = window.setInterval(
+            () => void configurationService.sync(shopId),
+            5 * 60 * 1000,
+          );
+          activeSyncShopId = shopId;
         }
         if (!preferenceRetryStarted) {
           preferencesRetry.start();
@@ -410,6 +449,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       ): Promise<OperationsSessionResult> => {
         try {
           const bootstrap = await remoteGateway.bootstrap(pin, shopId);
+          if (activeSyncShopId !== bootstrap.shopId) stopRemoteRuntime();
           const configuration = await configurationService.sync(bootstrap.shopId);
           if (
             configuration.status === 'REMOTE_UNAVAILABLE' ||
@@ -451,6 +491,14 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       };
 
       const submitPin = async (pin: string, shopId?: string): Promise<OperationsSessionResult> => {
+        if (LEGACY_BROWSER_E2E) {
+          const result = await session.submitPin(pin);
+          trackWorkerIdentity(result);
+          if (result.ok && result.value.status === 'ACTIVE') {
+            startLegacyRemotePreferenceFixture();
+          }
+          return result;
+        }
         const state = await session.getState();
         if (!state.ok) {
           trackWorkerIdentity(state);
@@ -474,17 +522,28 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       };
 
       const getState = async (): Promise<OperationsSessionResult> => {
+        if (LEGACY_BROWSER_E2E) {
+          const result = await session.getState();
+          trackWorkerIdentity(result);
+          return result;
+        }
         const result = await fenceStaleBrowserSession(
           await session.getState(),
           async () => (await remoteGateway.currentSession())?.shopId ?? null,
           () => session.signOut(),
         );
+        if (result.ok && result.value.status === 'ACTIVE') {
+          startRemoteRuntime(result.value.shopId);
+        } else {
+          stopRemoteRuntime();
+        }
         trackWorkerIdentity(result);
         return result;
       };
 
       const signOut = async (): Promise<OperationsSessionResult> => {
         const result = await session.signOut();
+        stopRemoteRuntime();
         trackWorkerIdentity(result);
         return result;
       };

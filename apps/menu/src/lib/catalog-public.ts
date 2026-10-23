@@ -39,6 +39,9 @@ async function requestCatalog(
   return fetch(catalogUrl(shopId, schemaVersion), {
     method: 'GET',
     headers: { Accept: 'application/json' },
+    // Always revalidate the published revision; a warm browser cache can otherwise
+    // serve a previous publish for another 30 seconds after a background poll.
+    cache: 'no-cache',
     signal,
   });
 }

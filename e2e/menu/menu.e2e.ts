@@ -197,6 +197,34 @@ test('uses catalog-public UUID identity, family, and priceMinor without stale fa
   expect(requests).toEqual([`${CATALOG_URL}?shopId=${SHOP_ID}&schemaVersion=2`]);
 });
 
+test('an open customer menu reflects a newly published price after tab focus', async ({ page }) => {
+  let published = false;
+  let reads = 0;
+  const updatedCatalog = {
+    ...catalogFixture,
+    revision: 'b'.repeat(64),
+    products: catalogFixture.products.map((product, index) =>
+      index === 0 ? { ...product, priceMinor: 21500 } : product,
+    ),
+  };
+  await page.route(`${CATALOG_URL}**`, async (route) => {
+    reads += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(published ? updatedCatalog : catalogFixture),
+    });
+  });
+
+  await page.goto('/tux-burger', { waitUntil: 'networkidle' });
+  await expect(page.getByText('190.5 EGP', { exact: true })).toBeVisible();
+
+  published = true;
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.getByText('215 EGP', { exact: true })).toBeVisible();
+  expect(reads).toBeGreaterThanOrEqual(2);
+});
+
 test('shows explicit unavailable state instead of checked-in catalog data', async ({ page }) => {
   await page.route(`${CATALOG_URL}**`, async (route) => {
     await route.fulfill({
@@ -222,21 +250,31 @@ test('legacy customer-runtime admin route is retired', async ({ page }) => {
   await expect(page.getByText(/Admin Login/i)).toHaveCount(0);
 });
 
-test('home images have real dimensions', async ({ page }) => {
+test('home images have real dimensions once visible, including deferred assets', async ({
+  page,
+}) => {
   await installCatalogFixture(page);
   await page.goto('/', { waitUntil: 'networkidle' });
-  const images = await page.locator('img').evaluateAll((nodes) =>
-    nodes.map((node) => ({
-      src: (node as HTMLImageElement).currentSrc,
-      width: (node as HTMLImageElement).naturalWidth,
-      height: (node as HTMLImageElement).naturalHeight,
-    })),
-  );
 
-  expect(images.length).toBeGreaterThan(0);
-  expect(
-    images.filter((image) => image.src).every((image) => image.width > 0 && image.height > 0),
-  ).toBe(true);
+  // Responsive layouts may contain intentionally hidden image duplicates.
+  // Exercise the displayed assets, including images below the initial viewport.
+  const images = page.locator('img:visible');
+  const count = await images.count();
+  expect(count).toBeGreaterThan(0);
+
+  for (let index = 0; index < count; index += 1) {
+    const image = images.nth(index);
+    await image.scrollIntoViewIfNeeded();
+    await expect
+      .poll(async () =>
+        image.evaluate((element) => {
+          const node = element as HTMLImageElement;
+          if (!node.getAttribute('src') && !node.currentSrc) return true;
+          return node.complete && node.naturalWidth > 0 && node.naturalHeight > 0;
+        }),
+      )
+      .toBe(true);
+  }
 });
 
 test('canonical category slug survives product deep-route entry', async ({ page }) => {

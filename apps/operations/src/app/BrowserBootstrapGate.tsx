@@ -8,6 +8,15 @@ type GateState = 'LOADING' | 'PIN_REQUIRED' | 'READY';
 type Branch = { readonly id: string; readonly name: string };
 const LAST_BRANCH_KEY = 'tux.operations.last-branch';
 
+// This fixture-only bypass exists solely in a deliberately named non-production
+// Vite build, on loopback. Production and the branch-picker E2E build still
+// require the server-authorized Branch + PIN flow.
+const LEGACY_BROWSER_E2E =
+  import.meta.env.MODE === 'e2e-browser-fallback' &&
+  (window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === 'localhost' ||
+    window.location.hostname.endsWith('.localhost'));
+
 function preferredBranch(): string {
   try {
     return window.localStorage.getItem(LAST_BRANCH_KEY) ?? '';
@@ -40,7 +49,7 @@ function Brand() {
 export function BrowserBootstrapGate() {
   const client = useMemo(() => createOperationsSessionClient(), []);
   const [state, setState] = useState<GateState>(
-    window.tuxDesktop === undefined ? 'LOADING' : 'READY',
+    window.tuxDesktop !== undefined || LEGACY_BROWSER_E2E ? 'READY' : 'LOADING',
   );
   const [freshAuthenticatedSession, setFreshAuthenticatedSession] = useState<ActiveSession>();
   const [pin, setPin] = useState('');
@@ -54,7 +63,7 @@ export function BrowserBootstrapGate() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (window.tuxDesktop !== undefined) return;
+    if (window.tuxDesktop !== undefined || LEGACY_BROWSER_E2E) return;
     let cancelled = false;
     void client.getState().then((result) => {
       if (cancelled) return;

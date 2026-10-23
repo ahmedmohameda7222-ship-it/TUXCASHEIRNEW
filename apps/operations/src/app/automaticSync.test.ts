@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const harness = vi.hoisted(() => ({
   schedulerOptions: undefined as AutomaticOutboxSchedulerOptions | undefined,
   schedulerStarted: vi.fn(),
+  schedulerStopped: vi.fn(),
   inventorySyncShop: vi.fn(async (shopId: unknown) => {
     void shopId;
     return 0;
@@ -28,6 +29,9 @@ vi.mock('@tux/sync', () => ({
 
     start(): void {
       harness.schedulerStarted();
+    }
+    stop(): void {
+      harness.schedulerStopped();
     }
   },
   HttpOutboxTransport: class HttpOutboxTransport {
@@ -79,6 +83,7 @@ vi.mock('./syncStatus', () => ({
     markRemoteConfigured: harness.markRemoteConfigured,
     markSyncStarted: harness.markSyncStarted,
     markSyncFinished: harness.markSyncFinished,
+    setOnline: vi.fn(),
   },
 }));
 
@@ -185,6 +190,56 @@ describe('startBrowserAutomaticSync', () => {
     });
 
     await vi.waitFor(() => expect(reconcileClaims).toHaveBeenCalledTimes(1));
+  });
+
+  it('ignores an in-flight sync completion from a shop that has signed out', () => {
+    const handle = startBrowserAutomaticSync({
+      database: {} as OperationsDatabase,
+      now: () => '2026-08-24T06:00:00.000Z' as Instant,
+      shopId: '14000000-0000-4000-8000-000000000001' as never,
+    });
+    const priorOnStart = harness.schedulerOptions?.onStart;
+    const priorOnResult = harness.schedulerOptions?.onResult;
+    handle.stop();
+
+    priorOnStart?.();
+    priorOnResult?.(cleanSummary);
+
+    expect(harness.markSyncStarted).not.toHaveBeenCalled();
+    expect(harness.markSyncFinished).not.toHaveBeenCalled();
+  });
+
+  it('tears down shop-scoped timers and listeners when the authenticated shop ends', () => {
+    const callbacks: Array<() => void> = [];
+    const setIntervalMock = vi.fn((callback: () => void) => {
+      callbacks.push(callback);
+      return 41;
+    });
+    const clearIntervalMock = vi.fn();
+    const listeners = new Map<string, () => void>();
+    const removeEventListener = vi.fn((name: string) => listeners.delete(name));
+    vi.stubGlobal('window', {
+      location: { origin: 'https://operations.example.test' },
+      setInterval: setIntervalMock,
+      clearInterval: clearIntervalMock,
+      addEventListener: (name: string, callback: () => void) => listeners.set(name, callback),
+      removeEventListener,
+    });
+    vi.stubGlobal('navigator', { onLine: true });
+    const handle = startBrowserAutomaticSync({
+      database: {} as OperationsDatabase,
+      now: () => '2026-08-24T06:00:00.000Z' as Instant,
+      shopId: '14000000-0000-4000-8000-000000000001' as never,
+    });
+    expect(listeners.has('online')).toBe(true);
+    const priorCalls = harness.inventorySyncShop.mock.calls.length;
+    handle.stop();
+    expect(harness.schedulerStopped).toHaveBeenCalledTimes(1);
+    expect(clearIntervalMock).toHaveBeenCalledWith(41);
+    expect(removeEventListener).toHaveBeenCalledWith('online', expect.any(Function));
+    expect(removeEventListener).toHaveBeenCalledWith('offline', expect.any(Function));
+    callbacks[0]?.();
+    expect(harness.inventorySyncShop.mock.calls.length).toBe(priorCalls);
   });
 
   it('retries reward-claim reconciliation on the periodic remote sync interval', async () => {

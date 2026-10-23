@@ -13,7 +13,8 @@ export const queryClient = new QueryClient({
     queries: {
       staleTime: 15_000,
       retry: shouldRetryAdminQuery,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
     },
     mutations: {
       retry: false,

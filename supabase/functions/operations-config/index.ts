@@ -49,15 +49,22 @@ Deno.serve(async (request) => {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data: userData, error: userError } = await client.auth.getUser(token);
+  // These checks are independent and both are required before reading configuration.
+  // devices_self_select RLS binds the device row to auth.uid() and active=true.
+  // Overlap remote authorization round trips without weakening either guard.
+  const [userResult, deviceResult] = await Promise.all([
+    client.auth.getUser(token),
+    client
+      .from('devices')
+      .select('id,shop_id')
+      .eq('id', deviceId)
+      .eq('shop_id', shopId)
+      .maybeSingle(),
+  ]);
+  const { data: userData, error: userError } = userResult;
   if (userError || !userData.user) return jsonResponse(401, { error: 'invalid_access_token' });
 
-  const { data: device, error: deviceError } = await client
-    .from('devices')
-    .select('id,shop_id')
-    .eq('id', deviceId)
-    .eq('shop_id', shopId)
-    .maybeSingle();
+  const { data: device, error: deviceError } = deviceResult;
   if (deviceError) {
     console.error('configuration device authorization lookup failed', deviceError);
     return jsonResponse(500, { error: 'device_authorization_lookup_failed' });

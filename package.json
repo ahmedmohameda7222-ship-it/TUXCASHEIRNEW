@@ -33,7 +33,7 @@
     "test:e2e": "playwright test",
     "test:e2e:admin": "playwright test --config playwright.admin.config.ts",
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
-    "e2e:serve": "npm run build -w @tux/operations && node e2e/whatsappFakeServer.mjs",
+    "e2e:serve": "npm run build -w @tux/operations -- --mode e2e-browser-fallback && node e2e/whatsappFakeServer.mjs",
     "dev:menu": "npm run dev -w @tux/menu",
     "build:menu": "npm run build -w @tux/menu",
     "typecheck:menu": "npm run typecheck -w @tux/menu",

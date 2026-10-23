@@ -14,6 +14,18 @@ describe('MenuContext published checkout propagation', () => {
     expect(source).toContain('snapshot.ordering');
   });
 
+  it('periodically refreshes the live published catalog and cancels outstanding requests on unmount', () => {
+    expect(source).toContain('startMenuRefreshLifecycle(');
+    expect(source).toContain('AbortController');
+    expect(source).toContain('controller.signal');
+    expect(source).toContain('controllerRef.current?.abort()');
+  });
+
+  it('keeps the previous browsable catalog when a background refresh fails, but disables checkout', () => {
+    expect(source).toContain('hasLoadedSnapshotRef.current');
+    expect(source).toContain('setCheckoutPolicy(null);');
+  });
+
   it('fails closed when the canonical public snapshot cannot be loaded', () => {
     expect(source).toContain('setShop(null);');
     expect(source).toContain('setCheckoutPolicy(null);');
