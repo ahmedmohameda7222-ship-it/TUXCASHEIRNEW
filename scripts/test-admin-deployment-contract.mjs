@@ -212,6 +212,7 @@ const expectedOperations = {
     { source: '/api/device-bootstrap', destination: '/api/device?route=device-bootstrap' },
     { source: '/api/device-enroll', destination: '/api/device?route=device-enroll' },
     { source: '/api/device-session', destination: '/api/device?route=device-session' },
+    { source: '/api/operations-shops', destination: '/api/device?route=operations-shops' },
     { source: '/api/worker-auth', destination: '/api/worker?route=worker-auth' },
     {
       source: '/api/worker-menu-layout',
