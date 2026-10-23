@@ -21,6 +21,8 @@ describe('browser device-session recovery', () => {
   });
   it('does not confuse a network outage with a revoked session', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
-    await expect(new VercelBrowserRemoteGateway().currentSession()).rejects.toThrow('while offline');
+    await expect(new VercelBrowserRemoteGateway().currentSession()).rejects.toThrow(
+      'while offline',
+    );
   });
 });
