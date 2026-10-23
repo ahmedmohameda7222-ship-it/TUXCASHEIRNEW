@@ -168,6 +168,9 @@ function csrfTokenForMutation(session: ReturnType<typeof useAdminSession>): stri
   return session.state.session.csrfToken;
 }
 
+// Periodic refetch is scoped to the currently authorized shop's active queries.
+const CATALOG_REFRESH_INTERVAL_MS = 30_000;
+
 function currentWorkspace(queryClient: QueryClient, shopId: string): CatalogWorkspace | undefined {
   return queryClient.getQueryData<CatalogWorkspace>(catalogQueryKey(shopId));
 }
@@ -197,6 +200,7 @@ export function useCatalog(shopId: string | undefined) {
   const workspaceQuery = useQuery({
     queryKey: shopId ? catalogQueryKey(shopId) : ['admin', 'catalog', 'no-shop'],
     enabled: Boolean(shopId),
+    refetchInterval: CATALOG_REFRESH_INTERVAL_MS,
     queryFn: async () => {
       if (!shopId) throw new CatalogUiError('concrete_shop_required');
       return adminFetch<CatalogWorkspace>(
@@ -515,6 +519,7 @@ export function useCatalogPublishing(shopId: string | undefined) {
       ? catalogPublishingQueryKey(shopId)
       : ['admin', 'catalog', 'no-shop', 'publishing'],
     enabled: Boolean(shopId),
+    refetchInterval: CATALOG_REFRESH_INTERVAL_MS,
     queryFn: async () => {
       if (!shopId) throw new CatalogUiError('concrete_shop_required');
       return adminFetch<CatalogPublishingWorkspace>(
