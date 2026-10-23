@@ -12,6 +12,9 @@ describe('Operations browser E2E build safety', () => {
     expect(gate).toContain("import.meta.env.MODE === 'e2e-browser-fallback'");
     expect(gate).toContain("window.location.hostname === '127.0.0.1'");
     expect(gate).toContain("window.location.hostname === 'localhost'");
+    expect(gate).toContain("window.location.hostname.endsWith('.localhost')");
+    const session = readFileSync(new URL('./sessionClient.ts', import.meta.url), 'utf8');
+    expect(session).toContain("window.location.hostname.endsWith('.localhost')");
     expect(pkg).toContain('--mode e2e-browser-fallback');
   });
 
