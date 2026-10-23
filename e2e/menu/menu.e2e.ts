@@ -265,8 +265,9 @@ test('home images have real dimensions once visible, including deferred assets',
     await image.scrollIntoViewIfNeeded();
     await expect
       .poll(async () =>
-        image.evaluate((node: HTMLImageElement) => {
-          if (!node.currentSrc) return true;
+        image.evaluate((element) => {
+          const node = element as HTMLImageElement;
+          if (!node.getAttribute('src') && !node.currentSrc) return true;
           return node.complete && node.naturalWidth > 0 && node.naturalHeight > 0;
         }),
       )
