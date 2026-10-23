@@ -23,12 +23,16 @@ export interface BrowserRewardClaimReconciler {
   ): Promise<void>;
 }
 
+export interface BrowserAutomaticSyncHandle {
+  stop(): void;
+}
+
 export function startBrowserAutomaticSync(input: {
   readonly database: OperationsDatabase;
   readonly now: () => Instant;
   readonly shopId?: ShopId;
   readonly rewardClaims?: BrowserRewardClaimReconciler;
-}): AutomaticOutboxScheduler {
+}): BrowserAutomaticSyncHandle {
   const endpoint = new URL('/api/operations-sync', window.location.origin).toString();
   const service = new OutboxSyncService(
     input.database,
@@ -41,11 +45,13 @@ export function startBrowserAutomaticSync(input: {
     onResult: (result) => browserSyncStatusStore.markSyncFinished(result),
   });
 
+  let stopped = false;
+  let convergenceTimer: number | null = null;
   let inventoryRunning = false;
   let lifecycleRunning = false;
   let rewardClaimsRunning = false;
   const synchronizeRewardClaims = async (): Promise<void> => {
-    if (input.shopId === undefined || input.rewardClaims === undefined || rewardClaimsRunning) {
+    if (stopped || input.shopId === undefined || input.rewardClaims === undefined || rewardClaimsRunning) {
       return;
     }
     rewardClaimsRunning = true;
@@ -66,7 +72,7 @@ export function startBrowserAutomaticSync(input: {
     }
   };
   const synchronizeInventory = async (): Promise<void> => {
-    if (input.shopId === undefined || inventoryRunning) return;
+    if (stopped || input.shopId === undefined || inventoryRunning) return;
     inventoryRunning = true;
     try {
       const inventoryEndpoint = new URL(
@@ -86,7 +92,7 @@ export function startBrowserAutomaticSync(input: {
   };
 
   const synchronizeLifecycle = async (): Promise<void> => {
-    if (input.shopId === undefined || lifecycleRunning) return;
+    if (stopped || input.shopId === undefined || lifecycleRunning) return;
     lifecycleRunning = true;
     try {
       const lifecycleEndpoint = new URL(
@@ -111,7 +117,7 @@ export function startBrowserAutomaticSync(input: {
     void synchronizeInventory();
     void synchronizeLifecycle();
     if (typeof window.setInterval === 'function') {
-      window.setInterval(() => {
+      convergenceTimer = window.setInterval(() => {
         void synchronizeRewardClaims();
         void synchronizeInventory();
         void synchronizeLifecycle();
@@ -119,16 +125,39 @@ export function startBrowserAutomaticSync(input: {
     }
   }
 
-  if (typeof window.addEventListener === 'function' && typeof navigator !== 'undefined') {
+  const onOnline = (): void => {
+    if (stopped) return;
+    browserSyncStatusStore.setOnline(true);
+    void synchronizeRewardClaims();
+    void synchronizeInventory();
+    void synchronizeLifecycle();
+  };
+  const onOffline = (): void => {
+    if (!stopped) browserSyncStatusStore.setOnline(false);
+  };
+
+  const registeredNetworkListeners =
+    typeof window.addEventListener === 'function' && typeof navigator !== 'undefined';
+  if (registeredNetworkListeners) {
     browserSyncStatusStore.setOnline(navigator.onLine);
-    window.addEventListener('online', () => {
-      browserSyncStatusStore.setOnline(true);
-      void synchronizeRewardClaims();
-      void synchronizeInventory();
-      void synchronizeLifecycle();
-    });
-    window.addEventListener('offline', () => browserSyncStatusStore.setOnline(false));
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
   }
+
   scheduler.start();
-  return scheduler;
+  return {
+    stop() {
+      if (stopped) return;
+      stopped = true;
+      scheduler.stop();
+      if (convergenceTimer !== null) {
+        window.clearInterval(convergenceTimer);
+        convergenceTimer = null;
+      }
+      if (registeredNetworkListeners) {
+        window.removeEventListener('online', onOnline);
+        window.removeEventListener('offline', onOffline);
+      }
+    },
+  };
 }
