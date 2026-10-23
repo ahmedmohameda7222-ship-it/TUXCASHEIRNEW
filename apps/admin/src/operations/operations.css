@@ -90,38 +90,6 @@
   color: var(--tux-text-secondary);
   background: var(--tux-surface-muted);
 }
-.admin-device-enrollment-context {
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--tux-border-subtle);
-  border-radius: var(--tux-radius-lg);
-  background: var(--tux-surface-panel);
-}
-.admin-device-enrollment-context strong,
-.admin-device-enrollment-context p {
-  flex-basis: 100%;
-}
-.admin-device-enrollment-context p {
-  margin: 0;
-  color: var(--tux-text-secondary);
-}
-.admin-device-enrollment-context code {
-  min-width: 0;
-  flex: 1 1 250px;
-  overflow-wrap: anywhere;
-}
-.admin-device-enrollment-context [role='status'] {
-  color: var(--tux-text-secondary);
-}
-@media (max-width: 700px) {
-  .admin-device-enrollment-context button {
-    width: 100%;
-  }
-}
 .admin-device-search {
   max-width: 520px;
 }

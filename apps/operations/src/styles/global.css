@@ -113,6 +113,40 @@ button:not(:disabled) {
   font-weight: 700;
 }
 
+.pin-form select {
+  width: 100%;
+  min-height: 3.25rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-raised);
+  color: var(--tux-text-primary);
+  padding: 0 var(--tux-space-4);
+  font-size: var(--tux-font-size-md);
+  cursor: pointer;
+}
+
+.entry-branch-hint {
+  margin: 0;
+  color: var(--tux-text-secondary);
+  font-size: var(--tux-font-size-sm);
+}
+
+.branch-load-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tux-space-3);
+  color: var(--tux-destructive);
+  font-size: var(--tux-font-size-sm);
+}
+.branch-load-error button {
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  padding: 0.5rem 0.75rem;
+  background: var(--tux-surface-raised);
+  color: var(--tux-text-primary);
+}
+
 .pin-form input {
   width: 100%;
   min-height: 3.25rem;
