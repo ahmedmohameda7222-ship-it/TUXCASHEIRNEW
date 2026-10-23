@@ -3,12 +3,15 @@ const SECRET = 'test-only-bootstrap-hmac-secret-with-more-than-32-bytes';
 const DEVICE_ID = '22222222-2222-4222-8222-222222222221';
 const RATE_KEY_A = 'a'.repeat(64);
 const RATE_KEY_B = 'b'.repeat(64);
+const SHOP_A = '10000000-0000-4000-8000-000000000001';
+const SHOP_B = '10000000-0000-4000-8000-000000000002';
 
 interface BootstrapBody {
   readonly pin: string;
   readonly deviceId: string;
   readonly deviceLabel: string;
   readonly rateLimitKey: string;
+  readonly shopId?: string;
 }
 
 interface RecordedCall {
@@ -22,13 +25,14 @@ function canonicalRequest(
   nonce: string,
 ): string {
   return JSON.stringify([
-    'tux-device-bootstrap:v1',
+    body.shopId === undefined ? 'tux-device-bootstrap:v1' : 'tux-device-bootstrap:v2',
     timestamp,
     nonce,
     body.rateLimitKey.toLowerCase(),
     body.deviceId.toLowerCase(),
     body.deviceLabel,
     body.pin,
+    ...(body.shopId === undefined ? [] : [body.shopId.toLowerCase()]),
   ]);
 }
 
@@ -92,6 +96,7 @@ async function waitForEdge(): Promise<void> {
 Deno.test('device-bootstrap requires cryptographic Vercel provenance before rate limiting', async (test) => {
   const calls: RecordedCall[] = [];
   const claimedNonces = new Set<string>();
+  let permitScopedShopLookup = false;
   const controller = new AbortController();
   const mock = Deno.serve(
     { hostname: '127.0.0.1', port: 0, signal: controller.signal, onListen() {} },
@@ -120,9 +125,21 @@ Deno.test('device-bootstrap requires cryptographic Vercel provenance before rate
         });
       }
       if (url.pathname.endsWith('/rest/v1/rpc/claim_tux_worker_pin_bootstrap_attempt')) {
-        return new Response(JSON.stringify([{ allowed: false, retry_after_seconds: 900 }]), {
+        return new Response(JSON.stringify([{ allowed: permitScopedShopLookup, retry_after_seconds: 900 }]), {
           status: 200,
           headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.pathname.endsWith('/rest/v1/shops') && request.method === 'GET') {
+        const selected = url.searchParams.get('id');
+        return new Response(
+          JSON.stringify(selected === `eq.${SHOP_A}` ? { id: SHOP_A, name: 'Selected shop', active: true } : null),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      if (url.pathname.endsWith('/rest/v1/workers') && request.method === 'GET') {
+        return new Response(JSON.stringify([]), {
+          status: 200, headers: { 'content-type': 'application/json' },
         });
       }
       return new Response(JSON.stringify({ error: 'unexpected_mock_call' }), {
@@ -200,6 +217,37 @@ Deno.test('device-bootstrap requires cryptographic Vercel provenance before rate
         throw new Error(`expected tampered proof rejection, received HTTP ${response.status}`);
       }
       if (calls.length !== 0) throw new Error('tampered request reached Supabase before rejection');
+    });
+
+    await test.step('tampering with the HMAC-bound shop after signing is rejected before Supabase', async () => {
+      calls.length = 0;
+      const selected: BootstrapBody = { ...body, shopId: SHOP_A };
+      const timestamp = Math.floor(Date.now() / 1000);
+      const nonce = crypto.randomUUID();
+      const headers = await signedHeaders(selected, timestamp, nonce);
+      const response = await postBootstrap({ ...selected, shopId: SHOP_B }, headers);
+      if (response.status !== 401) {
+        throw new Error('unsigned shop substitution was accepted');
+      }
+      if (calls.length !== 0) throw new Error('shop tampering reached Supabase');
+    });
+
+    await test.step('a selected shop is queried by ID, never by global single-shop count', async () => {
+      permitScopedShopLookup = true;
+      calls.length = 0;
+      const selected: BootstrapBody = { ...body, shopId: SHOP_A };
+      const response = await postBootstrap(
+        selected,
+        await signedHeaders(selected, Math.floor(Date.now() / 1000), crypto.randomUUID()),
+      );
+      permitScopedShopLookup = false;
+      if (response.status !== 401) {
+        throw new Error(`expected invalid PIN after scoped lookup, received HTTP ${response.status}`);
+      }
+      const shops = calls.filter((call) => call.pathname.endsWith('/rest/v1/shops'));
+      if (shops.length !== 1) throw new Error('selected shop was not queried exactly once');
+      const workers = calls.filter((call) => call.pathname.endsWith('/rest/v1/workers'));
+      if (workers.length !== 1) throw new Error('worker lookup was not shop-scoped');
     });
 
     await test.step('stale signed requests are rejected before Supabase', async () => {

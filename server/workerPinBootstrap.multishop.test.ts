@@ -19,7 +19,7 @@ function request(shopId: string): GatewayRequest {
       'x-vercel-forwarded-for': '203.0.113.33',
     },
     body: { pin: '1234', deviceId: DEVICE, deviceLabel: 'Operations Browser', shopId },
-  } as GatewayRequest;
+  } as unknown as GatewayRequest;
 }
 
 function response(): GatewayResponse {

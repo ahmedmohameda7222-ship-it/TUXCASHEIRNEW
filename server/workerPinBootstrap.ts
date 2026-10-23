@@ -161,7 +161,7 @@ export async function bootstrapDeviceWithWorkerPin(
     deviceId,
     deviceLabel,
     rateLimitKey: rateLimitKey(request),
-    ...(shopId === undefined ? {} : { shopId }),
+    ...(shopId === undefined || shopId === null ? {} : { shopId }),
   };
   const timestamp = Math.floor(Date.now() / 1000);
   const nonce = randomUUID();
