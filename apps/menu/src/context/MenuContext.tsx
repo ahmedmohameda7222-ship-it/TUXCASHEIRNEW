@@ -1,5 +1,13 @@
 import type { PublicCatalogShopV2 } from '@tux/catalog-contracts';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { fetchPublicCatalog } from '@/lib/catalog-public';
 import { startMenuRefreshLifecycle } from './menuRefreshLifecycle';
 import {
