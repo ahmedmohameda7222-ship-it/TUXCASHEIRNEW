@@ -3,8 +3,7 @@ import { defineConfig } from '@playwright/test';
 const menuLayoutTouchSpec = /menu-layout-editor\.touch\.e2e\.ts/;
 const menuSuiteSpec = /(?:^|[\\/])menu[\\/]/;
 const branchLoginSpec = /operations-branch-login\.e2e\.ts/;
-const branchLoginIgnore =
-  process.env['TUX_OPERATIONS_BRANCH_E2E'] === '1' ? [] : [branchLoginSpec];
+const branchLoginIgnore = process.env['TUX_OPERATIONS_BRANCH_E2E'] === '1' ? [] : [branchLoginSpec];
 
 export default defineConfig({
   testDir: './e2e',
