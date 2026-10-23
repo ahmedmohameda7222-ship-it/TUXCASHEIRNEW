@@ -250,21 +250,28 @@ test('legacy customer-runtime admin route is retired', async ({ page }) => {
   await expect(page.getByText(/Admin Login/i)).toHaveCount(0);
 });
 
-test('home images have real dimensions', async ({ page }) => {
+test('home images have real dimensions once visible, including deferred assets', async ({
+  page,
+}) => {
   await installCatalogFixture(page);
   await page.goto('/', { waitUntil: 'networkidle' });
-  const images = await page.locator('img').evaluateAll((nodes) =>
-    nodes.map((node) => ({
-      src: (node as HTMLImageElement).currentSrc,
-      width: (node as HTMLImageElement).naturalWidth,
-      height: (node as HTMLImageElement).naturalHeight,
-    })),
-  );
 
-  expect(images.length).toBeGreaterThan(0);
-  expect(
-    images.filter((image) => image.src).every((image) => image.width > 0 && image.height > 0),
-  ).toBe(true);
+  const images = page.locator('img');
+  const count = await images.count();
+  expect(count).toBeGreaterThan(0);
+
+  for (let index = 0; index < count; index += 1) {
+    const image = images.nth(index);
+    await image.scrollIntoViewIfNeeded();
+    await expect
+      .poll(async () =>
+        image.evaluate((node: HTMLImageElement) => {
+          if (!node.currentSrc) return true;
+          return node.complete && node.naturalWidth > 0 && node.naturalHeight > 0;
+        }),
+      )
+      .toBe(true);
+  }
 });
 
 test('canonical category slug survives product deep-route entry', async ({ page }) => {
