@@ -96,7 +96,9 @@ interface BrowserRuntime {
 const LEGACY_BROWSER_E2E =
   import.meta.env.MODE === 'e2e-browser-fallback' &&
   typeof window !== 'undefined' &&
-  (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
+  (window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === 'localhost' ||
+    window.location.hostname.endsWith('.localhost'));
 
 let browserRuntimePromise: Promise<BrowserRuntime> | null = null;
 let browserWhatsAppPromise: Promise<TuxWhatsAppApi> | null = null;
