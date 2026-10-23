@@ -76,7 +76,7 @@ function canonicalBootstrapRequest(
 
 async function verifiedProvenanceNonce(
   request: Request,
-  body: TrustedBootstrapBody,
+  body: TrustedBootstrapBody | null,
   secret: string,
 ): Promise<string | null> {
   const rawTimestamp = request.headers.get('x-tux-bootstrap-timestamp')?.trim() ?? '';
@@ -109,7 +109,11 @@ async function verifiedProvenanceNonce(
     await crypto.subtle.sign(
       'HMAC',
       key,
-      new TextEncoder().encode(canonicalBootstrapRequest(body, timestamp, nonce)),
+      new TextEncoder().encode(
+        body === null
+          ? JSON.stringify(['tux-operations-shop-directory:v1', timestamp, nonce])
+          : canonicalBootstrapRequest(body, timestamp, nonce),
+      ),
     ),
   );
   return constantTimeEqual(supplied, expected) ? nonce : null;
@@ -178,7 +182,9 @@ async function deleteNewIdentity(
 }
 
 Deno.serve(async (request) => {
-  if (request.method !== 'POST') return jsonResponse(405, { error: 'method_not_allowed' });
+  if (request.method !== 'POST' && request.method !== 'GET') {
+    return jsonResponse(405, { error: 'method_not_allowed' });
+  }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const publishableKey = Deno.env.get('SUPABASE_ANON_KEY');
@@ -191,6 +197,33 @@ Deno.serve(async (request) => {
     new TextEncoder().encode(hmacSecret).length < MIN_BOOTSTRAP_HMAC_SECRET_BYTES
   ) {
     return jsonResponse(500, { error: 'bootstrap_not_configured' });
+  }
+
+  if (request.method === 'GET') {
+    // Only the trusted Operations BFF may fetch the public-facing branch names.
+    // No PIN hashes, worker identities or archived shops ever leave this endpoint.
+    if ((await verifiedProvenanceNonce(request, null, hmacSecret)) === null) {
+      return jsonResponse(401, { error: 'invalid_shop_directory_provenance' });
+    }
+    const directory = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: rows, error: listError } = await directory
+      .from('shops')
+      .select('id,name')
+      .eq('active', true)
+      .eq('lifecycle_state', 'ACTIVE')
+      .order('name', { ascending: true })
+      .limit(200);
+    if (listError || !Array.isArray(rows)) {
+      console.error('operations shop directory lookup failed', listError);
+      return jsonResponse(503, { error: 'shop_directory_unavailable' });
+    }
+    return jsonResponse(200, {
+      shops: rows
+        .filter((row) => UUID_PATTERN.test(String(row.id)) && typeof row.name === 'string')
+        .map((row) => ({ id: row.id, name: row.name })),
+    });
   }
 
   let body: Record<string, unknown>;
