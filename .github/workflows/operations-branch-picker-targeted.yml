@@ -32,6 +32,9 @@ jobs:
           npm run typecheck -w @tux/operations
           npx tsc --noEmit -p tsconfig.api.json
           npm run typecheck -w @tux/admin
+      - name: Targeted ESLint for changed source and browser tests
+        run: |
+          npx eslint api/operations-shops.ts server/operationsShopDirectory.ts server/operationsShopDirectory.test.ts apps/operations/src/app/App.tsx apps/operations/src/app/BrowserBootstrapGate.tsx apps/operations/src/app/browserRemote.ts apps/operations/src/app/browserBranchPicker.test.ts apps/operations/src/app/browserShopScope.ts apps/operations/src/app/browserShopScope.test.ts apps/operations/src/app/sessionClient.ts apps/admin/src/operations/DevicesPage.tsx e2e/operations-branch-login.e2e.ts playwright.config.ts --max-warnings 0
       - name: Capture and enforce exact formatting
         run: |
           npx prettier --write api/operations-shops.ts server/operationsShopDirectory.ts server/operationsShopDirectory.test.ts apps/operations/src/app/BrowserBootstrapGate.tsx apps/operations/src/app/browserRemote.ts apps/operations/src/app/browserBranchPicker.test.ts apps/operations/src/app/browserShopScope.ts apps/operations/src/app/browserShopScope.test.ts apps/operations/src/app/sessionClient.ts apps/operations/src/app/App.tsx apps/operations/src/styles/global.css apps/admin/src/operations/DevicesPage.tsx apps/admin/src/operations/operations.css e2e/operations-branch-login.e2e.ts
@@ -50,3 +53,5 @@ jobs:
           deno-version: v2.x
       - name: Edge directory signature and shop isolation
         run: deno test --allow-env --allow-net --allow-run --allow-read supabase/functions/device-bootstrap/security.deno.ts
+      - name: Verify standard Operations production build
+        run: npm run build -w @tux/operations
