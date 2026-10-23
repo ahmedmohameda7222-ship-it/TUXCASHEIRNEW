@@ -40,12 +40,16 @@ export function startBrowserAutomaticSync(input: {
     { now: input.now },
     input.shopId,
   );
+  let stopped = false;
   const scheduler = new AutomaticOutboxScheduler(service, {
-    onStart: () => browserSyncStatusStore.markSyncStarted(),
-    onResult: (result) => browserSyncStatusStore.markSyncFinished(result),
+    onStart: () => {
+      if (!stopped) browserSyncStatusStore.markSyncStarted();
+    },
+    onResult: (result) => {
+      if (!stopped) browserSyncStatusStore.markSyncFinished(result);
+    },
   });
 
-  let stopped = false;
   let convergenceTimer: number | null = null;
   let inventoryRunning = false;
   let lifecycleRunning = false;
