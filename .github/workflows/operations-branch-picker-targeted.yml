@@ -1,0 +1,42 @@
+name: Operations Branch Picker Targeted Acceptance
+
+on:
+  push:
+    branches:
+      - feat/operations-branch-picker-pin-login
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  branch-login:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Locked dependencies
+        run: npm ci
+      - name: Domain contract build
+        run: npm run build:domain
+      - name: Targeted branch picker, BFF signing and authentication regression
+        run: npx vitest run server/operationsShopDirectory.test.ts apps/operations/src/app/browserBranchPicker.test.ts server/workerPinBootstrap.multishop.test.ts server/workerPinBootstrap.test.ts apps/operations/src/app/browserWorkerAuthentication.test.ts
+      - name: Operations / API / Admin type safety
+        run: |
+          npm run typecheck -w @tux/operations
+          npx tsc --noEmit -p tsconfig.api.json
+          npm run typecheck -w @tux/admin
+      - name: Targeted formatting
+        run: |
+          npx prettier --check api/operations-shops.ts server/operationsShopDirectory.ts server/operationsShopDirectory.test.ts apps/operations/src/app/BrowserBootstrapGate.tsx apps/operations/src/app/browserRemote.ts apps/operations/src/app/browserBranchPicker.test.ts apps/operations/src/styles/global.css apps/admin/src/operations/DevicesPage.tsx apps/admin/src/operations/operations.css
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Edge directory signature and shop isolation
+        run: deno test --allow-env --allow-net --allow-run --allow-read supabase/functions/device-bootstrap/security.deno.ts
