@@ -285,7 +285,12 @@ if (adminCronApiFiles.length > 0) {
 const rootApiFiles = collectTsFiles(rootApiDir);
 const operationsApiFiles = collectTsFiles(operationsApiDir);
 const consolidatedOperationsRoutes = {
-  'device.ts': ['device-bootstrap.ts', 'device-enroll.ts', 'device-session.ts'],
+  'device.ts': [
+    'device-bootstrap.ts',
+    'device-enroll.ts',
+    'device-session.ts',
+    'operations-shops.ts',
+  ],
   'worker.ts': ['worker-auth.ts', 'worker-menu-layout.ts', 'worker-ui-preferences.ts'],
 };
 const consolidatedRootApiFiles = new Set(Object.values(consolidatedOperationsRoutes).flat());
