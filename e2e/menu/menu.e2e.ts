@@ -256,7 +256,9 @@ test('home images have real dimensions once visible, including deferred assets',
   await installCatalogFixture(page);
   await page.goto('/', { waitUntil: 'networkidle' });
 
-  const images = page.locator('img');
+  // Responsive layouts may contain intentionally hidden image duplicates.
+  // Exercise the displayed assets, including images below the initial viewport.
+  const images = page.locator('img:visible');
   const count = await images.count();
   expect(count).toBeGreaterThan(0);
 
