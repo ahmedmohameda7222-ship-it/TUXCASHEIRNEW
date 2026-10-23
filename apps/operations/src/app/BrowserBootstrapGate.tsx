@@ -15,7 +15,6 @@ const LEGACY_BROWSER_E2E =
   import.meta.env.MODE === 'e2e-browser-fallback' &&
   (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
 
-
 function preferredBranch(): string {
   try {
     return window.localStorage.getItem(LAST_BRANCH_KEY) ?? '';
