@@ -96,9 +96,7 @@ describe('shop-explicit first-browser bootstrap', () => {
       }),
     );
     vi.stubGlobal('fetch', upstream);
-    await expect(
-      new VercelBrowserRemoteGateway().bootstrap('1234', SHOP_B),
-    ).rejects.toThrow();
+    await expect(new VercelBrowserRemoteGateway().bootstrap('1234', SHOP_B)).rejects.toThrow();
     const init = upstream.mock.calls[0]?.[1] as RequestInit;
     const body = JSON.parse(String(init.body)) as Record<string, string>;
     expect(body.shopId).toBe(SHOP_B);

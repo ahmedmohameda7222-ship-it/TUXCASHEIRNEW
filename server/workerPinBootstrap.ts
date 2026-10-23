@@ -150,7 +150,10 @@ export async function bootstrapDeviceWithWorkerPin(
     !/^\d{4,12}$/.test(pin) ||
     deviceId === null ||
     !UUID_PATTERN.test(deviceId) ||
-    (rawShopId !== undefined && (requestedShopId === null || requestedShopId === undefined || !UUID_PATTERN.test(requestedShopId)))
+    (rawShopId !== undefined &&
+      (requestedShopId === null ||
+        requestedShopId === undefined ||
+        !UUID_PATTERN.test(requestedShopId)))
   ) {
     sendJson(response, 400, { error: 'invalid_bootstrap_request' });
     return;
@@ -161,7 +164,9 @@ export async function bootstrapDeviceWithWorkerPin(
     deviceId,
     deviceLabel,
     rateLimitKey: rateLimitKey(request),
-    ...(requestedShopId === undefined || requestedShopId === null ? {} : { shopId: requestedShopId }),
+    ...(requestedShopId === undefined || requestedShopId === null
+      ? {}
+      : { shopId: requestedShopId }),
   };
   const timestamp = Math.floor(Date.now() / 1000);
   const nonce = randomUUID();
