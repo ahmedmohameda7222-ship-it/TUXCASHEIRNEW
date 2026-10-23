@@ -51,7 +51,10 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run e2e:serve',
+    command:
+      process.env['TUX_OPERATIONS_BRANCH_E2E'] === '1'
+        ? 'npm run build -w @tux/operations -- --mode e2e-operations && node e2e/whatsappFakeServer.mjs'
+        : 'npm run e2e:serve',
     url: 'http://127.0.0.1:4173',
     timeout: 120_000,
     reuseExistingServer: !process.env['CI'],
