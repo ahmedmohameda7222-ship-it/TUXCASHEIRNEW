@@ -58,7 +58,7 @@ import { BrowserPbkdf2PinVerifier } from './browserPinVerifier';
 
 export interface OperationsSessionClient {
   getState(): Promise<OperationsSessionResult>;
-  submitPin(pin: string): Promise<OperationsSessionResult>;
+  submitPin(pin: string, shopId?: string): Promise<OperationsSessionResult>;
   signOut(): Promise<OperationsSessionResult>;
   enrollDevice?(pin: string): Promise<OperationsSessionResult>;
 }
@@ -83,7 +83,7 @@ interface BrowserRuntime {
   readonly bulkStock: OperationsBulkStockService;
   readonly endDay: OperationsEndDayService;
   getState(): Promise<OperationsSessionResult>;
-  submitPin(pin: string): Promise<OperationsSessionResult>;
+  submitPin(pin: string, shopId?: string): Promise<OperationsSessionResult>;
   signOut(): Promise<OperationsSessionResult>;
 }
 
@@ -389,9 +389,12 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         },
       };
 
-      const bootstrapWithPin = async (pin: string): Promise<OperationsSessionResult> => {
+      const bootstrapWithPin = async (
+        pin: string,
+        shopId?: string,
+      ): Promise<OperationsSessionResult> => {
         try {
-          const bootstrap = await remoteGateway.bootstrap(pin);
+          const bootstrap = await remoteGateway.bootstrap(pin, shopId);
           const configuration = await configurationService.sync(bootstrap.shopId);
           if (
             configuration.status === 'REMOTE_UNAVAILABLE' ||
@@ -430,14 +433,14 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         }
       };
 
-      const submitPin = async (pin: string): Promise<OperationsSessionResult> => {
+      const submitPin = async (pin: string, shopId?: string): Promise<OperationsSessionResult> => {
         const state = await session.getState();
         if (!state.ok) {
           trackWorkerIdentity(state);
           return state;
         }
         if (state.value.status === 'CONFIGURATION_REQUIRED') {
-          const result = await bootstrapWithPin(pin);
+          const result = await bootstrapWithPin(pin, shopId);
           trackWorkerIdentity(result);
           return result;
         }
@@ -549,7 +552,8 @@ export function createOperationsSessionClient(): OperationsSessionClient {
   if (desktop !== undefined) return desktop.session;
   return {
     getState: async () => (await browserRuntime()).getState(),
-    submitPin: async (pin: string) => (await browserRuntime()).submitPin(pin),
+    submitPin: async (pin: string, shopId?: string) =>
+      (await browserRuntime()).submitPin(pin, shopId),
     signOut: async () => (await browserRuntime()).signOut(),
     enrollDevice: async (pin: string) => (await browserRuntime()).submitPin(pin),
   };

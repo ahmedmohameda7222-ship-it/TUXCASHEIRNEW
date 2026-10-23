@@ -10,6 +10,7 @@ export function DevicesPage() {
   const { scope } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const [search, setSearch] = useState('');
+  const [copyMessage, setCopyMessage] = useState('');
   const query = useOperationsHealth(shopId, 'devices');
   const devices = query.data?.view === 'devices' ? query.data.devices : [];
   const filtered = useMemo(() => {
@@ -38,6 +39,27 @@ export function DevicesPage() {
         />
       ) : (
         <div className="admin-operations-workspace">
+          <div className="admin-device-enrollment-context">
+            <strong>Shop ID for Operations browser setup</strong>
+            <p>
+              Share this Shop ID with a worker enrolling a new Operations browser. Their PIN is
+              still required.
+            </p>
+            <code>{shopId}</code>
+            <button
+              type="button"
+              className="admin-secondary-button"
+              onClick={() => {
+                void navigator.clipboard.writeText(shopId).then(
+                  () => setCopyMessage('Shop ID copied.'),
+                  () => setCopyMessage('Select the Shop ID above to copy it.'),
+                );
+              }}
+            >
+              Copy Shop ID
+            </button>
+            {copyMessage ? <span role="status">{copyMessage}</span> : null}
+          </div>
           <label className="admin-field admin-device-search">
             <span>Search devices</span>
             <input
