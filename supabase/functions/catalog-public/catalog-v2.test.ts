@@ -73,6 +73,34 @@ describe('catalog-public V2 HTTP contract', () => {
     expect(response.headers.get('etag')).toBe(`\"${body.revision}\"`);
   });
 
+  it('starts the ordering RPC without waiting for the catalog RPC to finish', async () => {
+    let unblockCategories: (() => void) | undefined;
+    const categoryGate = new Promise<void>((resolve) => {
+      unblockCategories = resolve;
+    });
+    let orderingStarted = false;
+    const baseStore = store(projection());
+    const delayedStore: V2Store = {
+      ...baseStore,
+      listCategories: async () => {
+        await categoryGate;
+        return [];
+      },
+      getPublishedOrderingProjection: async () => {
+        orderingStarted = true;
+        return projection();
+      },
+    };
+    const pending = handleCatalogPublicRequest(request(2), delayedStore);
+    await Promise.resolve(); // let the authorized shop lookup complete
+    try {
+      expect(orderingStarted).toBe(true);
+    } finally {
+      unblockCategories?.();
+      await pending; // never leave a request blocked after the assertion
+    }
+  });
+
   it('keeps the existing V1 response as the default for deployed clients', async () => {
     const response = await handleCatalogPublicRequest(request(), store(projection()));
 
