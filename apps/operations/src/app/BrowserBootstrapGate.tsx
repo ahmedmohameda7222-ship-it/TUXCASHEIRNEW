@@ -58,11 +58,8 @@ export function BrowserBootstrapGate() {
     let cancelled = false;
     void client.getState().then((result) => {
       if (cancelled) return;
-      if (result.ok && result.value.status !== 'ACTIVE') {
-        setState('PIN_REQUIRED');
-      } else {
-        setState('READY');
-      }
+      setState(result.ok && result.value.status === 'ACTIVE' ? 'READY' : 'PIN_REQUIRED');
+      if (!result.ok) setError(result.error.message);
     });
     return () => {
       cancelled = true;

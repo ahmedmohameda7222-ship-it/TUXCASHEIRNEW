@@ -966,6 +966,27 @@ export function App({ initialAuthenticatedSession }: AppProps = {}) {
     );
   }
   if (screen.session.status === 'CONFIGURATION_REQUIRED') {
+    if (window.tuxDesktop === undefined) {
+      return (
+        <main className="entry-shell">
+          <section className="entry-card" aria-labelledby="browser-sign-in-retry-title">
+            <Brand />
+            <h1 id="browser-sign-in-retry-title">TUX Operations</h1>
+            <p className="entry-state">Sign-in unavailable</p>
+            <p className="configuration-note" role="alert">
+              Your session could not be loaded. Return to branch selection and sign in again.
+            </p>
+            <button
+              className="primary-action"
+              type="button"
+              onClick={() => window.location.reload()}
+            >
+              Try Again
+            </button>
+          </section>
+        </main>
+      );
+    }
     return (
       <DeviceSetupScreen
         message={screen.session.message}

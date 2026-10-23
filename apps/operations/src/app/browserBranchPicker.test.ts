@@ -23,6 +23,10 @@ describe('first-browser branch and PIN entry', () => {
     expect(gate).not.toContain('Shop ID (from TUX Admin)');
     expect(gate).not.toContain('Paste the Shop ID');
     expect(admin).not.toContain('Shop ID for Operations browser setup');
+    const app = readFileSync(new URL('./App.tsx', import.meta.url), 'utf8');
+    expect(app).toContain("if (window.tuxDesktop === undefined) {");
+    expect(app).toContain('Return to branch selection and sign in again.');
+    expect(app).toContain('onClick={() => window.location.reload()}');
   });
 
   it('uses a stable distinct device per branch on the same browser', async () => {
