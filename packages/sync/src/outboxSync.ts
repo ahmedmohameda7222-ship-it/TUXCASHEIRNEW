@@ -9,6 +9,7 @@ import {
   type InventoryMovementId,
   type OrderId,
   type OutboxEvent,
+  type ShopId,
 } from '@tux/domain';
 import type { OperationsDatabase, OperationsTransaction } from '@tux/persistence';
 
@@ -219,16 +220,19 @@ export class OutboxSyncService {
   readonly #database: OperationsDatabase;
   readonly #transport: OutboxTransport;
   readonly #runtime: OutboxSyncRuntime;
+  readonly #shopId: ShopId | undefined;
   #tail: Promise<void> = Promise.resolve();
 
   constructor(
     database: OperationsDatabase,
     transport: OutboxTransport,
     runtime: OutboxSyncRuntime,
+    shopId?: ShopId,
   ) {
     this.#database = database;
     this.#transport = transport;
     this.#runtime = runtime;
+    this.#shopId = shopId;
   }
 
   async syncOnce(limit = DEFAULT_BATCH_SIZE): Promise<OutboxSyncSummary> {
@@ -241,7 +245,7 @@ export class OutboxSyncService {
   async #syncUnlocked(limit: number): Promise<OutboxSyncSummary> {
     const now = this.#runtime.now();
     const pending = await this.#database.transaction((transaction) =>
-      transaction.outbox.listPending(now, limit),
+      transaction.outbox.listPending(now, limit, this.#shopId),
     );
     let delivered = 0;
     let quarantined = 0;

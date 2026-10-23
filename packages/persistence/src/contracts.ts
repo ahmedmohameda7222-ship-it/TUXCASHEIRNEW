@@ -92,7 +92,7 @@ export interface AuditRepository {
 }
 export interface OutboxRepository {
   append(event: OutboxEvent): Promise<void>;
-  listPending(now: Instant, limit: number): Promise<readonly OutboxEvent[]>;
+  listPending(now: Instant, limit: number, shopId?: ShopId): Promise<readonly OutboxEvent[]>;
   markDelivered(id: OutboxEventId, deliveredAt: Instant): Promise<void>;
   recordFailure(
     id: OutboxEventId,
