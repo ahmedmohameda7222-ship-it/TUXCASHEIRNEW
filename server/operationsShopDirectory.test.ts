@@ -54,9 +54,11 @@ describe('Operations login branch directory', () => {
       source: '/api/operations-shops',
       destination: '/api/device?route=operations-shops',
     });
-    const upstream = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ shops: [{ id: A, name: 'Downtown' }] }), { status: 200 }),
-    );
+    const upstream = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ shops: [{ id: A, name: 'Downtown' }] }), { status: 200 }),
+      );
     vi.stubGlobal('fetch', upstream);
     const routeRequest = {
       ...request(),
