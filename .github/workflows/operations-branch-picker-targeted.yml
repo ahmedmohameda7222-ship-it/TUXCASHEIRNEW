@@ -34,11 +34,17 @@ jobs:
           npm run typecheck -w @tux/admin
       - name: Capture and enforce exact formatting
         run: |
-          npx prettier --write api/operations-shops.ts server/operationsShopDirectory.ts server/operationsShopDirectory.test.ts apps/operations/src/app/BrowserBootstrapGate.tsx apps/operations/src/app/browserRemote.ts apps/operations/src/app/browserBranchPicker.test.ts apps/operations/src/app/browserShopScope.ts apps/operations/src/app/browserShopScope.test.ts apps/operations/src/app/sessionClient.ts apps/operations/src/app/App.tsx apps/operations/src/styles/global.css apps/admin/src/operations/DevicesPage.tsx apps/admin/src/operations/operations.css
+          npx prettier --write api/operations-shops.ts server/operationsShopDirectory.ts server/operationsShopDirectory.test.ts apps/operations/src/app/BrowserBootstrapGate.tsx apps/operations/src/app/browserRemote.ts apps/operations/src/app/browserBranchPicker.test.ts apps/operations/src/app/browserShopScope.ts apps/operations/src/app/browserShopScope.test.ts apps/operations/src/app/sessionClient.ts apps/operations/src/app/App.tsx apps/operations/src/styles/global.css apps/admin/src/operations/DevicesPage.tsx apps/admin/src/operations/operations.css e2e/operations-branch-login.e2e.ts
           echo TUX_BRANCH_FORMAT_DIFF_BEGIN
-          git --no-pager diff -- api/operations-shops.ts server/operationsShopDirectory.ts server/operationsShopDirectory.test.ts apps/operations/src/app/BrowserBootstrapGate.tsx apps/operations/src/app/browserRemote.ts apps/operations/src/app/browserBranchPicker.test.ts apps/operations/src/app/browserShopScope.ts apps/operations/src/app/browserShopScope.test.ts apps/operations/src/app/sessionClient.ts apps/operations/src/app/App.tsx apps/operations/src/styles/global.css apps/admin/src/operations/DevicesPage.tsx apps/admin/src/operations/operations.css
+          git --no-pager diff -- api/operations-shops.ts server/operationsShopDirectory.ts server/operationsShopDirectory.test.ts apps/operations/src/app/BrowserBootstrapGate.tsx apps/operations/src/app/browserRemote.ts apps/operations/src/app/browserBranchPicker.test.ts apps/operations/src/app/browserShopScope.ts apps/operations/src/app/browserShopScope.test.ts apps/operations/src/app/sessionClient.ts apps/operations/src/app/App.tsx apps/operations/src/styles/global.css apps/admin/src/operations/DevicesPage.tsx apps/admin/src/operations/operations.css e2e/operations-branch-login.e2e.ts
           echo TUX_BRANCH_FORMAT_DIFF_END
           git diff --exit-code
+      - name: Install Operations browser test
+        run: |
+          npm run build -w @tux/operations
+          npx playwright install chromium
+      - name: Chromium branch picker Desktop + Mobile
+        run: npx playwright test e2e/operations-branch-login.e2e.ts --project=desktop-browser-fallback --project=mobile-browser-fallback
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
