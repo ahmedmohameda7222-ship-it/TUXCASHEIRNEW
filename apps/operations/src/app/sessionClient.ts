@@ -89,6 +89,15 @@ interface BrowserRuntime {
   signOut(): Promise<OperationsSessionResult>;
 }
 
+// Only the intentionally named E2E fixture build running on loopback can
+// exercise legacy IndexedDB worker credentials without the server BFF.
+// Production, staging and authenticated branch-picker E2E retain the full
+// server-verified cookie + worker authentication boundary.
+const LEGACY_BROWSER_E2E =
+  import.meta.env.MODE === 'e2e-browser-fallback' &&
+  typeof window !== 'undefined' &&
+  (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
+
 let browserRuntimePromise: Promise<BrowserRuntime> | null = null;
 let browserWhatsAppPromise: Promise<TuxWhatsAppApi> | null = null;
 
@@ -466,6 +475,11 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       };
 
       const submitPin = async (pin: string, shopId?: string): Promise<OperationsSessionResult> => {
+        if (LEGACY_BROWSER_E2E) {
+          const result = await session.submitPin(pin);
+          trackWorkerIdentity(result);
+          return result;
+        }
         const state = await session.getState();
         if (!state.ok) {
           trackWorkerIdentity(state);
@@ -489,6 +503,11 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       };
 
       const getState = async (): Promise<OperationsSessionResult> => {
+        if (LEGACY_BROWSER_E2E) {
+          const result = await session.getState();
+          trackWorkerIdentity(result);
+          return result;
+        }
         const result = await fenceStaleBrowserSession(
           await session.getState(),
           async () => (await remoteGateway.currentSession())?.shopId ?? null,
