@@ -77,11 +77,12 @@ class MemoryDatabase implements OperationsDatabase {
         append: async (event: OutboxEvent) => {
           this.events.set(event.id, event);
         },
-        listPending: async (now: ReturnType<typeof instant>, limit: number) =>
+        listPending: async (now: ReturnType<typeof instant>, limit: number, shopId?: ShopId) =>
           [...this.events.values()]
             .filter(
               (event) =>
                 event.deliveredAt === null &&
+                (shopId === undefined || event.shopId === shopId) &&
                 (event.nextAttemptAt === null || event.nextAttemptAt <= now),
             )
             .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
@@ -118,6 +119,32 @@ class MemoryDatabase implements OperationsDatabase {
 }
 
 describe('OutboxSyncService', () => {
+  it('only syncs the active branch and leaves another branch\'s outbox untouched', async () => {
+    const database = new MemoryDatabase();
+    const otherShop = parseEntityId<ShopId>('11000000-0000-4000-8000-000000000002');
+    const other = {
+      ...outbox('21000000-0000-4000-8000-000000000030', '2026-08-18T09:00:00.000Z'),
+      shopId: otherShop,
+    };
+    const current = outbox('21000000-0000-4000-8000-000000000031', '2026-08-18T10:00:00.000Z');
+    database.events.set(other.id, other);
+    database.events.set(current.id, current);
+    const delivered: OutboxEventId[] = [];
+    const service = new OutboxSyncService(
+      database,
+      { deliver: async (event) => { delivered.push(event.id); } },
+      { now: () => instant('2026-08-18T11:00:00.000Z') },
+      SHOP_ID,
+    );
+    const result = await service.syncOnce(1);
+    expect(result.attempted).toBe(1);
+    expect(result.delivered).toBe(1);
+    expect(delivered).toEqual([current.id]);
+    expect(database.events.get(current.id)?.deliveredAt).not.toBeNull();
+    expect(database.events.get(other.id)?.deliveredAt).toBeNull();
+    expect(database.events.get(other.id)?.attemptCount).toBe(0);
+  });
+
   it('delivers oldest eligible events and marks delivered only after transport success', async () => {
     const database = new MemoryDatabase();
     const first = outbox('21000000-0000-4000-8000-000000000001', '2026-08-18T10:00:00.000Z');
