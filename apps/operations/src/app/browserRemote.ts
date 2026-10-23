@@ -168,9 +168,10 @@ export class VercelBrowserRemoteGateway
         headers: { accept: 'application/json' },
       });
     } catch {
-      return null;
+      throw new Error('Device session could not be checked while offline.');
     }
-    if (response.status === 404 || response.status === 401 || response.status === 503) return null;
+    if (response.status === 404 || response.status === 401) return null;
+    if (response.status === 503) throw new Error('Device session service is temporarily unavailable.');
     if (!response.ok)
       throw new Error(`Device session request failed with HTTP ${response.status}.`);
     return parseSession(await jsonObject(response, 'Device session'));

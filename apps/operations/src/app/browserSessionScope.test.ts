@@ -35,23 +35,27 @@ describe('authenticated browser branch recovery', () => {
     expect(fence).toHaveBeenCalledTimes(1);
   });
 
-  it('fails closed without an authorized remote session, including network failures', async () => {
+  it('fences a definitively missing remote session', async () => {
     const closed = {
       ok: true,
       value: { status: 'NO_ACTIVE_DAY', shopId: A },
     } as OperationsSessionResult;
     const close = vi.fn().mockResolvedValue(closed);
     expect(await fenceStaleBrowserSession(ACTIVE, async () => null, close)).toBe(closed);
-    expect(
-      await fenceStaleBrowserSession(
-        ACTIVE,
-        async () => {
-          throw new Error('offline');
-        },
-        close,
-      ),
-    ).toBe(closed);
-    expect(close).toHaveBeenCalledTimes(2);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a locally authenticated worker active during a temporary network outage', async () => {
+    const close = vi.fn();
+    const result = await fenceStaleBrowserSession(
+      ACTIVE,
+      async () => {
+        throw new Error('offline');
+      },
+      close,
+    );
+    expect(result).toBe(ACTIVE);
+    expect(close).not.toHaveBeenCalled();
   });
 
   it('does not contact the server for signed-out or invalid local sessions', async () => {

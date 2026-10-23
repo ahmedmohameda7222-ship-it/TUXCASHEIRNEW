@@ -13,7 +13,9 @@ export async function fenceStaleBrowserSession(
   try {
     remote = await remoteShopId();
   } catch {
-    // The online Operations browser requires an authoritative remote device session.
+    // A transient connection failure is not a revocation. Keep the last-known-good
+    // local session for offline operation; a definite absence or shop change still fences it.
+    return local;
   }
   if (remote === local.value.shopId) return local;
   return closeLocalSession();
