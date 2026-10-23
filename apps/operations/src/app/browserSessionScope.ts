@@ -9,14 +9,13 @@ export async function fenceStaleBrowserSession(
 ): Promise<OperationsSessionResult> {
   if (!local.ok || local.value.status !== 'ACTIVE') return local;
 
-  let remote: ShopId | null = null;
   try {
-    remote = await remoteShopId();
+    const remote = await remoteShopId();
+    if (remote === local.value.shopId) return local;
   } catch {
-    // A transient connection failure is not a revocation. Keep the last-known-good
-    // local session for offline operation; a definite absence or shop change still fences it.
+    // Keep the last-known-good worker session during an offline outage.
+    // Definitively missing or different remote shops still force a sign-out.
     return local;
   }
-  if (remote === local.value.shopId) return local;
   return closeLocalSession();
 }
