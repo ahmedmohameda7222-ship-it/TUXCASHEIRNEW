@@ -15,8 +15,12 @@ function response(): GatewayResponse & { body?: Record<string, unknown> } {
   const capture: { body?: Record<string, unknown> } = {};
   return {
     statusCode: 200,
-    get body() { return capture.body; },
-    setHeader() { return this; },
+    get body() {
+      return capture.body;
+    },
+    setHeader() {
+      return this;
+    },
     end(value?: string) {
       if (value) capture.body = JSON.parse(value) as Record<string, unknown>;
       return this;
@@ -39,24 +43,39 @@ afterEach(() => {
 
 describe('Operations login branch directory', () => {
   it('returns only validated branch names and IDs through a signed BFF request', async () => {
-    const upstream = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      shops: [{ id: A, name: 'Downtown' }, { id: B, name: 'Mall' }],
-    }), { status: 200 }));
+    const upstream = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          shops: [
+            { id: A, name: 'Downtown' },
+            { id: B, name: 'Mall' },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
     vi.stubGlobal('fetch', upstream);
     const reply = response();
     await listOperationsLoginShops(request(), reply);
     expect(reply.statusCode).toBe(200);
-    expect(reply.body).toEqual({ shops: [{ id: A, name: 'Downtown' }, { id: B, name: 'Mall' }] });
+    expect(reply.body).toEqual({
+      shops: [
+        { id: A, name: 'Downtown' },
+        { id: B, name: 'Mall' },
+      ],
+    });
     const init = upstream.mock.calls[0]?.[1] as RequestInit;
     const headers = new Headers(init.headers);
     expect(init.method).toBe('GET');
     expect(headers.get('x-tux-bootstrap-signature')).toBe(
       createHmac('sha256', SECRET)
-        .update(JSON.stringify([
-          'tux-operations-shop-directory:v1',
-          Number(headers.get('x-tux-bootstrap-timestamp')),
-          headers.get('x-tux-bootstrap-nonce'),
-        ]))
+        .update(
+          JSON.stringify([
+            'tux-operations-shop-directory:v1',
+            Number(headers.get('x-tux-bootstrap-timestamp')),
+            headers.get('x-tux-bootstrap-nonce'),
+          ]),
+        )
         .digest('hex'),
     );
   });
@@ -74,9 +93,17 @@ describe('Operations login branch directory', () => {
   });
 
   it('rejects malformed upstream data instead of leaking extra fields', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      shops: [{ id: A, name: 'Downtown', pin_hash: 'must-not-escape' }],
-    }), { status: 200 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            shops: [{ id: A, name: 'Downtown', pin_hash: 'must-not-escape' }],
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
     const reply = response();
     await listOperationsLoginShops(request(), reply);
     expect(reply.statusCode).toBe(200);

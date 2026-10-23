@@ -167,9 +167,7 @@ export function BrowserBootstrapGate() {
             aria-describedby={shopError ? 'bootstrap-branch-error' : undefined}
             required
           >
-            <option value="">
-              {shopLoading ? 'Loading branches…' : 'Choose your branch'}
-            </option>
+            <option value="">{shopLoading ? 'Loading branches…' : 'Choose your branch'}</option>
             {shops.map((shop) => (
               <option key={shop.id} value={shop.id}>
                 {shop.name}
@@ -207,7 +205,11 @@ export function BrowserBootstrapGate() {
               {error}
             </p>
           )}
-          <button className="primary-action" type="submit" disabled={busy || shopLoading || !shopId || pin.length === 0}>
+          <button
+            className="primary-action"
+            type="submit"
+            disabled={busy || shopLoading || !shopId || pin.length === 0}
+          >
             {busy ? 'Checking…' : 'Sign In'}
           </button>
         </form>

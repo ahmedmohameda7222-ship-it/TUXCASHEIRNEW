@@ -8,17 +8,28 @@ test('worker selects branch by name then PIN; browser device remains scoped on b
 }) => {
   const enrollments: Array<{ shopId: string; deviceId: string; pin: string }> = [];
   await page.route('**/api/device-session', (route) =>
-    route.fulfill({ status: 404, contentType: 'application/json', body: '{"status":"NOT_ENROLLED"}' }),
+    route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: '{"status":"NOT_ENROLLED"}',
+    }),
   );
   await page.route('**/api/operations-shops', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ shops: [{ id: A, name: 'Downtown' }, { id: B, name: 'Mall Branch' }] }),
+      body: JSON.stringify({
+        shops: [
+          { id: A, name: 'Downtown' },
+          { id: B, name: 'Mall Branch' },
+        ],
+      }),
     }),
   );
   await page.route('**/api/device-bootstrap', async (route) => {
-    enrollments.push(route.request().postDataJSON() as { shopId: string; deviceId: string; pin: string });
+    enrollments.push(
+      route.request().postDataJSON() as { shopId: string; deviceId: string; pin: string },
+    );
     await route.fulfill({
       status: 401,
       contentType: 'application/json',
@@ -30,7 +41,9 @@ test('worker selects branch by name then PIN; browser device remains scoped on b
   const branches = page.getByRole('combobox', { name: 'Branch' });
   await expect(branches).toBeVisible();
   await expect(branches.locator('option')).toHaveText([
-    'Choose your branch', 'Downtown', 'Mall Branch',
+    'Choose your branch',
+    'Downtown',
+    'Mall Branch',
   ]);
   await expect(page.getByLabel('Shop ID')).toHaveCount(0);
   await branches.selectOption({ label: 'Mall Branch' });

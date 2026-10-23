@@ -24,7 +24,9 @@ describe('selectBrowserShop — cached multi-branch isolation', () => {
     );
     await selectBrowserShop(
       { transaction } as unknown as OperationsDatabase,
-      { listActiveShops: vi.fn().mockResolvedValue([prior]) } as unknown as OperatorSessionReadModel,
+      {
+        listActiveShops: vi.fn().mockResolvedValue([prior]),
+      } as unknown as OperatorSessionReadModel,
       selected,
       worker,
     );

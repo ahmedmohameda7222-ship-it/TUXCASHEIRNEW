@@ -61,7 +61,8 @@ export async function listOperationsLoginShops(
         typeof row['name'] !== 'string' ||
         row['name'].trim().length === 0 ||
         row['name'].length > 200
-      ) throw new Error();
+      )
+        throw new Error();
       return { id: row['id'], name: row['name'] };
     });
     sendJson(response, 200, { shops });

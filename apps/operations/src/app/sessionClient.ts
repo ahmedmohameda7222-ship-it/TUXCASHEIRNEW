@@ -256,7 +256,11 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       // browser. The next PIN login may choose a different branch.
       if (recoveredShopId !== null) {
         const recovered = await session.getState();
-        if (recovered.ok && recovered.value.status === 'ACTIVE' && recovered.value.shopId === recoveredShopId) {
+        if (
+          recovered.ok &&
+          recovered.value.status === 'ACTIVE' &&
+          recovered.value.shopId === recoveredShopId
+        ) {
           startRemoteRuntime(recoveredShopId);
         }
       }
