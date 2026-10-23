@@ -247,16 +247,17 @@ test('P01 desktop navigation groups Catalog under Operations and preserves selec
   await page.screenshot({ path: 'test-results/p01-desktop-sidebar-catalog-active.png' });
 });
 
-test('P08 Alerts deep link renders the shipped page while later checkpoint routes stay honest', async ({
-  page,
-}) => {
+test('P08-P10 deep links render shipped pages without planned placeholders', async ({ page }) => {
   await mockSession(page);
   await page.goto('/alerts');
   await expect(page.getByRole('heading', { name: 'Alerts' })).toBeVisible();
   await expect(page.getByText('Planned capability')).toHaveCount(0);
   await page.goto('/devices');
-  await expect(page.getByText('Planned capability')).toBeVisible();
-  await expect(page.getByText(/not available in the current TUX Admin release/i)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Operations health' })).toBeVisible();
+  await expect(page.getByText('Planned capability')).toHaveCount(0);
+  await page.goto('/whatsapp');
+  await expect(page.getByRole('heading', { name: 'WhatsApp', exact: true })).toBeVisible();
+  await expect(page.getByText('Planned capability')).toHaveCount(0);
 });
 
 test('P01 keeps shop selection in memory and rejects revoked assignment on reload', async ({

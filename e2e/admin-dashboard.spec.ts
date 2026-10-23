@@ -521,7 +521,12 @@ for (const role of ['OWNER', 'MANAGER'] as const) {
         await mobile.getByRole('link', { name: 'More' }).click();
         await expect(page.getByRole('heading', { name: 'More' })).toBeVisible();
         await expect(page.getByRole('link', { name: /Staff/ }).first()).toBeVisible();
-        await expect(page.getByText('WhatsApp')).toHaveCount(0);
+        const whatsappLink = page.locator('main').getByRole('link', { name: 'WhatsApp' });
+        if (role === 'OWNER') {
+          await expect(whatsappLink).toBeVisible();
+        } else {
+          await expect(whatsappLink).toHaveCount(0);
+        }
         await page.screenshot({
           path: `test-results/p01-representative-${role.toLowerCase()}-more-${viewport.width}-light.png`,
           fullPage: true,
