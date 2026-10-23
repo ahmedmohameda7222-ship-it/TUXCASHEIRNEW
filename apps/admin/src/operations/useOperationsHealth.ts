@@ -6,7 +6,11 @@ import { adminFetch } from '../lib/adminApi';
 
 type HealthView = 'summary' | 'devices' | 'device';
 
-export function useOperationsHealth(shopId: string | undefined, view: HealthView, deviceId?: string) {
+export function useOperationsHealth(
+  shopId: string | undefined,
+  view: HealthView,
+  deviceId?: string,
+) {
   const queryClient = useQueryClient();
   const previousShopId = useRef(shopId);
   useEffect(() => {
@@ -24,7 +28,9 @@ export function useOperationsHealth(shopId: string | undefined, view: HealthView
       if (!shopId) throw new Error('concrete_shop_required');
       const params = new URLSearchParams({ view, shopId });
       if (deviceId) params.set('deviceId', deviceId);
-      return adminFetch<OperationsHealthResponse>(`/api/admin/operations-health?${params.toString()}`);
+      return adminFetch<OperationsHealthResponse>(
+        `/api/admin/operations-health?${params.toString()}`,
+      );
     },
     refetchInterval: () =>
       typeof document !== 'undefined' && document.visibilityState === 'visible' ? 60_000 : false,

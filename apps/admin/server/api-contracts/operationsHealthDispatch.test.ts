@@ -19,6 +19,8 @@ describe('Admin consolidated operations health dispatch', () => {
     const response = { setHeader: vi.fn(), end: vi.fn(), statusCode: 200 };
     await handler(request as never, response as never);
     expect(handleOperationsHealthRequest).toHaveBeenCalledOnce();
-    expect(request.url).toBe('/api/admin/orders?view=summary&shopId=11111111-1111-4111-8111-111111111111');
+    expect(request.url).toBe(
+      '/api/admin/orders?view=summary&shopId=11111111-1111-4111-8111-111111111111',
+    );
   });
 });

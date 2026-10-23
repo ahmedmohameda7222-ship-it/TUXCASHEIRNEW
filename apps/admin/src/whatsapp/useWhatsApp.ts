@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { WhatsAppAdminCommand, WhatsAppAdminCommandResult, WhatsAppAdminResponse, WhatsAppAdminView } from '@tux/admin-contracts';
+import type {
+  WhatsAppAdminCommand,
+  WhatsAppAdminCommandResult,
+  WhatsAppAdminResponse,
+  WhatsAppAdminView,
+} from '@tux/admin-contracts';
 
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
@@ -22,9 +27,15 @@ export function useWhatsAppMutation() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (command: WhatsAppAdminCommand) => {
-      const csrf = session.state.status === 'authenticated' ? session.state.session.csrfToken : undefined;
-      return adminFetch<WhatsAppAdminCommandResult>('/api/admin/whatsapp', { method: 'POST', body: JSON.stringify(command) }, csrf);
+      const csrf =
+        session.state.status === 'authenticated' ? session.state.session.csrfToken : undefined;
+      return adminFetch<WhatsAppAdminCommandResult>(
+        '/api/admin/whatsapp',
+        { method: 'POST', body: JSON.stringify(command) },
+        csrf,
+      );
     },
-    onSuccess: async (_result, command) => client.invalidateQueries({ queryKey: ['admin', 'whatsapp', command.shopId] }),
+    onSuccess: async (_result, command) =>
+      client.invalidateQueries({ queryKey: ['admin', 'whatsapp', command.shopId] }),
   });
 }

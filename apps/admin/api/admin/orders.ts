@@ -833,7 +833,9 @@ export default async function handler(
   if (routedUrl.searchParams.get('__adminResource') === 'whatsapp') {
     routedUrl.searchParams.delete('__adminResource');
     request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
-    await (await import('../../server/whatsapp/whatsappAdminApi.js')).handleWhatsAppAdminRequest(request, response);
+    await (
+      await import('../../server/whatsapp/whatsappAdminApi.js')
+    ).handleWhatsAppAdminRequest(request, response);
     return;
   }
   if (routedUrl.searchParams.get('__adminResource') === 'finance') {

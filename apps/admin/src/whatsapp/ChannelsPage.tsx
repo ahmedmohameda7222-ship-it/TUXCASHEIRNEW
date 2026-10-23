@@ -1,2 +1,28 @@
-import { useShopScope } from '../shops/ShopScopeProvider';import { useWhatsApp } from './useWhatsApp';import { WhatsAppFrame } from './WhatsAppPage';
-export function ChannelsPage(){const{scope}=useShopScope();const shopId=scope.kind==='shop'?scope.shopId:undefined;const q=useWhatsApp(shopId,'channels');const d=q.data?.view==='channels'?q.data:undefined;return <WhatsAppFrame title="Channels" description="Safe channel ownership metadata. Provider credentials are never exposed."><p className="admin-whatsapp-banner">{d?.configured?'Channel configured':'Not configured'}</p><div className="admin-whatsapp-list">{d?.rows.map(c=><article key={c.id}><strong>Meta Cloud API</strong><span>{c.maskedBusinessPhone??'Business phone unavailable'}</span><span>{c.active?'Active':'Inactive'}</span></article>)}</div></WhatsAppFrame>}
+import { useShopScope } from '../shops/ShopScopeProvider';
+import { useWhatsApp } from './useWhatsApp';
+import { WhatsAppFrame } from './WhatsAppPage';
+export function ChannelsPage() {
+  const { scope } = useShopScope();
+  const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
+  const q = useWhatsApp(shopId, 'channels');
+  const d = q.data?.view === 'channels' ? q.data : undefined;
+  return (
+    <WhatsAppFrame
+      title="Channels"
+      description="Safe channel ownership metadata. Provider credentials are never exposed."
+    >
+      <p className="admin-whatsapp-banner">
+        {d?.configured ? 'Channel configured' : 'Not configured'}
+      </p>
+      <div className="admin-whatsapp-list">
+        {d?.rows.map((c) => (
+          <article key={c.id}>
+            <strong>Meta Cloud API</strong>
+            <span>{c.maskedBusinessPhone ?? 'Business phone unavailable'}</span>
+            <span>{c.active ? 'Active' : 'Inactive'}</span>
+          </article>
+        ))}
+      </div>
+    </WhatsAppFrame>
+  );
+}

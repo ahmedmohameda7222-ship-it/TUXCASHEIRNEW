@@ -2,7 +2,10 @@ import type { AdminSessionPrincipal } from '@tux/admin-contracts';
 import { describe, expect, it } from 'vitest';
 
 import { AdminAuthorizationError } from '../authorization.js';
-import { createOperationsHealthService, type OperationsHealthDependencies } from './healthService.js';
+import {
+  createOperationsHealthService,
+  type OperationsHealthDependencies,
+} from './healthService.js';
 
 const SHOP_A = '11111111-1111-4111-8111-111111111111';
 const SHOP_B = '22222222-2222-4222-8222-222222222222';
@@ -18,7 +21,9 @@ const principal: AdminSessionPrincipal = {
   shopIds: [SHOP_A],
 };
 
-function dependencies(overrides: Partial<OperationsHealthDependencies> = {}): OperationsHealthDependencies {
+function dependencies(
+  overrides: Partial<OperationsHealthDependencies> = {},
+): OperationsHealthDependencies {
   return {
     now: () => NOW,
     loadShop: async (_principal, shopId) => ({
@@ -78,8 +83,24 @@ describe('operations health service', () => {
     const service = createOperationsHealthService(
       dependencies({
         loadDevices: async () => [
-          { id: DEVICE_A, shopId: SHOP_A, label: 'Revoked', active: false, membershipActive: true, lastSeenAt: NOW.toISOString(), configVersion: 2 },
-          { id: DEVICE_B, shopId: SHOP_A, label: 'Expired', active: true, membershipActive: false, lastSeenAt: NOW.toISOString(), configVersion: 2 },
+          {
+            id: DEVICE_A,
+            shopId: SHOP_A,
+            label: 'Revoked',
+            active: false,
+            membershipActive: true,
+            lastSeenAt: NOW.toISOString(),
+            configVersion: 2,
+          },
+          {
+            id: DEVICE_B,
+            shopId: SHOP_A,
+            label: 'Expired',
+            active: true,
+            membershipActive: false,
+            lastSeenAt: NOW.toISOString(),
+            configVersion: 2,
+          },
         ],
       }),
     );
@@ -96,7 +117,17 @@ describe('operations health service', () => {
   it('is deterministic across process timezones and ignores optional WhatsApp absence', async () => {
     const health = await createOperationsHealthService(
       dependencies({
-        loadDevices: async () => [{ id: DEVICE_A, shopId: SHOP_A, label: 'Register', active: true, membershipActive: true, lastSeenAt: '2026-10-22T11:59:00.000Z', configVersion: 8 }],
+        loadDevices: async () => [
+          {
+            id: DEVICE_A,
+            shopId: SHOP_A,
+            label: 'Register',
+            active: true,
+            membershipActive: true,
+            lastSeenAt: '2026-10-22T11:59:00.000Z',
+            configVersion: 8,
+          },
+        ],
       }),
     ).summary(SHOP_A, principal);
     expect(health.asOf).toBe('2026-10-22T12:00:00.000Z');
@@ -107,15 +138,34 @@ describe('operations health service', () => {
 
   it('denies Shop B and never calls data loaders for a denied shop', async () => {
     let called = false;
-    const service = createOperationsHealthService(dependencies({ loadShop: async () => { called = true; throw new Error('leak'); } }));
-    await expect(service.summary(SHOP_B, principal)).rejects.toBeInstanceOf(AdminAuthorizationError);
+    const service = createOperationsHealthService(
+      dependencies({
+        loadShop: async () => {
+          called = true;
+          throw new Error('leak');
+        },
+      }),
+    );
+    await expect(service.summary(SHOP_B, principal)).rejects.toBeInstanceOf(
+      AdminAuthorizationError,
+    );
     expect(called).toBe(false);
   });
 
   it('does not return a cross-shop device detail even when a dependency drifts', async () => {
     const service = createOperationsHealthService(
       dependencies({
-        loadDevices: async () => [{ id: DEVICE_B, shopId: SHOP_B, label: 'Other shop', active: true, membershipActive: true, lastSeenAt: NOW.toISOString(), configVersion: 1 }],
+        loadDevices: async () => [
+          {
+            id: DEVICE_B,
+            shopId: SHOP_B,
+            label: 'Other shop',
+            active: true,
+            membershipActive: true,
+            lastSeenAt: NOW.toISOString(),
+            configVersion: 1,
+          },
+        ],
       }),
     );
     await expect(service.device(SHOP_A, DEVICE_B, principal)).rejects.toThrow('device_not_found');

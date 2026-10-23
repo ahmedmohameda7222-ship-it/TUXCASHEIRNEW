@@ -26,20 +26,46 @@ const PrintersPage = lazy(() =>
   import('../operations/PrintersPage').then((module) => ({ default: module.PrintersPage })),
 );
 const OpeningClosingPage = lazy(() =>
-  import('../operations/OpeningClosingPage').then((module) => ({ default: module.OpeningClosingPage })),
+  import('../operations/OpeningClosingPage').then((module) => ({
+    default: module.OpeningClosingPage,
+  })),
 );
 const ManagerLogPage = lazy(() =>
   import('../operations/ManagerLogPage').then((module) => ({ default: module.ManagerLogPage })),
 );
-const WhatsAppPage = lazy(() => import('../whatsapp/WhatsAppPage').then((module) => ({ default: module.WhatsAppPage })));
-const ConversationsPage = lazy(() => import('../whatsapp/ConversationsPage').then((module) => ({ default: module.ConversationsPage })));
-const ConversationDetailPage = lazy(() => import('../whatsapp/ConversationDetailPage').then((module) => ({ default: module.ConversationDetailPage })));
-const TemplatesPage = lazy(() => import('../whatsapp/TemplatesPage').then((module) => ({ default: module.TemplatesPage })));
-const QuickRepliesPage = lazy(() => import('../whatsapp/QuickRepliesPage').then((module) => ({ default: module.QuickRepliesPage })));
-const AutomaticMessagesPage = lazy(() => import('../whatsapp/AutomaticMessagesPage').then((module) => ({ default: module.AutomaticMessagesPage })));
-const AnalyticsPage = lazy(() => import('../whatsapp/AnalyticsPage').then((module) => ({ default: module.AnalyticsPage })));
-const ChannelsPage = lazy(() => import('../whatsapp/ChannelsPage').then((module) => ({ default: module.ChannelsPage })));
-const WhatsAppHealthPage = lazy(() => import('../whatsapp/WhatsAppHealthPage').then((module) => ({ default: module.WhatsAppHealthPage })));
+const WhatsAppPage = lazy(() =>
+  import('../whatsapp/WhatsAppPage').then((module) => ({ default: module.WhatsAppPage })),
+);
+const ConversationsPage = lazy(() =>
+  import('../whatsapp/ConversationsPage').then((module) => ({ default: module.ConversationsPage })),
+);
+const ConversationDetailPage = lazy(() =>
+  import('../whatsapp/ConversationDetailPage').then((module) => ({
+    default: module.ConversationDetailPage,
+  })),
+);
+const TemplatesPage = lazy(() =>
+  import('../whatsapp/TemplatesPage').then((module) => ({ default: module.TemplatesPage })),
+);
+const QuickRepliesPage = lazy(() =>
+  import('../whatsapp/QuickRepliesPage').then((module) => ({ default: module.QuickRepliesPage })),
+);
+const AutomaticMessagesPage = lazy(() =>
+  import('../whatsapp/AutomaticMessagesPage').then((module) => ({
+    default: module.AutomaticMessagesPage,
+  })),
+);
+const AnalyticsPage = lazy(() =>
+  import('../whatsapp/AnalyticsPage').then((module) => ({ default: module.AnalyticsPage })),
+);
+const ChannelsPage = lazy(() =>
+  import('../whatsapp/ChannelsPage').then((module) => ({ default: module.ChannelsPage })),
+);
+const WhatsAppHealthPage = lazy(() =>
+  import('../whatsapp/WhatsAppHealthPage').then((module) => ({
+    default: module.WhatsAppHealthPage,
+  })),
+);
 const AuditPage = lazy(() =>
   import('../audit/AuditPage').then((module) => ({ default: module.AuditPage })),
 );
@@ -182,7 +208,12 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   if (route.path === '/whatsapp') {
     if (location === '/whatsapp') return <WhatsAppPage />;
     if (location === '/whatsapp/conversations') return <ConversationsPage />;
-    if (location.startsWith('/whatsapp/conversations/')) return <ConversationDetailPage conversationId={location.slice('/whatsapp/conversations/'.length)} />;
+    if (location.startsWith('/whatsapp/conversations/'))
+      return (
+        <ConversationDetailPage
+          conversationId={location.slice('/whatsapp/conversations/'.length)}
+        />
+      );
     if (location === '/whatsapp/templates') return <TemplatesPage />;
     if (location === '/whatsapp/quick-replies') return <QuickRepliesPage />;
     if (location === '/whatsapp/automatic-messages') return <AutomaticMessagesPage />;

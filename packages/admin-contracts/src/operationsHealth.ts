@@ -1,10 +1,5 @@
 export type HealthState =
-  | 'HEALTHY'
-  | 'ATTENTION'
-  | 'CRITICAL'
-  | 'UNKNOWN'
-  | 'STALE'
-  | 'NOT_CONFIGURED';
+  'HEALTHY' | 'ATTENTION' | 'CRITICAL' | 'UNKNOWN' | 'STALE' | 'NOT_CONFIGURED';
 
 export type ComponentHealth = {
   key: 'DEVICES' | 'SYNC' | 'BUSINESS_DAY' | 'ONLINE_ORDERS' | 'PRINTERS' | 'WHATSAPP';
