@@ -212,6 +212,7 @@ const expectedOperations = {
     { source: '/api/device-bootstrap', destination: '/api/device?route=device-bootstrap' },
     { source: '/api/device-enroll', destination: '/api/device?route=device-enroll' },
     { source: '/api/device-session', destination: '/api/device?route=device-session' },
+    { source: '/api/operations-shops', destination: '/api/device?route=operations-shops' },
     { source: '/api/worker-auth', destination: '/api/worker?route=worker-auth' },
     {
       source: '/api/worker-menu-layout',
@@ -284,7 +285,12 @@ if (adminCronApiFiles.length > 0) {
 const rootApiFiles = collectTsFiles(rootApiDir);
 const operationsApiFiles = collectTsFiles(operationsApiDir);
 const consolidatedOperationsRoutes = {
-  'device.ts': ['device-bootstrap.ts', 'device-enroll.ts', 'device-session.ts'],
+  'device.ts': [
+    'device-bootstrap.ts',
+    'device-enroll.ts',
+    'device-session.ts',
+    'operations-shops.ts',
+  ],
   'worker.ts': ['worker-auth.ts', 'worker-menu-layout.ts', 'worker-ui-preferences.ts'],
 };
 const consolidatedRootApiFiles = new Set(Object.values(consolidatedOperationsRoutes).flat());
