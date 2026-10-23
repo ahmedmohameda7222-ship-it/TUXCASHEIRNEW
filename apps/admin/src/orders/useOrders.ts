@@ -15,6 +15,9 @@ import { useAdminSession } from '../auth/useAdminSession';
 import { AdminApiError, adminFetch } from '../lib/adminApi';
 import { createRetainedCommandIds, isPendingApprovalResult } from '../lib/retainedCommandIds';
 
+// Cross-app changes must reach an open Admin order workspace without user refresh.
+const ORDER_REFRESH_INTERVAL_MS = 20_000;
+
 export class OrdersUiError extends Error {
   constructor(readonly code: string) {
     super(code);
@@ -89,6 +92,7 @@ export function useOrders(
     queryKey: shopId ? listKey(shopId, filters) : ['admin', 'orders', 'no-shop'],
     enabled: Boolean(shopId) && searchEnabled,
     initialPageParam: null as string | null,
+    refetchInterval: ORDER_REFRESH_INTERVAL_MS,
     queryFn: async ({ pageParam }) => {
       if (!shopId) throw new OrdersUiError('concrete_shop_required');
       return adminFetch<AdminOrderSearchResult>(
@@ -113,6 +117,7 @@ export function useOrders(
         ? detailKey(shopId, selectedOrderId)
         : ['admin', 'orders', 'no-detail'],
     enabled: Boolean(shopId && selectedOrderId),
+    refetchInterval: ORDER_REFRESH_INTERVAL_MS,
     queryFn: async () => {
       if (!shopId || !selectedOrderId) throw new OrdersUiError('order_required');
       return adminFetch<AdminOrderDetail>(
