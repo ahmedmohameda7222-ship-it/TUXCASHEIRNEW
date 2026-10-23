@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 
 const gate = readFileSync(new URL('./BrowserBootstrapGate.tsx', import.meta.url), 'utf8');
 const playwright = readFileSync(new URL('../../../../playwright.config.ts', import.meta.url), 'utf8');
-const packageJson = JSON.parse(readFileSync(new URL('../../../../package.json', import.meta.url), 'utf8')) as {
-  scripts: Record<string, string>;
-};
+const packageJson = JSON.parse(
+  readFileSync(new URL('../../../../package.json', import.meta.url), 'utf8'),
+) as { scripts: Record<string, string> };
 const rootCi = readFileSync(
   new URL('../../../../.github/workflows/ci.yml', import.meta.url),
   'utf8',
