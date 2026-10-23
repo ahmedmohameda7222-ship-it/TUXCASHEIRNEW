@@ -174,8 +174,9 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         menuLayoutService,
         () => activeMenuLayoutIdentity,
       );
-      let automaticSyncStarted = false;
-      let configurationTimerStarted = false;
+      let activeSyncShopId: ShopId | null = null;
+      let automaticSyncHandle: ReturnType<typeof startBrowserAutomaticSync> | null = null;
+      let configurationTimer: number | null = null;
       let preferenceRetryStarted = false;
       let menuLayoutRetryStarted = false;
 
@@ -190,19 +191,32 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         retryMenuLayout();
       };
 
+      const stopRemoteRuntime = (): void => {
+        automaticSyncHandle?.stop();
+        automaticSyncHandle = null;
+        if (configurationTimer !== null) {
+          window.clearInterval(configurationTimer);
+          configurationTimer = null;
+        }
+        activeSyncShopId = null;
+      };
+
       const startRemoteRuntime = (shopId: ShopId): void => {
-        if (!automaticSyncStarted) {
-          startBrowserAutomaticSync({
+        // A browser can change branches after signing out. Never leave Shop A's
+        // outbox, inventory or configuration polls active under Shop B's cookie.
+        if (activeSyncShopId !== shopId) {
+          stopRemoteRuntime();
+          automaticSyncHandle = startBrowserAutomaticSync({
             database,
             now: runtime.now,
             shopId,
             rewardClaims: rewardAuthority,
           });
-          automaticSyncStarted = true;
-        }
-        if (!configurationTimerStarted) {
-          window.setInterval(() => void configurationService.sync(shopId), 5 * 60 * 1000);
-          configurationTimerStarted = true;
+          configurationTimer = window.setInterval(
+            () => void configurationService.sync(shopId),
+            5 * 60 * 1000,
+          );
+          activeSyncShopId = shopId;
         }
         if (!preferenceRetryStarted) {
           preferencesRetry.start();
@@ -410,6 +424,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       ): Promise<OperationsSessionResult> => {
         try {
           const bootstrap = await remoteGateway.bootstrap(pin, shopId);
+          if (activeSyncShopId !== bootstrap.shopId) stopRemoteRuntime();
           const configuration = await configurationService.sync(bootstrap.shopId);
           if (
             configuration.status === 'REMOTE_UNAVAILABLE' ||
@@ -479,12 +494,14 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           async () => (await remoteGateway.currentSession())?.shopId ?? null,
           () => session.signOut(),
         );
+        if (!result.ok || result.value.status !== 'ACTIVE') stopRemoteRuntime();
         trackWorkerIdentity(result);
         return result;
       };
 
       const signOut = async (): Promise<OperationsSessionResult> => {
         const result = await session.signOut();
+        stopRemoteRuntime();
         trackWorkerIdentity(result);
         return result;
       };
