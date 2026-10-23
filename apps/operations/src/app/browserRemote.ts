@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import type {
   AuthoritativeWorkerAuthenticationResult,
   InboundConfigurationProvider,
@@ -123,12 +124,18 @@ function parseRemoteWorkerMenuLayout(value: Record<string, unknown>): RemoteWork
 }
 
 function isLoopbackHost(): boolean {
+  // Only the isolated Playwright build may exercise a mocked local BFF.
+  // Normal development and production builds retain the localhost safety fence.
+  if (import.meta.env.MODE === 'e2e-operations') return false;
   return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 }
 
-function browserDeviceId(): string {
+function browserDeviceId(shopId?: string): string {
+  // A browser can sign into different branches, but one device ID must never
+  // be rebound to a different shop. Isolate device identity by selected shop.
+  const key = shopId ? `${DEVICE_ID_STORAGE_KEY}.${shopId.toLowerCase()}` : DEVICE_ID_STORAGE_KEY;
   try {
-    const stored = window.localStorage.getItem(DEVICE_ID_STORAGE_KEY)?.trim() ?? '';
+    const stored = window.localStorage.getItem(key)?.trim() ?? '';
     if (UUID_PATTERN.test(stored)) return stored;
   } catch {
     // Device identity can still be persisted by the HttpOnly server session cookie.
@@ -136,7 +143,7 @@ function browserDeviceId(): string {
 
   const created = crypto.randomUUID();
   try {
-    window.localStorage.setItem(DEVICE_ID_STORAGE_KEY, created);
+    window.localStorage.setItem(key, created);
   } catch {
     // The server session remains authoritative when browser storage is unavailable.
   }
@@ -161,9 +168,11 @@ export class VercelBrowserRemoteGateway
         headers: { accept: 'application/json' },
       });
     } catch {
-      return null;
+      throw new Error('Device session could not be checked while offline.');
     }
-    if (response.status === 404 || response.status === 401 || response.status === 503) return null;
+    if (response.status === 404 || response.status === 401) return null;
+    if (response.status === 503)
+      throw new Error('Device session service is temporarily unavailable.');
     if (!response.ok)
       throw new Error(`Device session request failed with HTTP ${response.status}.`);
     return parseSession(await jsonObject(response, 'Device session'));
@@ -185,7 +194,7 @@ export class VercelBrowserRemoteGateway
       body: JSON.stringify({
         pin: requiredString(pin, 'Worker PIN'),
         ...(shopId === undefined ? {} : { shopId: shopId.trim() }),
-        deviceId: browserDeviceId(),
+        deviceId: browserDeviceId(shopId),
         deviceLabel: 'TUX Operations Web',
       }),
     });

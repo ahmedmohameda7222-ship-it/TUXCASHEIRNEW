@@ -331,7 +331,7 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
         };
         await requestResult(store('outboxEvents').add(stored));
       },
-      async listPending(now: Instant, limit: number) {
+      async listPending(now: Instant, limit: number, shopId?: ShopId) {
         if (!Number.isSafeInteger(limit) || limit <= 0) {
           throw new RangeError('Outbox pending limit must be a positive safe integer.');
         }
@@ -342,6 +342,7 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
           .filter(
             (event) =>
               event.deliveredAt === null &&
+              (shopId === undefined || event.shopId === shopId) &&
               (event.quarantinedAt ?? null) === null &&
               (event.nextAttemptAt === null || event.nextAttemptAt <= now),
           )

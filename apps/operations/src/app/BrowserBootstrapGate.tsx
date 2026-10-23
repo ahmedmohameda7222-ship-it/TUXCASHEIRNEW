@@ -1,11 +1,37 @@
 import { type OperationsSessionState } from '@tux/application';
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { App } from './App';
 import { createOperationsSessionClient } from './sessionClient';
 
 type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;
 type GateState = 'LOADING' | 'PIN_REQUIRED' | 'READY';
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+type Branch = { readonly id: string; readonly name: string };
+const LAST_BRANCH_KEY = 'tux.operations.last-branch';
+
+function preferredBranch(): string {
+  try {
+    return window.localStorage.getItem(LAST_BRANCH_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+async function fetchBranches(): Promise<readonly Branch[]> {
+  const response = await fetch('/api/operations-shops', {
+    method: 'GET',
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
+  if (!response.ok) throw new Error('Branches are temporarily unavailable. Try again.');
+  const data: unknown = await response.json();
+  if (!data || typeof data !== 'object' || !('shops' in data)) throw new Error();
+  const shops = (data as { shops?: unknown }).shops;
+  if (!Array.isArray(shops)) throw new Error();
+  if (!shops.every((shop) => typeof shop?.id === 'string' && typeof shop?.name === 'string')) {
+    throw new Error();
+  }
+  return shops as Branch[];
+}
 
 function Brand() {
   return <img className="tux-brand" src="/favicon.svg" alt="TUX" />;
@@ -18,9 +44,12 @@ export function BrowserBootstrapGate() {
   );
   const [freshAuthenticatedSession, setFreshAuthenticatedSession] = useState<ActiveSession>();
   const [pin, setPin] = useState('');
-  const [shopId, setShopId] = useState(
-    () => new URLSearchParams(window.location?.search ?? '').get('shopId')?.trim() ?? '',
-  );
+  const [shops, setShops] = useState<readonly Branch[]>([]);
+  const [shopId, setShopId] = useState('');
+  const [shopLoading, setShopLoading] = useState(false);
+  const [shopError, setShopError] = useState<string | null>(null);
+  const [reloadShops, setReloadShops] = useState(0);
+  const pinInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,22 +58,53 @@ export function BrowserBootstrapGate() {
     let cancelled = false;
     void client.getState().then((result) => {
       if (cancelled) return;
-      if (result.ok && result.value.status === 'CONFIGURATION_REQUIRED') {
-        setState('PIN_REQUIRED');
-      } else {
-        setState('READY');
-      }
+      setState(result.ok && result.value.status === 'ACTIVE' ? 'READY' : 'PIN_REQUIRED');
+      if (!result.ok) setError(result.error.message);
     });
     return () => {
       cancelled = true;
     };
   }, [client]);
 
+  useEffect(() => {
+    if (state !== 'PIN_REQUIRED') return;
+    let cancelled = false;
+    setShopLoading(true);
+    setShopError(null);
+    void fetchBranches()
+      .then((loaded) => {
+        if (cancelled) return;
+        setShops(loaded);
+        setShopId((current) => {
+          if (loaded.some((shop) => shop.id === current)) return current;
+          const saved = preferredBranch();
+          if (loaded.some((shop) => shop.id === saved)) return saved;
+          return loaded.length === 1 ? loaded[0]!.id : '';
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setShops([]);
+        setShopId('');
+        setShopError('Could not load branches. Check your connection and retry.');
+      })
+      .finally(() => {
+        if (!cancelled) setShopLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [state, reloadShops]);
+
+  useEffect(() => {
+    if (state === 'PIN_REQUIRED' && !shopLoading && shopId) pinInput.current?.focus();
+  }, [state, shopLoading, shopId]);
+
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (busy || pin.length === 0) return;
-    if (!UUID_PATTERN.test(shopId.trim())) {
-      setError('Enter the Shop ID provided by your manager.');
+    if (busy || shopLoading || pin.length === 0) return;
+    if (!shops.some((shop) => shop.id === shopId)) {
+      setError('Choose your branch before entering your PIN.');
       return;
     }
     setBusy(true);
@@ -62,6 +122,11 @@ export function BrowserBootstrapGate() {
       return;
     }
     if (result.value.status === 'ACTIVE') {
+      try {
+        window.localStorage.setItem(LAST_BRANCH_KEY, shopId);
+      } catch {
+        // Remembering a branch is optional; server authentication is authoritative.
+      }
       setFreshAuthenticatedSession(result.value);
     }
     setState('READY');
@@ -85,23 +150,40 @@ export function BrowserBootstrapGate() {
         <h1 id="worker-sign-in-title">TUX Operations</h1>
         <p className="entry-state">Worker sign in</p>
         <form className="pin-form" onSubmit={submit}>
-          <label htmlFor="bootstrap-shop-id">Shop ID (from TUX Admin)</label>
-          <input
-            id="bootstrap-shop-id"
-            name="bootstrap-shop-id"
-            type="text"
-            autoComplete="off"
-            spellCheck={false}
+          <label htmlFor="bootstrap-branch">Branch</label>
+          <select
+            id="bootstrap-branch"
+            name="branch"
             value={shopId}
-            onChange={(event) => setShopId(event.target.value.trim())}
-            disabled={busy}
-            placeholder="Paste the Shop ID from your manager"
-            aria-describedby="bootstrap-shop-help"
-          />
-          <p id="bootstrap-shop-help" className="entry-state">
-            Required only for first-time browser connection. Your Shop ID is available in TUX Admin
-            → Devices.
-          </p>
+            onChange={(event) => {
+              setShopId(event.target.value);
+              setPin('');
+              setError(null);
+            }}
+            disabled={busy || shopLoading || !!shopError}
+            aria-describedby={shopError ? 'bootstrap-branch-error' : undefined}
+            required
+          >
+            <option value="">{shopLoading ? 'Loading branches…' : 'Choose your branch'}</option>
+            {shops.map((shop) => (
+              <option key={shop.id} value={shop.id}>
+                {shop.name}
+              </option>
+            ))}
+          </select>
+          {shopError ? (
+            <div className="branch-load-error" id="bootstrap-branch-error" role="alert">
+              <span>{shopError}</span>
+              <button type="button" onClick={() => setReloadShops((value) => value + 1)}>
+                Retry
+              </button>
+            </div>
+          ) : null}
+          {!shopLoading && !shopError && shops.length === 0 ? (
+            <p className="entry-branch-hint" role="status">
+              No active branches available. Contact your manager.
+            </p>
+          ) : null}
           <label htmlFor="bootstrap-worker-pin">Enter PIN to Sign In</label>
           <input
             id="bootstrap-worker-pin"
@@ -111,8 +193,8 @@ export function BrowserBootstrapGate() {
             autoComplete="off"
             value={pin}
             onChange={(event) => setPin(event.target.value.replace(/\D/g, ''))}
-            disabled={busy}
-            autoFocus={shopId.length > 0}
+            disabled={busy || shopLoading || !shopId}
+            ref={pinInput}
             aria-describedby={error === null ? undefined : 'bootstrap-pin-error'}
           />
           {error === null ? null : (
@@ -120,7 +202,11 @@ export function BrowserBootstrapGate() {
               {error}
             </p>
           )}
-          <button className="primary-action" type="submit" disabled={busy || pin.length === 0}>
+          <button
+            className="primary-action"
+            type="submit"
+            disabled={busy || shopLoading || !shopId || pin.length === 0}
+          >
             {busy ? 'Checking…' : 'Sign In'}
           </button>
         </form>

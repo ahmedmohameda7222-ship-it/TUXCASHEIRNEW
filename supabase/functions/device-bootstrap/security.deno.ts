@@ -132,6 +132,15 @@ Deno.test('device-bootstrap requires cryptographic Vercel provenance before rate
       }
       if (url.pathname.endsWith('/rest/v1/shops') && request.method === 'GET') {
         const selected = url.searchParams.get('id');
+        if (selected === null) {
+          if (url.searchParams.get('active') !== 'eq.true' || url.searchParams.get('lifecycle_state') !== 'eq.ACTIVE') {
+            return new Response(JSON.stringify({ error: 'unsafe_shop_directory_query' }), { status: 500 });
+          }
+          return new Response(JSON.stringify([
+            { id: SHOP_A, name: 'Downtown' },
+            { id: SHOP_B, name: 'Mall' },
+          ]), { status: 200, headers: { 'content-type': 'application/json' } });
+        }
         return new Response(
           JSON.stringify(selected === `eq.${SHOP_A}` ? { id: SHOP_A, name: 'Selected shop', active: true } : null),
           { status: 200, headers: { 'content-type': 'application/json' } },
@@ -177,6 +186,46 @@ Deno.test('device-bootstrap requires cryptographic Vercel provenance before rate
       deviceLabel: 'Rotating label',
       rateLimitKey: RATE_KEY_A,
     };
+
+
+    await test.step('unsigned shop directory requests cannot read Supabase', async () => {
+      calls.length = 0;
+      const response = await fetch(EDGE_ORIGIN, { method: 'GET' });
+      if (response.status !== 401) throw new Error('unsigned branch listing was allowed');
+      await response.body?.cancel();
+      if (calls.length !== 0) throw new Error('unsigned branch listing accessed Supabase');
+    });
+
+    await test.step('signed directory exposes only active branch names and IDs without worker data', async () => {
+      calls.length = 0;
+      const timestamp = Math.floor(Date.now() / 1000);
+      const nonce = crypto.randomUUID();
+      const key = await crypto.subtle.importKey(
+        'raw', new TextEncoder().encode(SECRET),
+        { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+      );
+      const signed = new Uint8Array(await crypto.subtle.sign(
+        'HMAC', key,
+        new TextEncoder().encode(JSON.stringify(['tux-operations-shop-directory:v1', timestamp, nonce])),
+      ));
+      const sig = Array.from(signed, (byte) => byte.toString(16).padStart(2, '0')).join('');
+      const response = await fetch(EDGE_ORIGIN, {
+        method: 'GET',
+        headers: {
+          'x-tux-bootstrap-timestamp': String(timestamp),
+          'x-tux-bootstrap-nonce': nonce,
+          'x-tux-bootstrap-signature': sig,
+        },
+      });
+      if (response.status !== 200) throw new Error(`directory returned HTTP ${response.status}`);
+      const body: unknown = await response.json();
+      if (JSON.stringify(body) !== JSON.stringify({
+        shops: [{ id: SHOP_A, name: 'Downtown' }, { id: SHOP_B, name: 'Mall' }],
+      })) throw new Error('directory leaked unexpected fields or dropped active shops');
+      if (calls.length !== 1 || !calls[0]?.pathname.endsWith('/rest/v1/shops')) {
+        throw new Error('directory performed unexpected Supabase calls');
+      }
+    });
 
     await test.step('unsigned direct callers cannot create a rate-limit bucket', async () => {
       calls.length = 0;

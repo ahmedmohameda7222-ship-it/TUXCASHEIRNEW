@@ -1,4 +1,5 @@
 import deviceBootstrap from '../../../api/device-bootstrap.js';
+import operationsShops from '../../../api/operations-shops.js';
 import deviceEnroll from '../../../api/device-enroll.js';
 import deviceSession from '../../../api/device-session.js';
 import type { GatewayRequest, GatewayResponse } from '../../../server/supabaseGateway.js';
@@ -8,6 +9,7 @@ const handlers = {
   'device-bootstrap': deviceBootstrap,
   'device-enroll': deviceEnroll,
   'device-session': deviceSession,
+  'operations-shops': operationsShops,
 } as const;
 
 type DeviceRoute = keyof typeof handlers;

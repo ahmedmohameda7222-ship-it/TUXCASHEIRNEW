@@ -51,6 +51,8 @@ import type {
 } from '@tux/platform-contracts';
 import { startBrowserAutomaticSync } from './automaticSync';
 import { VercelBrowserRemoteGateway } from './browserRemote';
+import { selectBrowserShop } from './browserShopScope';
+import { fenceStaleBrowserSession } from './browserSessionScope';
 import { BrowserOrderPrinter } from './browserOrderPrinter';
 import { BrowserOrderRewardAuthority } from './browserOrderRewards';
 import { VercelBrowserWhatsAppRemote } from './browserWhatsAppRemote';
@@ -232,11 +234,12 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         if (menuLayoutRetryStarted) retryMenuLayout();
       };
 
+      let recoveredShopId: ShopId | null = null;
       try {
         const remoteSession = await remoteGateway.currentSession();
         if (remoteSession !== null) {
           await configurationService.sync(remoteSession.shopId);
-          startRemoteRuntime(remoteSession.shopId);
+          recoveredShopId = remoteSession.shopId;
         }
       } catch {
         // Browser Operations stays usable from the last known-good local snapshot.
@@ -250,6 +253,18 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         runtime,
         coordinator,
       );
+      // Do not start background syncing the previously selected shop on a signed-out
+      // browser. The next PIN login may choose a different branch.
+      if (recoveredShopId !== null) {
+        const recovered = await session.getState();
+        if (
+          recovered.ok &&
+          recovered.value.status === 'ACTIVE' &&
+          recovered.value.shopId === recoveredShopId
+        ) {
+          startRemoteRuntime(recoveredShopId);
+        }
+      }
       const workerCredentialStore: WorkerCredentialStore = {
         put: (worker) => database.transaction((transaction) => transaction.workers.put(worker)),
         fenceMatchingPin: async (pin) => {
@@ -417,12 +432,14 @@ async function browserRuntime(): Promise<BrowserRuntime> {
               message: 'Could not install the Operations configuration on this browser.',
             });
           }
-          await database.transaction(async (transaction) => {
-            await transaction.shops.put(bootstrap.shop);
-            await transaction.workers.put(bootstrap.worker);
-          });
-          startRemoteRuntime(bootstrap.shopId);
-          return session.submitPin(pin);
+          await selectBrowserShop(database, readModel, bootstrap.shop, bootstrap.worker);
+          const signedIn = await session.submitPin(pin);
+          // The remote cookie and the local PIN result must both be valid before
+          // background sync is permitted to run under this shop.
+          if (signedIn.ok && signedIn.value.status === 'ACTIVE') {
+            startRemoteRuntime(signedIn.value.shopId);
+          }
+          return signedIn;
         } catch (cause) {
           return err({
             code: 'REMOTE_SYNC_ERROR',
@@ -439,7 +456,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           trackWorkerIdentity(state);
           return state;
         }
-        if (state.value.status === 'CONFIGURATION_REQUIRED') {
+        if (shopId !== undefined || state.value.status === 'CONFIGURATION_REQUIRED') {
           const result = await bootstrapWithPin(pin, shopId);
           trackWorkerIdentity(result);
           return result;
@@ -451,12 +468,17 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           workerCredentialStore,
         );
         const result = await workerAuthentication.submitPin(pin);
+        if (result.ok && result.value.status === 'ACTIVE') startRemoteRuntime(result.value.shopId);
         trackWorkerIdentity(result);
         return result;
       };
 
       const getState = async (): Promise<OperationsSessionResult> => {
-        const result = await session.getState();
+        const result = await fenceStaleBrowserSession(
+          await session.getState(),
+          async () => (await remoteGateway.currentSession())?.shopId ?? null,
+          () => session.signOut(),
+        );
         trackWorkerIdentity(result);
         return result;
       };

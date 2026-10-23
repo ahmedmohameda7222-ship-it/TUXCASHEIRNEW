@@ -607,19 +607,31 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
             blockedByEventId,
           );
       },
-      async listPending(now: Instant, limit: number) {
+      async listPending(now: Instant, limit: number, shopId?: ShopId) {
         if (!Number.isSafeInteger(limit) || limit <= 0) {
           throw new RangeError('Outbox pending limit must be a positive safe integer.');
         }
-        const rows = database
-          .prepare(
-            `SELECT payload_json, aggregate_revision FROM outbox_events
-             WHERE delivered_at IS NULL
-               AND quarantined_at IS NULL
-               AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
-             ORDER BY created_at ASC LIMIT ?`,
-          )
-          .all(now, limit);
+        const rows =
+          shopId === undefined
+            ? database
+                .prepare(
+                  `SELECT payload_json, aggregate_revision FROM outbox_events
+                 WHERE delivered_at IS NULL
+                   AND quarantined_at IS NULL
+                   AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+                 ORDER BY created_at ASC LIMIT ?`,
+                )
+                .all(now, limit)
+            : database
+                .prepare(
+                  `SELECT payload_json, aggregate_revision FROM outbox_events
+                 WHERE delivered_at IS NULL
+                   AND quarantined_at IS NULL
+                   AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+                   AND shop_id = ?
+                 ORDER BY created_at ASC LIMIT ?`,
+                )
+                .all(now, shopId, limit);
         return rows
           .map((row) => parseOutboxPayload(row))
           .filter((event): event is OutboxEvent => event !== null);

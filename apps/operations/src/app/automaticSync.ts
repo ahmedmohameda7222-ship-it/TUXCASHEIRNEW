@@ -30,9 +30,12 @@ export function startBrowserAutomaticSync(input: {
   readonly rewardClaims?: BrowserRewardClaimReconciler;
 }): AutomaticOutboxScheduler {
   const endpoint = new URL('/api/operations-sync', window.location.origin).toString();
-  const service = new OutboxSyncService(input.database, new HttpOutboxTransport({ endpoint }), {
-    now: input.now,
-  });
+  const service = new OutboxSyncService(
+    input.database,
+    new HttpOutboxTransport({ endpoint }),
+    { now: input.now },
+    input.shopId,
+  );
   const scheduler = new AutomaticOutboxScheduler(service, {
     onStart: () => browserSyncStatusStore.markSyncStarted(),
     onResult: (result) => browserSyncStatusStore.markSyncFinished(result),

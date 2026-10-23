@@ -23,6 +23,10 @@
       "destination": "/api/device?route=device-session"
     },
     {
+      "source": "/api/operations-shops",
+      "destination": "/api/device?route=operations-shops"
+    },
+    {
       "source": "/api/worker-auth",
       "destination": "/api/worker?route=worker-auth"
     },
