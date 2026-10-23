@@ -284,6 +284,7 @@ jobs:
       - windows-package
       - menu
       - architecture
+      - branch-login-e2e
     runs-on: ubuntu-latest
     steps:
       - name: Require every permanent gate
@@ -294,6 +295,7 @@ jobs:
           WINDOWS_RESULT: ${{ needs.windows-package.result }}
           MENU_RESULT: ${{ needs.menu.result }}
           ARCHITECTURE_RESULT: ${{ needs.architecture.result }}
+          BRANCH_LOGIN_RESULT: ${{ needs.branch-login-e2e.result }}
         run: |
           test "$QUALITY_RESULT" = "success"
           test "$ADMIN_RESULT" = "success"
@@ -301,6 +303,7 @@ jobs:
           test "$WINDOWS_RESULT" = "success"
           test "$MENU_RESULT" = "success"
           test "$ARCHITECTURE_RESULT" = "success"
+          test "$BRANCH_LOGIN_RESULT" = "success"
 
   branch-login-e2e:
     name: Branch + PIN authenticated Chromium E2E
