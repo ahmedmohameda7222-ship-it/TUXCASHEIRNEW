@@ -169,8 +169,11 @@ export class VercelBrowserRemoteGateway
     return parseSession(await jsonObject(response, 'Device session'));
   }
 
-  async bootstrap(pin: string): Promise<BrowserBootstrapResult> {
+  async bootstrap(pin: string, shopId?: string): Promise<BrowserBootstrapResult> {
     if (isLoopbackHost()) throw new Error('Remote worker sign-in is unavailable on localhost.');
+    if (shopId !== undefined && !UUID_PATTERN.test(shopId.trim())) {
+      throw new Error('Enter a valid Shop ID provided by your manager.');
+    }
     const response = await fetch('/api/device-bootstrap', {
       method: 'POST',
       credentials: 'same-origin',
@@ -181,6 +184,7 @@ export class VercelBrowserRemoteGateway
       },
       body: JSON.stringify({
         pin: requiredString(pin, 'Worker PIN'),
+        ...(shopId === undefined ? {} : { shopId: shopId.trim() }),
         deviceId: browserDeviceId(),
         deviceLabel: 'TUX Operations Web',
       }),
