@@ -197,6 +197,34 @@ test('uses catalog-public UUID identity, family, and priceMinor without stale fa
   expect(requests).toEqual([`${CATALOG_URL}?shopId=${SHOP_ID}&schemaVersion=2`]);
 });
 
+test('an open customer menu reflects a newly published price after tab focus', async ({ page }) => {
+  let published = false;
+  let reads = 0;
+  const updatedCatalog = {
+    ...catalogFixture,
+    revision: 'b'.repeat(64),
+    products: catalogFixture.products.map((product, index) =>
+      index === 0 ? { ...product, priceMinor: 21500 } : product,
+    ),
+  };
+  await page.route(`${CATALOG_URL}**`, async (route) => {
+    reads += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(published ? updatedCatalog : catalogFixture),
+    });
+  });
+
+  await page.goto('/tux-burger', { waitUntil: 'networkidle' });
+  await expect(page.getByText('190.5 EGP', { exact: true })).toBeVisible();
+
+  published = true;
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.getByText('215 EGP', { exact: true })).toBeVisible();
+  expect(reads).toBeGreaterThanOrEqual(2);
+});
+
 test('shows explicit unavailable state instead of checked-in catalog data', async ({ page }) => {
   await page.route(`${CATALOG_URL}**`, async (route) => {
     await route.fulfill({
