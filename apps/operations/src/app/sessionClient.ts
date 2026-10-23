@@ -51,6 +51,7 @@ import type {
 } from '@tux/platform-contracts';
 import { startBrowserAutomaticSync } from './automaticSync';
 import { VercelBrowserRemoteGateway } from './browserRemote';
+import { selectBrowserShop } from './browserShopScope';
 import { BrowserOrderPrinter } from './browserOrderPrinter';
 import { BrowserOrderRewardAuthority } from './browserOrderRewards';
 import { VercelBrowserWhatsAppRemote } from './browserWhatsAppRemote';
@@ -232,11 +233,12 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         if (menuLayoutRetryStarted) retryMenuLayout();
       };
 
+      let recoveredShopId: ShopId | null = null;
       try {
         const remoteSession = await remoteGateway.currentSession();
         if (remoteSession !== null) {
           await configurationService.sync(remoteSession.shopId);
-          startRemoteRuntime(remoteSession.shopId);
+          recoveredShopId = remoteSession.shopId;
         }
       } catch {
         // Browser Operations stays usable from the last known-good local snapshot.
@@ -250,6 +252,14 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         runtime,
         coordinator,
       );
+      // Do not start background syncing the previously selected shop on a signed-out
+      // browser. The next PIN login may choose a different branch.
+      if (recoveredShopId !== null) {
+        const recovered = await session.getState();
+        if (recovered.ok && recovered.value.status === 'ACTIVE' && recovered.value.shopId === recoveredShopId) {
+          startRemoteRuntime(recoveredShopId);
+        }
+      }
       const workerCredentialStore: WorkerCredentialStore = {
         put: (worker) => database.transaction((transaction) => transaction.workers.put(worker)),
         fenceMatchingPin: async (pin) => {
@@ -417,10 +427,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
               message: 'Could not install the Operations configuration on this browser.',
             });
           }
-          await database.transaction(async (transaction) => {
-            await transaction.shops.put(bootstrap.shop);
-            await transaction.workers.put(bootstrap.worker);
-          });
+          await selectBrowserShop(database, readModel, bootstrap.shop, bootstrap.worker);
           startRemoteRuntime(bootstrap.shopId);
           return session.submitPin(pin);
         } catch (cause) {
@@ -439,7 +446,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           trackWorkerIdentity(state);
           return state;
         }
-        if (state.value.status === 'CONFIGURATION_REQUIRED') {
+        if (shopId !== undefined || state.value.status === 'CONFIGURATION_REQUIRED') {
           const result = await bootstrapWithPin(pin, shopId);
           trackWorkerIdentity(result);
           return result;
@@ -451,6 +458,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           workerCredentialStore,
         );
         const result = await workerAuthentication.submitPin(pin);
+        if (result.ok && result.value.status === 'ACTIVE') startRemoteRuntime(result.value.shopId);
         trackWorkerIdentity(result);
         return result;
       };

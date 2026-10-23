@@ -934,6 +934,10 @@ export function App({ initialAuthenticatedSession }: AppProps = {}) {
       setError(result.error.message);
       return;
     }
+    if (window.tuxDesktop === undefined) {
+      window.location.reload();
+      return;
+    }
     setScreen({ kind: 'SESSION', session: result.value });
   }
 

@@ -58,7 +58,7 @@ export function BrowserBootstrapGate() {
     let cancelled = false;
     void client.getState().then((result) => {
       if (cancelled) return;
-      if (result.ok && result.value.status === 'CONFIGURATION_REQUIRED') {
+      if (result.ok && result.value.status !== 'ACTIVE') {
         setState('PIN_REQUIRED');
       } else {
         setState('READY');

@@ -14,6 +14,7 @@ function request(origin = 'https://ops.example', method = 'GET'): GatewayRequest
 function response(): GatewayResponse & { body?: Record<string, unknown> } {
   return {
     statusCode: 200,
+    body: undefined as Record<string, unknown> | undefined,
     setHeader() { return this; },
     end(value?: string) {
       if (value) this.body = JSON.parse(value) as Record<string, unknown>;
