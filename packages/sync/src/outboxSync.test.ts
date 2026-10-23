@@ -119,7 +119,7 @@ class MemoryDatabase implements OperationsDatabase {
 }
 
 describe('OutboxSyncService', () => {
-  it('only syncs the active branch and leaves another branch\'s outbox untouched', async () => {
+  it("only syncs the active branch and leaves another branch's outbox untouched", async () => {
     const database = new MemoryDatabase();
     const otherShop = parseEntityId<ShopId>('11000000-0000-4000-8000-000000000002');
     const other = {
@@ -132,7 +132,11 @@ describe('OutboxSyncService', () => {
     const delivered: OutboxEventId[] = [];
     const service = new OutboxSyncService(
       database,
-      { deliver: async (event) => { delivered.push(event.id); } },
+      {
+        deliver: async (event) => {
+          delivered.push(event.id);
+        },
+      },
       { now: () => instant('2026-08-18T11:00:00.000Z') },
       SHOP_ID,
     );

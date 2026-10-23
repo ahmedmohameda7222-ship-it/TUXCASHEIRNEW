@@ -25,7 +25,10 @@ describe('authenticated browser branch recovery', () => {
   });
 
   it('closes cached Shop A session when the device cookie belongs to Shop B', async () => {
-    const closed = { ok: true, value: { status: 'NO_ACTIVE_DAY', shopId: A } } as OperationsSessionResult;
+    const closed = {
+      ok: true,
+      value: { status: 'NO_ACTIVE_DAY', shopId: A },
+    } as OperationsSessionResult;
     const fence = vi.fn().mockResolvedValue(closed);
     const result = await fenceStaleBrowserSession(ACTIVE, async () => B, fence);
     expect(result).toBe(closed);
@@ -33,15 +36,29 @@ describe('authenticated browser branch recovery', () => {
   });
 
   it('fails closed without an authorized remote session, including network failures', async () => {
-    const closed = { ok: true, value: { status: 'NO_ACTIVE_DAY', shopId: A } } as OperationsSessionResult;
+    const closed = {
+      ok: true,
+      value: { status: 'NO_ACTIVE_DAY', shopId: A },
+    } as OperationsSessionResult;
     const close = vi.fn().mockResolvedValue(closed);
     expect(await fenceStaleBrowserSession(ACTIVE, async () => null, close)).toBe(closed);
-    expect(await fenceStaleBrowserSession(ACTIVE, async () => { throw new Error('offline'); }, close)).toBe(closed);
+    expect(
+      await fenceStaleBrowserSession(
+        ACTIVE,
+        async () => {
+          throw new Error('offline');
+        },
+        close,
+      ),
+    ).toBe(closed);
     expect(close).toHaveBeenCalledTimes(2);
   });
 
   it('does not contact the server for signed-out or invalid local sessions', async () => {
-    const local = { ok: true, value: { status: 'NO_ACTIVE_DAY', shopId: A } } as OperationsSessionResult;
+    const local = {
+      ok: true,
+      value: { status: 'NO_ACTIVE_DAY', shopId: A },
+    } as OperationsSessionResult;
     const remote = vi.fn();
     const close = vi.fn();
     expect(await fenceStaleBrowserSession(local, remote, close)).toBe(local);
