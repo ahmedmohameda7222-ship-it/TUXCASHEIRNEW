@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { OperationsSessionResult } from '@tux/application';
+import type { ShopId } from '@tux/domain';
 import { fenceStaleBrowserSession } from './browserSessionScope';
 
-const A = '10000000-0000-4000-8000-000000000001';
-const B = '10000000-0000-4000-8000-000000000002';
+const A = '10000000-0000-4000-8000-000000000001' as ShopId;
+const B = '10000000-0000-4000-8000-000000000002' as ShopId;
 const ACTIVE = {
   ok: true,
   value: {
