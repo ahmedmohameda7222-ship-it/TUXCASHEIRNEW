@@ -194,6 +194,20 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       const retryPreferences = (): void => {
         void preferencesRetry.syncActive();
       };
+
+      // The reserved .localhost fixture exercises the actual preference
+      // subscription without enabling outbox, inventory or shop configuration
+      // polling. Production and the authenticated Branch + PIN E2E never enter
+      // this branch.
+      const startLegacyRemotePreferenceFixture = (): void => {
+        if (!LEGACY_BROWSER_E2E || !window.location.hostname.endsWith('.localhost')) return;
+        if (!preferenceRetryStarted) {
+          preferencesRetry.start();
+          preferenceRetryStarted = true;
+          window.addEventListener('online', retryPreferences);
+        }
+        retryPreferences();
+      };
       const retryMenuLayout = (): void => {
         void menuLayoutRetry.syncActive();
       };
@@ -480,6 +494,9 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         if (LEGACY_BROWSER_E2E) {
           const result = await session.submitPin(pin);
           trackWorkerIdentity(result);
+          if (result.ok && result.value.status === 'ACTIVE') {
+            startLegacyRemotePreferenceFixture();
+          }
           return result;
         }
         const state = await session.getState();
