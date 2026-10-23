@@ -13,7 +13,9 @@ const LAST_BRANCH_KEY = 'tux.operations.last-branch';
 // require the server-authorized Branch + PIN flow.
 const LEGACY_BROWSER_E2E =
   import.meta.env.MODE === 'e2e-browser-fallback' &&
-  (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
+  (window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === 'localhost' ||
+    window.location.hostname.endsWith('.localhost'));
 
 function preferredBranch(): string {
   try {
