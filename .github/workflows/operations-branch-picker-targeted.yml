@@ -26,15 +26,19 @@ jobs:
       - name: Domain contract build
         run: npm run build:domain
       - name: Targeted branch picker, BFF signing and authentication regression
-        run: npx vitest run server/operationsShopDirectory.test.ts apps/operations/src/app/browserBranchPicker.test.ts server/workerPinBootstrap.multishop.test.ts server/workerPinBootstrap.test.ts apps/operations/src/app/browserWorkerAuthentication.test.ts
+        run: npx vitest run server/operationsShopDirectory.test.ts apps/operations/src/app/browserBranchPicker.test.ts server/workerPinBootstrap.multishop.test.ts server/workerPinBootstrap.test.ts apps/operations/src/app/browserWorkerAuthentication.test.ts apps/operations/src/app/browserShopScope.test.ts
       - name: Operations / API / Admin type safety
         run: |
           npm run typecheck -w @tux/operations
           npx tsc --noEmit -p tsconfig.api.json
           npm run typecheck -w @tux/admin
-      - name: Targeted formatting
+      - name: Capture and enforce exact formatting
         run: |
-          npx prettier --check api/operations-shops.ts server/operationsShopDirectory.ts server/operationsShopDirectory.test.ts apps/operations/src/app/BrowserBootstrapGate.tsx apps/operations/src/app/browserRemote.ts apps/operations/src/app/browserBranchPicker.test.ts apps/operations/src/styles/global.css apps/admin/src/operations/DevicesPage.tsx apps/admin/src/operations/operations.css
+          npx prettier --write api/operations-shops.ts server/operationsShopDirectory.ts server/operationsShopDirectory.test.ts apps/operations/src/app/BrowserBootstrapGate.tsx apps/operations/src/app/browserRemote.ts apps/operations/src/app/browserBranchPicker.test.ts apps/operations/src/app/browserShopScope.ts apps/operations/src/app/browserShopScope.test.ts apps/operations/src/app/sessionClient.ts apps/operations/src/app/App.tsx apps/operations/src/styles/global.css apps/admin/src/operations/DevicesPage.tsx apps/admin/src/operations/operations.css
+          echo TUX_BRANCH_FORMAT_DIFF_BEGIN
+          git --no-pager diff -- api/operations-shops.ts server/operationsShopDirectory.ts server/operationsShopDirectory.test.ts apps/operations/src/app/BrowserBootstrapGate.tsx apps/operations/src/app/browserRemote.ts apps/operations/src/app/browserBranchPicker.test.ts apps/operations/src/app/browserShopScope.ts apps/operations/src/app/browserShopScope.test.ts apps/operations/src/app/sessionClient.ts apps/operations/src/app/App.tsx apps/operations/src/styles/global.css apps/admin/src/operations/DevicesPage.tsx apps/admin/src/operations/operations.css
+          echo TUX_BRANCH_FORMAT_DIFF_END
+          git diff --exit-code
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
