@@ -1,7 +1,9 @@
 import { createHmac } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GatewayRequest, GatewayResponse } from './supabaseGateway';
 import { listOperationsLoginShops } from './operationsShopDirectory';
+import operationsDeviceRoute from '../apps/operations/api/device';
 
 const SECRET = 'test-only-operations-branch-directory-hmac-secret';
 const A = '10000000-0000-4000-8000-000000000001';
@@ -42,6 +44,31 @@ afterEach(() => {
 });
 
 describe('Operations login branch directory', () => {
+  it('routes deployed Operations GET /api/operations-shops through the consolidated device function', async () => {
+    const vercel: unknown = JSON.parse(
+      readFileSync(new URL('../apps/operations/vercel.json', import.meta.url), 'utf8'),
+    );
+    const rewrites = (vercel as { rewrites: Array<{ source: string; destination: string }> })
+      .rewrites;
+    expect(rewrites).toContainEqual({
+      source: '/api/operations-shops',
+      destination: '/api/device?route=operations-shops',
+    });
+    const upstream = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ shops: [{ id: A, name: 'Downtown' }] }), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', upstream);
+    const routeRequest = {
+      ...request(),
+      url: '/api/device?route=operations-shops',
+    } as GatewayRequest;
+    const reply = response();
+    await operationsDeviceRoute(routeRequest, reply);
+    expect(reply.statusCode).toBe(200);
+    expect(reply.body).toEqual({ shops: [{ id: A, name: 'Downtown' }] });
+    expect(upstream).toHaveBeenCalledTimes(1);
+  });
+
   it('returns only validated branch names and IDs through a signed BFF request', async () => {
     const upstream = vi.fn().mockResolvedValue(
       new Response(
