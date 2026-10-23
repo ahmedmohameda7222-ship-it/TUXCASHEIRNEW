@@ -125,7 +125,8 @@ function parseRemoteWorkerMenuLayout(value: Record<string, unknown>): RemoteWork
 function isLoopbackHost(): boolean {
   // Only the isolated Playwright build may exercise a mocked local BFF.
   // Normal development and production builds retain the localhost safety fence.
-  if (import.meta.env.MODE === 'e2e-operations') return false;
+  const mode = (import.meta as ImportMeta & { readonly env?: { readonly MODE?: string } }).env?.MODE;
+  if (mode === 'e2e-operations') return false;
   return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 }
 
