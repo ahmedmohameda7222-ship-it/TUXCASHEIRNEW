@@ -41,7 +41,10 @@ export function DevicesPage() {
         <div className="admin-operations-workspace">
           <div className="admin-device-enrollment-context">
             <strong>Shop ID for Operations browser setup</strong>
-            <p>Share this Shop ID with a worker enrolling a new Operations browser. Their PIN is still required.</p>
+            <p>
+              Share this Shop ID with a worker enrolling a new Operations browser. Their PIN is
+              still required.
+            </p>
             <code>{shopId}</code>
             <button
               type="button"

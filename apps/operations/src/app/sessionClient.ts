@@ -389,7 +389,10 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         },
       };
 
-      const bootstrapWithPin = async (pin: string, shopId?: string): Promise<OperationsSessionResult> => {
+      const bootstrapWithPin = async (
+        pin: string,
+        shopId?: string,
+      ): Promise<OperationsSessionResult> => {
         try {
           const bootstrap = await remoteGateway.bootstrap(pin, shopId);
           const configuration = await configurationService.sync(bootstrap.shopId);
