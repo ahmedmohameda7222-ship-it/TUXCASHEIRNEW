@@ -659,12 +659,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       const signOut = async (): Promise<OperationsSessionResult> => {
         const before = await session.getState();
         const result = await session.signOut();
-        if (
-          !LEGACY_BROWSER_E2E &&
-          result.ok &&
-          before.ok &&
-          before.value.status === 'ACTIVE'
-        ) {
+        if (!LEGACY_BROWSER_E2E && result.ok && before.ok && before.value.status === 'ACTIVE') {
           try {
             // A second browser should see this departure before it decides
             // whether its operator is the final worker. Offline failures keep
