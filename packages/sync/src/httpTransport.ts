@@ -40,7 +40,13 @@ function normalizeTimeout(value: number | undefined): number {
 }
 
 function responseFailure(status: number): OutboxDeliveryError {
-  const transient = status === 408 || status === 425 || status === 429 || status >= 500;
+  const transient =
+    status === 401 ||
+    status === 403 ||
+    status === 408 ||
+    status === 425 ||
+    status === 429 ||
+    status >= 500;
   return new OutboxDeliveryError(
     `Remote outbox endpoint rejected event with HTTP ${status}.`,
     transient ? 'TRANSIENT' : 'PERMANENT',

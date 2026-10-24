@@ -636,6 +636,45 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
           .map((row) => parseOutboxPayload(row))
           .filter((event): event is OutboxEvent => event !== null);
       },
+      async getDeliveryStatus(shopId?: ShopId) {
+        const whereShop = shopId === undefined ? '' : ' AND shop_id = ?';
+        const parameters = shopId === undefined ? [] : [shopId];
+        const summary = database
+          .prepare(
+            `SELECT
+               COUNT(CASE WHEN delivered_at IS NULL AND quarantined_at IS NULL THEN 1 END) AS pending_count,
+               COUNT(CASE WHEN delivered_at IS NULL AND quarantined_at IS NOT NULL THEN 1 END) AS quarantined_count,
+               MIN(CASE WHEN delivered_at IS NULL AND quarantined_at IS NULL THEN next_attempt_at END) AS next_attempt_at,
+               MAX(delivered_at) AS last_successful_delivery_at
+             FROM outbox_events
+             WHERE 1 = 1${whereShop}`,
+          )
+          .get(...parameters) as
+          | {
+              pending_count: number;
+              quarantined_count: number;
+              next_attempt_at: string | null;
+              last_successful_delivery_at: string | null;
+            }
+          | undefined;
+        const latestFailure = database
+          .prepare(
+            `SELECT last_error
+             FROM outbox_events
+             WHERE delivered_at IS NULL
+               AND last_error IS NOT NULL${whereShop}
+             ORDER BY created_at DESC
+             LIMIT 1`,
+          )
+          .get(...parameters) as { last_error: string } | undefined;
+        return {
+          pendingCount: summary?.pending_count ?? 0,
+          quarantinedCount: summary?.quarantined_count ?? 0,
+          nextAttemptAt: (summary?.next_attempt_at ?? null) as Instant | null,
+          lastError: latestFailure?.last_error ?? null,
+          lastSuccessfulDeliveryAt: (summary?.last_successful_delivery_at ?? null) as Instant | null,
+        };
+      },
       async markDelivered(id: OutboxEventId, deliveredAt: Instant) {
         const existing = parseOutboxPayload(
           database

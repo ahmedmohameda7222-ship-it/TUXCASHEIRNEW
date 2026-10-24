@@ -10,6 +10,10 @@ const cleanSummary = {
   dependencyBlocked: 0,
   blockedUntil: null,
   lastError: null,
+  pendingCount: 0,
+  quarantinedCount: 0,
+  nextRetryAt: null,
+  lastSuccessfulDeliveryAt: null,
 } as const;
 
 describe('buildSyncHealth', () => {

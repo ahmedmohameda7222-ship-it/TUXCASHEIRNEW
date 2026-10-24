@@ -48,6 +48,10 @@ export interface OutboxSyncSummary {
   readonly dependencyBlocked: number;
   readonly blockedUntil: Instant | null;
   readonly lastError: string | null;
+  readonly pendingCount: number;
+  readonly quarantinedCount: number;
+  readonly nextRetryAt: Instant | null;
+  readonly lastSuccessfulDeliveryAt: Instant | null;
 }
 
 const DEFAULT_BATCH_SIZE = 50;
@@ -300,6 +304,9 @@ export class OutboxSyncService {
         await this.#database.transaction((transaction) =>
           transaction.outbox.recordFailure(event.id, attemptCount, nextAttemptAt, lastError),
         );
+        const deliveryStatus = await this.#database.transaction((transaction) =>
+          transaction.outbox.getDeliveryStatus(this.#shopId),
+        );
         return {
           attempted,
           delivered,
@@ -307,11 +314,18 @@ export class OutboxSyncService {
           quarantined,
           dependencyBlocked,
           blockedUntil: nextAttemptAt,
-          lastError,
+          lastError: deliveryStatus.lastError ?? lastError,
+          pendingCount: deliveryStatus.pendingCount,
+          quarantinedCount: deliveryStatus.quarantinedCount,
+          nextRetryAt: deliveryStatus.nextAttemptAt,
+          lastSuccessfulDeliveryAt: deliveryStatus.lastSuccessfulDeliveryAt,
         };
       }
     }
 
+    const deliveryStatus = await this.#database.transaction((transaction) =>
+      transaction.outbox.getDeliveryStatus(this.#shopId),
+    );
     return {
       attempted,
       delivered,
@@ -319,7 +333,11 @@ export class OutboxSyncService {
       quarantined,
       dependencyBlocked,
       blockedUntil: null,
-      lastError: lastPermanentError,
+      lastError: deliveryStatus.lastError ?? lastPermanentError,
+      pendingCount: deliveryStatus.pendingCount,
+      quarantinedCount: deliveryStatus.quarantinedCount,
+      nextRetryAt: deliveryStatus.nextAttemptAt,
+      lastSuccessfulDeliveryAt: deliveryStatus.lastSuccessfulDeliveryAt,
     };
   }
 

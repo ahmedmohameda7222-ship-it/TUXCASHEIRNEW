@@ -46,6 +46,7 @@ function outbox(id: string, createdAt: string): OutboxEvent {
 
 class MemoryDatabase implements OperationsDatabase {
   readonly events = new Map<OutboxEventId, OutboxEvent>();
+  readonly quarantined = new Set<OutboxEventId>();
   readonly orders = new Map<OrderId, OrderSnapshot>();
   readonly movements: InventoryMovement[] = [];
   readonly auditEvents: AuditEvent[] = [];
@@ -87,6 +88,33 @@ class MemoryDatabase implements OperationsDatabase {
             )
             .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
             .slice(0, limit),
+        getDeliveryStatus: async (shopId?: ShopId) => {
+          const scoped = [...this.events.values()].filter(
+            (event) => shopId === undefined || event.shopId === shopId,
+          );
+          const pending = scoped.filter(
+            (event) => event.deliveredAt === null && !this.quarantined.has(event.id),
+          );
+          const failed = pending
+            .filter((event) => event.lastError !== null)
+            .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+          const delivered = scoped
+            .filter((event) => event.deliveredAt !== null)
+            .sort((left, right) =>
+              (right.deliveredAt ?? '').localeCompare(left.deliveredAt ?? ''),
+            )[0];
+          return {
+            pendingCount: pending.length,
+            quarantinedCount: scoped.filter((event) => this.quarantined.has(event.id)).length,
+            nextAttemptAt:
+              pending
+                .map((event) => event.nextAttemptAt)
+                .filter((value): value is ReturnType<typeof instant> => value !== null)
+                .sort()[0] ?? null,
+            lastError: failed?.lastError ?? null,
+            lastSuccessfulDeliveryAt: delivered?.deliveredAt ?? null,
+          };
+        },
         markDelivered: async (id: OutboxEventId, deliveredAt: ReturnType<typeof instant>) => {
           const current = this.events.get(id);
           if (current === undefined) throw new Error('Missing event');
@@ -99,6 +127,7 @@ class MemoryDatabase implements OperationsDatabase {
         ) => {
           const current = this.events.get(id);
           if (current === undefined) throw new Error('Missing event');
+          this.quarantined.add(id);
           this.events.set(id, { ...current, lastError: reason, nextAttemptAt: null });
         },
         quarantineDependents: async () => 0,
@@ -174,6 +203,10 @@ describe('OutboxSyncService', () => {
       dependencyBlocked: 0,
       blockedUntil: null,
       lastError: null,
+      pendingCount: 0,
+      quarantinedCount: 0,
+      nextRetryAt: null,
+      lastSuccessfulDeliveryAt: '2026-08-18T11:00:00.000Z',
     });
     expect(delivered).toEqual([first.idempotencyKey, second.idempotencyKey]);
   });
@@ -210,6 +243,37 @@ describe('OutboxSyncService', () => {
       deliveredAt: null,
     });
     expect(database.events.get(second.id)?.attemptCount).toBe(0);
+  });
+
+  it('counts delayed active-shop events so a clean scheduler pass cannot report Synced', async () => {
+    const database = new MemoryDatabase();
+    const delayed = {
+      ...outbox('21000000-0000-4000-8000-000000000040', '2026-08-18T10:00:00.000Z'),
+      attemptCount: 1,
+      nextAttemptAt: instant('2026-08-18T11:05:00.000Z'),
+      lastError: 'Remote outbox endpoint rejected event with HTTP 401.',
+    };
+    const otherShop = parseEntityId<ShopId>('11000000-0000-4000-8000-000000000002');
+    const other = {
+      ...outbox('21000000-0000-4000-8000-000000000041', '2026-08-18T10:01:00.000Z'),
+      shopId: otherShop,
+    };
+    database.events.set(delayed.id, delayed);
+    database.events.set(other.id, other);
+    const service = new OutboxSyncService(
+      database,
+      { deliver: async () => undefined },
+      { now: () => instant('2026-08-18T11:00:00.000Z') },
+      SHOP_ID,
+    );
+
+    expect(await service.syncOnce()).toMatchObject({
+      attempted: 0,
+      pendingCount: 1,
+      quarantinedCount: 0,
+      nextRetryAt: '2026-08-18T11:05:00.000Z',
+      lastError: 'Remote outbox endpoint rejected event with HTTP 401.',
+    });
   });
 
   it('uses exponential retry with a five-minute cap', () => {

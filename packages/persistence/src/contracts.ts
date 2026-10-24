@@ -90,9 +90,17 @@ export interface ReconciliationRepository {
 export interface AuditRepository {
   append(event: AuditEvent): Promise<void>;
 }
+export interface OutboxDeliveryStatus {
+  readonly pendingCount: number;
+  readonly quarantinedCount: number;
+  readonly nextAttemptAt: Instant | null;
+  readonly lastError: string | null;
+  readonly lastSuccessfulDeliveryAt: Instant | null;
+}
 export interface OutboxRepository {
   append(event: OutboxEvent): Promise<void>;
   listPending(now: Instant, limit: number, shopId?: ShopId): Promise<readonly OutboxEvent[]>;
+  getDeliveryStatus(shopId?: ShopId): Promise<OutboxDeliveryStatus>;
   markDelivered(id: OutboxEventId, deliveredAt: Instant): Promise<void>;
   recordFailure(
     id: OutboxEventId,

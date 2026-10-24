@@ -10,6 +10,7 @@ import {
   type WorkerId,
 } from '@tux/domain';
 import { HttpOutboxTransport } from './httpTransport';
+import { OutboxDeliveryError } from './outboxSync';
 
 const SHOP_ID = parseEntityId<ShopId>('12000000-0000-4000-8000-000000000001');
 const EVENT_ID = parseEntityId<OutboxEventId>('22000000-0000-4000-8000-000000000001');
@@ -104,6 +105,21 @@ describe('HttpOutboxTransport', () => {
     });
     await expect(transport.deliver(event)).rejects.toThrow(/HTTP 503/);
   });
+
+  it.each([401, 403])(
+    'keeps HTTP %s authentication failures retryable so queued orders are not quarantined',
+    async (status) => {
+      const transport = new HttpOutboxTransport({
+        endpoint: 'https://sync.example.test/events',
+        fetcher: (async () => new Response(null, { status })) as typeof fetch,
+      });
+
+      await expect(transport.deliver(event)).rejects.toMatchObject({
+        kind: 'TRANSIENT',
+        status,
+      } satisfies Partial<OutboxDeliveryError>);
+    },
+  );
 
   it('requires HTTPS outside loopback development', () => {
     expect(() => new HttpOutboxTransport({ endpoint: 'http://example.test/events' })).toThrow(

@@ -38,6 +38,10 @@ describe('AutomaticOutboxScheduler', () => {
       dependencyBlocked: 0,
       blockedUntil: null,
       lastError: null,
+      pendingCount: 0,
+      quarantinedCount: 0,
+      nextRetryAt: null,
+      lastSuccessfulDeliveryAt: null,
     });
     await vi.waitFor(() => expect(events).toEqual(['start', 'result']));
 
