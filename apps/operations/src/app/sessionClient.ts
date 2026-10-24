@@ -451,22 +451,24 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         },
       };
 
+      const flushShopOutbox = async (shopId: ShopId): Promise<void> => {
+        const endpoint = new URL('/api/operations-sync', window.location.origin).toString();
+        const service = new OutboxSyncService(
+          database,
+          new HttpOutboxTransport({ endpoint }),
+          { now: runtime.now },
+          shopId,
+        );
+        for (let batch = 0; batch < 4; batch += 1) {
+          const result = await service.syncOnce(50);
+          if (result.failed > 0 || result.delivered < 50) break;
+        }
+      };
+
       const checkDayBeforeLogin = async (shopId: ShopId): Promise<void> => {
         await reconcileCanonicalBusinessDay({
           shopId,
-          drainLocalOutbox: async () => {
-            const endpoint = new URL('/api/operations-sync', window.location.origin).toString();
-            const service = new OutboxSyncService(
-              database,
-              new HttpOutboxTransport({ endpoint }),
-              { now: runtime.now },
-              shopId,
-            );
-            for (let batch = 0; batch < 4; batch += 1) {
-              const result = await service.syncOnce(50);
-              if (result.failed > 0 || result.delivered < 50) break;
-            }
-          },
+          drainLocalOutbox: () => flushShopOutbox(shopId),
           getLocalOpenDay: async () => {
             const day = await database.transaction((tx) => tx.businessDays.getOpenForShop(shopId));
             return day?.status === 'OPEN' ? day : null;
@@ -655,7 +657,23 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       };
 
       const signOut = async (): Promise<OperationsSessionResult> => {
+        const before = await session.getState();
         const result = await session.signOut();
+        if (
+          !LEGACY_BROWSER_E2E &&
+          result.ok &&
+          before.ok &&
+          before.value.status === 'ACTIVE'
+        ) {
+          try {
+            // A second browser should see this departure before it decides
+            // whether its operator is the final worker. Offline failures keep
+            // the immutable sign-out event in the local outbox.
+            await flushShopOutbox(before.value.shopId);
+          } catch {
+            // The original local mutation remains durable for next login.
+          }
+        }
         stopRemoteRuntime();
         trackWorkerIdentity(result);
         return result;
