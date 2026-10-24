@@ -13,6 +13,8 @@ import { browserSyncStatusStore } from './syncStatus';
 import { recoverMissingBusinessDayStart } from './businessDayStartRecovery';
 
 const INVENTORY_SYNC_INTERVAL_MS = 15_000;
+const MISSING_BUSINESS_DAY_DIAGNOSTIC =
+  /Business Day ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) has not materialized\./i;
 
 export interface BrowserRewardClaimReconciler {
   reconcileClaims(
@@ -61,6 +63,22 @@ export function startBrowserAutomaticSync(input: {
       if (!stopped) browserSyncStatusStore.markSyncFinished(result);
     },
   });
+
+  const recoverPreviousMissingBusinessDay = async (): Promise<void> => {
+    if (input.shopId === undefined) return;
+    const deliveryStatus = await input.database.transaction((transaction) =>
+      transaction.outbox.getDeliveryStatus(input.shopId),
+    );
+    const missingDayId = deliveryStatus.lastError?.match(MISSING_BUSINESS_DAY_DIAGNOSTIC)?.[1];
+    if (missingDayId === undefined) return;
+    await recoverMissingBusinessDayStart({
+      database: input.database,
+      businessDayId: parseEntityId<BusinessDayId>(missingDayId),
+      shopId: input.shopId,
+      createUuid: () => crypto.randomUUID(),
+    });
+    if (!stopped) scheduler.trigger();
+  };
 
   let convergenceTimer: number | null = null;
   let inventoryRunning = false;
@@ -167,6 +185,9 @@ export function startBrowserAutomaticSync(input: {
   }
 
   scheduler.start();
+  void recoverPreviousMissingBusinessDay().catch(() => {
+    // The ordinary delivery callback retries the exact recovery when the dependency responds 425.
+  });
   return {
     stop() {
       if (stopped) return;
