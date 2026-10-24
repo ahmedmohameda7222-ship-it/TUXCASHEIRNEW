@@ -420,7 +420,12 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
               .map((event) => event.nextAttemptAt)
               .filter((value): value is Instant => value !== null)
               .sort()[0] ?? null,
-          lastError: latestFailure?.lastError ?? null,
+          lastError:
+            latestFailure?.lastError === null || latestFailure === undefined
+              ? null
+              : (latestFailure.quarantinedAt ?? null) === null
+                ? latestFailure.lastError
+                : `${latestFailure.lastError} Event: ${latestFailure.eventType} ${latestFailure.id}; Business Day: ${latestFailure.businessDayId ?? 'none'}.`,
           lastSuccessfulDeliveryAt: latestDelivery?.deliveredAt ?? null,
         };
       },

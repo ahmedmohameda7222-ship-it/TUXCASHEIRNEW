@@ -25,6 +25,7 @@ import {
   type SystemAccentColor,
   type Worker,
   type WorkerId,
+  type WorkerSessionId,
 } from '@tux/domain';
 
 const DEVICE_ID_STORAGE_KEY = 'tux.operations.device-id';
@@ -38,6 +39,13 @@ export interface BrowserRemoteSession {
 export interface BrowserBootstrapResult extends BrowserRemoteSession {
   readonly shop: Shop;
   readonly worker: Worker;
+}
+
+export class WorkerSessionLeaseLostError extends Error {
+  constructor() {
+    super('The canonical worker session is no longer active. Sign in again.');
+    this.name = 'WorkerSessionLeaseLostError';
+  }
 }
 
 function requiredString(value: unknown, label: string): string {
@@ -160,6 +168,44 @@ export class VercelBrowserRemoteGateway
     WorkerUiPreferencesRemoteGateway,
     WorkerMenuLayoutRemoteGateway
 {
+  async touchWorkerSession(
+    businessDayId: BusinessDayId,
+    workerSessionId: WorkerSessionId,
+  ): Promise<void> {
+    const response = await fetch('/api/operations-session-exit', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ action: 'HEARTBEAT', businessDayId, workerSessionId }),
+    });
+    if (response.status === 409) throw new WorkerSessionLeaseLostError();
+    if (!response.ok)
+      throw new Error(`Worker session heartbeat failed with HTTP ${response.status}.`);
+  }
+
+  async prepareWorkerExit(
+    businessDayId: BusinessDayId,
+    workerSessionId: WorkerSessionId,
+  ): Promise<'SIGNED_OUT' | 'END_DAY_REQUIRED'> {
+    const response = await fetch('/api/operations-session-exit', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ action: 'PREPARE_EXIT', businessDayId, workerSessionId }),
+    });
+    if (!response.ok) {
+      throw new Error(`Worker session exit check failed with HTTP ${response.status}.`);
+    }
+    const body = await jsonObject(response, 'Worker session exit');
+    const decision = body['decision'];
+    if (decision !== 'SIGNED_OUT' && decision !== 'END_DAY_REQUIRED') {
+      throw new TypeError('Worker session exit decision is invalid.');
+    }
+    return decision;
+  }
+
   async currentSession(): Promise<BrowserRemoteSession | null> {
     if (isLoopbackHost()) return null;
 

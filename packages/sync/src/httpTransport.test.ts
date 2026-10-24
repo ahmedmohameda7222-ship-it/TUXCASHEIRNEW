@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   instant,
   operationsSyncPayloadJson,
@@ -48,6 +48,10 @@ const event: OutboxEvent = {
   lastError: null,
   deliveredAt: null,
 };
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('HttpOutboxTransport', () => {
   it('uses the window receiver for native fetch while preserving APPLIED and REPLAY receipts', async () => {
@@ -111,6 +115,22 @@ describe('HttpOutboxTransport', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it('invokes the default browser fetch with the global receiver', async () => {
+    const nativeFetch = vi.fn(function (this: unknown) {
+      if (this !== globalThis) throw new TypeError('Illegal invocation');
+      return Promise.resolve(
+        new Response(JSON.stringify({ status: 'APPLIED' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+    }) as unknown as typeof fetch;
+    vi.stubGlobal('fetch', nativeFetch);
+    const transport = new HttpOutboxTransport({ endpoint: 'https://sync.example.test/events' });
+
+    await expect(transport.deliver(event)).resolves.toBeUndefined();
   });
 
   it('sends immutable event identity and idempotency headers', async () => {

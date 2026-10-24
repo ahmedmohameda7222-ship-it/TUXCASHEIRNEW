@@ -54,9 +54,8 @@ import { startBrowserAutomaticSync } from './automaticSync';
 import {
   assertCanonicalDayNotLocallyClosed,
   reconcileCanonicalBusinessDay,
-  requiresEndDayOnWorkerExit,
 } from './businessDayPreflight';
-import { VercelBrowserRemoteGateway } from './browserRemote';
+import { VercelBrowserRemoteGateway, WorkerSessionLeaseLostError } from './browserRemote';
 import { selectBrowserShop } from './browserShopScope';
 import { fenceStaleBrowserSession } from './browserSessionScope';
 import { BrowserOrderPrinter } from './browserOrderPrinter';
@@ -196,6 +195,8 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       let activeSyncShopId: ShopId | null = null;
       let automaticSyncHandle: ReturnType<typeof startBrowserAutomaticSync> | null = null;
       let configurationTimer: number | null = null;
+      let sessionLeaseTimer: number | null = null;
+      let sessionLeaseHeartbeat: (() => Promise<void>) | null = null;
       let preferenceRetryStarted = false;
       let menuLayoutRetryStarted = false;
 
@@ -231,7 +232,23 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           window.clearInterval(configurationTimer);
           configurationTimer = null;
         }
+        if (sessionLeaseTimer !== null) {
+          window.clearInterval(sessionLeaseTimer);
+          sessionLeaseTimer = null;
+        }
+        window.removeEventListener('focus', refreshSessionLease);
+        window.removeEventListener('online', refreshSessionLease);
+        document.removeEventListener('visibilitychange', refreshVisibleSessionLease);
+        sessionLeaseHeartbeat = null;
         activeSyncShopId = null;
+      };
+
+      const refreshSessionLease = (): void => {
+        void sessionLeaseHeartbeat?.();
+      };
+
+      const refreshVisibleSessionLease = (): void => {
+        if (document.visibilityState === 'visible') refreshSessionLease();
       };
 
       const startRemoteRuntime = (shopId: ShopId): void => {
@@ -249,6 +266,34 @@ async function browserRuntime(): Promise<BrowserRuntime> {
             () => void configurationService.sync(shopId),
             5 * 60 * 1000,
           );
+          const heartbeat = async (): Promise<void> => {
+            try {
+              const day = await database.transaction((tx) =>
+                tx.businessDays.getOpenForShop(shopId),
+              );
+              if (day?.status !== 'OPEN') return;
+              const workerSession = await readModel.getOpenWorkerSession(day.id);
+              if (workerSession === null) return;
+              await remoteGateway.touchWorkerSession(day.id, workerSession.id);
+            } catch (cause) {
+              if (cause instanceof WorkerSessionLeaseLostError) {
+                // Canonical authority has explicitly ended this session. Fence
+                // the local client immediately so it cannot resume split-brain.
+                await session.signOut();
+                stopRemoteRuntime();
+                activePreferenceIdentity = null;
+                activeMenuLayoutIdentity = null;
+              }
+              // Transient network/server failures keep local state durable; a
+              // later heartbeat or event delivery retries them.
+            }
+          };
+          sessionLeaseHeartbeat = heartbeat;
+          void heartbeat();
+          sessionLeaseTimer = window.setInterval(() => void heartbeat(), 60 * 1000);
+          window.addEventListener('focus', refreshSessionLease);
+          window.addEventListener('online', refreshSessionLease);
+          document.addEventListener('visibilitychange', refreshVisibleSessionLease);
           activeSyncShopId = shopId;
         }
         if (!preferenceRetryStarted) {
@@ -651,9 +696,13 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         if (LEGACY_BROWSER_E2E) return true;
         const state = await session.getState();
         if (!state.ok || state.value.status !== 'ACTIVE') return true;
-        const canonical = await remoteGateway.readCanonicalOpenBusinessDay(state.value.shopId);
-        if (canonical.day?.id !== state.value.businessDayId) return true;
-        return requiresEndDayOnWorkerExit(canonical.openWorkerCount);
+        const workerSession = await readModel.getOpenWorkerSession(state.value.businessDayId);
+        if (workerSession === null) return true;
+        const decision = await remoteGateway.prepareWorkerExit(
+          state.value.businessDayId,
+          workerSession.id,
+        );
+        return decision === 'END_DAY_REQUIRED';
       };
 
       const signOut = async (): Promise<OperationsSessionResult> => {

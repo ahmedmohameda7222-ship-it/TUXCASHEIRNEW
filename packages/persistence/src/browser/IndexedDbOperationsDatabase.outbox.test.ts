@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import {
   instant,
   parseEntityId,
+  type BusinessDayId,
   type OutboxEvent,
   type OutboxEventId,
   type ShopId,
@@ -53,6 +54,46 @@ afterEach(async () => {
 });
 
 describe('IndexedDB Business Day outbox ordering', () => {
+  it('exposes the quarantined event identity in delivery diagnostics without deleting it', async () => {
+    const name = 'tux-outbox-quarantine-diagnostics-' + crypto.randomUUID();
+    names.add(name);
+    const db = new IndexedDbOperationsDatabase(name);
+    await db.initialize();
+    try {
+      const event = {
+        ...outbox(
+          '33000000-0000-4000-8000-000000000001',
+          A,
+          'BUSINESS_DAY_STARTED',
+          '2026-10-10T08:00:00.000Z',
+        ),
+        businessDayId: parseEntityId<BusinessDayId>('35000000-0000-4000-8000-000000000001'),
+      };
+      await db.transaction(async (tx) => {
+        await tx.outbox.append(event);
+        await tx.outbox.quarantine(
+          event.id,
+          instant('2026-10-10T08:00:01.000Z'),
+          'Remote outbox endpoint rejected event with HTTP 400.',
+        );
+      });
+
+      const status = await db.transaction((tx) => tx.outbox.getDeliveryStatus(A));
+      expect(status.pendingCount).toBe(0);
+      expect(status.quarantinedCount).toBe(1);
+      expect(status.lastError).toContain('BUSINESS_DAY_STARTED');
+      expect(status.lastError).toContain(event.id);
+      expect(status.lastError).toContain(event.businessDayId);
+      expect(
+        await db.transaction((tx) =>
+          tx.outbox.listPending(instant('2026-10-10T09:00:00.000Z'), 50, A),
+        ),
+      ).toEqual([]);
+    } finally {
+      await db.close();
+    }
+  });
+
   it('does not skip a delayed day start and deliver a dependent worker session', async () => {
     const name = 'tux-business-day-order-' + crypto.randomUUID();
     names.add(name);

@@ -238,3 +238,153 @@ begin
   end if;
   raise notice 'PASS: cross-browser distinct worker sessions share the canonical OPEN day';
 end $body$;
+
+-- One worker may operate from many authorized browser/device sessions. Final-worker
+-- routing must count the durable open sessions, not distinct worker identities,
+-- otherwise any one of 100 same-worker browsers is incorrectly treated as final.
+do $body$
+declare
+  s uuid := '52000000-0000-4000-8000-000000000001';
+  d2 uuid := '56000000-0000-4000-8000-000000000002';
+  w uuid := '53000000-0000-4000-8000-000000000001';
+  n integer;
+  row jsonb;
+  snapshot jsonb;
+begin
+  -- The first same-worker session already exists; add 99 more, plus the distinct
+  -- worker from the preceding acceptance case, for 101 total open sessions.
+  for n in 1..99 loop
+    row := jsonb_build_object(
+      'id', md5('same-worker-session-' || n::text)::uuid,
+      'shop_id', s,
+      'business_day_id', d2,
+      'worker_id', w,
+      'started_at', '2026-10-11T10:00:00Z'::timestamptz + n * interval '1 second',
+      'ended_at', null
+    );
+    if pg_temp.test_rpc(
+      md5('same-worker-event-' || n::text)::uuid,
+      'WORKER_SIGNED_IN', d2, 'worker_sessions', row, 'UPSERT', true
+    ) <> 'APPLIED' then
+      raise exception 'Same-worker session % could not sign in', n;
+    end if;
+  end loop;
+  snapshot := public.read_tux_operations_business_day_state_v2(
+    '54000000-0000-4000-8000-000000000001',
+    '55000000-0000-4000-8000-000000000001', d2
+  );
+  if (snapshot ->> 'openWorkerCount') <> '101' then
+    raise exception 'Expected 101 open sessions across repeated worker/device logins, got %', snapshot;
+  end if;
+  raise notice 'PASS: 100 same-worker browser sessions plus a second worker share one canonical day';
+end $body$;
+
+-- Exit classification is a single server-side critical section. Two browsers
+-- cannot both observe "another session" and then independently leave the day
+-- orphaned OPEN with zero sessions. A crashed session can expire, while a
+-- resumed browser is authoritatively fenced by its immediate heartbeat.
+do $body$
+declare
+  s uuid := '52000000-0000-4000-8000-000000000001';
+  d2 uuid := '56000000-0000-4000-8000-000000000002';
+  w uuid := '53000000-0000-4000-8000-000000000001';
+  first_session uuid := '59000000-0000-4000-8000-000000000101';
+  final_session uuid := '59000000-0000-4000-8000-000000000102';
+  stale_session uuid := '59000000-0000-4000-8000-000000000103';
+  race_session uuid := '59000000-0000-4000-8000-000000000104';
+  result jsonb;
+  close_row jsonb;
+  err text;
+begin
+  update public.worker_sessions
+  set ended_at = greatest(started_at, '2026-10-24T13:00:00Z'::timestamptz)
+  where business_day_id = d2 and ended_at is null;
+
+  insert into public.worker_sessions(
+    id, shop_id, business_day_id, worker_id, device_id, started_at, last_seen_at, ended_at
+  ) values
+    (first_session, s, d2, w, '55000000-0000-4000-8000-000000000001',
+      '2026-10-24T13:01:00Z', clock_timestamp(), null),
+    (final_session, s, d2, w, '55000000-0000-4000-8000-000000000002',
+      '2026-10-24T13:01:01Z', clock_timestamp(), null);
+
+  result := public.prepare_tux_operations_worker_exit_v1(
+    '54000000-0000-4000-8000-000000000001',
+    '55000000-0000-4000-8000-000000000001', d2, first_session
+  );
+  if result ->> 'decision' <> 'SIGNED_OUT'
+    or result ->> 'remainingOpenSessionCount' <> '1' then
+    raise exception 'First concurrent exit was not atomically signed out: %', result;
+  end if;
+
+  result := public.prepare_tux_operations_worker_exit_v1(
+    '54000000-0000-4000-8000-000000000001',
+    '55000000-0000-4000-8000-000000000001', d2, first_session
+  );
+  if result ->> 'decision' <> 'SIGNED_OUT'
+    or result ->> 'remainingOpenSessionCount' <> '1' then
+    raise exception 'Ambiguous committed exit was not idempotent: %', result;
+  end if;
+
+  result := public.touch_tux_operations_worker_session_v1(
+    '54000000-0000-4000-8000-000000000001',
+    '55000000-0000-4000-8000-000000000001', d2, first_session
+  );
+  if result ->> 'status' <> 'ALREADY_ENDED' then
+    raise exception 'Accepted sign-in replay could not settle after exit: %', result;
+  end if;
+
+  result := public.prepare_tux_operations_worker_exit_v1(
+    '54000000-0000-4000-8000-000000000002',
+    '55000000-0000-4000-8000-000000000002', d2, final_session
+  );
+  if result ->> 'decision' <> 'END_DAY_REQUIRED'
+    or result ->> 'remainingOpenSessionCount' <> '0'
+    or (select ended_at from public.worker_sessions where id = final_session) is not null then
+    raise exception 'Final concurrent exit did not retain its session for End Day: %', result;
+  end if;
+
+  insert into public.worker_sessions(
+    id, shop_id, business_day_id, worker_id, device_id, started_at, last_seen_at, ended_at
+  ) values (
+    stale_session, s, d2, w, '55000000-0000-4000-8000-000000000001',
+    clock_timestamp() - interval '10 minutes',
+    clock_timestamp() - interval '10 minutes', null
+  );
+  result := public.prepare_tux_operations_worker_exit_v1(
+    '54000000-0000-4000-8000-000000000002',
+    '55000000-0000-4000-8000-000000000002', d2, final_session
+  );
+  if result ->> 'decision' <> 'END_DAY_REQUIRED'
+    or (select ended_at from public.worker_sessions where id = stale_session) is null then
+    raise exception 'Crashed session still blocked the final live browser: %', result;
+  end if;
+
+  insert into public.worker_sessions(
+    id, shop_id, business_day_id, worker_id, device_id, started_at, last_seen_at, ended_at
+  ) values (
+    race_session, s, d2, w, '55000000-0000-4000-8000-000000000001',
+    clock_timestamp(), clock_timestamp(), null
+  );
+  close_row := jsonb_build_object(
+    'id',d2,'shop_id',s,'status','CLOSED',
+    'started_at',(select started_at from public.business_days where id=d2),
+    'started_by_worker_id',(select started_by_worker_id from public.business_days where id=d2),
+    'ended_at',clock_timestamp(),'ended_by_worker_id',w,
+    'last_allocated_display_order_no',(select last_allocated_display_order_no from public.business_days where id=d2)
+  );
+  begin
+    perform pg_temp.test_rpc(
+      '60000000-0000-4000-8000-000000000199','BUSINESS_DAY_CLOSED',d2,
+      'business_days',close_row,'UPDATE',true
+    );
+    raise exception 'Concurrent sign-in was not rechecked during End Day';
+  exception when others then
+    get stacked diagnostics err=MESSAGE_TEXT;
+    if position('TUX_BUSINESS_DAY_OTHER_SESSIONS_ACTIVE' in err) = 0 then raise; end if;
+  end;
+  if (select status from public.business_days where id=d2) <> 'OPEN' then
+    raise exception 'Rejected End Day did not roll back atomically';
+  end if;
+  raise notice 'PASS: atomic idempotent exit, stale recovery and End Day session recheck';
+end $body$;

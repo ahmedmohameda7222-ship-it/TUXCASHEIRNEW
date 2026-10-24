@@ -1,4 +1,4 @@
-export const INDEXED_DB_VERSION = 7;
+export const INDEXED_DB_VERSION = 8;
 
 export const INDEXED_DB_STORES = [
   'shops',
@@ -281,6 +281,15 @@ const MIGRATIONS: readonly IndexedDbMigration[] = [
     name: 'order_lifecycle_convergence_state',
     apply(database) {
       database.createObjectStore('orderLifecycleSyncCursor', { keyPath: 'shopId' });
+    },
+  },
+  {
+    version: 8,
+    name: 'preserve_outbox_quarantine_evidence',
+    apply() {
+      // Version 8 was briefly exercised during pre-production recovery work.
+      // Keep the version monotonic, but never delete quarantined operations:
+      // they remain visible until they are explicitly reconciled.
     },
   },
 ];

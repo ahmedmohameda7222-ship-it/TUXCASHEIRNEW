@@ -681,19 +681,32 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
           | undefined;
         const latestFailure = database
           .prepare(
-            `SELECT last_error
+            `SELECT id, event_type, business_day_id, quarantined_at, last_error
              FROM outbox_events
              WHERE delivered_at IS NULL
                AND last_error IS NOT NULL${whereShop}
              ORDER BY created_at DESC
              LIMIT 1`,
           )
-          .get(...parameters) as { last_error: string } | undefined;
+          .get(...parameters) as
+          | {
+              id: string;
+              event_type: string;
+              business_day_id: string | null;
+              quarantined_at: string | null;
+              last_error: string;
+            }
+          | undefined;
         return {
           pendingCount: summary?.pending_count ?? 0,
           quarantinedCount: summary?.quarantined_count ?? 0,
           nextAttemptAt: (summary?.next_attempt_at ?? null) as Instant | null,
-          lastError: latestFailure?.last_error ?? null,
+          lastError:
+            latestFailure === undefined
+              ? null
+              : latestFailure.quarantined_at === null
+                ? latestFailure.last_error
+                : `${latestFailure.last_error} Event: ${latestFailure.event_type} ${latestFailure.id}; Business Day: ${latestFailure.business_day_id ?? 'none'}.`,
           lastSuccessfulDeliveryAt: (summary?.last_successful_delivery_at ??
             null) as Instant | null,
         };

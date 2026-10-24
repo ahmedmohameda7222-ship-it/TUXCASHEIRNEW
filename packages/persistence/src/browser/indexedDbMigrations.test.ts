@@ -124,8 +124,47 @@ afterEach(async () => {
 
 describe('IndexedDB migration registry', () => {
   it('declares a contiguous production migration chain', () => {
-    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7]);
-    expect(INDEXED_DB_VERSION).toBe(7);
+    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(INDEXED_DB_VERSION).toBe(8);
+  });
+
+  it('keeps quarantined evidence when a browser upgrades from v7 to v8', async () => {
+    const name = `tux-indexeddb-v8-preservation-${crypto.randomUUID()}`;
+    const v7 = await openAtVersion(name, 7);
+    const write = v7.transaction('outboxEvents', 'readwrite');
+    const id = '60000000-0000-4000-8000-000000000001';
+    write.objectStore('outboxEvents').put({
+      id,
+      shopId: '10000000-0000-4000-8000-000000000001',
+      businessDayId: '20000000-0000-4000-8000-000000000001',
+      aggregateType: 'BUSINESS_DAY',
+      aggregateId: '20000000-0000-4000-8000-000000000001',
+      aggregateRevision: 0,
+      eventType: 'BUSINESS_DAY_STARTED',
+      payloadVersion: 1,
+      payload: {},
+      idempotencyKey: 'quarantine-evidence-preserved',
+      createdAt: '2026-10-24T13:00:00.000Z',
+      attemptCount: 1,
+      nextAttemptAt: null,
+      lastError: 'canonical rejection evidence',
+      deliveredAt: null,
+      quarantinedAt: '2026-10-24T13:01:00.000Z',
+      permanentFailureReason: 'canonical rejection evidence',
+      blockedByEventId: null,
+    });
+    await transactionDone(write);
+    v7.close();
+
+    const v8 = await openAtVersion(name, 8);
+    try {
+      const row = await requestResult(
+        v8.transaction('outboxEvents', 'readonly').objectStore('outboxEvents').get(id),
+      );
+      expect(row).toMatchObject({ id, quarantinedAt: '2026-10-24T13:01:00.000Z' });
+    } finally {
+      v8.close();
+    }
   });
 
   it('creates every production store and operational index on a fresh install', async () => {
@@ -411,6 +450,6 @@ describe('IndexedDB migration registry', () => {
         INDEXED_DB_VERSION,
         INDEXED_DB_VERSION + 1,
       ),
-    ).toThrow('IndexedDB migration v8 is missing');
+    ).toThrow(`IndexedDB migration v${INDEXED_DB_VERSION + 1} is missing`);
   });
 });
