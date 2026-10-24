@@ -130,15 +130,24 @@ export class HttpOutboxTransport implements OutboxTransport {
       });
       if (!response.ok) {
         if (response.status === 423 || response.status === 425) {
-          let diagnostic = 'Business Day synchronization is waiting for its canonical prerequisite.';
+          let diagnostic =
+            'Business Day synchronization is waiting for its canonical prerequisite.';
           try {
             const body = (await response.json()) as Record<string, unknown>;
             if (body['error'] === 'business_day_open_conflict') {
-              const dayId = typeof body['canonicalDayId'] === 'string' ? body['canonicalDayId'] : 'unknown';
-              diagnostic = 'Canonical Business Day ' + dayId + ' remains OPEN. Reconnect the original browser and synchronize its End Day before starting another day. Do not clear local events.';
+              const dayId =
+                typeof body['canonicalDayId'] === 'string' ? body['canonicalDayId'] : 'unknown';
+              diagnostic =
+                'Canonical Business Day ' +
+                dayId +
+                ' remains OPEN. Reconnect the original browser and synchronize its End Day before starting another day. Do not clear local events.';
             } else if (body['error'] === 'business_day_dependency_not_ready') {
-              const dayId = typeof body['missingDayId'] === 'string' ? body['missingDayId'] : 'unknown';
-              diagnostic = 'Business Day ' + dayId + ' has not materialized. Retry after the original Business Day start event is synchronized; preserve the outbox.';
+              const dayId =
+                typeof body['missingDayId'] === 'string' ? body['missingDayId'] : 'unknown';
+              diagnostic =
+                'Business Day ' +
+                dayId +
+                ' has not materialized. Retry after the original Business Day start event is synchronized; preserve the outbox.';
             }
           } catch {
             // Preserve typed status even when the remote diagnostic is malformed.

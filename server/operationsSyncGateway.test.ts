@@ -61,9 +61,11 @@ afterEach(() => {
 
 describe('operations sync gateway', () => {
   it('proxies authenticated read-only canonical day lookup without posting an event', async () => {
-    const fetcher = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ shopId: SHOP_ID, openDayId: null }), { status: 200 }),
-    );
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ shopId: SHOP_ID, openDayId: null }), { status: 200 }),
+      );
     vi.stubGlobal('fetch', fetcher);
     const req = { ...request({}), method: 'GET' } as GatewayRequest;
     const output = responseCapture();

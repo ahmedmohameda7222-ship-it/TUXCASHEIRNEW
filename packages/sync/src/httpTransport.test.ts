@@ -217,23 +217,31 @@ describe('HttpOutboxTransport', () => {
     },
   );
 
-
   it.each([
     [423, 'business_day_open_conflict', 'Canonical Business Day'],
     [425, 'business_day_dependency_not_ready', 'Business Day'],
-  ])('retains blocked day events on HTTP %i with actionable diagnostics', async (status, code, expected) => {
-    const transport = new HttpOutboxTransport({
-      endpoint: 'https://sync.example.test/events',
-      fetcher: (async () => new Response(JSON.stringify({
-        error: code,
-        canonicalDayId: DAY_ID,
-        missingDayId: DAY_ID,
-      }), { status })) as typeof fetch,
-    });
-    await expect(transport.deliver(event)).rejects.toMatchObject({
-      kind: 'TRANSIENT', status, message: expect.stringContaining(expected),
-    } satisfies Partial<OutboxDeliveryError>);
-  });
+  ])(
+    'retains blocked day events on HTTP %i with actionable diagnostics',
+    async (status, code, expected) => {
+      const transport = new HttpOutboxTransport({
+        endpoint: 'https://sync.example.test/events',
+        fetcher: (async () =>
+          new Response(
+            JSON.stringify({
+              error: code,
+              canonicalDayId: DAY_ID,
+              missingDayId: DAY_ID,
+            }),
+            { status },
+          )) as typeof fetch,
+      });
+      await expect(transport.deliver(event)).rejects.toMatchObject({
+        kind: 'TRANSIENT',
+        status,
+        message: expect.stringContaining(expected),
+      } satisfies Partial<OutboxDeliveryError>);
+    },
+  );
 
   it('requires HTTPS outside loopback development', () => {
     expect(() => new HttpOutboxTransport({ endpoint: 'http://example.test/events' })).toThrow(
