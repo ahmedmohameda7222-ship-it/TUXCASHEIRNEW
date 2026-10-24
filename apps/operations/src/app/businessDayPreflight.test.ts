@@ -84,7 +84,6 @@ describe('canonical Business Day reconciliation before PIN transition', () => {
     expect(adopt).not.toHaveBeenCalled();
   });
 
-
   it('archives a locally OPEN day already CLOSED on the authenticated server after force End Day', async () => {
     const adopt = vi.fn(async () => undefined);
     const result = await reconcileCanonicalBusinessDay({
@@ -92,7 +91,9 @@ describe('canonical Business Day reconciliation before PIN transition', () => {
       drainLocalOutbox: async () => undefined,
       getLocalOpenDay: async () => day(OLD),
       getCanonicalState: async () => ({
-        day: null, openWorkerCount: 0, localDayStatus: 'CLOSED',
+        day: null,
+        openWorkerCount: 0,
+        localDayStatus: 'CLOSED',
       }),
       adoptCanonicalDay: adopt,
     });
@@ -107,7 +108,9 @@ describe('canonical Business Day reconciliation before PIN transition', () => {
       drainLocalOutbox: async () => undefined,
       getLocalOpenDay: async () => day(NEW),
       getCanonicalState: async () => ({
-        day: null, openWorkerCount: 0, localDayStatus: null,
+        day: null,
+        openWorkerCount: 0,
+        localDayStatus: null,
       }),
       adoptCanonicalDay: adopt,
     });

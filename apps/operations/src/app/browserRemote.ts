@@ -189,9 +189,10 @@ export class VercelBrowserRemoteGateway
     if (isLoopbackHost()) {
       throw new Error('Canonical Business Day authority is unavailable on localhost.');
     }
-    const path = localDayId === null
-      ? '/api/operations-sync'
-      : `/api/operations-sync?localDayId=${encodeURIComponent(localDayId)}`;
+    const path =
+      localDayId === null
+        ? '/api/operations-sync'
+        : `/api/operations-sync?localDayId=${encodeURIComponent(localDayId)}`;
     const response = await fetch(path, {
       method: 'GET',
       credentials: 'same-origin',
