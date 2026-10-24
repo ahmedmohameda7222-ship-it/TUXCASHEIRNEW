@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { instant, type BusinessDayId, type OpenBusinessDay, type ShopId } from '@tux/domain';
-import { reconcileCanonicalBusinessDay, requiresEndDayOnWorkerExit } from './businessDayPreflight';
+import { assertCanonicalDayNotLocallyClosed, reconcileCanonicalBusinessDay, requiresEndDayOnWorkerExit } from './businessDayPreflight';
 
 const SHOP = '12000000-0000-4000-8000-000000000001' as ShopId;
 const OLD = '22000000-0000-4000-8000-000000000001' as BusinessDayId;
@@ -133,5 +133,16 @@ describe('worker exit semantics', () => {
   });
   it('refuses an invalid remote session count', () => {
     expect(() => requiresEndDayOnWorkerExit(-1)).toThrow('invalid');
+  });
+});
+
+describe('locally completed End Day protection', () => {
+  it('does not reopen a locally CLOSED day while its End Day receipt awaits synchronization', () => {
+    expect(() => assertCanonicalDayNotLocallyClosed({
+      ...day(OLD), status: 'CLOSED', endedAt: instant('2026-10-10T19:00:00Z'),
+      endedByWorkerId: WORKER,
+    })).toThrow('ended locally');
+    expect(() => assertCanonicalDayNotLocallyClosed(null)).not.toThrow();
+    expect(() => assertCanonicalDayNotLocallyClosed(day(OLD))).not.toThrow();
   });
 });
