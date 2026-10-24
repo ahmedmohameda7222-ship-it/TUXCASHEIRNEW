@@ -281,8 +281,8 @@ end $body$;
 
 -- Exit classification is a single server-side critical section. Two browsers
 -- cannot both observe "another session" and then independently leave the day
--- orphaned OPEN with zero sessions. Stale crashed browsers also stop blocking
--- the final live session after their heartbeat lease expires.
+-- orphaned OPEN with zero sessions. An inactive tab is never silently expired:
+-- only an explicit exit may end it, which prevents a resumed split-brain client.
 do $body$
 declare
   s uuid := '52000000-0000-4000-8000-000000000001';
@@ -315,6 +315,23 @@ begin
   end if;
 
   result := public.prepare_tux_operations_worker_exit_v1(
+    '54000000-0000-4000-8000-000000000001',
+    '55000000-0000-4000-8000-000000000001', d2, first_session
+  );
+  if result ->> 'decision' <> 'SIGNED_OUT'
+    or result ->> 'remainingOpenSessionCount' <> '1' then
+    raise exception 'Ambiguous committed exit was not idempotent: %', result;
+  end if;
+
+  result := public.touch_tux_operations_worker_session_v1(
+    '54000000-0000-4000-8000-000000000001',
+    '55000000-0000-4000-8000-000000000001', d2, first_session
+  );
+  if result ->> 'status' <> 'ALREADY_ENDED' then
+    raise exception 'Accepted sign-in replay could not settle after exit: %', result;
+  end if;
+
+  result := public.prepare_tux_operations_worker_exit_v1(
     '54000000-0000-4000-8000-000000000002',
     '55000000-0000-4000-8000-000000000002', d2, final_session
   );
@@ -335,9 +352,9 @@ begin
     '54000000-0000-4000-8000-000000000002',
     '55000000-0000-4000-8000-000000000002', d2, final_session
   );
-  if result ->> 'decision' <> 'END_DAY_REQUIRED'
-    or (select ended_at from public.worker_sessions where id = stale_session) is null then
-    raise exception 'Stale crashed session still blocked final End Day: %', result;
+  if result ->> 'decision' <> 'SIGNED_OUT'
+    or (select ended_at from public.worker_sessions where id = stale_session) is not null then
+    raise exception 'Inactive browser was silently expired or failed to keep the day open: %', result;
   end if;
-  raise notice 'PASS: atomic concurrent exit and stale-session lease recovery';
+  raise notice 'PASS: atomic idempotent exit without background-tab lease expiry';
 end $body$;

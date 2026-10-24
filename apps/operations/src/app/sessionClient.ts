@@ -55,7 +55,7 @@ import {
   assertCanonicalDayNotLocallyClosed,
   reconcileCanonicalBusinessDay,
 } from './businessDayPreflight';
-import { VercelBrowserRemoteGateway } from './browserRemote';
+import { VercelBrowserRemoteGateway, WorkerSessionLeaseLostError } from './browserRemote';
 import { selectBrowserShop } from './browserShopScope';
 import { fenceStaleBrowserSession } from './browserSessionScope';
 import { BrowserOrderPrinter } from './browserOrderPrinter';
@@ -262,8 +262,17 @@ async function browserRuntime(): Promise<BrowserRuntime> {
               const workerSession = await readModel.getOpenWorkerSession(day.id);
               if (workerSession === null) return;
               await remoteGateway.touchWorkerSession(day.id, workerSession.id);
-            } catch {
-              // The local session remains durable; the next heartbeat or event retries.
+            } catch (cause) {
+              if (cause instanceof WorkerSessionLeaseLostError) {
+                // Canonical authority has explicitly ended this session. Fence
+                // the local client immediately so it cannot resume split-brain.
+                await session.signOut();
+                stopRemoteRuntime();
+                activePreferenceIdentity = null;
+                activeMenuLayoutIdentity = null;
+              }
+              // Transient network/server failures keep local state durable; a
+              // later heartbeat or event delivery retries them.
             }
           };
           void heartbeat();

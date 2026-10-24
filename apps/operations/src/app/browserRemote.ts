@@ -41,6 +41,13 @@ export interface BrowserBootstrapResult extends BrowserRemoteSession {
   readonly worker: Worker;
 }
 
+export class WorkerSessionLeaseLostError extends Error {
+  constructor() {
+    super('The canonical worker session is no longer active. Sign in again.');
+    this.name = 'WorkerSessionLeaseLostError';
+  }
+}
+
 function requiredString(value: unknown, label: string): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new TypeError(`${label} is required.`);
@@ -172,6 +179,7 @@ export class VercelBrowserRemoteGateway
       headers: { 'content-type': 'application/json', accept: 'application/json' },
       body: JSON.stringify({ action: 'HEARTBEAT', businessDayId, workerSessionId }),
     });
+    if (response.status === 409) throw new WorkerSessionLeaseLostError();
     if (!response.ok)
       throw new Error(`Worker session heartbeat failed with HTTP ${response.status}.`);
   }

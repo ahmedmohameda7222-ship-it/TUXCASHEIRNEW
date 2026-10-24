@@ -77,6 +77,7 @@ Deno.serve(async (request) => {
     }
     if (
       message.includes('TUX_WORKER_SESSION_NOT_ACTIVE') ||
+      message.includes('TUX_WORKER_SESSION_NOT_FOUND') ||
       message.includes('TUX_BUSINESS_DAY_NOT_OPEN')
     ) {
       return jsonResponse(409, { error: 'worker_session_not_active' });

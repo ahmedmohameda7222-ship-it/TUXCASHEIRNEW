@@ -124,67 +124,8 @@ afterEach(async () => {
 
 describe('IndexedDB migration registry', () => {
   it('declares a contiguous production migration chain', () => {
-    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
-    expect(INDEXED_DB_VERSION).toBe(8);
-  });
-
-  it('removes only authorized pre-launch quarantined fixtures during the v8 upgrade', async () => {
-    const name = `tux-indexeddb-prelaunch-cleanup-${crypto.randomUUID()}`;
-    const v7 = await openAtVersion(name, 7);
-    const write = v7.transaction('outboxEvents', 'readwrite');
-    const store = write.objectStore('outboxEvents');
-    const base = {
-      shopId: '10000000-0000-4000-8000-000000000001',
-      businessDayId: '20000000-0000-4000-8000-000000000001',
-      aggregateType: 'BUSINESS_DAY',
-      aggregateId: '20000000-0000-4000-8000-000000000001',
-      aggregateRevision: 0,
-      eventType: 'BUSINESS_DAY_STARTED',
-      payloadVersion: 1,
-      payload: {},
-      attemptCount: 1,
-      nextAttemptAt: null,
-      lastError: 'test fixture',
-      deliveredAt: null,
-      permanentFailureReason: 'test fixture',
-      blockedByEventId: null,
-    };
-    store.put({
-      ...base,
-      id: '60000000-0000-4000-8000-000000000001',
-      idempotencyKey: 'legacy-quarantine',
-      createdAt: '2026-10-24T13:00:00.000Z',
-      quarantinedAt: '2026-10-24T13:01:00.000Z',
-    });
-    store.put({
-      ...base,
-      id: '60000000-0000-4000-8000-000000000002',
-      idempotencyKey: 'pending-preserved',
-      createdAt: '2026-10-24T13:00:00.000Z',
-      quarantinedAt: null,
-    });
-    store.put({
-      ...base,
-      id: '60000000-0000-4000-8000-000000000003',
-      idempotencyKey: 'future-quarantine-preserved',
-      createdAt: '2026-10-24T14:00:00.000Z',
-      quarantinedAt: '2026-10-24T14:01:00.000Z',
-    });
-    await transactionDone(write);
-    v7.close();
-
-    const v8 = await openAtVersion(name, 8);
-    try {
-      const rows = await requestResult(
-        v8.transaction('outboxEvents', 'readonly').objectStore('outboxEvents').getAll(),
-      );
-      expect((rows as Array<{ id: string }>).map((row) => row.id).sort()).toEqual([
-        '60000000-0000-4000-8000-000000000002',
-        '60000000-0000-4000-8000-000000000003',
-      ]);
-    } finally {
-      v8.close();
-    }
+    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(INDEXED_DB_VERSION).toBe(7);
   });
 
   it('creates every production store and operational index on a fresh install', async () => {
@@ -470,6 +411,6 @@ describe('IndexedDB migration registry', () => {
         INDEXED_DB_VERSION,
         INDEXED_DB_VERSION + 1,
       ),
-    ).toThrow('IndexedDB migration v9 is missing');
+    ).toThrow(`IndexedDB migration v${INDEXED_DB_VERSION + 1} is missing`);
   });
 });
