@@ -6,6 +6,7 @@ export type OnlineOrderOperationsStoreErrorCode =
   | 'FORBIDDEN'
   | 'NOT_FOUND'
   | 'CONFLICT'
+  | 'RESERVATION_OWNED'
   | 'INVALID'
   | 'UNAVAILABLE';
 
@@ -24,13 +25,15 @@ export function classifyOnlineOrderOperationsStoreError(message: string): Online
   if (message.includes('TUX_ONLINE_ORDER_NOT_FOUND')) {
     return new OnlineOrderOperationsStoreError('NOT_FOUND');
   }
+  if (message.includes('TUX_ONLINE_ORDER_RESERVATION_OWNED')) {
+    return new OnlineOrderOperationsStoreError('RESERVATION_OWNED');
+  }
   if (
     message.includes('TUX_ONLINE_ORDER_ALREADY_PROCESSING') ||
     message.includes('TUX_ONLINE_ORDER_ALREADY_RESOLVED') ||
     message.includes('TUX_ONLINE_ORDER_CLAIM_MISMATCH') ||
     message.includes('TUX_ONLINE_ORDER_REJECTION_CONFLICT') ||
     message.includes('TUX_ONLINE_ORDER_REJECTION_FENCED') ||
-    message.includes('TUX_ONLINE_ORDER_RESERVATION_OWNED') ||
     message.includes('TUX_ONLINE_ORDER_RESERVATION_TRANSFER_CONFLICT') ||
     message.includes('TUX_ONLINE_ORDER_RESERVATION_RELEASE_CONFLICT') ||
     message.includes('TUX_ONLINE_ORDER_RESERVATION_MISSING')
@@ -306,6 +309,8 @@ function mapStoreError(error: unknown): Response {
       return jsonResponse(404, { error: 'online_order_not_found' });
     case 'CONFLICT':
       return jsonResponse(409, { error: 'online_order_conflict' });
+    case 'RESERVATION_OWNED':
+      return jsonResponse(409, { error: 'online_order_reservation_owned' });
     case 'INVALID':
       return jsonResponse(400, { error: 'invalid_online_order_operation' });
     case 'UNAVAILABLE':
