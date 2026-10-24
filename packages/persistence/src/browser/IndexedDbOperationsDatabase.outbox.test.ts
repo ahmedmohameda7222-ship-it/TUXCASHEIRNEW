@@ -137,7 +137,7 @@ describe('IndexedDB Business Day outbox ordering', () => {
 
       await expect(
         db.transaction((tx) => tx.outbox.recoverMissingBusinessDayStart(missingDayId)),
-      ).resolves.toBe(true);
+      ).resolves.toBe('RECOVERED');
       expect(
         (
           await db.transaction((tx) =>

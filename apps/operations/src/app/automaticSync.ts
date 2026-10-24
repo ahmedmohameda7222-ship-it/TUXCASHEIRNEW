@@ -10,6 +10,7 @@ import {
   OutboxSyncService,
 } from '@tux/sync';
 import { browserSyncStatusStore } from './syncStatus';
+import { recoverMissingBusinessDayStart } from './businessDayStartRecovery';
 
 const INVENTORY_SYNC_INTERVAL_MS = 15_000;
 
@@ -38,11 +39,14 @@ export function startBrowserAutomaticSync(input: {
     input.database,
     new HttpOutboxTransport({
       endpoint,
-      onDependencyMissing: async (_event, missingDayId) => {
+      onDependencyMissing: async (event, missingDayId) => {
         const businessDayId = parseEntityId<BusinessDayId>(missingDayId);
-        await input.database.transaction((transaction) =>
-          transaction.outbox.recoverMissingBusinessDayStart(businessDayId),
-        );
+        await recoverMissingBusinessDayStart({
+          database: input.database,
+          businessDayId,
+          shopId: event.shopId,
+          createUuid: () => crypto.randomUUID(),
+        });
       },
     }),
     { now: input.now },

@@ -505,11 +505,11 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
             (event) =>
               event.businessDayId === businessDayId &&
               event.eventType === 'BUSINESS_DAY_STARTED' &&
-              event.deliveredAt === null &&
-              event.quarantinedAt !== null,
+              event.deliveredAt === null,
           )
           .sort((left, right) => left.createdAt.localeCompare(right.createdAt))[0];
-        if (origin === undefined) return false;
+        if (origin === undefined) return 'MISSING';
+        if (origin.quarantinedAt === null && origin.nextAttemptAt === null) return 'PRESENT';
         await requestResult(
           objectStore.put({
             ...origin,
@@ -521,7 +521,7 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
             blockedByEventId: null,
           } satisfies StoredOutboxEvent),
         );
-        return true;
+        return 'RECOVERED';
       },
     },
   };

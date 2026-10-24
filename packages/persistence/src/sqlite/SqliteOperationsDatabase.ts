@@ -769,7 +769,8 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
         if (origin.aggregateRevision === null) return 0;
         const rows = database
           .prepare(
-            `SELECT id, payload_json, aggregate_revision FROM outbox_events
+            `SELECT id, payload_json, aggregate_revision, quarantined_at, next_attempt_at
+             FROM outbox_events
              WHERE shop_id = ? AND aggregate_type = ? AND aggregate_id = ?
                AND delivered_at IS NULL AND quarantined_at IS NULL
                AND aggregate_revision IS NOT NULL AND aggregate_revision > ?
@@ -810,12 +811,17 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
           .prepare(
             `SELECT id, payload_json, aggregate_revision FROM outbox_events
              WHERE business_day_id = ? AND event_type = 'BUSINESS_DAY_STARTED'
-               AND delivered_at IS NULL AND quarantined_at IS NOT NULL
+               AND delivered_at IS NULL
              ORDER BY created_at ASC LIMIT 1`,
           )
           .get(businessDayId);
         const event = parseOutboxPayload(row);
-        if (event === null) return false;
+        if (event === null) return 'MISSING';
+        const metadata = row as {
+          readonly quarantined_at?: string | null;
+          readonly next_attempt_at?: string | null;
+        };
+        if (metadata.quarantined_at == null && metadata.next_attempt_at == null) return 'PRESENT';
         const recovered: OutboxEvent = {
           ...event,
           attemptCount: 0,
@@ -831,7 +837,7 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
              WHERE id = ?`,
           )
           .run(serialize(recovered), event.id);
-        return true;
+        return 'RECOVERED';
       },
     },
   };
