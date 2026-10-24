@@ -79,6 +79,32 @@ describe('operations sync gateway', () => {
     expect(init.headers).toMatchObject({ 'x-tux-device-id': DEVICE_ID });
   });
 
+  it('forwards a local Business Day ID to the authenticated GET authority only', async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ shopId: SHOP_ID, openDayId: null, localDayStatus: 'CLOSED' }), {
+        status: 200,
+      }),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    const localId = '70000000-0000-4000-8000-000000000010';
+    const req = {
+      ...request({}),
+      method: 'GET',
+      url: '/api/operations-sync?localDayId=' + localId,
+    } as GatewayRequest;
+    const captured = responseCapture();
+    await proxyAuthenticatedFunction(req, captured.response, 'operations-sync');
+
+    expect(captured.status()).toBe(200);
+    expect(captured.json()['localDayStatus']).toBe('CLOSED');
+    const [url, init] = fetcher.mock.calls[0] as [URL, RequestInit];
+    expect(url.toString()).toBe(
+      'https://project.supabase.co/functions/v1/operations-sync?localDayId=' + localId,
+    );
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+  });
+
   it('forwards the durable envelope with device authentication and preserves a verified receipt', async () => {
     const envelope = {
       eventId: '20000000-0000-4000-8000-000000000001',
