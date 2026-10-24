@@ -1,0 +1,25 @@
+name: One-time Prettier Delta
+on:
+  pull_request:
+    paths:
+      - 'apps/operations/src/app/**'
+      - 'server/operationsSyncGateway.test.ts'
+      - '.github/workflows/operations-format-diagnostic.yml'
+permissions:
+  contents: read
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Print exact format delta
+        run: |
+          npx prettier --write apps/operations/src/app/browserRemote.ts apps/operations/src/app/businessDayPreflight.test.ts apps/operations/src/app/businessDayPreflight.ts apps/operations/src/app/sessionClient.ts server/operationsSyncGateway.test.ts
+          git diff --unified=0 -- apps/operations/src/app/browserRemote.ts apps/operations/src/app/businessDayPreflight.test.ts apps/operations/src/app/businessDayPreflight.ts apps/operations/src/app/sessionClient.ts server/operationsSyncGateway.test.ts
