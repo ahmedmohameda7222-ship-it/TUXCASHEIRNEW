@@ -21,7 +21,7 @@ begin
   select bd.* into v_day from public.business_days bd
   where bd.shop_id = v_shop_id and bd.status = 'OPEN' limit 1;
   if v_day.id is not null then
-    select count(*) into v_worker_count from public.worker_sessions ws
+    select count(distinct ws.worker_id) into v_worker_count from public.worker_sessions ws
     where ws.business_day_id = v_day.id and ws.shop_id = v_shop_id and ws.ended_at is null;
   end if;
   return jsonb_build_object(
