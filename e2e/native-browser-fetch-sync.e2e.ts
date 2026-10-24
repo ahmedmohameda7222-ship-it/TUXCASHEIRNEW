@@ -120,7 +120,7 @@ test('native Chromium POST accepts APPLIED and REPLAY receipts', async ({ page }
       await transport.deliver(outbox);
       await transport.deliver(outbox);
     },
-      JSON.stringify(event),
+    JSON.stringify(event),
   );
 
   expect(requests).toHaveLength(2);
