@@ -23,7 +23,7 @@ export function createSyncStatusStore(options?: {
   let remoteConfigured = false;
   let hasRun = false;
   let syncing = false;
-  let offline = false;
+  let isOnline = true;
   let lastResult: OutboxSyncSummary | Error | null = null;
   let visibilityTimer: ReturnType<typeof setTimeout> | null = null;
   const listeners = new Set<() => void>();
@@ -48,16 +48,9 @@ export function createSyncStatusStore(options?: {
 
   const currentHealth = (): SyncHealthSnapshot => {
     if (!remoteConfigured) return buildSyncHealth({ remoteConfigured: false });
-    if (offline) {
-      return {
-        state: 'SYNC_RETRYING',
-        label: 'Sync retrying',
-        remoteConfigured: true,
-        attentionRequired: false,
-      };
-    }
     return buildSyncHealth({
       remoteConfigured: true,
+      online: isOnline,
       syncing,
       hasRun,
       lastResult,
@@ -97,12 +90,18 @@ export function createSyncStatusStore(options?: {
     },
     setOnline: (online) => {
       if (!remoteConfigured) return;
-      offline = !online;
+      isOnline = online;
       publishTransientAware(currentHealth());
     },
     setExternalSnapshot: (next) => {
       remoteConfigured = next.remoteConfigured;
-      publishTransientAware(next);
+      publishTransientAware({
+        ...next,
+        pendingCount: next.pendingCount ?? 0,
+        lastSuccessfulDeliveryAt: next.lastSuccessfulDeliveryAt ?? null,
+        lastError: next.lastError ?? null,
+        nextRetryAt: next.nextRetryAt ?? null,
+      });
     },
   };
 }

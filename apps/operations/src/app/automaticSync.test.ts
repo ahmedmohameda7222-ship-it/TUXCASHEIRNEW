@@ -7,6 +7,7 @@ const harness = vi.hoisted(() => ({
   schedulerOptions: undefined as AutomaticOutboxSchedulerOptions | undefined,
   schedulerStarted: vi.fn(),
   schedulerStopped: vi.fn(),
+  schedulerTriggered: vi.fn(),
   inventorySyncShop: vi.fn(async (shopId: unknown) => {
     void shopId;
     return 0;
@@ -32,6 +33,9 @@ vi.mock('@tux/sync', () => ({
     }
     stop(): void {
       harness.schedulerStopped();
+    }
+    trigger(): void {
+      harness.schedulerTriggered();
     }
   },
   HttpOutboxTransport: class HttpOutboxTransport {
@@ -97,6 +101,10 @@ const cleanSummary: OutboxSyncSummary = {
   dependencyBlocked: 0,
   blockedUntil: null,
   lastError: null,
+  pendingCount: 0,
+  quarantinedCount: 0,
+  nextRetryAt: null,
+  lastSuccessfulDeliveryAt: null,
 };
 
 beforeEach(() => {
@@ -240,6 +248,28 @@ describe('startBrowserAutomaticSync', () => {
     expect(removeEventListener).toHaveBeenCalledWith('offline', expect.any(Function));
     callbacks[0]?.();
     expect(harness.inventorySyncShop.mock.calls.length).toBe(priorCalls);
+  });
+
+  it('triggers an immediate outbox delivery pass when connectivity returns', () => {
+    const listeners = new Map<string, () => void>();
+    vi.stubGlobal('window', {
+      location: { origin: 'https://operations.example.test' },
+      setInterval: vi.fn(() => 1),
+      clearInterval: vi.fn(),
+      addEventListener: (name: string, callback: () => void) => listeners.set(name, callback),
+      removeEventListener: vi.fn(),
+    });
+    vi.stubGlobal('navigator', { onLine: false });
+    startBrowserAutomaticSync({
+      database: {} as OperationsDatabase,
+      now: () => '2026-08-24T06:00:00.000Z' as Instant,
+      shopId: '14000000-0000-4000-8000-000000000001' as never,
+    });
+    harness.schedulerTriggered.mockClear();
+
+    listeners.get('online')?.();
+
+    expect(harness.schedulerTriggered).toHaveBeenCalledTimes(1);
   });
 
   it('retries reward-claim reconciliation on the periodic remote sync interval', async () => {

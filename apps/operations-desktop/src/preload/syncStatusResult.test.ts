@@ -3,6 +3,12 @@ import { assertSyncHealthSnapshot } from './syncStatusResult';
 
 const snapshots = [
   {
+    state: 'OFFLINE',
+    label: 'Offline',
+    remoteConfigured: true,
+    attentionRequired: false,
+  },
+  {
     state: 'LOCAL_ONLY',
     label: 'Local only',
     remoteConfigured: false,
@@ -73,5 +79,14 @@ describe('assertSyncHealthSnapshot', () => {
       }),
     ).toThrow(TypeError);
     expect(() => assertSyncHealthSnapshot(null)).toThrow(TypeError);
+    expect(() =>
+      assertSyncHealthSnapshot({
+        state: 'SYNC_RETRYING',
+        label: 'Sync retrying',
+        remoteConfigured: true,
+        attentionRequired: false,
+        pendingCount: -1,
+      }),
+    ).toThrow(TypeError);
   });
 });
