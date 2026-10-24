@@ -809,9 +809,10 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
       async recoverMissingBusinessDayStart(businessDayId: BusinessDayId) {
         const row = database
           .prepare(
-            `SELECT id, payload_json, aggregate_revision FROM outbox_events
+            `SELECT id, payload_json, aggregate_revision, delivered_at,
+                    quarantined_at, next_attempt_at
+             FROM outbox_events
              WHERE business_day_id = ? AND event_type = 'BUSINESS_DAY_STARTED'
-               AND delivered_at IS NULL
              ORDER BY created_at ASC LIMIT 1`,
           )
           .get(businessDayId);
@@ -820,18 +821,27 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
         const metadata = row as {
           readonly quarantined_at?: string | null;
           readonly next_attempt_at?: string | null;
+          readonly delivered_at?: string | null;
         };
-        if (metadata.quarantined_at == null && metadata.next_attempt_at == null) return 'PRESENT';
+        if (
+          metadata.delivered_at == null &&
+          metadata.quarantined_at == null &&
+          metadata.next_attempt_at == null
+        ) {
+          return 'PRESENT';
+        }
         const recovered: OutboxEvent = {
           ...event,
           attemptCount: 0,
           nextAttemptAt: null,
           lastError: null,
+          deliveredAt: null,
         };
         database
           .prepare(
             `UPDATE outbox_events
              SET attempt_count = 0, next_attempt_at = NULL, last_error = NULL,
+                 delivered_at = NULL,
                  quarantined_at = NULL, permanent_failure_reason = NULL,
                  blocked_by_event_id = NULL, payload_json = ?
              WHERE id = ?`,

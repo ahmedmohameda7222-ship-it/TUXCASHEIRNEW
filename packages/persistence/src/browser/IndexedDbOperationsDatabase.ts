@@ -504,18 +504,24 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
           .filter(
             (event) =>
               event.businessDayId === businessDayId &&
-              event.eventType === 'BUSINESS_DAY_STARTED' &&
-              event.deliveredAt === null,
+              event.eventType === 'BUSINESS_DAY_STARTED',
           )
           .sort((left, right) => left.createdAt.localeCompare(right.createdAt))[0];
         if (origin === undefined) return 'MISSING';
-        if (origin.quarantinedAt === null && origin.nextAttemptAt === null) return 'PRESENT';
+        if (
+          origin.deliveredAt === null &&
+          origin.quarantinedAt === null &&
+          origin.nextAttemptAt === null
+        ) {
+          return 'PRESENT';
+        }
         await requestResult(
           objectStore.put({
             ...origin,
             attemptCount: 0,
             nextAttemptAt: null,
             lastError: null,
+            deliveredAt: null,
             quarantinedAt: null,
             permanentFailureReason: null,
             blockedByEventId: null,

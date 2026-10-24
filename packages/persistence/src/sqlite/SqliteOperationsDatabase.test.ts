@@ -105,6 +105,28 @@ function outboxEvent(): OutboxEvent {
 }
 
 describe('SqliteOperationsDatabase', () => {
+  it('requeues a previously delivered Business Day start after a canonical reset', async () => {
+    const database = new SqliteOperationsDatabase(':memory:');
+    await database.initialize();
+    await seedFoundation(database);
+    await database.transaction(async (transaction) => {
+      await transaction.outbox.append(outboxEvent());
+      await transaction.outbox.markDelivered(outboxId, instant('2026-08-17T13:01:00Z'));
+    });
+
+    await expect(
+      database.transaction((transaction) =>
+        transaction.outbox.recoverMissingBusinessDayStart(businessDayId),
+      ),
+    ).resolves.toBe('RECOVERED');
+    expect(
+      await database.transaction((transaction) =>
+        transaction.outbox.listPending(instant('2026-08-17T14:00:00Z'), 10, shopId),
+      ),
+    ).toEqual([outboxEvent()]);
+    await database.close();
+  });
+
   it('rolls back all writes when a transaction fails', async () => {
     const database = new SqliteOperationsDatabase(':memory:');
     await database.initialize();
