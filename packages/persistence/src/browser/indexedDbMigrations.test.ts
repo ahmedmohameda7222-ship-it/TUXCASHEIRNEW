@@ -124,8 +124,67 @@ afterEach(async () => {
 
 describe('IndexedDB migration registry', () => {
   it('declares a contiguous production migration chain', () => {
-    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
-    expect(INDEXED_DB_VERSION).toBe(8);
+    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(INDEXED_DB_VERSION).toBe(9);
+  });
+
+  it('retries transient pending events once on v9 without touching quarantine evidence', async () => {
+    const name = `tux-indexeddb-v9-retry-${crypto.randomUUID()}`;
+    const v8 = await openAtVersion(name, 8);
+    const write = v8.transaction('outboxEvents', 'readwrite');
+    const pendingId = '60000000-0000-4000-8000-000000000009';
+    const quarantinedId = '60000000-0000-4000-8000-000000000010';
+    const base = {
+      shopId: '10000000-0000-4000-8000-000000000001',
+      businessDayId: '20000000-0000-4000-8000-000000000001',
+      aggregateType: 'BUSINESS_DAY',
+      aggregateId: '20000000-0000-4000-8000-000000000001',
+      aggregateRevision: 0,
+      eventType: 'RECONCILIATION_RECORDED',
+      payloadVersion: 1,
+      payload: {},
+      createdAt: '2026-10-24T13:00:00.000Z',
+      attemptCount: 7,
+      nextAttemptAt: '2026-10-25T00:00:00.000Z',
+      lastError: 'Remote outbox endpoint rejected event with HTTP 500.',
+      deliveredAt: null,
+      permanentFailureReason: null,
+      blockedByEventId: null,
+    };
+    write.objectStore('outboxEvents').put({
+      ...base,
+      id: pendingId,
+      idempotencyKey: 'pending-v9-retry',
+      quarantinedAt: null,
+    });
+    write.objectStore('outboxEvents').put({
+      ...base,
+      id: quarantinedId,
+      idempotencyKey: 'quarantined-v9-preserved',
+      nextAttemptAt: null,
+      quarantinedAt: '2026-10-24T13:01:00.000Z',
+      permanentFailureReason: 'manual review required',
+    });
+    await transactionDone(write);
+    v8.close();
+
+    const v9 = await openAtVersion(name, 9);
+    try {
+      const read = v9.transaction('outboxEvents', 'readonly').objectStore('outboxEvents');
+      await expect(requestResult(read.get(pendingId))).resolves.toMatchObject({
+        attemptCount: 0,
+        nextAttemptAt: null,
+        lastError: null,
+        quarantinedAt: null,
+      });
+      await expect(requestResult(read.get(quarantinedId))).resolves.toMatchObject({
+        attemptCount: 7,
+        quarantinedAt: '2026-10-24T13:01:00.000Z',
+        permanentFailureReason: 'manual review required',
+      });
+    } finally {
+      v9.close();
+    }
   });
 
   it('keeps quarantined evidence when a browser upgrades from v7 to v8', async () => {
