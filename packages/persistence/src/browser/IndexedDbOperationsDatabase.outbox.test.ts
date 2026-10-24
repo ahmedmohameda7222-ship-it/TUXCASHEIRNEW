@@ -159,9 +159,7 @@ describe('IndexedDB Business Day outbox ordering', () => {
     const db = new IndexedDbOperationsDatabase(name);
     await db.initialize();
     try {
-      const resetDayId = parseEntityId<BusinessDayId>(
-        '35000000-0000-4000-8000-000000000003',
-      );
+      const resetDayId = parseEntityId<BusinessDayId>('35000000-0000-4000-8000-000000000003');
       const started = {
         ...outbox(
           '33000000-0000-4000-8000-000000000013',

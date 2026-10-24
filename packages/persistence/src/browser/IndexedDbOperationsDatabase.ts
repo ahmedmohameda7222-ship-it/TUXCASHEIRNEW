@@ -503,8 +503,7 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
         const origin = candidates
           .filter(
             (event) =>
-              event.businessDayId === businessDayId &&
-              event.eventType === 'BUSINESS_DAY_STARTED',
+              event.businessDayId === businessDayId && event.eventType === 'BUSINESS_DAY_STARTED',
           )
           .sort((left, right) => left.createdAt.localeCompare(right.createdAt))[0];
         if (origin === undefined) return 'MISSING';
