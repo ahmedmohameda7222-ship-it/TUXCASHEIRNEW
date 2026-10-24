@@ -76,6 +76,8 @@ Deno.serve(async (request) => {
     return jsonResponse(200, {
       shopId: data.shopId,
       openDayId: data.openDayId ?? null,
+      openDay: data.openDay ?? null,
+      openWorkerCount: data.openWorkerCount ?? 0,
     });
   }
 
