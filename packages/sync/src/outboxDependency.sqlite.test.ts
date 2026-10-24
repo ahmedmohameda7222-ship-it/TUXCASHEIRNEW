@@ -162,12 +162,18 @@ describe('aggregate-aware outbox dependency safety', () => {
       await tx.outbox.append(first);
       await tx.outbox.append(second);
     });
-    expect(await database.transaction((tx) =>
-      tx.outbox.listPending(instant('2026-08-20T00:05:00.000Z'), 50, SHOP_ID),
-    )).toEqual([]);
-    expect((await database.transaction((tx) =>
-      tx.outbox.listPending(instant('2026-08-20T00:10:00.000Z'), 50, SHOP_ID),
-    )).map((x) => x.id)).toEqual([first.id, second.id]);
+    expect(
+      await database.transaction((tx) =>
+        tx.outbox.listPending(instant('2026-08-20T00:05:00.000Z'), 50, SHOP_ID),
+      ),
+    ).toEqual([]);
+    expect(
+      (
+        await database.transaction((tx) =>
+          tx.outbox.listPending(instant('2026-08-20T00:10:00.000Z'), 50, SHOP_ID),
+        )
+      ).map((x) => x.id),
+    ).toEqual([first.id, second.id]);
   });
 
   it('keeps transient failure ordered and retries the origin before later revisions', async () => {
