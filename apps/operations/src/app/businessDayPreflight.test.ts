@@ -84,6 +84,36 @@ describe('canonical Business Day reconciliation before PIN transition', () => {
     expect(adopt).not.toHaveBeenCalled();
   });
 
+
+  it('archives a locally OPEN day already CLOSED on the authenticated server after force End Day', async () => {
+    const adopt = vi.fn(async () => undefined);
+    const result = await reconcileCanonicalBusinessDay({
+      shopId: SHOP,
+      drainLocalOutbox: async () => undefined,
+      getLocalOpenDay: async () => day(OLD),
+      getCanonicalState: async () => ({
+        day: null, openWorkerCount: 0, localDayStatus: 'CLOSED',
+      }),
+      adoptCanonicalDay: adopt,
+    });
+    expect(result).toBe(0);
+    expect(adopt).toHaveBeenCalledWith(null, day(OLD));
+  });
+
+  it('preserves a legitimate offline day unknown to the server', async () => {
+    const adopt = vi.fn(async () => undefined);
+    await reconcileCanonicalBusinessDay({
+      shopId: SHOP,
+      drainLocalOutbox: async () => undefined,
+      getLocalOpenDay: async () => day(NEW),
+      getCanonicalState: async () => ({
+        day: null, openWorkerCount: 0, localDayStatus: null,
+      }),
+      adoptCanonicalDay: adopt,
+    });
+    expect(adopt).not.toHaveBeenCalled();
+  });
+
   it('keeps a matching canonical Business Day without remapping its ID', async () => {
     const adopt = vi.fn(async () => undefined);
     await reconcileCanonicalBusinessDay({
