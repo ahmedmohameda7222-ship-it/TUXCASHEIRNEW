@@ -149,7 +149,8 @@ Deno.serve(async (request) => {
     if (
       message.includes('TUX_BUSINESS_DAY_SHOP_CONFLICT') ||
       message.includes('TUX_BUSINESS_DAY_REOPEN_FORBIDDEN') ||
-      message.includes('TUX_BUSINESS_DAY_ALREADY_CLOSED')
+      message.includes('TUX_BUSINESS_DAY_ALREADY_CLOSED') ||
+      message.includes('TUX_BUSINESS_DAY_OTHER_SESSIONS_ACTIVE')
     ) {
       return jsonResponse(409, { error: 'business_day_identity_conflict' });
     }

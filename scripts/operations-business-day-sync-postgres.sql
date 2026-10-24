@@ -291,7 +291,10 @@ declare
   first_session uuid := '59000000-0000-4000-8000-000000000101';
   final_session uuid := '59000000-0000-4000-8000-000000000102';
   stale_session uuid := '59000000-0000-4000-8000-000000000103';
+  race_session uuid := '59000000-0000-4000-8000-000000000104';
   result jsonb;
+  close_row jsonb;
+  err text;
 begin
   update public.worker_sessions
   set ended_at = greatest(started_at, '2026-10-24T13:00:00Z'::timestamptz)
@@ -356,5 +359,32 @@ begin
     or (select ended_at from public.worker_sessions where id = stale_session) is null then
     raise exception 'Crashed session still blocked the final live browser: %', result;
   end if;
-  raise notice 'PASS: atomic idempotent exit and fenced stale-session recovery';
+
+  insert into public.worker_sessions(
+    id, shop_id, business_day_id, worker_id, device_id, started_at, last_seen_at, ended_at
+  ) values (
+    race_session, s, d2, w, '55000000-0000-4000-8000-000000000001',
+    clock_timestamp(), clock_timestamp(), null
+  );
+  close_row := jsonb_build_object(
+    'id',d2,'shop_id',s,'status','CLOSED',
+    'started_at',(select started_at from public.business_days where id=d2),
+    'started_by_worker_id',(select started_by_worker_id from public.business_days where id=d2),
+    'ended_at',clock_timestamp(),'ended_by_worker_id',w,
+    'last_allocated_display_order_no',(select last_allocated_display_order_no from public.business_days where id=d2)
+  );
+  begin
+    perform pg_temp.test_rpc(
+      '60000000-0000-4000-8000-000000000199','BUSINESS_DAY_CLOSED',d2,
+      'business_days',close_row,'UPDATE',true
+    );
+    raise exception 'Concurrent sign-in was not rechecked during End Day';
+  exception when others then
+    get stacked diagnostics err=MESSAGE_TEXT;
+    if position('TUX_BUSINESS_DAY_OTHER_SESSIONS_ACTIVE' in err) = 0 then raise; end if;
+  end;
+  if (select status from public.business_days where id=d2) <> 'OPEN' then
+    raise exception 'Rejected End Day did not roll back atomically';
+  end if;
+  raise notice 'PASS: atomic idempotent exit, stale recovery and End Day session recheck';
 end $body$;
