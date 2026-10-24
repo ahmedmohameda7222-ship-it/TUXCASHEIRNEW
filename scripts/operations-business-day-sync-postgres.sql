@@ -7,10 +7,20 @@ insert into public.shop_memberships(id,shop_id,auth_user_id,role)
  values (gen_random_uuid(),'52000000-0000-4000-8000-000000000001','54000000-0000-4000-8000-000000000001','OPERATIONS_DEVICE');
 insert into public.devices(id,shop_id,label,auth_user_id)
  values ('55000000-0000-4000-8000-000000000001','52000000-0000-4000-8000-000000000001','Browser','54000000-0000-4000-8000-000000000001');
+-- Separate browser identity, same authorized shop: cannot create a second OPEN day.
+insert into auth.users(id) values ('54000000-0000-4000-8000-000000000002');
+insert into public.shop_memberships(id,shop_id,auth_user_id,role)
+values (gen_random_uuid(),'52000000-0000-4000-8000-000000000001',
+ '54000000-0000-4000-8000-000000000002','OPERATIONS_DEVICE');
+insert into public.devices(id,shop_id,label,auth_user_id)
+values ('55000000-0000-4000-8000-000000000002',
+ '52000000-0000-4000-8000-000000000001','Incognito',
+ '54000000-0000-4000-8000-000000000002');
+
 insert into public.business_days(id,shop_id,status,started_at,started_by_worker_id)
  values ('56000000-0000-4000-8000-000000000001','52000000-0000-4000-8000-000000000001','OPEN','2026-10-10T09:00:00Z','53000000-0000-4000-8000-000000000001');
 
-create function pg_temp.test_rpc(p_event uuid,p_type text,p_day uuid,p_table text,p_row jsonb,p_mode text default 'UPSERT')
+create function pg_temp.test_rpc(p_event uuid,p_type text,p_day uuid,p_table text,p_row jsonb,p_mode text default 'UPSERT',p_other_device boolean default false)
 returns text language plpgsql as $body$
 declare s uuid:='52000000-0000-4000-8000-000000000001'; env jsonb; plan jsonb;
 begin
@@ -30,8 +40,10 @@ begin
      'conflictColumns',jsonb_build_array('id'),'row',p_row,'guard',
      case when p_mode='UPDATE' then '{"kind":"STATE_RANK","column":"status","incomingStatus":"CLOSED","rank":{"OPEN":0,"CLOSED":1}}'::jsonb else null end)));
  return public.ingest_tux_operations_materialization_v1(
-  '54000000-0000-4000-8000-000000000001'::uuid,
-  '55000000-0000-4000-8000-000000000001'::uuid,env,repeat('a',64),plan);
+  case when p_other_device then '54000000-0000-4000-8000-000000000002'::uuid
+       else '54000000-0000-4000-8000-000000000001'::uuid end,
+  case when p_other_device then '55000000-0000-4000-8000-000000000002'::uuid
+       else '55000000-0000-4000-8000-000000000001'::uuid end,env,repeat('a',64),plan);
 end $body$;
 
 do $body$
@@ -148,7 +160,7 @@ begin
     row := jsonb_build_object('id',d3,'shop_id',s,'status','OPEN',
       'started_at','2026-10-12T09:00:00Z','started_by_worker_id',w,
       'ended_at',null,'ended_by_worker_id',null,'last_allocated_display_order_no',0);
-    perform pg_temp.test_rpc('60000000-0000-4000-8000-000000000007','BUSINESS_DAY_STARTED',d3,'business_days',row);
+    perform pg_temp.test_rpc('60000000-0000-4000-8000-000000000007','BUSINESS_DAY_STARTED',d3,'business_days',row,'UPSERT',true);
     raise exception 'Expected other browser duplicate OPEN conflict';
   exception when others then
     get stacked diagnostics message = MESSAGE_TEXT;
