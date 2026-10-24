@@ -471,17 +471,20 @@ async function browserRuntime(): Promise<BrowserRuntime> {
             const day = await database.transaction((tx) => tx.businessDays.getOpenForShop(shopId));
             return day?.status === 'OPEN' ? day : null;
           },
-          getCanonicalState: (scope) => remoteGateway.readCanonicalOpenBusinessDay(scope),
+          getCanonicalState: (scope, localDayId) =>
+            remoteGateway.readCanonicalOpenBusinessDay(scope, localDayId),
           adoptCanonicalDay: async (canonical, oldLocal) => {
             const previousSession =
               oldLocal === null ? null : await readModel.getOpenWorkerSession(oldLocal.id);
             await database.transaction(async (tx) => {
               const current = await tx.businessDays.getOpenForShop(shopId);
-              assertCanonicalDayNotLocallyClosed(await tx.businessDays.getById(canonical.id));
+              if (canonical !== null) {
+                assertCanonicalDayNotLocallyClosed(await tx.businessDays.getById(canonical.id));
+              }
               if ((current?.id ?? null) !== (oldLocal?.id ?? null)) {
                 throw new Error('Local Business Day changed during canonical recovery.');
               }
-              if (oldLocal !== null && oldLocal.id !== canonical.id) {
+              if (oldLocal !== null && (canonical === null || oldLocal.id !== canonical.id)) {
                 const closedAt = instant(
                   new Date(Math.max(Date.parse(oldLocal.startedAt), Date.now())),
                 );
@@ -511,13 +514,15 @@ async function browserRuntime(): Promise<BrowserRuntime> {
                   endedByWorkerId: oldLocal.startedByWorkerId,
                 });
               }
-              await tx.businessDays.put({
-                ...canonical,
-                lastAllocatedDisplayOrderNo: Math.max(
-                  canonical.lastAllocatedDisplayOrderNo,
-                  current?.id === canonical.id ? current.lastAllocatedDisplayOrderNo : 0,
-                ),
-              });
+              if (canonical !== null) {
+                await tx.businessDays.put({
+                  ...canonical,
+                  lastAllocatedDisplayOrderNo: Math.max(
+                    canonical.lastAllocatedDisplayOrderNo,
+                    current?.id === canonical.id ? current.lastAllocatedDisplayOrderNo : 0,
+                  ),
+                });
+              }
             });
           },
         });
