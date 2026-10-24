@@ -33,6 +33,10 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Show exact native probe formatting drift
+        run: |
+          npx prettier --write e2e/native-browser-fetch-sync.e2e.ts
+          git diff -- e2e/native-browser-fetch-sync.e2e.ts
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Verify real native fetch POST and APPLIED/REPLAY receipts
