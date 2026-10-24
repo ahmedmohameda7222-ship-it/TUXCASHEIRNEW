@@ -17,7 +17,8 @@ describe('Operations shop-scoped background sync lifecycle', () => {
   });
 
   it('attempts durable worker sign-out delivery before stopping remote sync', () => {
-    const section = source.slice(source.indexOf('const signOut = async'), source.indexOf('if (preferenceRetryStarted'));
+    const begin = source.indexOf('const signOut = async');
+    const section = source.slice(begin, source.indexOf('if (preferenceRetryStarted', begin));
     const flush = section.indexOf('await flushShopOutbox(');
     const stop = section.indexOf('stopRemoteRuntime();');
     expect(flush).toBeGreaterThanOrEqual(0);
