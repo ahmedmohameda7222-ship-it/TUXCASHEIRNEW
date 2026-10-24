@@ -51,7 +51,11 @@ import type {
   TuxWorkerUiPreferencesApi,
 } from '@tux/platform-contracts';
 import { startBrowserAutomaticSync } from './automaticSync';
-import { assertCanonicalBusinessDayReady } from './businessDayPreflight';
+import {
+  assertCanonicalDayNotLocallyClosed,
+  reconcileCanonicalBusinessDay,
+  requiresEndDayOnWorkerExit,
+} from './businessDayPreflight';
 import { VercelBrowserRemoteGateway } from './browserRemote';
 import { selectBrowserShop } from './browserShopScope';
 import { fenceStaleBrowserSession } from './browserSessionScope';
@@ -64,6 +68,7 @@ export interface OperationsSessionClient {
   getState(): Promise<OperationsSessionResult>;
   submitPin(pin: string, shopId?: string): Promise<OperationsSessionResult>;
   signOut(): Promise<OperationsSessionResult>;
+  shouldCloseDayOnSignOut?(): Promise<boolean>;
   enrollDevice?(pin: string): Promise<OperationsSessionResult>;
 }
 
@@ -89,6 +94,7 @@ interface BrowserRuntime {
   getState(): Promise<OperationsSessionResult>;
   submitPin(pin: string, shopId?: string): Promise<OperationsSessionResult>;
   signOut(): Promise<OperationsSessionResult>;
+  shouldCloseDayOnSignOut(): Promise<boolean>;
 }
 
 // Only the intentionally named E2E fixture build running on loopback can
@@ -445,31 +451,82 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         },
       };
 
-      const checkDayBeforeLogin = async (shopId: ShopId): Promise<void> => {
-        await assertCanonicalBusinessDayReady({
+      const flushShopOutbox = async (shopId: ShopId): Promise<void> => {
+        const endpoint = new URL('/api/operations-sync', window.location.origin).toString();
+        const service = new OutboxSyncService(
+          database,
+          new HttpOutboxTransport({ endpoint }),
+          { now: runtime.now },
           shopId,
-          drainLocalOutbox: async () => {
-            // Day closure can be committed to IndexedDB while sync is stopped.
-            // Drain its immutable outbox under the newly authenticated shop cookie.
-            const endpoint = new URL('/api/operations-sync', window.location.origin).toString();
-            const service = new OutboxSyncService(
-              database,
-              new HttpOutboxTransport({ endpoint }),
-              { now: runtime.now },
-              shopId,
-            );
-            for (let batch = 0; batch < 4; batch += 1) {
-              const result = await service.syncOnce(50);
-              if (result.failed > 0 || result.delivered < 50) break;
-            }
+        );
+        for (let batch = 0; batch < 4; batch += 1) {
+          const result = await service.syncOnce(50);
+          if (result.failed > 0 || result.delivered < 50) break;
+        }
+      };
+
+      const checkDayBeforeLogin = async (shopId: ShopId): Promise<void> => {
+        await reconcileCanonicalBusinessDay({
+          shopId,
+          drainLocalOutbox: () => flushShopOutbox(shopId),
+          getLocalOpenDay: async () => {
+            const day = await database.transaction((tx) => tx.businessDays.getOpenForShop(shopId));
+            return day?.status === 'OPEN' ? day : null;
           },
-          getLocalOpenDayId: async () => {
-            const day = await database.transaction((transaction) =>
-              transaction.businessDays.getOpenForShop(shopId),
-            );
-            return day?.id ?? null;
+          getCanonicalState: (scope, localDayId) =>
+            remoteGateway.readCanonicalOpenBusinessDay(scope, localDayId),
+          adoptCanonicalDay: async (canonical, oldLocal) => {
+            const previousSession =
+              oldLocal === null ? null : await readModel.getOpenWorkerSession(oldLocal.id);
+            await database.transaction(async (tx) => {
+              const current = await tx.businessDays.getOpenForShop(shopId);
+              if (canonical !== null) {
+                assertCanonicalDayNotLocallyClosed(await tx.businessDays.getById(canonical.id));
+              }
+              if ((current?.id ?? null) !== (oldLocal?.id ?? null)) {
+                throw new Error('Local Business Day changed during canonical recovery.');
+              }
+              if (oldLocal !== null && (canonical === null || oldLocal.id !== canonical.id)) {
+                const closedAt = instant(
+                  new Date(Math.max(Date.parse(oldLocal.startedAt), Date.now())),
+                );
+                // Mock-only mismatch: preserve every old event as quarantined,
+                // never erase local storage or manufacture a remote End Day.
+                const pending = await tx.outbox.listPending(
+                  instant('9999-12-31T23:59:59Z'),
+                  100000,
+                  shopId,
+                );
+                for (const event of pending) {
+                  if (event.businessDayId === oldLocal.id) {
+                    await tx.outbox.quarantine(
+                      event.id,
+                      closedAt,
+                      'DEVELOPMENT_CANONICAL_DAY_RECOVERY',
+                    );
+                  }
+                }
+                if (previousSession?.endedAt === null) {
+                  await tx.workerSessions.put({ ...previousSession, endedAt: closedAt });
+                }
+                await tx.businessDays.put({
+                  ...oldLocal,
+                  status: 'CLOSED',
+                  endedAt: closedAt,
+                  endedByWorkerId: oldLocal.startedByWorkerId,
+                });
+              }
+              if (canonical !== null) {
+                await tx.businessDays.put({
+                  ...canonical,
+                  lastAllocatedDisplayOrderNo: Math.max(
+                    canonical.lastAllocatedDisplayOrderNo,
+                    current?.id === canonical.id ? current.lastAllocatedDisplayOrderNo : 0,
+                  ),
+                });
+              }
+            });
           },
-          getCanonicalOpenDayId: (scope) => remoteGateway.readCanonicalOpenBusinessDay(scope),
         });
       };
 
@@ -590,8 +647,28 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         return result;
       };
 
+      const shouldCloseDayOnSignOut = async (): Promise<boolean> => {
+        if (LEGACY_BROWSER_E2E) return true;
+        const state = await session.getState();
+        if (!state.ok || state.value.status !== 'ACTIVE') return true;
+        const canonical = await remoteGateway.readCanonicalOpenBusinessDay(state.value.shopId);
+        if (canonical.day?.id !== state.value.businessDayId) return true;
+        return requiresEndDayOnWorkerExit(canonical.openWorkerCount);
+      };
+
       const signOut = async (): Promise<OperationsSessionResult> => {
+        const before = await session.getState();
         const result = await session.signOut();
+        if (!LEGACY_BROWSER_E2E && result.ok && before.ok && before.value.status === 'ACTIVE') {
+          try {
+            // A second browser should see this departure before it decides
+            // whether its operator is the final worker. Offline failures keep
+            // the immutable sign-out event in the local outbox.
+            await flushShopOutbox(before.value.shopId);
+          } catch {
+            // The original local mutation remains durable for next login.
+          }
+        }
         stopRemoteRuntime();
         trackWorkerIdentity(result);
         return result;
@@ -641,6 +718,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         getState,
         submitPin,
         signOut,
+        shouldCloseDayOnSignOut,
       };
     })();
   }
@@ -685,6 +763,7 @@ export function createOperationsSessionClient(): OperationsSessionClient {
     submitPin: async (pin: string, shopId?: string) =>
       (await browserRuntime()).submitPin(pin, shopId),
     signOut: async () => (await browserRuntime()).signOut(),
+    shouldCloseDayOnSignOut: async () => (await browserRuntime()).shouldCloseDayOnSignOut(),
     enrollDevice: async (pin: string) => (await browserRuntime()).submitPin(pin),
   };
 }

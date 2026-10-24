@@ -1,30 +1,63 @@
-import type { BusinessDayId, ShopId } from '@tux/domain';
+import type { BusinessDay, BusinessDayId, OpenBusinessDay, ShopId } from '@tux/domain';
+
+export interface CanonicalBusinessDayState {
+  readonly day: OpenBusinessDay | null;
+  readonly openWorkerCount: number;
+  readonly localDayStatus?: 'OPEN' | 'CLOSED' | null;
+}
 
 /**
- * Preserve immutable local day IDs and outbox events. Never auto-adopt another
- * browser's OPEN day, as its receipt sequence and worker session are device-local.
+ * Sign-in reconnects to the server's original OPEN-day identity, never creates
+ * a duplicate. A local offline day remains valid when the server has no OPEN day.
+ * Conflicting development fixtures are archived by an explicit persistence callback
+ * that retains their outbox history as quarantined events for inspection.
  */
-export async function assertCanonicalBusinessDayReady(input: {
+export async function reconcileCanonicalBusinessDay(input: {
   readonly shopId: ShopId;
   readonly drainLocalOutbox: () => Promise<void>;
-  readonly getLocalOpenDayId: () => Promise<BusinessDayId | null>;
-  readonly getCanonicalOpenDayId: (shopId: ShopId) => Promise<BusinessDayId | null>;
-}): Promise<void> {
+  readonly getLocalOpenDay: () => Promise<OpenBusinessDay | null>;
+  readonly getCanonicalState: (
+    shopId: ShopId,
+    localDayId: BusinessDayId | null,
+  ) => Promise<CanonicalBusinessDayState>;
+  readonly adoptCanonicalDay: (
+    canonical: OpenBusinessDay | null,
+    previouslyLocal: OpenBusinessDay | null,
+  ) => Promise<void>;
+}): Promise<number> {
   await input.drainLocalOutbox();
-  const canonical = await input.getCanonicalOpenDayId(input.shopId);
-  const local = await input.getLocalOpenDayId();
-  if (canonical === null && local !== null) {
-    throw new Error(
-      'Local Business Day ' +
-        local +
-        ' remains OPEN, but Supabase has no matching OPEN day. Synchronize the original local Business Day start before signing in, or investigate a remotely closed day. Do not change day IDs or clear IndexedDB.',
-    );
+  const local = await input.getLocalOpenDay();
+  const canonical = await input.getCanonicalState(input.shopId, local?.id ?? null);
+  if (!Number.isSafeInteger(canonical.openWorkerCount) || canonical.openWorkerCount < 0) {
+    throw new Error('Canonical open-worker count is invalid.');
   }
-  if (canonical !== null && canonical !== local) {
-    throw new Error(
-      'Canonical Business Day ' +
-        canonical +
-        ' is still OPEN in Supabase. Reconnect the original browser and synchronize End Day before starting another day. Do not clear IndexedDB or replace Business Day IDs.',
-    );
+  if (canonical.day !== null && canonical.day.shopId !== input.shopId) {
+    throw new Error('Canonical Business Day response belongs to a different shop.');
+  }
+  if (local !== null && canonical.day === null && canonical.localDayStatus === 'CLOSED') {
+    await input.adoptCanonicalDay(null, local);
+  }
+  if (
+    canonical.day !== null &&
+    (canonical.day.id !== local?.id ||
+      canonical.day.lastAllocatedDisplayOrderNo > (local?.lastAllocatedDisplayOrderNo ?? -1))
+  ) {
+    await input.adoptCanonicalDay(canonical.day, local);
+  }
+  return canonical.openWorkerCount;
+}
+
+/** Only a non-final worker may sign out without closing the Business Day. */
+export function requiresEndDayOnWorkerExit(openWorkerCount: number): boolean {
+  if (!Number.isSafeInteger(openWorkerCount) || openWorkerCount < 0) {
+    throw new Error('Canonical open-worker count is invalid.');
+  }
+  return openWorkerCount <= 1;
+}
+
+/** Never overwrite a locally completed, possibly still queued, End Day. */
+export function assertCanonicalDayNotLocallyClosed(previouslyStored: BusinessDay | null): void {
+  if (previouslyStored?.status === 'CLOSED') {
+    throw new Error('Business Day ended locally. Synchronize End Day before rejoining.');
   }
 }

@@ -8,11 +8,14 @@ import type {
   WorkerUiPreferencesRemoteGateway,
 } from '@tux/application';
 import { WorkerMenuLayoutConflictError } from '@tux/application';
+import type { CanonicalBusinessDayState } from './businessDayPreflight';
 import {
+  instant,
   parseEntityId,
   parseWorkerMenuLayout,
   parseWorkerUiPreferences,
   type BusinessDayId,
+  type OpenBusinessDay,
   type CategoryAlignment,
   type MenuCategoryId,
   type ProductId,
@@ -179,11 +182,18 @@ export class VercelBrowserRemoteGateway
     return parseSession(await jsonObject(response, 'Device session'));
   }
 
-  async readCanonicalOpenBusinessDay(shopId: ShopId): Promise<BusinessDayId | null> {
+  async readCanonicalOpenBusinessDay(
+    shopId: ShopId,
+    localDayId: BusinessDayId | null = null,
+  ): Promise<CanonicalBusinessDayState> {
     if (isLoopbackHost()) {
       throw new Error('Canonical Business Day authority is unavailable on localhost.');
     }
-    const response = await fetch('/api/operations-sync', {
+    const path =
+      localDayId === null
+        ? '/api/operations-sync'
+        : `/api/operations-sync?localDayId=${encodeURIComponent(localDayId)}`;
+    const response = await fetch(path, {
       method: 'GET',
       credentials: 'same-origin',
       cache: 'no-store',
@@ -196,8 +206,52 @@ export class VercelBrowserRemoteGateway
     if (body['shopId'] !== shopId) {
       throw new Error('Canonical Business Day response belongs to a different shop.');
     }
-    if (body['openDayId'] === null) return null;
-    return parseEntityId<BusinessDayId>(requiredString(body['openDayId'], 'Canonical openDayId'));
+    const rawLocalStatus = body['localDayStatus'];
+    if (rawLocalStatus !== null && rawLocalStatus !== 'OPEN' && rawLocalStatus !== 'CLOSED') {
+      throw new TypeError('Canonical local-day status is invalid.');
+    }
+    const count = body['openWorkerCount'];
+    if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0) {
+      throw new TypeError('Canonical open-worker count is invalid.');
+    }
+    if (body['openDayId'] === null) {
+      if (body['openDay'] !== null)
+        throw new TypeError('Canonical closed day has an OPEN snapshot.');
+      return { day: null, openWorkerCount: count, localDayStatus: rawLocalStatus };
+    }
+    const daySource = object(body['openDay'], 'Canonical open Business Day');
+    const dayId = parseEntityId<BusinessDayId>(
+      requiredString(body['openDayId'], 'Canonical openDayId'),
+    );
+    const dayShopId = parseEntityId<ShopId>(
+      requiredString(daySource['shopId'], 'Canonical day shop'),
+    );
+    if (
+      daySource['id'] !== dayId ||
+      dayShopId !== shopId ||
+      daySource['status'] !== 'OPEN' ||
+      daySource['endedAt'] !== null ||
+      daySource['endedByWorkerId'] !== null
+    ) {
+      throw new TypeError('Canonical Business Day identity or state is inconsistent.');
+    }
+    const lastNumber = daySource['lastAllocatedDisplayOrderNo'];
+    if (typeof lastNumber !== 'number' || !Number.isSafeInteger(lastNumber) || lastNumber < 0) {
+      throw new TypeError('Canonical last order number is invalid.');
+    }
+    const day: OpenBusinessDay = {
+      id: dayId,
+      shopId,
+      status: 'OPEN',
+      startedAt: instant(requiredString(daySource['startedAt'], 'Canonical startedAt')),
+      startedByWorkerId: parseEntityId<WorkerId>(
+        requiredString(daySource['startedByWorkerId'], 'Canonical starting worker'),
+      ),
+      endedAt: null,
+      endedByWorkerId: null,
+      lastAllocatedDisplayOrderNo: lastNumber,
+    };
+    return { day, openWorkerCount: count, localDayStatus: rawLocalStatus };
   }
 
   async bootstrap(pin: string, shopId?: string): Promise<BrowserBootstrapResult> {

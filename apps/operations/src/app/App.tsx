@@ -296,7 +296,7 @@ function ActiveShell({
   readonly busy: boolean;
   readonly error: string | null;
   readonly onSwitch: (pin: string) => Promise<boolean>;
-  readonly onSignOut: () => Promise<void>;
+  readonly onSignOut: () => Promise<'END_DAY_REQUIRED' | 'DONE'>;
   readonly onBusinessDayClosed: () => Promise<void>;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -667,7 +667,16 @@ function ActiveShell({
                   type="button"
                   role="menuitem"
                   disabled={busy}
-                  onClick={() => requestProtectedTransition(() => void onSignOut())}
+                  onClick={() =>
+                    requestProtectedTransition(() => {
+                      void onSignOut().then((action) => {
+                        if (action === 'END_DAY_REQUIRED') {
+                          setMenuOpen(false);
+                          setEndDayOpen(true);
+                        }
+                      });
+                    })
+                  }
                 >
                   Sign out
                 </button>
@@ -925,20 +934,31 @@ export function App({ initialAuthenticatedSession }: AppProps = {}) {
     setScreen({ kind: 'SESSION', session: result.value });
   }
 
-  async function signOut(): Promise<void> {
+  async function signOut(): Promise<'END_DAY_REQUIRED' | 'DONE'> {
     setBusy(true);
     setError(null);
+    try {
+      if ((await client.shouldCloseDayOnSignOut?.()) ?? true) {
+        setBusy(false);
+        return 'END_DAY_REQUIRED';
+      }
+    } catch (cause) {
+      setBusy(false);
+      setError(cause instanceof Error ? cause.message : 'Worker session status is unavailable.');
+      return 'DONE';
+    }
     const result = await client.signOut();
     setBusy(false);
     if (!result.ok) {
       setError(result.error.message);
-      return;
+      return 'DONE';
     }
     if (window.tuxDesktop === undefined) {
       window.location.reload();
-      return;
+      return 'DONE';
     }
     setScreen({ kind: 'SESSION', session: result.value });
+    return 'DONE';
   }
 
   async function refreshAfterEndDay(): Promise<void> {

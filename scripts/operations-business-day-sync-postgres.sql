@@ -173,3 +173,68 @@ begin
   end if;
   raise notice 'PASS: End Day recovery, authenticated canonical read, reopen, worker session, Order persistence/replay, Incognito conflict';
 end $body$;
+
+-- Read the exact local day status after an authorized development Force End Day,
+-- without trusting the browser as shop authority or inventing a replacement day.
+do $body$
+declare
+  d1 uuid := '56000000-0000-4000-8000-000000000001';
+  d2 uuid := '56000000-0000-4000-8000-000000000002';
+  payload jsonb;
+begin
+  payload := public.read_tux_operations_business_day_state_v2(
+    '54000000-0000-4000-8000-000000000002',
+    '55000000-0000-4000-8000-000000000002',
+    d1
+  );
+  if payload ->> 'localDayStatus' is distinct from 'CLOSED'
+    or payload ->> 'openDayId' is distinct from d2::text
+    or payload -> 'openDay' ->> 'id' is distinct from d2::text
+    or payload ->> 'openWorkerCount' is distinct from '1' then
+    raise exception 'Canonical recovery did not return CLOSED local identity and resumed OPEN day: %', payload;
+  end if;
+
+  payload := public.read_tux_operations_business_day_state_v2(
+    '54000000-0000-4000-8000-000000000001',
+    '55000000-0000-4000-8000-000000000001',
+    '56000000-0000-4000-8000-000000000099'
+  );
+  if payload ->> 'localDayStatus' is not null then
+    raise exception 'Unknown offline Business Day was incorrectly reported closed';
+  end if;
+  raise notice 'PASS: canonical day resume, forced-closed browser recovery and unknown offline day';
+end $body$;
+
+-- Two DISTINCT workers must be able to remain signed in across distinct
+-- browsers on a single canonical day; otherwise last-worker Sign Out can
+-- never observe openWorkerCount=2 despite the UI rule.
+insert into public.workers(id,shop_id,display_name,pin_hash)
+values ('53000000-0000-4000-8000-000000000002',
+        '52000000-0000-4000-8000-000000000001','Second worker','hash');
+
+do $body$
+declare
+  s uuid := '52000000-0000-4000-8000-000000000001';
+  d2 uuid := '56000000-0000-4000-8000-000000000002';
+  second_worker uuid := '53000000-0000-4000-8000-000000000002';
+  row jsonb;
+  snapshot jsonb;
+begin
+  row := jsonb_build_object(
+    'id','59000000-0000-4000-8000-000000000002',
+    'shop_id',s,'business_day_id',d2,'worker_id',second_worker,
+    'started_at','2026-10-11T09:05:00Z','ended_at',null
+  );
+  if pg_temp.test_rpc('60000000-0000-4000-8000-000000000008',
+      'WORKER_SIGNED_IN',d2,'worker_sessions',row,'UPSERT',true) <> 'APPLIED' then
+    raise exception 'Second concurrent worker could not sign in';
+  end if;
+  snapshot := public.read_tux_operations_business_day_state_v2(
+    '54000000-0000-4000-8000-000000000001',
+    '55000000-0000-4000-8000-000000000001',d2
+  );
+  if (snapshot ->> 'openWorkerCount') <> '2' then
+    raise exception 'Two distinct workers were not counted: %', snapshot;
+  end if;
+  raise notice 'PASS: cross-browser distinct worker sessions share the canonical OPEN day';
+end $body$;
