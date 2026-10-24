@@ -2,13 +2,7 @@ import type { Instant } from '@tux/domain';
 import type { OutboxSyncSummary } from './outboxSync';
 
 export type SyncHealthState =
-  | 'LOCAL_ONLY'
-  | 'OFFLINE'
-  | 'SYNC_PENDING'
-  | 'SYNCING'
-  | 'SYNCED'
-  | 'SYNC_RETRYING'
-  | 'SYNC_ISSUE';
+  'LOCAL_ONLY' | 'OFFLINE' | 'SYNC_PENDING' | 'SYNCING' | 'SYNCED' | 'SYNC_RETRYING' | 'SYNC_ISSUE';
 
 export interface SyncHealthSnapshot {
   readonly state: SyncHealthState;
@@ -29,7 +23,9 @@ export interface SyncHealthSnapshot {
   readonly detail?: string;
 }
 
-function diagnostics(result: OutboxSyncSummary | Error | null): Pick<
+function diagnostics(
+  result: OutboxSyncSummary | Error | null,
+): Pick<
   SyncHealthSnapshot,
   'pendingCount' | 'lastSuccessfulDeliveryAt' | 'lastError' | 'nextRetryAt'
 > {

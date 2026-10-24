@@ -672,7 +672,8 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
           quarantinedCount: summary?.quarantined_count ?? 0,
           nextAttemptAt: (summary?.next_attempt_at ?? null) as Instant | null,
           lastError: latestFailure?.last_error ?? null,
-          lastSuccessfulDeliveryAt: (summary?.last_successful_delivery_at ?? null) as Instant | null,
+          lastSuccessfulDeliveryAt: (summary?.last_successful_delivery_at ??
+            null) as Instant | null,
         };
       },
       async markDelivered(id: OutboxEventId, deliveredAt: Instant) {
