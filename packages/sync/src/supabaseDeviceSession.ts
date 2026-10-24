@@ -149,7 +149,7 @@ export class SupabaseDeviceSessionManager {
     this.#projectUrl = projectUrl(options.projectUrl);
     this.#publishableKey = required(options.publishableKey, 'Supabase publishable key');
     this.#store = options.store;
-    this.#fetcher = options.fetcher ?? fetch;
+    this.#fetcher = options.fetcher ?? globalThis.fetch.bind(globalThis);
     this.#nowEpochSeconds = options.nowEpochSeconds ?? (() => Math.floor(Date.now() / 1000));
     this.#timeoutMs = timeoutMs(options.timeoutMs);
   }
@@ -317,7 +317,7 @@ export class SupabaseInboundConfigurationProvider {
   }) {
     this.#projectUrl = projectUrl(input.projectUrl);
     this.#session = input.session;
-    this.#fetcher = input.fetcher ?? fetch;
+    this.#fetcher = input.fetcher ?? globalThis.fetch.bind(globalThis);
     this.#timeoutMs = timeoutMs(input.timeoutMs);
   }
 

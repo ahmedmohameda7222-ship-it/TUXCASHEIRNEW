@@ -170,7 +170,7 @@ export class HttpOrderLifecycleFeedTransport implements OrderLifecycleFeedTransp
     this.#endpoint = url.toString();
     this.#headers = options.headers ?? {};
     this.#headerProvider = options.headerProvider ?? null;
-    this.#fetcher = options.fetcher ?? fetch;
+    this.#fetcher = options.fetcher ?? globalThis.fetch.bind(globalThis);
   }
 
   async pull(shopId: ShopId, cursor: string | null): Promise<OrderLifecycleFeedPage> {

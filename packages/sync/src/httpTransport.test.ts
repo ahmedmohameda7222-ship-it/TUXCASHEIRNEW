@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   instant,
   operationsSyncPayloadJson,
@@ -10,6 +10,8 @@ import {
   type WorkerId,
 } from '@tux/domain';
 import { HttpOutboxTransport } from './httpTransport';
+import { HttpInventoryFeedTransport } from './inventoryConvergence';
+import { HttpOrderLifecycleFeedTransport } from './orderLifecycleConvergence';
 import type { OutboxDeliveryError } from './outboxSync';
 
 const SHOP_ID = parseEntityId<ShopId>('12000000-0000-4000-8000-000000000001');
@@ -48,6 +50,69 @@ const event: OutboxEvent = {
 };
 
 describe('HttpOutboxTransport', () => {
+  it('uses the window receiver for native fetch while preserving APPLIED and REPLAY receipts', async () => {
+    const requests: Array<{ url: string; method: string }> = [];
+    function browserFetch(
+      this: typeof globalThis,
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> {
+      if (this !== globalThis) throw new TypeError('Illegal invocation');
+      requests.push({ url: String(input), method: init?.method ?? 'GET' });
+      const status = requests.length === 1 ? 'APPLIED' : 'REPLAY';
+      return Promise.resolve(new Response(JSON.stringify({ status }), { status: 200 }));
+    }
+    vi.stubGlobal('fetch', browserFetch);
+
+    try {
+      const transport = new HttpOutboxTransport({
+        endpoint: 'https://sync.example.test/api/operations-sync',
+      });
+      await transport.deliver(event);
+      await transport.deliver(event);
+      expect(requests).toEqual([
+        { url: 'https://sync.example.test/api/operations-sync', method: 'POST' },
+        { url: 'https://sync.example.test/api/operations-sync', method: 'POST' },
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('uses the browser fetch receiver for inventory and lifecycle GET convergence', async () => {
+    const requests: Array<{ url: string; method: string }> = [];
+    function browserFetch(
+      this: typeof globalThis,
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> {
+      if (this !== globalThis) throw new TypeError('Illegal invocation');
+      const url = String(input);
+      requests.push({ url, method: init?.method ?? 'GET' });
+      const responseBody = url.includes('inventory')
+        ? { shopId: SHOP_ID, items: [], movements: [], costs: [], nextCursor: null, hasMore: false }
+        : { shopId: SHOP_ID, events: [], nextCursor: null, hasMore: false };
+      return Promise.resolve(new Response(JSON.stringify(responseBody), { status: 200 }));
+    }
+    vi.stubGlobal('fetch', browserFetch);
+
+    try {
+      const inventory = new HttpInventoryFeedTransport({
+        endpoint: 'https://sync.example.test/api/operations-inventory',
+      });
+      const lifecycle = new HttpOrderLifecycleFeedTransport({
+        endpoint: 'https://sync.example.test/api/operations-order-lifecycle',
+      });
+      expect((await inventory.pull(SHOP_ID, null)).items).toEqual([]);
+      expect((await lifecycle.pull(SHOP_ID, null)).events).toEqual([]);
+      expect(requests).toHaveLength(2);
+      expect(requests.every((request) => request.method === 'GET')).toBe(true);
+      expect(requests.every((request) => request.url.includes('shopId='))).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('sends immutable event identity and idempotency headers', async () => {
     const calls: Array<Parameters<typeof fetch>> = [];
     const fetcher: typeof fetch = async (...args) => {

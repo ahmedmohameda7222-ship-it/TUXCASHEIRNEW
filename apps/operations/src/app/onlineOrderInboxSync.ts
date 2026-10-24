@@ -187,6 +187,15 @@ async function requestJson(
   }
 
   if (!response.ok) {
+    const errorCode =
+      typeof payload === 'object' && payload !== null && 'error' in payload
+        ? (payload as { error?: unknown }).error
+        : null;
+    if (response.status === 409 && errorCode === 'online_order_reservation_owned') {
+      throw new Error(
+        'This order is reserved by another active Operations device. Claim and release the reservation on the original device, then retry.',
+      );
+    }
     throw new Error(`Online-order Operations remote failed with HTTP ${response.status}.`);
   }
   return payload;
