@@ -512,7 +512,7 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
           .filter(
             (event) =>
               event.id !== origin.id &&
-              event.businessDayId === businessDayId &&
+              event.shopId === origin.shopId &&
               event.deliveredAt === null,
           )
           .map((event) => event.createdAt)

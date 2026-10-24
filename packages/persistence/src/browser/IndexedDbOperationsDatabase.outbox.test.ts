@@ -178,7 +178,6 @@ describe('IndexedDB Business Day outbox ordering', () => {
           'WORKER_SIGNED_IN',
           '2026-10-10T07:59:59.000Z',
         ),
-        businessDayId: resetDayId,
       };
       await db.transaction(async (tx) => {
         await tx.outbox.append(started);
