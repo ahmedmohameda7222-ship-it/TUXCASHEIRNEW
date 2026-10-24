@@ -114,7 +114,9 @@ export interface OutboxRepository {
     quarantinedAt: Instant,
     reason: string,
   ): Promise<number>;
-  recoverMissingBusinessDayStart(businessDayId: BusinessDayId): Promise<boolean>;
+  recoverMissingBusinessDayStart(
+    businessDayId: BusinessDayId,
+  ): Promise<'RECOVERED' | 'PRESENT' | 'MISSING'>;
 }
 
 export interface OperationsTransaction {

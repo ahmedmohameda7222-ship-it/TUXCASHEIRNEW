@@ -53,6 +53,7 @@ import type {
   TuxWorkerUiPreferencesApi,
 } from '@tux/platform-contracts';
 import { startBrowserAutomaticSync } from './automaticSync';
+import { recoverMissingBusinessDayStart } from './businessDayStartRecovery';
 import {
   assertCanonicalDayNotLocallyClosed,
   reconcileCanonicalBusinessDay,
@@ -504,12 +505,13 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           database,
           new HttpOutboxTransport({
             endpoint,
-            onDependencyMissing: async (_event, missingDayId) => {
-              await database.transaction((transaction) =>
-                transaction.outbox.recoverMissingBusinessDayStart(
-                  parseEntityId<BusinessDayId>(missingDayId),
-                ),
-              );
+            onDependencyMissing: async (event, missingDayId) => {
+              await recoverMissingBusinessDayStart({
+                database,
+                businessDayId: parseEntityId<BusinessDayId>(missingDayId),
+                shopId: event.shopId,
+                createUuid: runtime.createUuid,
+              });
             },
           }),
           { now: runtime.now },
