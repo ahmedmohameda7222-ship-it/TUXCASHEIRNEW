@@ -19,6 +19,7 @@ const harness = vi.hoisted(() => ({
   markRemoteConfigured: vi.fn(),
   markSyncStarted: vi.fn(),
   markSyncFinished: vi.fn(),
+  recoverMissingBusinessDayStart: vi.fn(async () => 'RECONSTRUCTED' as const),
 }));
 
 vi.mock('@tux/sync', () => ({
@@ -91,6 +92,10 @@ vi.mock('./syncStatus', () => ({
   },
 }));
 
+vi.mock('./businessDayStartRecovery', () => ({
+  recoverMissingBusinessDayStart: harness.recoverMissingBusinessDayStart,
+}));
+
 import { startBrowserAutomaticSync } from './automaticSync';
 
 const cleanSummary: OutboxSyncSummary = {
@@ -114,6 +119,37 @@ beforeEach(() => {
 });
 
 describe('startBrowserAutomaticSync', () => {
+  it('recovers a previously reported missing Business Day origin immediately at startup', async () => {
+    const shopId = '14000000-0000-4000-8000-000000000001';
+    const businessDayId = '7a73d78c-7f7f-4288-aa41-ef7a5b3be0b6';
+    const database = {
+      transaction: async (work: (transaction: unknown) => Promise<unknown>) =>
+        work({
+          outbox: {
+            getDeliveryStatus: async () => ({
+              pendingCount: 5,
+              quarantinedCount: 0,
+              nextAttemptAt: '2026-10-24T23:37:38.251Z',
+              lastError: `Business Day ${businessDayId} has not materialized. Retry after the original Business Day start event is synchronized; preserve the outbox.`,
+              lastSuccessfulDeliveryAt: null,
+            }),
+          },
+        }),
+    } as unknown as OperationsDatabase;
+
+    startBrowserAutomaticSync({
+      database,
+      now: () => '2026-10-24T23:33:00.000Z' as Instant,
+      shopId: shopId as never,
+    });
+
+    await vi.waitFor(() => expect(harness.recoverMissingBusinessDayStart).toHaveBeenCalledTimes(1));
+    expect(harness.recoverMissingBusinessDayStart).toHaveBeenCalledWith(
+      expect.objectContaining({ database, businessDayId, shopId }),
+    );
+    expect(harness.schedulerTriggered).toHaveBeenCalledTimes(1);
+  });
+
   it('feeds real scheduler lifecycle events into the browser sync status store', () => {
     const database = {} as OperationsDatabase;
     const now = () => '2026-08-24T06:00:00.000Z' as Instant;
