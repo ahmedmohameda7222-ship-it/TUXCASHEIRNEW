@@ -1,4 +1,4 @@
-export const INDEXED_DB_VERSION = 7;
+export const INDEXED_DB_VERSION = 8;
 
 export const INDEXED_DB_STORES = [
   'shops',
@@ -281,6 +281,27 @@ const MIGRATIONS: readonly IndexedDbMigration[] = [
     name: 'order_lifecycle_convergence_state',
     apply(database) {
       database.createObjectStore('orderLifecycleSyncCursor', { keyPath: 'shopId' });
+    },
+  },
+  {
+    version: 8,
+    name: 'remove_authorized_prelaunch_quarantine_fixtures',
+    apply(_database, transaction) {
+      const outbox = transaction.objectStore('outboxEvents');
+      const cursorRequest = outbox.openCursor();
+      cursorRequest.addEventListener('success', () => {
+        const cursor = cursorRequest.result;
+        if (cursor === null) return;
+        const value = cursor.value as Record<string, unknown>;
+        if (
+          typeof value['quarantinedAt'] === 'string' &&
+          typeof value['createdAt'] === 'string' &&
+          value['createdAt'] < '2026-10-24T14:00:00.000Z'
+        ) {
+          cursor.delete();
+        }
+        cursor.continue();
+      });
     },
   },
 ];

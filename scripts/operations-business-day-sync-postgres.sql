@@ -278,3 +278,66 @@ begin
   end if;
   raise notice 'PASS: 100 same-worker browser sessions plus a second worker share one canonical day';
 end $body$;
+
+-- Exit classification is a single server-side critical section. Two browsers
+-- cannot both observe "another session" and then independently leave the day
+-- orphaned OPEN with zero sessions. Stale crashed browsers also stop blocking
+-- the final live session after their heartbeat lease expires.
+do $body$
+declare
+  s uuid := '52000000-0000-4000-8000-000000000001';
+  d2 uuid := '56000000-0000-4000-8000-000000000002';
+  w uuid := '53000000-0000-4000-8000-000000000001';
+  first_session uuid := '59000000-0000-4000-8000-000000000101';
+  final_session uuid := '59000000-0000-4000-8000-000000000102';
+  stale_session uuid := '59000000-0000-4000-8000-000000000103';
+  result jsonb;
+begin
+  update public.worker_sessions
+  set ended_at = greatest(started_at, '2026-10-24T13:00:00Z'::timestamptz)
+  where business_day_id = d2 and ended_at is null;
+
+  insert into public.worker_sessions(
+    id, shop_id, business_day_id, worker_id, device_id, started_at, last_seen_at, ended_at
+  ) values
+    (first_session, s, d2, w, '55000000-0000-4000-8000-000000000001',
+      '2026-10-24T13:01:00Z', clock_timestamp(), null),
+    (final_session, s, d2, w, '55000000-0000-4000-8000-000000000002',
+      '2026-10-24T13:01:01Z', clock_timestamp(), null);
+
+  result := public.prepare_tux_operations_worker_exit_v1(
+    '54000000-0000-4000-8000-000000000001',
+    '55000000-0000-4000-8000-000000000001', d2, first_session
+  );
+  if result ->> 'decision' <> 'SIGNED_OUT'
+    or result ->> 'remainingOpenSessionCount' <> '1' then
+    raise exception 'First concurrent exit was not atomically signed out: %', result;
+  end if;
+
+  result := public.prepare_tux_operations_worker_exit_v1(
+    '54000000-0000-4000-8000-000000000002',
+    '55000000-0000-4000-8000-000000000002', d2, final_session
+  );
+  if result ->> 'decision' <> 'END_DAY_REQUIRED'
+    or result ->> 'remainingOpenSessionCount' <> '0'
+    or (select ended_at from public.worker_sessions where id = final_session) is not null then
+    raise exception 'Final concurrent exit did not retain its session for End Day: %', result;
+  end if;
+
+  insert into public.worker_sessions(
+    id, shop_id, business_day_id, worker_id, device_id, started_at, last_seen_at, ended_at
+  ) values (
+    stale_session, s, d2, w, '55000000-0000-4000-8000-000000000001',
+    clock_timestamp() - interval '10 minutes',
+    clock_timestamp() - interval '10 minutes', null
+  );
+  result := public.prepare_tux_operations_worker_exit_v1(
+    '54000000-0000-4000-8000-000000000002',
+    '55000000-0000-4000-8000-000000000002', d2, final_session
+  );
+  if result ->> 'decision' <> 'END_DAY_REQUIRED'
+    or (select ended_at from public.worker_sessions where id = stale_session) is null then
+    raise exception 'Stale crashed session still blocked final End Day: %', result;
+  end if;
+  raise notice 'PASS: atomic concurrent exit and stale-session lease recovery';
+end $body$;

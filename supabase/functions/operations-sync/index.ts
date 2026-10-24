@@ -122,7 +122,10 @@ Deno.serve(async (request) => {
     // A mismatched OPEN identity is a blocked dependency, not a transient generic 500.
     // Keep the immutable local event in the outbox so the origin can deliver End Day first.
     const openConflict = message.match(/TUX_BUSINESS_DAY_OPEN_CONFLICT:([0-9a-f-]{36})/i);
-    if (openConflict || (error.code === '23505' && message.includes('business_days_one_open_per_shop_idx'))) {
+    if (
+      openConflict ||
+      (error.code === '23505' && message.includes('business_days_one_open_per_shop_idx'))
+    ) {
       return jsonResponse(423, {
         error: 'business_day_open_conflict',
         canonicalDayId: openConflict?.[1] ?? null,
@@ -130,19 +133,24 @@ Deno.serve(async (request) => {
       });
     }
     const missingDay = message.match(/TUX_BUSINESS_DAY_DEPENDENCY_MISSING:([0-9a-f-]{36})/i);
-    if (missingDay || (error.code === '23503' &&
-       (message.includes('worker_sessions_business_day_id_fkey') ||
-        message.includes('worker_sessions_day_same_shop_fk') ||
-        message.includes('orders_business_day_id_fkey')))) {
+    if (
+      missingDay ||
+      (error.code === '23503' &&
+        (message.includes('worker_sessions_business_day_id_fkey') ||
+          message.includes('worker_sessions_day_same_shop_fk') ||
+          message.includes('orders_business_day_id_fkey')))
+    ) {
       return jsonResponse(425, {
         error: 'business_day_dependency_not_ready',
         missingDayId: missingDay?.[1] ?? null,
         recovery: 'deliver_original_business_day_started_event_first',
       });
     }
-    if (message.includes('TUX_BUSINESS_DAY_SHOP_CONFLICT') ||
-        message.includes('TUX_BUSINESS_DAY_REOPEN_FORBIDDEN') ||
-        message.includes('TUX_BUSINESS_DAY_ALREADY_CLOSED')) {
+    if (
+      message.includes('TUX_BUSINESS_DAY_SHOP_CONFLICT') ||
+      message.includes('TUX_BUSINESS_DAY_REOPEN_FORBIDDEN') ||
+      message.includes('TUX_BUSINESS_DAY_ALREADY_CLOSED')
+    ) {
       return jsonResponse(409, { error: 'business_day_identity_conflict' });
     }
     if (message.includes('TUX_DEVICE_NOT_AUTHORIZED')) {
@@ -180,6 +188,25 @@ Deno.serve(async (request) => {
     }
     console.error('operations-sync RPC failed', error);
     return jsonResponse(500, { error: 'remote_materialization_failed' });
+  }
+
+  const source = envelope as Record<string, unknown>;
+  if (source.eventType === 'WORKER_SIGNED_IN' || source.eventType === 'WORKER_SWITCHED') {
+    const payload = source.payload as Record<string, unknown>;
+    const workerSession = payload.session as Record<string, unknown>;
+    const { error: touchError } = await serviceClient.rpc(
+      'touch_tux_operations_worker_session_v1',
+      {
+        p_auth_user_id: userData.user.id,
+        p_device_id: deviceId,
+        p_business_day_id: source.businessDayId,
+        p_worker_session_id: workerSession.id,
+      },
+    );
+    if (touchError) {
+      console.error('operations-sync worker session lease attach failed', touchError);
+      return jsonResponse(503, { error: 'worker_session_lease_unavailable' });
+    }
   }
 
   return jsonResponse(200, { status: data === 'REPLAY' ? 'REPLAY' : 'APPLIED' });

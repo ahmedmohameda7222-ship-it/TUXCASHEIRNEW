@@ -60,6 +60,34 @@ afterEach(() => {
 });
 
 describe('operations sync gateway', () => {
+  it('proxies the atomic worker-session exit command as authenticated same-origin POST', async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ decision: 'SIGNED_OUT', remainingOpenSessionCount: 1 }), {
+        status: 200,
+      }),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    const payload = {
+      action: 'PREPARE_EXIT',
+      businessDayId: '70000000-0000-4000-8000-000000000001',
+      workerSessionId: '80000000-0000-4000-8000-000000000001',
+    };
+    const captured = responseCapture();
+
+    await proxyAuthenticatedFunction(
+      { ...request(payload), url: '/api/operations-session-exit' } as GatewayRequest,
+      captured.response,
+      'operations-session-exit',
+    );
+
+    expect(captured.status()).toBe(200);
+    expect(captured.json()).toEqual({ decision: 'SIGNED_OUT', remainingOpenSessionCount: 1 });
+    const [url, init] = fetcher.mock.calls[0] as [URL, RequestInit];
+    expect(url.toString()).toBe('https://project.supabase.co/functions/v1/operations-session-exit');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual(payload);
+  });
+
   it('proxies authenticated read-only canonical day lookup without posting an event', async () => {
     const fetcher = vi
       .fn()

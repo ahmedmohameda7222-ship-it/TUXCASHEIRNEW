@@ -42,6 +42,9 @@ verify_jwt = true
 [functions.operations-order-rewards]
 verify_jwt = true
 
+[functions.operations-session-exit]
+verify_jwt = true
+
 [functions.operations-sync]
 verify_jwt = true
 

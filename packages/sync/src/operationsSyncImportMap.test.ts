@@ -7,7 +7,7 @@ const reviewedSha = 'f26b4eb040050226412668d84461dd4697d1069b';
 const rawBase = 'https://raw.githubusercontent.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/';
 
 describe('operations-sync deployment dependency provenance', () => {
-  it.each(['operations-order-lifecycle', 'operations-order-rewards'])(
+  it.each(['operations-order-lifecycle', 'operations-order-rewards', 'operations-session-exit'])(
     'keeps %s independently deployable with an explicit Supabase import map',
     (functionName) => {
       const mapUrl = new URL(

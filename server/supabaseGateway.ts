@@ -450,7 +450,8 @@ async function callSupabaseFunction(
     | 'operations-sync'
     | 'operations-inventory'
     | 'operations-order-lifecycle'
-    | 'operations-order-rewards',
+    | 'operations-order-rewards'
+    | 'operations-session-exit',
   request: GatewayRequest,
   body: string | null,
 ): Promise<Response> {
@@ -468,6 +469,7 @@ async function callSupabaseFunction(
   return fetch(target, {
     method:
       functionName === 'operations-order-rewards' ||
+      functionName === 'operations-session-exit' ||
       (functionName === 'operations-sync' && request.method === 'POST')
         ? 'POST'
         : 'GET',
@@ -490,10 +492,12 @@ export async function proxyAuthenticatedFunction(
     | 'operations-sync'
     | 'operations-inventory'
     | 'operations-order-lifecycle'
-    | 'operations-order-rewards',
+    | 'operations-order-rewards'
+    | 'operations-session-exit',
 ): Promise<void> {
   const expectedMethod =
     functionName === 'operations-order-rewards' ||
+    functionName === 'operations-session-exit' ||
     (functionName === 'operations-sync' && request.method !== 'GET')
       ? 'POST'
       : 'GET';
