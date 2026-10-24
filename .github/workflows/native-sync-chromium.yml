@@ -20,7 +20,7 @@ jobs:
   browser-sync:
     name: Real Chromium outbox POST and receipt acceptance
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 3
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
