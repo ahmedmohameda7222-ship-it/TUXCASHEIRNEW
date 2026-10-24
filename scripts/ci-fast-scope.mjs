@@ -3,8 +3,7 @@ import { appendFileSync } from 'node:fs';
 
 const staticPaths =
   /^(?:\.github\/workflows\/|api\/|server\/|apps\/|packages\/|e2e\/|scripts\/ci-fast-|(?:playwright|package|tsconfig)[^/]*\.)/;
-const unitPaths =
-  /^(?:api|server|apps|packages|supabase\/functions|scripts|e2e)\/.*\.(?:[cm]?[jt]sx?)$/;
+const unitPaths = /^(?:api|server|apps|packages)\/.*\.(?:[cm]?[jt]sx?)$/;
 const typesPaths =
   /^(?:api|server|apps|packages|e2e)\/.*\.[cm]?[jt]sx?$|^tsconfig.*\.json$|^package(?:-lock)?\.json$/;
 const operationsPaths =

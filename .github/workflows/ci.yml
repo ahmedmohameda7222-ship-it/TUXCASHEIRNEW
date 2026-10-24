@@ -120,12 +120,12 @@ jobs:
           mapfile -d '' files < <(git diff --diff-filter=ACMR --name-only -z "$base" "$TUX_HEAD_SHA")
           related=()
           for file in "${files[@]}"; do
-            if [[ -f "$file" && "$file" =~ ^(api|server|apps|packages|supabase/functions|scripts|e2e)/.*\.(ts|tsx|js|jsx|mjs|cjs)$ ]]; then
+            if [[ -f "$file" && "$file" =~ ^(api|server|apps|packages)/.*\.(ts|tsx|js|jsx|mjs|cjs)$ ]]; then
               related+=("$file")
             fi
           done
           if (( ${#related[@]} )); then
-            npx vitest related --run --passWithNoTests --exclude 'e2e/**' --exclude 'scripts/monorepo-architecture-guard.test.mjs' --exclude 'scripts/catalog-architecture-guard.test.mjs' "${related[@]}"
+            npx vitest related --run --exclude 'e2e/**' --exclude 'scripts/monorepo-architecture-guard.test.mjs' --exclude 'scripts/catalog-architecture-guard.test.mjs' "${related[@]}"
           fi
 
   types:

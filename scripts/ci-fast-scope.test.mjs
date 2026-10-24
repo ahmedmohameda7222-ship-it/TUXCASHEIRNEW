@@ -36,12 +36,13 @@ test('database migrations run only the migration job', () => {
 test('Supabase function updates trigger Edge checking', () => {
   const scope = classifyFiles(['supabase/functions/operations-sync/index.ts']);
   assert.equal(scope.edge, true);
-  assert.equal(scope.unit, true);
+  assert.equal(scope.unit, false);
 });
 
 test('E2E TypeScript changes must typecheck even without app changes', () => {
   const scope = classifyFiles(['e2e/operations-branch-login.e2e.ts']);
   assert.equal(scope.types, true);
+  assert.equal(scope.unit, false);
 });
 
 test('Admin order and shared sync changes are both in scope', () => {
@@ -57,4 +58,14 @@ test('Admin order and shared sync changes are both in scope', () => {
 test('Deleting historical screenshots leaves runtime jobs disabled', () => {
   const scope = classifyFiles(['artifacts/tux-final/matrix/alerts.png']);
   assert.deepEqual(Object.values(scope).filter(Boolean), []);
+});
+
+test('Node test and CI helper files never masquerade as Vitest suites', () => {
+  const scope = classifyFiles(['scripts/ci-fast-scope.test.mjs']);
+  assert.equal(scope.unit, false);
+});
+
+test('Runtime changes select the Vitest unit job', () => {
+  const scope = classifyFiles(['apps/operations/src/app/automaticSync.ts']);
+  assert.equal(scope.unit, true);
 });
