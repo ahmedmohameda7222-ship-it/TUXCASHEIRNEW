@@ -30,7 +30,7 @@ export async function reconcileCanonicalBusinessDay(input: {
     throw new Error('Canonical Business Day response belongs to a different shop.');
   }
   const local = await input.getLocalOpenDay();
-  if (canonical.day !== null && canonical.day.id !== local?.id) {
+  if (canonical.day !== null && (canonical.day.id !== local?.id || canonical.day.lastAllocatedDisplayOrderNo > (local?.lastAllocatedDisplayOrderNo ?? -1))) {
     await input.adoptCanonicalDay(canonical.day, local);
   }
   return canonical.openWorkerCount;
