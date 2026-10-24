@@ -104,24 +104,23 @@ test('native Chromium POST accepts APPLIED and REPLAY receipts', async ({ page }
 
   await page.goto('/__tux_native_sync_probe__');
   await page.addScriptTag({ content: source });
-  await page.evaluate(
-    async (serializedEvent) => {
-      const modules = (window as unknown as {
+  await page.evaluate(async (serializedEvent) => {
+    const modules = (
+      window as unknown as {
         TuxNativeSyncProbe: {
           HttpOutboxTransport: new (options: { endpoint: string }) => {
             deliver(event: unknown): Promise<void>;
           };
         };
-      }).TuxNativeSyncProbe;
-      const transport = new modules.HttpOutboxTransport({
-        endpoint: `${location.origin}/api/operations-sync`,
-      });
-      const outbox: unknown = JSON.parse(serializedEvent);
-      await transport.deliver(outbox);
-      await transport.deliver(outbox);
-    },
-    JSON.stringify(event),
-  );
+      }
+    ).TuxNativeSyncProbe;
+    const transport = new modules.HttpOutboxTransport({
+      endpoint: `${location.origin}/api/operations-sync`,
+    });
+    const outbox: unknown = JSON.parse(serializedEvent);
+    await transport.deliver(outbox);
+    await transport.deliver(outbox);
+  }, JSON.stringify(event));
 
   expect(requests).toHaveLength(2);
   for (const request of requests) {
