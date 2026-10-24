@@ -263,6 +263,27 @@ describe('HttpOutboxTransport', () => {
     },
   );
 
+  it('requests recovery of the exact missing Business Day start before retrying a 425', async () => {
+    const recovered: string[] = [];
+    const transport = new HttpOutboxTransport({
+      endpoint: 'https://sync.example.test/events',
+      onDependencyMissing: async (_event, businessDayId) => {
+        recovered.push(businessDayId);
+      },
+      fetcher: (async () =>
+        new Response(
+          JSON.stringify({ error: 'business_day_dependency_not_ready', missingDayId: DAY_ID }),
+          { status: 425 },
+        )) as typeof fetch,
+    });
+
+    await expect(transport.deliver(event)).rejects.toMatchObject({
+      kind: 'TRANSIENT',
+      status: 425,
+    });
+    expect(recovered).toEqual([DAY_ID]);
+  });
+
   it('quarantines explicit permanent day identity conflicts with their actionable cause', async () => {
     const transport = new HttpOutboxTransport({
       endpoint: 'https://sync.example.test/events',

@@ -94,6 +94,65 @@ describe('IndexedDB Business Day outbox ordering', () => {
     }
   });
 
+  it('requeues only the quarantined start for the exact missing Business Day', async () => {
+    const name = 'tux-outbox-missing-day-recovery-' + crypto.randomUUID();
+    names.add(name);
+    const db = new IndexedDbOperationsDatabase(name);
+    await db.initialize();
+    try {
+      const missingDayId = parseEntityId<BusinessDayId>('35000000-0000-4000-8000-000000000001');
+      const otherDayId = parseEntityId<BusinessDayId>('35000000-0000-4000-8000-000000000002');
+      const missing = {
+        ...outbox(
+          '33000000-0000-4000-8000-000000000011',
+          A,
+          'BUSINESS_DAY_STARTED',
+          '2026-10-10T08:00:00.000Z',
+        ),
+        businessDayId: missingDayId,
+      };
+      const other = {
+        ...outbox(
+          '33000000-0000-4000-8000-000000000012',
+          A,
+          'BUSINESS_DAY_STARTED',
+          '2026-10-10T08:00:01.000Z',
+        ),
+        businessDayId: otherDayId,
+      };
+      await db.transaction(async (tx) => {
+        await tx.outbox.append(missing);
+        await tx.outbox.append(other);
+        await tx.outbox.quarantine(
+          missing.id,
+          instant('2026-10-10T08:01:00.000Z'),
+          'legacy HTTP 400',
+        );
+        await tx.outbox.quarantine(
+          other.id,
+          instant('2026-10-10T08:01:00.000Z'),
+          'unrelated evidence',
+        );
+      });
+
+      await expect(
+        db.transaction((tx) => tx.outbox.recoverMissingBusinessDayStart(missingDayId)),
+      ).resolves.toBe(true);
+      expect(
+        (
+          await db.transaction((tx) =>
+            tx.outbox.listPending(instant('2026-10-10T09:00:00.000Z'), 50, A),
+          )
+        ).map((event) => event.id),
+      ).toEqual([missing.id]);
+      expect((await db.transaction((tx) => tx.outbox.getDeliveryStatus(A))).quarantinedCount).toBe(
+        1,
+      );
+    } finally {
+      await db.close();
+    }
+  });
+
   it('does not skip a delayed day start and deliver a dependent worker session', async () => {
     const name = 'tux-business-day-order-' + crypto.randomUUID();
     names.add(name);

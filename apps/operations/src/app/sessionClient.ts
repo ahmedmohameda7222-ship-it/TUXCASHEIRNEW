@@ -24,7 +24,9 @@ import {
 import {
   flattenWorkerMenuLayoutProductOrder,
   instant,
+  parseEntityId,
   parseWorkerUiPreferences,
+  type BusinessDayId,
   type ShopId,
   type WorkerMenuLayout,
   type WorkerUiPreferences,
@@ -500,7 +502,16 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         const endpoint = new URL('/api/operations-sync', window.location.origin).toString();
         const service = new OutboxSyncService(
           database,
-          new HttpOutboxTransport({ endpoint }),
+          new HttpOutboxTransport({
+            endpoint,
+            onDependencyMissing: async (_event, missingDayId) => {
+              await database.transaction((transaction) =>
+                transaction.outbox.recoverMissingBusinessDayStart(
+                  parseEntityId<BusinessDayId>(missingDayId),
+                ),
+              );
+            },
+          }),
           { now: runtime.now },
           shopId,
         );
