@@ -28,6 +28,55 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe('SupabaseDeviceSessionManager', () => {
+
+  it('binds native browser fetch for enrollment and configuration while leaving injected mocks untouched', async () => {
+    const store = new MemoryStore();
+    const targets: string[] = [];
+    vi.stubGlobal('fetch', function receiverCheckedFetch(
+      this: typeof globalThis,
+      input: RequestInfo | URL,
+    ): Promise<Response> {
+      if (this !== globalThis) throw new TypeError('Illegal invocation');
+      const url = String(input);
+      targets.push(url);
+      return Promise.resolve(
+        jsonResponse(
+          url.includes('device-enroll')
+            ? {
+                shopId: SHOP_ID,
+                deviceId: DEVICE_ID,
+                accessToken: 'browser-token',
+                refreshToken: 'browser-refresh',
+                expiresAt: 10_000,
+              }
+            : { version: 1, bundle: { shopId: SHOP_ID } },
+        ),
+      );
+    } as typeof fetch);
+    try {
+      const manager = new SupabaseDeviceSessionManager({
+        projectUrl: 'https://example.supabase.co',
+        publishableKey: 'sb_publishable_test',
+        store,
+        nowEpochSeconds: () => 1_000,
+      });
+      await manager.enroll({
+        enrollmentCode: 'a'.repeat(64),
+        deviceId: DEVICE_ID,
+      });
+      const provider = new SupabaseInboundConfigurationProvider({
+        projectUrl: 'https://example.supabase.co',
+        session: manager,
+      });
+      expect(await provider.discoverVersion(SHOP_ID)).toBe(1);
+      expect(targets).toHaveLength(2);
+      expect(targets[0]).toContain('/functions/v1/device-enroll');
+      expect(targets[1]).toContain('/functions/v1/operations-config');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('enrolls once and persists the returned device session', async () => {
     const store = new MemoryStore();
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
