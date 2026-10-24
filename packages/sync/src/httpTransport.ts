@@ -157,6 +157,28 @@ export class HttpOutboxTransport implements OutboxTransport {
         }
         throw responseFailure(response.status);
       }
+
+      let receipt: unknown;
+      try {
+        receipt = await response.json();
+      } catch {
+        throw new OutboxDeliveryError(
+          'Remote outbox endpoint did not provide a verified delivery receipt.',
+          'TRANSIENT',
+          response.status,
+        );
+      }
+      const status =
+        typeof receipt === 'object' && receipt !== null && 'status' in receipt
+          ? (receipt as { readonly status?: unknown }).status
+          : null;
+      if (status !== 'APPLIED' && status !== 'REPLAY') {
+        throw new OutboxDeliveryError(
+          'Remote outbox endpoint did not provide a verified delivery receipt.',
+          'TRANSIENT',
+          response.status,
+        );
+      }
     } catch (cause) {
       if (cause instanceof OutboxDeliveryError) throw cause;
       if (controller.signal.aborted) {

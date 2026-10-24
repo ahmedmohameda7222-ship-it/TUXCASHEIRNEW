@@ -32,6 +32,7 @@
 ### Task 1: Durable delivery diagnostics and retry classification
 
 **Files:**
+
 - Modify: `packages/persistence/src/contracts.ts`
 - Modify: `packages/persistence/src/browser/IndexedDbOperationsDatabase.ts`
 - Modify: `packages/persistence/src/sqlite/SqliteOperationsDatabase.ts`
@@ -41,6 +42,7 @@
 - Test: `packages/sync/src/outboxSync.test.ts`
 
 **Interfaces:**
+
 - Produces: durable active-shop queue diagnostics on `OutboxSyncSummary`.
 - Produces: retryable authentication failures while preserving permanent protocol quarantine.
 
@@ -53,6 +55,7 @@
 ### Task 2: Reconnection and truthful browser status
 
 **Files:**
+
 - Modify: `packages/sync/src/scheduler.ts`
 - Modify: `packages/sync/src/syncHealth.ts`
 - Modify: `apps/operations/src/app/automaticSync.ts`
@@ -65,6 +68,7 @@
 - Test: `apps/operations/src/app/SyncStatusIndicator.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `OutboxSyncSummary` queue diagnostics from Task 1.
 - Produces: scheduler `trigger()` and safe UI diagnostics fields.
 
@@ -77,11 +81,13 @@
 ### Task 3: Gateway-to-Admin visibility regression coverage
 
 **Files:**
+
 - Test/modify as evidence requires: `server/supabaseGateway.ts`
 - Test/modify as evidence requires: `supabase/functions/operations-sync/index.ts`
 - Test: focused gateway/materializer/Admin order-store tests.
 
 **Interfaces:**
+
 - Consumes: unchanged sync envelope event ID/idempotency key.
 - Produces: evidence that a retry reaches canonical materialization and the Admin order query surface.
 
@@ -90,4 +96,3 @@
 - [ ] Make only evidence-backed gateway/Edge changes, if required.
 - [ ] Run all task-targeted tests, TypeScript checks for touched workspaces, ESLint/Prettier on touched files, and a production Operations build.
 - [ ] Commit the task and prepare a Draft PR without deploying.
-

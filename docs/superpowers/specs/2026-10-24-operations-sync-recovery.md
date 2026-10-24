@@ -12,4 +12,3 @@ Requirements:
 - Diagnostics expose pending count, last successful delivery, last error, and retry timing/state without secrets or customer payloads.
 - Focused tests cover failed delivery, retry scheduling, reconnect recovery, pending Orders, and the canonical order row consumed by Admin.
 - Do not change Branch + PIN UX, deploy, merge, clear IndexedDB, or modify live data.
-
