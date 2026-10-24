@@ -508,16 +508,31 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
           )
           .sort((left, right) => left.createdAt.localeCompare(right.createdAt))[0];
         if (origin === undefined) return 'MISSING';
+        const earliestDependentAt = candidates
+          .filter(
+            (event) =>
+              event.id !== origin.id &&
+              event.businessDayId === businessDayId &&
+              event.deliveredAt === null,
+          )
+          .map((event) => event.createdAt)
+          .sort()[0];
+        const recoveredCreatedAt =
+          earliestDependentAt !== undefined && origin.createdAt >= earliestDependentAt
+            ? (new Date(Date.parse(earliestDependentAt) - 1).toISOString() as Instant)
+            : origin.createdAt;
         if (
           origin.deliveredAt === null &&
           origin.quarantinedAt === null &&
-          origin.nextAttemptAt === null
+          origin.nextAttemptAt === null &&
+          recoveredCreatedAt === origin.createdAt
         ) {
           return 'PRESENT';
         }
         await requestResult(
           objectStore.put({
             ...origin,
+            createdAt: recoveredCreatedAt,
             attemptCount: 0,
             nextAttemptAt: null,
             lastError: null,

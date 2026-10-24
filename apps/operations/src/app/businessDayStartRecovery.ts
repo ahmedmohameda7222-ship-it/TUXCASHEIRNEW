@@ -52,6 +52,7 @@ export async function recoverMissingBusinessDayStart(input: {
       lastError: null,
       deliveredAt: null,
     });
+    await transaction.outbox.recoverMissingBusinessDayStart(input.businessDayId);
     return 'RECONSTRUCTED';
   });
 }
