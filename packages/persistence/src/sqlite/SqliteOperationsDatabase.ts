@@ -823,15 +823,29 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
           readonly next_attempt_at?: string | null;
           readonly delivered_at?: string | null;
         };
+        const earliestDependent = database
+          .prepare(
+            `SELECT MIN(created_at) AS created_at
+             FROM outbox_events
+             WHERE business_day_id = ? AND id <> ? AND delivered_at IS NULL`,
+          )
+          .get(businessDayId, event.id) as { readonly created_at?: string | null } | undefined;
+        const earliestDependentAt = earliestDependent?.created_at ?? null;
+        const recoveredCreatedAt =
+          earliestDependentAt !== null && event.createdAt >= earliestDependentAt
+            ? (new Date(Date.parse(earliestDependentAt) - 1).toISOString() as Instant)
+            : event.createdAt;
         if (
           metadata.delivered_at == null &&
           metadata.quarantined_at == null &&
-          metadata.next_attempt_at == null
+          metadata.next_attempt_at == null &&
+          recoveredCreatedAt === event.createdAt
         ) {
           return 'PRESENT';
         }
         const recovered: OutboxEvent = {
           ...event,
+          createdAt: recoveredCreatedAt,
           attemptCount: 0,
           nextAttemptAt: null,
           lastError: null,
@@ -843,10 +857,10 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
              SET attempt_count = 0, next_attempt_at = NULL, last_error = NULL,
                  delivered_at = NULL,
                  quarantined_at = NULL, permanent_failure_reason = NULL,
-                 blocked_by_event_id = NULL, payload_json = ?
+                 blocked_by_event_id = NULL, created_at = ?, payload_json = ?
              WHERE id = ?`,
           )
-          .run(serialize(recovered), event.id);
+          .run(recoveredCreatedAt, serialize(recovered), event.id);
         return 'RECOVERED';
       },
     },

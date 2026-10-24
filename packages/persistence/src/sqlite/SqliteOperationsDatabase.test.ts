@@ -109,8 +109,16 @@ describe('SqliteOperationsDatabase', () => {
     const database = new SqliteOperationsDatabase(':memory:');
     await database.initialize();
     await seedFoundation(database);
+    const dependent = {
+      ...outboxEvent(),
+      id: parseEntityId<OutboxEventId>('44444444-4444-4444-8444-444444444445'),
+      eventType: 'WORKER_SIGNED_IN' as const,
+      idempotencyKey: 'worker-signed-in-before-day-start',
+      createdAt: instant('2026-08-17T12:59:59Z'),
+    };
     await database.transaction(async (transaction) => {
       await transaction.outbox.append(outboxEvent());
+      await transaction.outbox.append(dependent);
       await transaction.outbox.markDelivered(outboxId, instant('2026-08-17T13:01:00Z'));
     });
 
@@ -120,10 +128,12 @@ describe('SqliteOperationsDatabase', () => {
       ),
     ).resolves.toBe('RECOVERED');
     expect(
-      await database.transaction((transaction) =>
-        transaction.outbox.listPending(instant('2026-08-17T14:00:00Z'), 10, shopId),
-      ),
-    ).toEqual([outboxEvent()]);
+      (
+        await database.transaction((transaction) =>
+          transaction.outbox.listPending(instant('2026-08-17T14:00:00Z'), 10, shopId),
+        )
+      ).map((event) => event.id),
+    ).toEqual([outboxId, dependent.id]);
     await database.close();
   });
 

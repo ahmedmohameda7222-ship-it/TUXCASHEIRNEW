@@ -171,8 +171,18 @@ describe('IndexedDB Business Day outbox ordering', () => {
         ),
         businessDayId: resetDayId,
       };
+      const dependent = {
+        ...outbox(
+          '33000000-0000-4000-8000-000000000014',
+          A,
+          'WORKER_SIGNED_IN',
+          '2026-10-10T07:59:59.000Z',
+        ),
+        businessDayId: resetDayId,
+      };
       await db.transaction(async (tx) => {
         await tx.outbox.append(started);
+        await tx.outbox.append(dependent);
         await tx.outbox.markDelivered(started.id, instant('2026-10-10T08:01:00.000Z'));
       });
 
@@ -185,7 +195,7 @@ describe('IndexedDB Business Day outbox ordering', () => {
             tx.outbox.listPending(instant('2026-10-10T09:00:00.000Z'), 50, A),
           )
         ).map((event) => event.id),
-      ).toEqual([started.id]);
+      ).toEqual([started.id, dependent.id]);
     } finally {
       await db.close();
     }
