@@ -39,3 +39,11 @@ export async function reconcileCanonicalBusinessDay(input: {
   }
   return canonical.openWorkerCount;
 }
+
+/** Only a non-final worker may sign out without closing the Business Day. */
+export function requiresEndDayOnWorkerExit(openWorkerCount: number): boolean {
+  if (!Number.isSafeInteger(openWorkerCount) || openWorkerCount < 0) {
+    throw new Error('Canonical open-worker count is invalid.');
+  }
+  return openWorkerCount <= 1;
+}

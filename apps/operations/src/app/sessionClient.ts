@@ -51,7 +51,7 @@ import type {
   TuxWorkerUiPreferencesApi,
 } from '@tux/platform-contracts';
 import { startBrowserAutomaticSync } from './automaticSync';
-import { reconcileCanonicalBusinessDay } from './businessDayPreflight';
+import { reconcileCanonicalBusinessDay, requiresEndDayOnWorkerExit } from './businessDayPreflight';
 import { VercelBrowserRemoteGateway } from './browserRemote';
 import { selectBrowserShop } from './browserShopScope';
 import { fenceStaleBrowserSession } from './browserSessionScope';
@@ -641,7 +641,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         if (!state.ok || state.value.status !== 'ACTIVE') return true;
         const canonical = await remoteGateway.readCanonicalOpenBusinessDay(state.value.shopId);
         if (canonical.day?.id !== state.value.businessDayId) return true;
-        return canonical.openWorkerCount <= 1;
+        return requiresEndDayOnWorkerExit(canonical.openWorkerCount);
       };
 
       const signOut = async (): Promise<OperationsSessionResult> => {
