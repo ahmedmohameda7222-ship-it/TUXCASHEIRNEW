@@ -1,4 +1,4 @@
-import type { OpenBusinessDay, ShopId } from '@tux/domain';
+import type { BusinessDay, OpenBusinessDay, ShopId } from '@tux/domain';
 
 export interface CanonicalBusinessDayState {
   readonly day: OpenBusinessDay | null;
@@ -46,4 +46,11 @@ export function requiresEndDayOnWorkerExit(openWorkerCount: number): boolean {
     throw new Error('Canonical open-worker count is invalid.');
   }
   return openWorkerCount <= 1;
+}
+
+/** Never overwrite a locally completed, possibly still queued, End Day. */
+export function assertCanonicalDayNotLocallyClosed(previouslyStored: BusinessDay | null): void {
+  if (previouslyStored?.status === 'CLOSED') {
+    throw new Error('Business Day ended locally. Synchronize End Day before rejoining.');
+  }
 }

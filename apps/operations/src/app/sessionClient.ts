@@ -51,7 +51,11 @@ import type {
   TuxWorkerUiPreferencesApi,
 } from '@tux/platform-contracts';
 import { startBrowserAutomaticSync } from './automaticSync';
-import { reconcileCanonicalBusinessDay, requiresEndDayOnWorkerExit } from './businessDayPreflight';
+import {
+  assertCanonicalDayNotLocallyClosed,
+  reconcileCanonicalBusinessDay,
+  requiresEndDayOnWorkerExit,
+} from './businessDayPreflight';
 import { VercelBrowserRemoteGateway } from './browserRemote';
 import { selectBrowserShop } from './browserShopScope';
 import { fenceStaleBrowserSession } from './browserSessionScope';
@@ -473,6 +477,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
               oldLocal === null ? null : await readModel.getOpenWorkerSession(oldLocal.id);
             await database.transaction(async (tx) => {
               const current = await tx.businessDays.getOpenForShop(shopId);
+              assertCanonicalDayNotLocallyClosed(await tx.businessDays.getById(canonical.id));
               if ((current?.id ?? null) !== (oldLocal?.id ?? null)) {
                 throw new Error('Local Business Day changed during canonical recovery.');
               }
