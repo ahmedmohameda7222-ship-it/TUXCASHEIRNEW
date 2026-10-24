@@ -1,0 +1,47 @@
+name: TUX Native Chromium Sync Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - packages/sync/src/httpTransport.ts
+      - packages/sync/src/httpTransport.test.ts
+      - e2e/native-browser-fetch-sync.e2e.ts
+      - .github/workflows/native-sync-chromium.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tux-native-sync-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  browser-sync:
+    name: Real Chromium outbox POST and receipt acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify real native fetch POST and APPLIED/REPLAY receipts
+        run: npx playwright test e2e/native-browser-fetch-sync.e2e.ts --project=desktop-browser-fallback --reporter=line
+      - name: Upload failure trace
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-sync-chromium-failure
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
