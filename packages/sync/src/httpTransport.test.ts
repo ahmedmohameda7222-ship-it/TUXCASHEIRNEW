@@ -50,16 +50,19 @@ const event: OutboxEvent = {
 };
 
 describe('HttpOutboxTransport', () => {
-
   it('uses the window receiver for native fetch while preserving APPLIED and REPLAY receipts', async () => {
     const requests: Array<{ url: string; method: string }> = [];
-    vi.stubGlobal('fetch', function browserFetch(this: typeof globalThis, input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    function browserFetch(
+      this: typeof globalThis,
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> {
       if (this !== globalThis) throw new TypeError('Illegal invocation');
       requests.push({ url: String(input), method: init?.method ?? 'GET' });
-      return Promise.resolve(new Response(JSON.stringify({
-        status: requests.length === 1 ? 'APPLIED' : 'REPLAY',
-      }), { status: 200 }));
-    } as typeof fetch);
+      const status = requests.length === 1 ? 'APPLIED' : 'REPLAY';
+      return Promise.resolve(new Response(JSON.stringify({ status }), { status: 200 }));
+    }
+    vi.stubGlobal('fetch', browserFetch);
 
     try {
       const transport = new HttpOutboxTransport({
@@ -78,14 +81,20 @@ describe('HttpOutboxTransport', () => {
 
   it('uses the browser fetch receiver for inventory and lifecycle GET convergence', async () => {
     const requests: Array<{ url: string; method: string }> = [];
-    vi.stubGlobal('fetch', function browserFetch(this: typeof globalThis, input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    function browserFetch(
+      this: typeof globalThis,
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> {
       if (this !== globalThis) throw new TypeError('Illegal invocation');
       const url = String(input);
       requests.push({ url, method: init?.method ?? 'GET' });
-      return Promise.resolve(new Response(JSON.stringify(url.includes('inventory')
+      const responseBody = url.includes('inventory')
         ? { shopId: SHOP_ID, items: [], movements: [], costs: [], nextCursor: null, hasMore: false }
-        : { shopId: SHOP_ID, events: [], nextCursor: null, hasMore: false }), { status: 200 }));
-    } as typeof fetch);
+        : { shopId: SHOP_ID, events: [], nextCursor: null, hasMore: false };
+      return Promise.resolve(new Response(JSON.stringify(responseBody), { status: 200 }));
+    }
+    vi.stubGlobal('fetch', browserFetch);
 
     try {
       const inventory = new HttpInventoryFeedTransport({

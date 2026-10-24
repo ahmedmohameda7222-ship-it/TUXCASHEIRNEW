@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { build } from 'esbuild';
+import { build } from 'vite';
 import { expect, test } from '@playwright/test';
 import {
   instant,
@@ -48,26 +48,43 @@ const event: OutboxEvent = {
   deliveredAt: null,
 };
 
+type CapturedRequest = {
+  method: string;
+  url: string;
+  eventId: string | undefined;
+  body: unknown;
+};
+
 test('native Chromium fetch delivers canonical outbox POST and honors APPLIED/REPLAY', async ({
   page,
 }) => {
   // Bundle the actual production transport and its dependencies for a browser execution,
   // rather than reproducing the bug with a synthetic copy of the implementation.
   const bundled = await build({
-    entryPoints: [resolve('packages/sync/src/httpTransport.ts')],
-    bundle: true,
-    platform: 'browser',
-    format: 'iife',
-    globalName: 'TuxNativeSyncProbe',
-    target: 'es2022',
-    write: false,
+    configFile: false,
+    logLevel: 'silent',
+    build: {
+      write: false,
+      minify: false,
+      target: 'es2022',
+      lib: {
+        entry: resolve('packages/sync/src/httpTransport.ts'),
+        name: 'TuxNativeSyncProbe',
+        formats: ['iife'],
+      },
+    },
   });
-  const source = bundled.outputFiles[0]?.text;
+  const artifact = Array.isArray(bundled) ? bundled[0] : bundled;
+  const source = artifact.output.find((asset) => asset.type === 'chunk')?.code;
   expect(source).toBeTruthy();
 
-  const requests: Array<{ method: string; url: string; eventId: string | undefined; body: unknown }> = [];
+  const requests: CapturedRequest[] = [];
   await page.route('**/__tux_native_sync_probe__', (route) =>
-    route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Native Sync</title>' }),
+    route.fulfill({
+      status: 200,
+      contentType: 'text/html',
+      body: '<!doctype html><title>Native Sync</title>',
+    }),
   );
   await page.route('**/api/operations-sync', async (route) => {
     const request = route.request();
@@ -86,20 +103,21 @@ test('native Chromium fetch delivers canonical outbox POST and honors APPLIED/RE
 
   await page.goto('/__tux_native_sync_probe__');
   await page.addScriptTag({ content: source! });
-  await page.evaluate(async (outbox) => {
+  await page.evaluate(async (serializedEvent) => {
     const modules = (window as unknown as {
       TuxNativeSyncProbe: {
         HttpOutboxTransport: new (options: { endpoint: string }) => {
-          deliver(event: OutboxEvent): Promise<void>;
+          deliver(event: unknown): Promise<void>;
         };
       };
     }).TuxNativeSyncProbe;
     const transport = new modules.HttpOutboxTransport({
       endpoint: `${location.origin}/api/operations-sync`,
     });
+    const outbox: unknown = JSON.parse(serializedEvent);
     await transport.deliver(outbox);
     await transport.deliver(outbox);
-  }, event);
+  }, JSON.stringify(event));
 
   expect(requests).toHaveLength(2);
   for (const request of requests) {
