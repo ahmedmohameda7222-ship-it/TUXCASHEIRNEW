@@ -37,6 +37,10 @@ jobs:
         run: |
           npx prettier --write e2e/native-browser-fetch-sync.e2e.ts
           git diff -- e2e/native-browser-fetch-sync.e2e.ts
+      - name: Inspect exact Prettier output for Chromium spec
+        run: |
+          npx prettier --write e2e/native-browser-fetch-sync.e2e.ts
+          git diff -- e2e/native-browser-fetch-sync.e2e.ts
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Verify real native fetch POST and APPLIED/REPLAY receipts
