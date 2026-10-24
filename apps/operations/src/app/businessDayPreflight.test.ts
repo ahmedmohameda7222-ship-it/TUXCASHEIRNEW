@@ -43,6 +43,17 @@ describe('canonical Business Day preflight', () => {
     ).rejects.toThrow(OLD);
   });
 
+  it('rejects a locally OPEN day when its canonical OPEN identity is absent', async () => {
+    await expect(
+      assertCanonicalBusinessDayReady({
+        shopId: SHOP,
+        drainLocalOutbox: async () => undefined,
+        getLocalOpenDayId: async () => OLD,
+        getCanonicalOpenDayId: async () => null,
+      }),
+    ).rejects.toThrow('has no matching OPEN day');
+  });
+
   it('accepts a matching authenticated day after reconnection', async () => {
     await expect(
       assertCanonicalBusinessDayReady({

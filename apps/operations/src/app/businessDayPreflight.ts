@@ -13,6 +13,13 @@ export async function assertCanonicalBusinessDayReady(input: {
   await input.drainLocalOutbox();
   const canonical = await input.getCanonicalOpenDayId(input.shopId);
   const local = await input.getLocalOpenDayId();
+  if (canonical === null && local !== null) {
+    throw new Error(
+      'Local Business Day ' +
+        local +
+        ' remains OPEN, but Supabase has no matching OPEN day. Synchronize the original local Business Day start before signing in, or investigate a remotely closed day. Do not change day IDs or clear IndexedDB.',
+    );
+  }
   if (canonical !== null && canonical !== local) {
     throw new Error(
       'Canonical Business Day ' +

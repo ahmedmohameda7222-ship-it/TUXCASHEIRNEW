@@ -243,6 +243,21 @@ describe('HttpOutboxTransport', () => {
     },
   );
 
+  it('quarantines explicit permanent day identity conflicts with their actionable cause', async () => {
+    const transport = new HttpOutboxTransport({
+      endpoint: 'https://sync.example.test/events',
+      fetcher: (async () =>
+        new Response(JSON.stringify({ error: 'business_day_identity_conflict' }), {
+          status: 409,
+        })) as typeof fetch,
+    });
+    await expect(transport.deliver(event)).rejects.toMatchObject({
+      kind: 'PERMANENT',
+      status: 409,
+      message: expect.stringContaining('explicit, audited recovery'),
+    } satisfies Partial<OutboxDeliveryError>);
+  });
+
   it('requires HTTPS outside loopback development', () => {
     expect(() => new HttpOutboxTransport({ endpoint: 'http://example.test/events' })).toThrow(
       /HTTPS/,

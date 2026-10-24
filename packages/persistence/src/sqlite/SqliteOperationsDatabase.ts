@@ -615,23 +615,45 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
           shopId === undefined
             ? database
                 .prepare(
-                  `SELECT payload_json, aggregate_revision FROM outbox_events
-                 WHERE delivered_at IS NULL
-                   AND quarantined_at IS NULL
-                   AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
-                 ORDER BY created_at ASC LIMIT ?`,
+                  `SELECT candidate.payload_json, candidate.aggregate_revision
+                   FROM outbox_events AS candidate
+                   WHERE candidate.delivered_at IS NULL
+                     AND candidate.quarantined_at IS NULL
+                     AND (candidate.next_attempt_at IS NULL OR candidate.next_attempt_at <= ?)
+                     AND NOT EXISTS (
+                       SELECT 1 FROM outbox_events AS earlier
+                       WHERE earlier.shop_id = candidate.shop_id
+                         AND earlier.delivered_at IS NULL
+                         AND earlier.quarantined_at IS NULL
+                         AND earlier.next_attempt_at > ?
+                         AND (earlier.created_at < candidate.created_at
+                           OR (earlier.created_at = candidate.created_at
+                             AND earlier.rowid < candidate.rowid))
+                     )
+                   ORDER BY candidate.created_at ASC, candidate.rowid ASC LIMIT ?`,
                 )
-                .all(now, limit)
+                .all(now, now, limit)
             : database
                 .prepare(
-                  `SELECT payload_json, aggregate_revision FROM outbox_events
-                 WHERE delivered_at IS NULL
-                   AND quarantined_at IS NULL
-                   AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
-                   AND shop_id = ?
-                 ORDER BY created_at ASC LIMIT ?`,
+                  `SELECT candidate.payload_json, candidate.aggregate_revision
+                   FROM outbox_events AS candidate
+                   WHERE candidate.delivered_at IS NULL
+                     AND candidate.quarantined_at IS NULL
+                     AND (candidate.next_attempt_at IS NULL OR candidate.next_attempt_at <= ?)
+                     AND candidate.shop_id = ?
+                     AND NOT EXISTS (
+                       SELECT 1 FROM outbox_events AS earlier
+                       WHERE earlier.shop_id = candidate.shop_id
+                         AND earlier.delivered_at IS NULL
+                         AND earlier.quarantined_at IS NULL
+                         AND earlier.next_attempt_at > ?
+                         AND (earlier.created_at < candidate.created_at
+                           OR (earlier.created_at = candidate.created_at
+                             AND earlier.rowid < candidate.rowid))
+                     )
+                   ORDER BY candidate.created_at ASC, candidate.rowid ASC LIMIT ?`,
                 )
-                .all(now, shopId, limit);
+                .all(now, shopId, now, limit);
         return rows
           .map((row) => parseOutboxPayload(row))
           .filter((event): event is OutboxEvent => event !== null);
