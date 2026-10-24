@@ -805,6 +805,34 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
         }
         return blocked;
       },
+      async recoverMissingBusinessDayStart(businessDayId: BusinessDayId) {
+        const row = database
+          .prepare(
+            `SELECT id, payload_json, aggregate_revision FROM outbox_events
+             WHERE business_day_id = ? AND event_type = 'BUSINESS_DAY_STARTED'
+               AND delivered_at IS NULL AND quarantined_at IS NOT NULL
+             ORDER BY created_at ASC LIMIT 1`,
+          )
+          .get(businessDayId);
+        const event = parseOutboxPayload(row);
+        if (event === null) return false;
+        const recovered: OutboxEvent = {
+          ...event,
+          attemptCount: 0,
+          nextAttemptAt: null,
+          lastError: null,
+        };
+        database
+          .prepare(
+            `UPDATE outbox_events
+             SET attempt_count = 0, next_attempt_at = NULL, last_error = NULL,
+                 quarantined_at = NULL, permanent_failure_reason = NULL,
+                 blocked_by_event_id = NULL, payload_json = ?
+             WHERE id = ?`,
+          )
+          .run(serialize(recovered), event.id);
+        return true;
+      },
     },
   };
 }

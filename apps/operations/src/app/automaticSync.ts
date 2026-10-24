@@ -1,4 +1,4 @@
-import type { Instant, ShopId } from '@tux/domain';
+import { parseEntityId, type BusinessDayId, type Instant, type ShopId } from '@tux/domain';
 import type { OperationsDatabase } from '@tux/persistence';
 import {
   AutomaticOutboxScheduler,
@@ -36,7 +36,15 @@ export function startBrowserAutomaticSync(input: {
   const endpoint = new URL('/api/operations-sync', window.location.origin).toString();
   const service = new OutboxSyncService(
     input.database,
-    new HttpOutboxTransport({ endpoint }),
+    new HttpOutboxTransport({
+      endpoint,
+      onDependencyMissing: async (_event, missingDayId) => {
+        const businessDayId = parseEntityId<BusinessDayId>(missingDayId);
+        await input.database.transaction((transaction) =>
+          transaction.outbox.recoverMissingBusinessDayStart(businessDayId),
+        );
+      },
+    }),
     { now: input.now },
     input.shopId,
   );

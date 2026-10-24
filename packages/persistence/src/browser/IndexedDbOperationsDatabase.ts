@@ -497,6 +497,32 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
         }
         return blocked;
       },
+      async recoverMissingBusinessDayStart(businessDayId: BusinessDayId) {
+        const objectStore = store('outboxEvents');
+        const candidates = (await requestResult(objectStore.getAll())) as StoredOutboxEvent[];
+        const origin = candidates
+          .filter(
+            (event) =>
+              event.businessDayId === businessDayId &&
+              event.eventType === 'BUSINESS_DAY_STARTED' &&
+              event.deliveredAt === null &&
+              event.quarantinedAt !== null,
+          )
+          .sort((left, right) => left.createdAt.localeCompare(right.createdAt))[0];
+        if (origin === undefined) return false;
+        await requestResult(
+          objectStore.put({
+            ...origin,
+            attemptCount: 0,
+            nextAttemptAt: null,
+            lastError: null,
+            quarantinedAt: null,
+            permanentFailureReason: null,
+            blockedByEventId: null,
+          } satisfies StoredOutboxEvent),
+        );
+        return true;
+      },
     },
   };
 }

@@ -14,6 +14,10 @@ export interface HttpOutboxTransportOptions {
     Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>;
   readonly beforeDeliver?: (event: OutboxEvent) => void | Promise<void>;
   readonly onConflict?: (event: OutboxEvent, conflict: HttpOutboxConflict) => void | Promise<void>;
+  readonly onDependencyMissing?: (
+    event: OutboxEvent,
+    businessDayId: string,
+  ) => void | Promise<void>;
   readonly fetcher?: typeof fetch;
   readonly timeoutMs?: number;
 }
@@ -64,6 +68,8 @@ export class HttpOutboxTransport implements OutboxTransport {
   readonly #beforeDeliver: ((event: OutboxEvent) => void | Promise<void>) | null;
   readonly #onConflict:
     ((event: OutboxEvent, conflict: HttpOutboxConflict) => void | Promise<void>) | null;
+  readonly #onDependencyMissing:
+    ((event: OutboxEvent, businessDayId: string) => void | Promise<void>) | null;
   readonly #fetcher: typeof fetch;
   readonly #timeoutMs: number;
 
@@ -73,6 +79,7 @@ export class HttpOutboxTransport implements OutboxTransport {
     this.#headerProvider = options.headerProvider ?? null;
     this.#beforeDeliver = options.beforeDeliver ?? null;
     this.#onConflict = options.onConflict ?? null;
+    this.#onDependencyMissing = options.onDependencyMissing ?? null;
     this.#fetcher = options.fetcher ?? globalThis.fetch.bind(globalThis);
     this.#timeoutMs = normalizeTimeout(options.timeoutMs);
   }
@@ -148,6 +155,13 @@ export class HttpOutboxTransport implements OutboxTransport {
                 'Business Day ' +
                 dayId +
                 ' has not materialized. Retry after the original Business Day start event is synchronized; preserve the outbox.';
+              if (dayId !== 'unknown') {
+                try {
+                  await this.#onDependencyMissing?.(event, dayId);
+                } catch {
+                  // Preserve the transient response; a later retry can recover the origin.
+                }
+              }
             }
           } catch {
             // Preserve typed status even when the remote diagnostic is malformed.
