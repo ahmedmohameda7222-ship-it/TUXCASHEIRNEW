@@ -204,12 +204,17 @@ export class VercelBrowserRemoteGateway
       throw new TypeError('Canonical open-worker count is invalid.');
     }
     if (body['openDayId'] === null) {
-      if (body['openDay'] !== null) throw new TypeError('Canonical closed day has an OPEN snapshot.');
+      if (body['openDay'] !== null)
+        throw new TypeError('Canonical closed day has an OPEN snapshot.');
       return { day: null, openWorkerCount: count };
     }
     const daySource = object(body['openDay'], 'Canonical open Business Day');
-    const dayId = parseEntityId<BusinessDayId>(requiredString(body['openDayId'], 'Canonical openDayId'));
-    const dayShopId = parseEntityId<ShopId>(requiredString(daySource['shopId'], 'Canonical day shop'));
+    const dayId = parseEntityId<BusinessDayId>(
+      requiredString(body['openDayId'], 'Canonical openDayId'),
+    );
+    const dayShopId = parseEntityId<ShopId>(
+      requiredString(daySource['shopId'], 'Canonical day shop'),
+    );
     if (
       daySource['id'] !== dayId ||
       dayShopId !== shopId ||
@@ -224,12 +229,16 @@ export class VercelBrowserRemoteGateway
       throw new TypeError('Canonical last order number is invalid.');
     }
     const day: OpenBusinessDay = {
-      id: dayId, shopId, status: 'OPEN',
+      id: dayId,
+      shopId,
+      status: 'OPEN',
       startedAt: instant(requiredString(daySource['startedAt'], 'Canonical startedAt')),
       startedByWorkerId: parseEntityId<WorkerId>(
         requiredString(daySource['startedByWorkerId'], 'Canonical starting worker'),
       ),
-      endedAt: null, endedByWorkerId: null, lastAllocatedDisplayOrderNo: lastNumber,
+      endedAt: null,
+      endedByWorkerId: null,
+      lastAllocatedDisplayOrderNo: lastNumber,
     };
     return { day, openWorkerCount: count };
   }

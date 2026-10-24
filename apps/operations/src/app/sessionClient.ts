@@ -453,7 +453,10 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           drainLocalOutbox: async () => {
             const endpoint = new URL('/api/operations-sync', window.location.origin).toString();
             const service = new OutboxSyncService(
-              database, new HttpOutboxTransport({ endpoint }), { now: runtime.now }, shopId,
+              database,
+              new HttpOutboxTransport({ endpoint }),
+              { now: runtime.now },
+              shopId,
             );
             for (let batch = 0; batch < 4; batch += 1) {
               const result = await service.syncOnce(50);
@@ -466,8 +469,8 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           },
           getCanonicalState: (scope) => remoteGateway.readCanonicalOpenBusinessDay(scope),
           adoptCanonicalDay: async (canonical, oldLocal) => {
-            const previousSession = oldLocal === null
-              ? null : await readModel.getOpenWorkerSession(oldLocal.id);
+            const previousSession =
+              oldLocal === null ? null : await readModel.getOpenWorkerSession(oldLocal.id);
             await database.transaction(async (tx) => {
               const current = await tx.businessDays.getOpenForShop(shopId);
               if ((current?.id ?? null) !== (oldLocal?.id ?? null)) {
@@ -480,12 +483,16 @@ async function browserRuntime(): Promise<BrowserRuntime> {
                 // Mock-only mismatch: preserve every old event as quarantined,
                 // never erase local storage or manufacture a remote End Day.
                 const pending = await tx.outbox.listPending(
-                  instant('9999-12-31T23:59:59Z'), 100000, shopId,
+                  instant('9999-12-31T23:59:59Z'),
+                  100000,
+                  shopId,
                 );
                 for (const event of pending) {
                   if (event.businessDayId === oldLocal.id) {
                     await tx.outbox.quarantine(
-                      event.id, closedAt, 'DEVELOPMENT_CANONICAL_DAY_RECOVERY',
+                      event.id,
+                      closedAt,
+                      'DEVELOPMENT_CANONICAL_DAY_RECOVERY',
                     );
                   }
                 }
@@ -493,7 +500,9 @@ async function browserRuntime(): Promise<BrowserRuntime> {
                   await tx.workerSessions.put({ ...previousSession, endedAt: closedAt });
                 }
                 await tx.businessDays.put({
-                  ...oldLocal, status: 'CLOSED', endedAt: closedAt,
+                  ...oldLocal,
+                  status: 'CLOSED',
+                  endedAt: closedAt,
                   endedByWorkerId: oldLocal.startedByWorkerId,
                 });
               }
@@ -731,8 +740,7 @@ export function createOperationsSessionClient(): OperationsSessionClient {
     submitPin: async (pin: string, shopId?: string) =>
       (await browserRuntime()).submitPin(pin, shopId),
     signOut: async () => (await browserRuntime()).signOut(),
-    shouldCloseDayOnSignOut: async () =>
-      (await browserRuntime()).shouldCloseDayOnSignOut(),
+    shouldCloseDayOnSignOut: async () => (await browserRuntime()).shouldCloseDayOnSignOut(),
     enrollDevice: async (pin: string) => (await browserRuntime()).submitPin(pin),
   };
 }
