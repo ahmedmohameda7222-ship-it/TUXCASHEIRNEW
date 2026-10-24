@@ -338,15 +338,60 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
         const all = (await requestResult(
           store('outboxEvents').index('createdAt').getAll(),
         )) as StoredOutboxEvent[];
-        return all
+        // Do not let a retry-delayed Business Day START/CLOSE be bypassed by
+        // newer worker sessions or Orders in the same shop. Preserve other shop
+        // progress, and the existing aggregate-quarantine semantics.
+        const pending = all
           .filter(
             (event) =>
               event.deliveredAt === null &&
               (shopId === undefined || event.shopId === shopId) &&
-              (event.quarantinedAt ?? null) === null &&
-              (event.nextAttemptAt === null || event.nextAttemptAt <= now),
+              (event.quarantinedAt ?? null) === null,
           )
-          .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+          .sort((left, right) => {
+            const chronological = left.createdAt.localeCompare(right.createdAt);
+            if (chronological !== 0) return chronological;
+            if (
+              left.shopId === right.shopId &&
+              left.aggregateType === right.aggregateType &&
+              left.aggregateId === right.aggregateId &&
+              left.aggregateRevision !== null &&
+              right.aggregateRevision !== null &&
+              left.aggregateRevision !== right.aggregateRevision
+            ) {
+              return left.aggregateRevision - right.aggregateRevision;
+            }
+            // IndexedDB secondary indexes order tied timestamps by random UUID,
+            // unlike insertion order in SQLite. Use domain causality for ties.
+            const priority = (eventType: string): number => {
+              switch (eventType) {
+                case 'BUSINESS_DAY_STARTED':
+                  return -20;
+                case 'WORKER_SIGNED_IN':
+                case 'WORKER_SWITCHED':
+                  return -10;
+                case 'RECONCILIATION_RECORDED':
+                  return 10;
+                case 'BUSINESS_DAY_CLOSED':
+                  return 20;
+                case 'WORKER_SIGNED_OUT':
+                  return 30;
+                default:
+                  return 0;
+              }
+            };
+            return priority(left.eventType) - priority(right.eventType);
+          });
+        const retryBlockedShops = new Set<ShopId>();
+        return pending
+          .filter((event) => {
+            if (retryBlockedShops.has(event.shopId)) return false;
+            if (event.nextAttemptAt !== null && event.nextAttemptAt > now) {
+              retryBlockedShops.add(event.shopId);
+              return false;
+            }
+            return true;
+          })
           .slice(0, limit);
       },
       async getDeliveryStatus(shopId?: ShopId) {

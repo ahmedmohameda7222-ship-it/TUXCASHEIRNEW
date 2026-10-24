@@ -217,6 +217,47 @@ describe('HttpOutboxTransport', () => {
     },
   );
 
+  it.each([
+    [423, 'business_day_open_conflict', 'Canonical Business Day'],
+    [425, 'business_day_dependency_not_ready', 'Business Day'],
+  ])(
+    'retains blocked day events on HTTP %i with actionable diagnostics',
+    async (status, code, expected) => {
+      const transport = new HttpOutboxTransport({
+        endpoint: 'https://sync.example.test/events',
+        fetcher: (async () =>
+          new Response(
+            JSON.stringify({
+              error: code,
+              canonicalDayId: DAY_ID,
+              missingDayId: DAY_ID,
+            }),
+            { status },
+          )) as typeof fetch,
+      });
+      await expect(transport.deliver(event)).rejects.toMatchObject({
+        kind: 'TRANSIENT',
+        status,
+        message: expect.stringContaining(expected),
+      } satisfies Partial<OutboxDeliveryError>);
+    },
+  );
+
+  it('quarantines explicit permanent day identity conflicts with their actionable cause', async () => {
+    const transport = new HttpOutboxTransport({
+      endpoint: 'https://sync.example.test/events',
+      fetcher: (async () =>
+        new Response(JSON.stringify({ error: 'business_day_identity_conflict' }), {
+          status: 409,
+        })) as typeof fetch,
+    });
+    await expect(transport.deliver(event)).rejects.toMatchObject({
+      kind: 'PERMANENT',
+      status: 409,
+      message: expect.stringContaining('explicit, audited recovery'),
+    } satisfies Partial<OutboxDeliveryError>);
+  });
+
   it('requires HTTPS outside loopback development', () => {
     expect(() => new HttpOutboxTransport({ endpoint: 'http://example.test/events' })).toThrow(
       /HTTPS/,

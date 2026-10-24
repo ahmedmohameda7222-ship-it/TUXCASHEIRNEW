@@ -30,6 +30,7 @@ import {
   type WorkerUiPreferences,
 } from '@tux/domain';
 import type { OperationsDatabase, WorkerUiPreferencesRepository } from '@tux/persistence';
+import { HttpOutboxTransport, OutboxSyncService } from '@tux/sync';
 import {
   IndexedDbBulkStockStore,
   IndexedDbExpenseLedgerStore,
@@ -50,6 +51,7 @@ import type {
   TuxWorkerUiPreferencesApi,
 } from '@tux/platform-contracts';
 import { startBrowserAutomaticSync } from './automaticSync';
+import { assertCanonicalBusinessDayReady } from './businessDayPreflight';
 import { VercelBrowserRemoteGateway } from './browserRemote';
 import { selectBrowserShop } from './browserShopScope';
 import { fenceStaleBrowserSession } from './browserSessionScope';
@@ -443,6 +445,34 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         },
       };
 
+      const checkDayBeforeLogin = async (shopId: ShopId): Promise<void> => {
+        await assertCanonicalBusinessDayReady({
+          shopId,
+          drainLocalOutbox: async () => {
+            // Day closure can be committed to IndexedDB while sync is stopped.
+            // Drain its immutable outbox under the newly authenticated shop cookie.
+            const endpoint = new URL('/api/operations-sync', window.location.origin).toString();
+            const service = new OutboxSyncService(
+              database,
+              new HttpOutboxTransport({ endpoint }),
+              { now: runtime.now },
+              shopId,
+            );
+            for (let batch = 0; batch < 4; batch += 1) {
+              const result = await service.syncOnce(50);
+              if (result.failed > 0 || result.delivered < 50) break;
+            }
+          },
+          getLocalOpenDayId: async () => {
+            const day = await database.transaction((transaction) =>
+              transaction.businessDays.getOpenForShop(shopId),
+            );
+            return day?.id ?? null;
+          },
+          getCanonicalOpenDayId: (scope) => remoteGateway.readCanonicalOpenBusinessDay(scope),
+        });
+      };
+
       const bootstrapWithPin = async (
         pin: string,
         shopId?: string,
@@ -473,6 +503,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
             });
           }
           await selectBrowserShop(database, readModel, bootstrap.shop, bootstrap.worker);
+          await checkDayBeforeLogin(bootstrap.shopId);
           const signedIn = await session.submitPin(pin);
           // The remote cookie and the local PIN result must both be valid before
           // background sync is permitted to run under this shop.
@@ -512,7 +543,25 @@ async function browserRuntime(): Promise<BrowserRuntime> {
 
         const workerAuthentication = new OperationsWorkerAuthenticationService(
           session,
-          { authenticate: () => remoteGateway.authenticateWorker(pin) },
+          {
+            authenticate: async () => {
+              const verified = await remoteGateway.authenticateWorker(pin);
+              if (verified.status === 'AUTHENTICATED') {
+                try {
+                  await checkDayBeforeLogin(verified.worker.shopId);
+                } catch (cause) {
+                  return {
+                    status: 'SERVER_ERROR',
+                    message:
+                      cause instanceof Error
+                        ? cause.message
+                        : 'Canonical Business Day lookup failed.',
+                  };
+                }
+              }
+              return verified;
+            },
+          },
           workerCredentialStore,
         );
         const result = await workerAuthentication.submitPin(pin);

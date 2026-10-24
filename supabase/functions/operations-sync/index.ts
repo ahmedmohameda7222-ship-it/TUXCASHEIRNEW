@@ -33,7 +33,9 @@ function bearerToken(request: Request): string | null {
 }
 
 Deno.serve(async (request) => {
-  if (request.method !== 'POST') return jsonResponse(405, { error: 'method_not_allowed' });
+  if (request.method !== 'POST' && request.method !== 'GET') {
+    return jsonResponse(405, { error: 'method_not_allowed' });
+  }
 
   const token = bearerToken(request);
   const deviceId = request.headers.get('x-tux-device-id')?.trim() ?? '';
@@ -54,6 +56,27 @@ Deno.serve(async (request) => {
   const { data: userData, error: userError } = await userClient.auth.getUser(token);
   if (userError || !userData.user) {
     return jsonResponse(401, { error: 'invalid_access_token' });
+  }
+
+  if (request.method === 'GET') {
+    const reader = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await reader.rpc('read_tux_operations_open_business_day_v1', {
+      p_auth_user_id: userData.user.id,
+      p_device_id: deviceId,
+    });
+    if (error) {
+      if (error.message?.includes('TUX_DEVICE_NOT_AUTHORIZED')) {
+        return jsonResponse(403, { error: 'device_not_authorized' });
+      }
+      console.error('operations-sync canonical business day read failed', error);
+      return jsonResponse(503, { error: 'canonical_business_day_unavailable' });
+    }
+    return jsonResponse(200, {
+      shopId: data.shopId,
+      openDayId: data.openDayId ?? null,
+    });
   }
 
   let envelope: unknown;
@@ -88,6 +111,32 @@ Deno.serve(async (request) => {
 
   if (error) {
     const message = error.message ?? '';
+    // A mismatched OPEN identity is a blocked dependency, not a transient generic 500.
+    // Keep the immutable local event in the outbox so the origin can deliver End Day first.
+    const openConflict = message.match(/TUX_BUSINESS_DAY_OPEN_CONFLICT:([0-9a-f-]{36})/i);
+    if (openConflict || (error.code === '23505' && message.includes('business_days_one_open_per_shop_idx'))) {
+      return jsonResponse(423, {
+        error: 'business_day_open_conflict',
+        canonicalDayId: openConflict?.[1] ?? null,
+        recovery: 'sync_origin_end_day_before_starting_another_day',
+      });
+    }
+    const missingDay = message.match(/TUX_BUSINESS_DAY_DEPENDENCY_MISSING:([0-9a-f-]{36})/i);
+    if (missingDay || (error.code === '23503' &&
+       (message.includes('worker_sessions_business_day_id_fkey') ||
+        message.includes('worker_sessions_day_same_shop_fk') ||
+        message.includes('orders_business_day_id_fkey')))) {
+      return jsonResponse(425, {
+        error: 'business_day_dependency_not_ready',
+        missingDayId: missingDay?.[1] ?? null,
+        recovery: 'deliver_original_business_day_started_event_first',
+      });
+    }
+    if (message.includes('TUX_BUSINESS_DAY_SHOP_CONFLICT') ||
+        message.includes('TUX_BUSINESS_DAY_REOPEN_FORBIDDEN') ||
+        message.includes('TUX_BUSINESS_DAY_ALREADY_CLOSED')) {
+      return jsonResponse(409, { error: 'business_day_identity_conflict' });
+    }
     if (message.includes('TUX_DEVICE_NOT_AUTHORIZED')) {
       return jsonResponse(403, { error: 'device_not_authorized' });
     }

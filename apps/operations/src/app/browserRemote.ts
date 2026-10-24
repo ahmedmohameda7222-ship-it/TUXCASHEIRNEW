@@ -12,6 +12,7 @@ import {
   parseEntityId,
   parseWorkerMenuLayout,
   parseWorkerUiPreferences,
+  type BusinessDayId,
   type CategoryAlignment,
   type MenuCategoryId,
   type ProductId,
@@ -176,6 +177,27 @@ export class VercelBrowserRemoteGateway
     if (!response.ok)
       throw new Error(`Device session request failed with HTTP ${response.status}.`);
     return parseSession(await jsonObject(response, 'Device session'));
+  }
+
+  async readCanonicalOpenBusinessDay(shopId: ShopId): Promise<BusinessDayId | null> {
+    if (isLoopbackHost()) {
+      throw new Error('Canonical Business Day authority is unavailable on localhost.');
+    }
+    const response = await fetch('/api/operations-sync', {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { accept: 'application/json' },
+    });
+    if (!response.ok) {
+      throw new Error('Canonical Business Day lookup failed with HTTP ' + response.status + '.');
+    }
+    const body = await jsonObject(response, 'Canonical Business Day');
+    if (body['shopId'] !== shopId) {
+      throw new Error('Canonical Business Day response belongs to a different shop.');
+    }
+    if (body['openDayId'] === null) return null;
+    return parseEntityId<BusinessDayId>(requiredString(body['openDayId'], 'Canonical openDayId'));
   }
 
   async bootstrap(pin: string, shopId?: string): Promise<BrowserBootstrapResult> {

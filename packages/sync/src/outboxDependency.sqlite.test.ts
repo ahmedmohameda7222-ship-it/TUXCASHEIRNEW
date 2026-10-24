@@ -139,6 +139,43 @@ describe('aggregate-aware outbox dependency safety', () => {
     await reopened.close();
   });
 
+  it('keeps a delayed Business Day prerequisite ahead of a new worker event', async () => {
+    const { database } = await fixture();
+    const first = {
+      ...event({
+        id: '93000000-0000-4000-8000-000000000080',
+        aggregateId: 'day-start',
+        revision: 0,
+        createdAt: '2026-08-20T00:00:00.000Z',
+      }),
+      attemptCount: 1,
+      nextAttemptAt: instant('2026-08-20T00:10:00.000Z'),
+      lastError: 'Business Day prerequisite delayed',
+    };
+    const second = event({
+      id: '93000000-0000-4000-8000-000000000081',
+      aggregateId: 'dependent-session',
+      revision: 0,
+      createdAt: '2026-08-20T00:00:01.000Z',
+    });
+    await database.transaction(async (tx) => {
+      await tx.outbox.append(first);
+      await tx.outbox.append(second);
+    });
+    expect(
+      await database.transaction((tx) =>
+        tx.outbox.listPending(instant('2026-08-20T00:05:00.000Z'), 50, SHOP_ID),
+      ),
+    ).toEqual([]);
+    expect(
+      (
+        await database.transaction((tx) =>
+          tx.outbox.listPending(instant('2026-08-20T00:10:00.000Z'), 50, SHOP_ID),
+        )
+      ).map((x) => x.id),
+    ).toEqual([first.id, second.id]);
+  });
+
   it('keeps transient failure ordered and retries the origin before later revisions', async () => {
     const { database } = await fixture();
     const first = event({

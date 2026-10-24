@@ -44,6 +44,7 @@ function responseFailure(status: number): OutboxDeliveryError {
     status === 401 ||
     status === 403 ||
     status === 408 ||
+    status === 423 ||
     status === 425 ||
     status === 429 ||
     status >= 500;
@@ -128,6 +129,31 @@ export class HttpOutboxTransport implements OutboxTransport {
         signal: controller.signal,
       });
       if (!response.ok) {
+        if (response.status === 423 || response.status === 425) {
+          let diagnostic =
+            'Business Day synchronization is waiting for its canonical prerequisite.';
+          try {
+            const body = (await response.json()) as Record<string, unknown>;
+            if (body['error'] === 'business_day_open_conflict') {
+              const dayId =
+                typeof body['canonicalDayId'] === 'string' ? body['canonicalDayId'] : 'unknown';
+              diagnostic =
+                'Canonical Business Day ' +
+                dayId +
+                ' remains OPEN. Reconnect the original browser and synchronize its End Day before starting another day. Do not clear local events.';
+            } else if (body['error'] === 'business_day_dependency_not_ready') {
+              const dayId =
+                typeof body['missingDayId'] === 'string' ? body['missingDayId'] : 'unknown';
+              diagnostic =
+                'Business Day ' +
+                dayId +
+                ' has not materialized. Retry after the original Business Day start event is synchronized; preserve the outbox.';
+            }
+          } catch {
+            // Preserve typed status even when the remote diagnostic is malformed.
+          }
+          throw new OutboxDeliveryError(diagnostic, 'TRANSIENT', response.status);
+        }
         if (response.status === 409) {
           let conflict: HttpOutboxConflict = {
             error: 'sync_conflict',
@@ -136,6 +162,13 @@ export class HttpOutboxTransport implements OutboxTransport {
           };
           try {
             const body = (await response.json()) as Record<string, unknown>;
+            if (body['error'] === 'business_day_identity_conflict') {
+              throw new OutboxDeliveryError(
+                'Canonical Business Day identity is incompatible with this event. Preserve the local queue and inspect the original day and shop before an explicit, audited recovery.',
+                'PERMANENT',
+                response.status,
+              );
+            }
             conflict = {
               error: typeof body['error'] === 'string' ? body['error'] : 'sync_conflict',
               canonicalStatus:
@@ -146,8 +179,9 @@ export class HttpOutboxTransport implements OutboxTransport {
                   ? body['canonicalOperationalRevision']
                   : null,
             };
-          } catch {
-            // A 409 is still a permanent rejected mutation even if the response body is malformed.
+          } catch (cause) {
+            if (cause instanceof OutboxDeliveryError) throw cause;
+            // A malformed conflict response is still a rejected mutation.
           }
           try {
             await this.#onConflict?.(event, conflict);
