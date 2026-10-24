@@ -166,7 +166,7 @@ export class HttpInventoryFeedTransport implements InventoryFeedTransport {
     this.#endpoint = url.toString();
     this.#headers = options.headers ?? {};
     this.#headerProvider = options.headerProvider ?? null;
-    this.#fetcher = options.fetcher ?? fetch;
+    this.#fetcher = options.fetcher ?? globalThis.fetch.bind(globalThis);
   }
 
   async pull(shopId: ShopId, cursor: string | null): Promise<InventoryConvergencePage> {
