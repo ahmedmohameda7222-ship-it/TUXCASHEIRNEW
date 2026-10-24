@@ -59,8 +59,11 @@ function dependencies(store: OnlineOrderOperationsStore) {
 }
 
 describe('online-order reservation conflict and recovery API', () => {
+  it('classifies an active reservation owner as a distinct business fence', () => {
+    expect(classifyOnlineOrderOperationsStoreError('TUX_ONLINE_ORDER_RESERVATION_OWNED').code).toBe('RESERVATION_OWNED');
+  });
+
   it.each([
-    'TUX_ONLINE_ORDER_RESERVATION_OWNED',
     'TUX_ONLINE_ORDER_RESERVATION_TRANSFER_CONFLICT',
     'TUX_ONLINE_ORDER_RESERVATION_RELEASE_CONFLICT',
   ])('classifies %s as a deterministic conflict rather than infrastructure failure', (message) => {
@@ -85,7 +88,7 @@ describe('online-order reservation conflict and recovery API', () => {
       http({ action: 'CLAIM', requestId: REQUEST }), dependencies(store),
     );
     expect(claimed.status).toBe(409);
-    expect(await claimed.json()).toEqual({ error: 'online_order_conflict' });
+    expect(await claimed.json()).toEqual({ error: 'online_order_reservation_owned' });
     expect(mutated).toBe(false);
   });
 
