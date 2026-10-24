@@ -196,6 +196,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       let automaticSyncHandle: ReturnType<typeof startBrowserAutomaticSync> | null = null;
       let configurationTimer: number | null = null;
       let sessionLeaseTimer: number | null = null;
+      let sessionLeaseHeartbeat: (() => Promise<void>) | null = null;
       let preferenceRetryStarted = false;
       let menuLayoutRetryStarted = false;
 
@@ -235,7 +236,19 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           window.clearInterval(sessionLeaseTimer);
           sessionLeaseTimer = null;
         }
+        window.removeEventListener('focus', refreshSessionLease);
+        window.removeEventListener('online', refreshSessionLease);
+        document.removeEventListener('visibilitychange', refreshVisibleSessionLease);
+        sessionLeaseHeartbeat = null;
         activeSyncShopId = null;
+      };
+
+      const refreshSessionLease = (): void => {
+        void sessionLeaseHeartbeat?.();
+      };
+
+      const refreshVisibleSessionLease = (): void => {
+        if (document.visibilityState === 'visible') refreshSessionLease();
       };
 
       const startRemoteRuntime = (shopId: ShopId): void => {
@@ -275,8 +288,12 @@ async function browserRuntime(): Promise<BrowserRuntime> {
               // later heartbeat or event delivery retries them.
             }
           };
+          sessionLeaseHeartbeat = heartbeat;
           void heartbeat();
           sessionLeaseTimer = window.setInterval(() => void heartbeat(), 60 * 1000);
+          window.addEventListener('focus', refreshSessionLease);
+          window.addEventListener('online', refreshSessionLease);
+          document.addEventListener('visibilitychange', refreshVisibleSessionLease);
           activeSyncShopId = shopId;
         }
         if (!preferenceRetryStarted) {

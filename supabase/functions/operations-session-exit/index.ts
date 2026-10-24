@@ -85,5 +85,13 @@ Deno.serve(async (request) => {
     console.error('operations session exit RPC failed', error);
     return jsonResponse(503, { error: 'session_exit_unavailable' });
   }
+  if (
+    action === 'HEARTBEAT' &&
+    typeof data === 'object' &&
+    data !== null &&
+    (data as Record<string, unknown>)['status'] === 'ALREADY_ENDED'
+  ) {
+    return jsonResponse(409, { error: 'worker_session_not_active' });
+  }
   return jsonResponse(200, data);
 });

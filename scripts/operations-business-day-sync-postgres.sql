@@ -281,8 +281,8 @@ end $body$;
 
 -- Exit classification is a single server-side critical section. Two browsers
 -- cannot both observe "another session" and then independently leave the day
--- orphaned OPEN with zero sessions. An inactive tab is never silently expired:
--- only an explicit exit may end it, which prevents a resumed split-brain client.
+-- orphaned OPEN with zero sessions. A crashed session can expire, while a
+-- resumed browser is authoritatively fenced by its immediate heartbeat.
 do $body$
 declare
   s uuid := '52000000-0000-4000-8000-000000000001';
@@ -352,9 +352,9 @@ begin
     '54000000-0000-4000-8000-000000000002',
     '55000000-0000-4000-8000-000000000002', d2, final_session
   );
-  if result ->> 'decision' <> 'SIGNED_OUT'
-    or (select ended_at from public.worker_sessions where id = stale_session) is not null then
-    raise exception 'Inactive browser was silently expired or failed to keep the day open: %', result;
+  if result ->> 'decision' <> 'END_DAY_REQUIRED'
+    or (select ended_at from public.worker_sessions where id = stale_session) is null then
+    raise exception 'Crashed session still blocked the final live browser: %', result;
   end if;
-  raise notice 'PASS: atomic idempotent exit without background-tab lease expiry';
+  raise notice 'PASS: atomic idempotent exit and fenced stale-session recovery';
 end $body$;
