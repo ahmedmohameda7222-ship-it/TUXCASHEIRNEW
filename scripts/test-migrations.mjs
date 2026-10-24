@@ -421,11 +421,19 @@ psql(
        ) then
          raise exception 'orders lifecycle constraint missing';
        end if;
-       if not exists (
+       if exists (
          select 1 from pg_indexes
          where schemaname = 'public' and indexname = 'worker_sessions_one_open_per_business_day_idx'
        ) then
-         raise exception 'worker session unique-open index missing';
+         raise exception 'legacy single-worker-per-day index still blocks multiple devices';
+       end if;
+       if not exists (
+         select 1 from pg_indexes
+         where schemaname = 'public' and indexname = 'worker_sessions_open_workers_by_day_idx'
+           and indexdef like '%(business_day_id, worker_id)%'
+           and indexdef like '%ended_at IS NULL%'
+       ) then
+         raise exception 'multi-worker business day lookup index missing';
        end if;
        if not exists (
          select 1 from information_schema.columns
