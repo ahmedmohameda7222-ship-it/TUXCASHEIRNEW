@@ -113,6 +113,7 @@ describe('SqliteOperationsDatabase', () => {
       ...outboxEvent(),
       id: parseEntityId<OutboxEventId>('44444444-4444-4444-8444-444444444445'),
       eventType: 'WORKER_SIGNED_IN' as const,
+      businessDayId: null,
       idempotencyKey: 'worker-signed-in-before-day-start',
       createdAt: instant('2026-08-17T12:59:59Z'),
     };

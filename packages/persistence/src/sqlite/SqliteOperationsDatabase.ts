@@ -827,9 +827,9 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
           .prepare(
             `SELECT MIN(created_at) AS created_at
              FROM outbox_events
-             WHERE business_day_id = ? AND id <> ? AND delivered_at IS NULL`,
+             WHERE shop_id = ? AND id <> ? AND delivered_at IS NULL`,
           )
-          .get(businessDayId, event.id) as { readonly created_at?: string | null } | undefined;
+          .get(event.shopId, event.id) as { readonly created_at?: string | null } | undefined;
         const earliestDependentAt = earliestDependent?.created_at ?? null;
         const recoveredCreatedAt =
           earliestDependentAt !== null && event.createdAt >= earliestDependentAt
