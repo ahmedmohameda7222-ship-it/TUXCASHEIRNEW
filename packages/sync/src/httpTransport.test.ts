@@ -10,6 +10,7 @@ import {
   type WorkerId,
 } from '@tux/domain';
 import { HttpOutboxTransport } from './httpTransport';
+import type { OutboxDeliveryError } from './outboxSync';
 
 const SHOP_ID = parseEntityId<ShopId>('12000000-0000-4000-8000-000000000001');
 const EVENT_ID = parseEntityId<OutboxEventId>('22000000-0000-4000-8000-000000000001');
@@ -51,7 +52,10 @@ describe('HttpOutboxTransport', () => {
     const calls: Array<Parameters<typeof fetch>> = [];
     const fetcher: typeof fetch = async (...args) => {
       calls.push(args);
-      return new Response(null, { status: 204 });
+      return new Response(JSON.stringify({ status: 'APPLIED' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     };
     const transport = new HttpOutboxTransport({
       endpoint: 'https://sync.example.test/events',
@@ -78,7 +82,10 @@ describe('HttpOutboxTransport', () => {
     let tokenRevision = 0;
     const fetcher: typeof fetch = async (...args) => {
       calls.push(args);
-      return new Response(null, { status: 204 });
+      return new Response(JSON.stringify({ status: calls.length === 1 ? 'APPLIED' : 'REPLAY' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     };
     const transport = new HttpOutboxTransport({
       endpoint: 'https://sync.example.test/events',
@@ -104,6 +111,46 @@ describe('HttpOutboxTransport', () => {
     });
     await expect(transport.deliver(event)).rejects.toThrow(/HTTP 503/);
   });
+
+  it.each([
+    ['an empty response', new Response(null, { status: 204 })],
+    [
+      'malformed JSON',
+      new Response('not-json', { status: 200, headers: { 'content-type': 'application/json' } }),
+    ],
+    [
+      'an unknown receipt',
+      new Response(JSON.stringify({ status: 'QUEUED' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    ],
+  ])('keeps delivery retryable when a 2xx has %s', async (_label, response) => {
+    const transport = new HttpOutboxTransport({
+      endpoint: 'https://sync.example.test/events',
+      fetcher: (async () => response.clone()) as typeof fetch,
+    });
+
+    await expect(transport.deliver(event)).rejects.toMatchObject({
+      kind: 'TRANSIENT',
+      status: response.status,
+    } satisfies Partial<OutboxDeliveryError>);
+  });
+
+  it.each([401, 403])(
+    'keeps HTTP %s authentication failures retryable so queued orders are not quarantined',
+    async (status) => {
+      const transport = new HttpOutboxTransport({
+        endpoint: 'https://sync.example.test/events',
+        fetcher: (async () => new Response(null, { status })) as typeof fetch,
+      });
+
+      await expect(transport.deliver(event)).rejects.toMatchObject({
+        kind: 'TRANSIENT',
+        status,
+      } satisfies Partial<OutboxDeliveryError>);
+    },
+  );
 
   it('requires HTTPS outside loopback development', () => {
     expect(() => new HttpOutboxTransport({ endpoint: 'http://example.test/events' })).toThrow(

@@ -11,6 +11,7 @@ import type {
 } from '@tux/application';
 import type {
   CategoryAlignment,
+  Instant,
   MenuCategoryId,
   ProductId,
   ProductOrderByCategory,
@@ -19,11 +20,24 @@ import type {
   WorkerUiPreferences,
 } from '@tux/domain';
 
-export type TuxSyncHealthSnapshot =
+type TuxSyncDiagnostics = {
+  readonly pendingCount?: number;
+  readonly lastSuccessfulDeliveryAt?: Instant | null;
+  readonly lastError?: string | null;
+  readonly nextRetryAt?: Instant | null;
+};
+
+export type TuxSyncHealthSnapshot = (
   | {
       readonly state: 'LOCAL_ONLY';
       readonly label: 'Local only';
       readonly remoteConfigured: false;
+      readonly attentionRequired: false;
+    }
+  | {
+      readonly state: 'OFFLINE';
+      readonly label: 'Offline';
+      readonly remoteConfigured: true;
       readonly attentionRequired: false;
     }
   | {
@@ -55,7 +69,9 @@ export type TuxSyncHealthSnapshot =
       readonly label: 'Sync issue';
       readonly remoteConfigured: true;
       readonly attentionRequired: true;
-    };
+    }
+) &
+  TuxSyncDiagnostics;
 
 export interface TuxSyncApi {
   readonly getStatus: () => Promise<TuxSyncHealthSnapshot>;

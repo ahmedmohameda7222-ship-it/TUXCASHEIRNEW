@@ -4,10 +4,11 @@ import { syncStatusStore } from './syncStatus';
 
 const STATUS_TEXT: Record<SyncHealthState, string> = {
   LOCAL_ONLY: 'Local only',
+  OFFLINE: 'Offline',
   SYNC_PENDING: 'Syncing…',
   SYNCING: 'Syncing…',
   SYNCED: 'Synced',
-  SYNC_RETRYING: 'Offline',
+  SYNC_RETRYING: 'Sync retrying',
   SYNC_ISSUE: 'Sync issue',
 };
 
@@ -28,6 +29,14 @@ function SyncStatusIcon({ state }: { readonly state: SyncHealthState }) {
     );
   }
   if (state === 'SYNC_RETRYING') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 4 20 20" />
+        <path d="M6.5 9.5A8 8 0 0 1 18 8M8 17a8 8 0 0 0 9.5-2.5" />
+      </svg>
+    );
+  }
+  if (state === 'OFFLINE') {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M4 4 20 20" />
@@ -57,6 +66,14 @@ export function SyncStatusIndicator() {
     syncStatusStore.getSnapshot,
   );
   const text = STATUS_TEXT[snapshot.state];
+  const visibleText =
+    snapshot.pendingCount > 0 ? `${text} · ${snapshot.pendingCount} pending` : text;
+  const diagnostics = [
+    `Pending: ${snapshot.pendingCount}`,
+    `Last successful delivery: ${snapshot.lastSuccessfulDeliveryAt ?? 'Never'}`,
+    `Last error: ${snapshot.lastError ?? 'None'}`,
+    `Next retry: ${snapshot.nextRetryAt ?? 'Not scheduled'}`,
+  ].join(' · ');
 
   return (
     <span
@@ -64,11 +81,11 @@ export function SyncStatusIndicator() {
       data-state={snapshot.state}
       role="status"
       aria-live="polite"
-      aria-label={`Sync status: ${text}`}
-      title={text}
+      aria-label={`Sync status: ${visibleText}. ${diagnostics}`}
+      title={diagnostics}
     >
       <SyncStatusIcon state={snapshot.state} />
-      <span>{text}</span>
+      <span>{visibleText}</span>
     </span>
   );
 }

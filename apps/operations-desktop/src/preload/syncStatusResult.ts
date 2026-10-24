@@ -17,6 +17,12 @@ export function assertSyncHealthSnapshot(value: unknown): TuxSyncHealthSnapshot 
           remoteConfigured: false,
           attentionRequired: false,
         } as const;
+      case 'OFFLINE':
+        return {
+          label: 'Offline',
+          remoteConfigured: true,
+          attentionRequired: false,
+        } as const;
       case 'SYNC_PENDING':
         return {
           label: 'Sync pending',
@@ -57,6 +63,22 @@ export function assertSyncHealthSnapshot(value: unknown): TuxSyncHealthSnapshot 
     value['label'] !== expected.label ||
     value['remoteConfigured'] !== expected.remoteConfigured ||
     value['attentionRequired'] !== expected.attentionRequired
+  ) {
+    throw new TypeError('Invalid sync status response from Electron main process.');
+  }
+
+  if (
+    (value['pendingCount'] !== undefined &&
+      (!Number.isSafeInteger(value['pendingCount']) || Number(value['pendingCount']) < 0)) ||
+    (value['lastSuccessfulDeliveryAt'] !== undefined &&
+      value['lastSuccessfulDeliveryAt'] !== null &&
+      typeof value['lastSuccessfulDeliveryAt'] !== 'string') ||
+    (value['lastError'] !== undefined &&
+      value['lastError'] !== null &&
+      typeof value['lastError'] !== 'string') ||
+    (value['nextRetryAt'] !== undefined &&
+      value['nextRetryAt'] !== null &&
+      typeof value['nextRetryAt'] !== 'string')
   ) {
     throw new TypeError('Invalid sync status response from Electron main process.');
   }

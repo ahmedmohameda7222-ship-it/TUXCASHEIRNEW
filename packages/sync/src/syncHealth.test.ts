@@ -10,6 +10,10 @@ const cleanSummary = {
   dependencyBlocked: 0,
   blockedUntil: null,
   lastError: null,
+  pendingCount: 0,
+  quarantinedCount: 0,
+  nextRetryAt: null,
+  lastSuccessfulDeliveryAt: null,
 } as const;
 
 describe('buildSyncHealth', () => {
@@ -21,6 +25,10 @@ describe('buildSyncHealth', () => {
       label: 'Local only',
       remoteConfigured: false,
       attentionRequired: false,
+      pendingCount: 0,
+      lastSuccessfulDeliveryAt: null,
+      lastError: null,
+      nextRetryAt: null,
     });
   });
 
@@ -53,6 +61,39 @@ describe('buildSyncHealth', () => {
     ).toMatchObject({ state: 'SYNC_ISSUE', attentionRequired: true });
   });
 
+  it('uses Offline only for confirmed connectivity loss and Retrying for delivery failure', () => {
+    expect(
+      buildSyncHealth({
+        remoteConfigured: true,
+        online: false,
+        hasRun: true,
+        lastResult: { ...cleanSummary, pendingCount: 2, lastError: 'HTTP 401' },
+      }),
+    ).toMatchObject({ state: 'OFFLINE', label: 'Offline', pendingCount: 2 });
+    expect(
+      buildSyncHealth({
+        remoteConfigured: true,
+        online: true,
+        hasRun: true,
+        lastResult: { ...cleanSummary, pendingCount: 2, lastError: 'HTTP 401' },
+      }),
+    ).toMatchObject({ state: 'SYNC_RETRYING', label: 'Sync retrying', pendingCount: 2 });
+  });
+
+  it('does not report Synced while durable pending events remain', () => {
+    expect(
+      buildSyncHealth({
+        remoteConfigured: true,
+        hasRun: true,
+        lastResult: {
+          ...cleanSummary,
+          pendingCount: 1,
+          nextRetryAt: instant('2026-08-20T00:01:00.000Z'),
+        },
+      }),
+    ).toMatchObject({ state: 'SYNC_PENDING', pendingCount: 1 });
+  });
+
   it('carries permanent conflict detail into the visible sync issue snapshot', () => {
     const detail =
       'Order 8 is already DONE locally after canonical inventory rejection; manual reconciliation required.';
@@ -81,6 +122,10 @@ describe('buildSyncHealth', () => {
       label: 'Sync issue',
       remoteConfigured: true,
       attentionRequired: true,
+      pendingCount: 0,
+      lastSuccessfulDeliveryAt: null,
+      lastError: null,
+      nextRetryAt: null,
     });
   });
 });

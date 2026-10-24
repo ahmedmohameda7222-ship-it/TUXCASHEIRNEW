@@ -10,6 +10,10 @@ const cleanSummary: OutboxSyncSummary = {
   dependencyBlocked: 0,
   blockedUntil: null,
   lastError: null,
+  pendingCount: 0,
+  quarantinedCount: 0,
+  nextRetryAt: null,
+  lastSuccessfulDeliveryAt: null,
 };
 
 afterEach(() => {
@@ -57,5 +61,26 @@ describe('renderer sync status store', () => {
 
     await vi.advanceTimersByTimeAsync(1);
     expect(store.getSnapshot().state).toBe('SYNC_PENDING');
+  });
+
+  it('reports Offline only from navigator connectivity and Retrying for an online delivery error', () => {
+    const store = createSyncStatusStore({ visibilityDelayMs: 0 });
+    store.markRemoteConfigured();
+    store.setOnline(true);
+    store.markSyncFinished({
+      ...cleanSummary,
+      failed: 1,
+      pendingCount: 2,
+      lastError: 'Remote outbox endpoint rejected event with HTTP 401.',
+      nextRetryAt: '2026-08-24T06:00:02.000Z' as never,
+    });
+    expect(store.getSnapshot()).toMatchObject({
+      state: 'SYNC_RETRYING',
+      pendingCount: 2,
+      lastError: 'Remote outbox endpoint rejected event with HTTP 401.',
+    });
+
+    store.setOnline(false);
+    expect(store.getSnapshot()).toMatchObject({ state: 'OFFLINE', pendingCount: 2 });
   });
 });

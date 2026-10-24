@@ -304,6 +304,10 @@ button:not(:disabled) {
   color: var(--tux-warning);
 }
 
+.sync-status[data-state='OFFLINE'] {
+  color: var(--tux-text-secondary);
+}
+
 .sync-status[data-state='SYNC_ISSUE'] {
   color: var(--tux-destructive);
 }

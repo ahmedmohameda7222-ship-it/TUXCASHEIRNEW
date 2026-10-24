@@ -40,7 +40,13 @@ function normalizeTimeout(value: number | undefined): number {
 }
 
 function responseFailure(status: number): OutboxDeliveryError {
-  const transient = status === 408 || status === 425 || status === 429 || status >= 500;
+  const transient =
+    status === 401 ||
+    status === 403 ||
+    status === 408 ||
+    status === 425 ||
+    status === 429 ||
+    status >= 500;
   return new OutboxDeliveryError(
     `Remote outbox endpoint rejected event with HTTP ${status}.`,
     transient ? 'TRANSIENT' : 'PERMANENT',
@@ -150,6 +156,28 @@ export class HttpOutboxTransport implements OutboxTransport {
           }
         }
         throw responseFailure(response.status);
+      }
+
+      let receipt: unknown;
+      try {
+        receipt = await response.json();
+      } catch {
+        throw new OutboxDeliveryError(
+          'Remote outbox endpoint did not provide a verified delivery receipt.',
+          'TRANSIENT',
+          response.status,
+        );
+      }
+      const status =
+        typeof receipt === 'object' && receipt !== null && 'status' in receipt
+          ? (receipt as { readonly status?: unknown }).status
+          : null;
+      if (status !== 'APPLIED' && status !== 'REPLAY') {
+        throw new OutboxDeliveryError(
+          'Remote outbox endpoint did not provide a verified delivery receipt.',
+          'TRANSIENT',
+          response.status,
+        );
       }
     } catch (cause) {
       if (cause instanceof OutboxDeliveryError) throw cause;

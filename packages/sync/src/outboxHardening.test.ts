@@ -65,6 +65,19 @@ function fakeDatabase(initial: readonly OutboxEvent[]) {
       pending.filter(
         (candidate) => !delivered.includes(candidate.id) && !quarantined.includes(candidate.id),
       ),
+    getDeliveryStatus: async () => {
+      const remaining = pending.filter(
+        (candidate) => !delivered.includes(candidate.id) && !quarantined.includes(candidate.id),
+      );
+      const latestFailure = failures.at(-1);
+      return {
+        pendingCount: remaining.length,
+        quarantinedCount: quarantined.length,
+        nextAttemptAt: null,
+        lastError: latestFailure?.error ?? null,
+        lastSuccessfulDeliveryAt: delivered.length > 0 ? createdAt : null,
+      };
+    },
     markDelivered: async (id: OutboxEventId) => {
       delivered.push(id);
     },

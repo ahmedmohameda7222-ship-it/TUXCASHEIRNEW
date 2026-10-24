@@ -349,6 +349,36 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
           .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
           .slice(0, limit);
       },
+      async getDeliveryStatus(shopId?: ShopId) {
+        const all = (await requestResult(
+          store('outboxEvents').index('createdAt').getAll(),
+        )) as StoredOutboxEvent[];
+        const scoped = all.filter((event) => shopId === undefined || event.shopId === shopId);
+        const pending = scoped.filter(
+          (event) => event.deliveredAt === null && (event.quarantinedAt ?? null) === null,
+        );
+        const latestFailure = scoped
+          .filter((event) => event.deliveredAt === null && event.lastError !== null)
+          .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+        const latestDelivery = scoped
+          .filter((event) => event.deliveredAt !== null)
+          .sort((left, right) =>
+            (right.deliveredAt ?? '').localeCompare(left.deliveredAt ?? ''),
+          )[0];
+        return {
+          pendingCount: pending.length,
+          quarantinedCount: scoped.filter(
+            (event) => event.deliveredAt === null && (event.quarantinedAt ?? null) !== null,
+          ).length,
+          nextAttemptAt:
+            pending
+              .map((event) => event.nextAttemptAt)
+              .filter((value): value is Instant => value !== null)
+              .sort()[0] ?? null,
+          lastError: latestFailure?.lastError ?? null,
+          lastSuccessfulDeliveryAt: latestDelivery?.deliveredAt ?? null,
+        };
+      },
       async markDelivered(id: OutboxEventId, deliveredAt: Instant) {
         const objectStore = store('outboxEvents');
         const existing = await recordOrNull<StoredOutboxEvent>(objectStore.get(id));

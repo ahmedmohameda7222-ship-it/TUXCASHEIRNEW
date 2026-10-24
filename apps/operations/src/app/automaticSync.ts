@@ -137,6 +137,7 @@ export function startBrowserAutomaticSync(input: {
   const onOnline = (): void => {
     if (stopped) return;
     browserSyncStatusStore.setOnline(true);
+    scheduler.trigger();
     void synchronizeRewardClaims();
     void synchronizeInventory();
     void synchronizeLifecycle();
