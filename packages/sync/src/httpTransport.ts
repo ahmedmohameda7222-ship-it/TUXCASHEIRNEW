@@ -72,7 +72,7 @@ export class HttpOutboxTransport implements OutboxTransport {
     this.#headerProvider = options.headerProvider ?? null;
     this.#beforeDeliver = options.beforeDeliver ?? null;
     this.#onConflict = options.onConflict ?? null;
-    this.#fetcher = options.fetcher ?? fetch;
+    this.#fetcher = options.fetcher ?? globalThis.fetch.bind(globalThis);
     this.#timeoutMs = normalizeTimeout(options.timeoutMs);
   }
 
