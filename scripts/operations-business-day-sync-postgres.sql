@@ -238,3 +238,43 @@ begin
   end if;
   raise notice 'PASS: cross-browser distinct worker sessions share the canonical OPEN day';
 end $body$;
+
+-- One worker may operate from many authorized browser/device sessions. Final-worker
+-- routing must count the durable open sessions, not distinct worker identities,
+-- otherwise any one of 100 same-worker browsers is incorrectly treated as final.
+do $body$
+declare
+  s uuid := '52000000-0000-4000-8000-000000000001';
+  d2 uuid := '56000000-0000-4000-8000-000000000002';
+  w uuid := '53000000-0000-4000-8000-000000000001';
+  n integer;
+  row jsonb;
+  snapshot jsonb;
+begin
+  -- The first same-worker session already exists; add 99 more, plus the distinct
+  -- worker from the preceding acceptance case, for 101 total open sessions.
+  for n in 1..99 loop
+    row := jsonb_build_object(
+      'id', md5('same-worker-session-' || n::text)::uuid,
+      'shop_id', s,
+      'business_day_id', d2,
+      'worker_id', w,
+      'started_at', '2026-10-11T10:00:00Z'::timestamptz + n * interval '1 second',
+      'ended_at', null
+    );
+    if pg_temp.test_rpc(
+      md5('same-worker-event-' || n::text)::uuid,
+      'WORKER_SIGNED_IN', d2, 'worker_sessions', row, 'UPSERT', true
+    ) <> 'APPLIED' then
+      raise exception 'Same-worker session % could not sign in', n;
+    end if;
+  end loop;
+  snapshot := public.read_tux_operations_business_day_state_v2(
+    '54000000-0000-4000-8000-000000000001',
+    '55000000-0000-4000-8000-000000000001', d2
+  );
+  if (snapshot ->> 'openWorkerCount') <> '101' then
+    raise exception 'Expected 101 open sessions across repeated worker/device logins, got %', snapshot;
+  end if;
+  raise notice 'PASS: 100 same-worker browser sessions plus a second worker share one canonical day';
+end $body$;

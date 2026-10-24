@@ -7,6 +7,23 @@ const reviewedSha = 'f26b4eb040050226412668d84461dd4697d1069b';
 const rawBase = 'https://raw.githubusercontent.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/';
 
 describe('operations-sync deployment dependency provenance', () => {
+  it.each(['operations-order-lifecycle', 'operations-order-rewards'])(
+    'keeps %s independently deployable with an explicit Supabase import map',
+    (functionName) => {
+      const mapUrl = new URL(
+        `../../../supabase/functions/${functionName}/deno.json`,
+        import.meta.url,
+      );
+      const imports = (
+        JSON.parse(readFileSync(mapUrl, 'utf8')) as {
+          imports: Record<string, string>;
+        }
+      ).imports;
+
+      expect(imports['@supabase/supabase-js']).toMatch(/^jsr:@supabase\/supabase-js@2/);
+    },
+  );
+
   it('pins the deployed materializer and domain to the reviewed CAS-capable baseline', () => {
     const mapUrl = new URL(
       '../../../supabase/functions/operations-sync/deno.json',

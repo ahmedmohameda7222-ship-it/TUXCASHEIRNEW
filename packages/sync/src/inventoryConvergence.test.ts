@@ -1,14 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseEntityId, type ShopId } from '@tux/domain';
 import type { OperationsDatabase, OperationsTransaction } from '@tux/persistence';
 
 import {
+  HttpInventoryFeedTransport,
   InventoryConvergenceService,
   type InventoryConvergencePage,
   type InventoryFeedTransport,
 } from './inventoryConvergence';
 
 const SHOP_ID = parseEntityId<ShopId>('11000000-0000-4000-8000-000000000099');
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 class MemoryDatabase implements OperationsDatabase {
   cursor: string | null = null;
@@ -46,6 +51,31 @@ function emptyPage(input: { cursor: string; hasMore: boolean }): InventoryConver
 }
 
 describe('InventoryConvergenceService', () => {
+  it('invokes the default browser fetch with the global receiver', async () => {
+    const nativeFetch = vi.fn(function (this: unknown) {
+      if (this !== globalThis) throw new TypeError('Illegal invocation');
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            shopId: SHOP_ID,
+            items: [],
+            movements: [],
+            costs: [],
+            nextCursor: null,
+            hasMore: false,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      );
+    }) as unknown as typeof fetch;
+    vi.stubGlobal('fetch', nativeFetch);
+    const transport = new HttpInventoryFeedTransport({
+      endpoint: 'https://operations.example.test/api/operations-inventory',
+    });
+
+    await expect(transport.pull(SHOP_ID, null)).resolves.toMatchObject({ shopId: SHOP_ID });
+  });
+
   it('continues catch-up past the former default page cap until the feed tail', async () => {
     const database = new MemoryDatabase();
     let pulls = 0;

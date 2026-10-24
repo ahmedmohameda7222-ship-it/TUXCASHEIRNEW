@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   instant,
@@ -10,6 +10,7 @@ import {
 } from '@tux/domain';
 import type { OperationsDatabase, OperationsTransaction } from '@tux/persistence';
 import {
+  HttpOrderLifecycleFeedTransport,
   OrderLifecycleConvergenceService,
   type OrderLifecycleFeedPage,
   type OrderLifecycleFeedTransport,
@@ -17,6 +18,10 @@ import {
 
 const shopId = parseEntityId<ShopId>('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
 const orderId = parseEntityId<OrderId>('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function order(): OrderSnapshot {
   return {
@@ -111,6 +116,29 @@ function fakeDatabase() {
 }
 
 describe('OrderLifecycleConvergenceService', () => {
+  it('invokes the default browser fetch with the global receiver', async () => {
+    const nativeFetch = vi.fn(function (this: unknown) {
+      if (this !== globalThis) throw new TypeError('Illegal invocation');
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            shopId,
+            events: [],
+            nextCursor: null,
+            hasMore: false,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      );
+    }) as unknown as typeof fetch;
+    vi.stubGlobal('fetch', nativeFetch);
+    const transport = new HttpOrderLifecycleFeedTransport({
+      endpoint: 'https://operations.example.test/api/operations-order-lifecycle',
+    });
+
+    await expect(transport.pull(shopId, null)).resolves.toMatchObject({ shopId });
+  });
+
   it('applies an Admin cancellation and advances the durable cursor atomically', async () => {
     const state = fakeDatabase();
     const page: OrderLifecycleFeedPage = {
