@@ -45,9 +45,10 @@ begin
   -- A locally queued End Day emits CLOSED before the final SIGNED_OUT update:
   -- closing an already-existing session remains legal, but a new OPEN worker cannot
   -- join a day the canonical server has already closed.
-  if tg_table_name = 'worker_sessions'
-     and new.ended_at is null and v_status = 'CLOSED' then
-    raise exception 'TUX_BUSINESS_DAY_ALREADY_CLOSED:%', new.business_day_id;
+  if tg_table_name = 'worker_sessions' then
+    if new.ended_at is null and v_status = 'CLOSED' then
+      raise exception 'TUX_BUSINESS_DAY_ALREADY_CLOSED:%', new.business_day_id;
+    end if;
   end if;
   return new;
 end;
