@@ -459,7 +459,8 @@ async function callSupabaseFunction(
   if (
     functionName === 'operations-config' ||
     functionName === 'operations-inventory' ||
-    functionName === 'operations-order-lifecycle'
+    functionName === 'operations-order-lifecycle' ||
+    (functionName === 'operations-sync' && request.method === 'GET')
   ) {
     target.search = incomingUrl.search;
   }

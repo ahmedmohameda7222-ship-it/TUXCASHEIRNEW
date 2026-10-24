@@ -62,9 +62,14 @@ Deno.serve(async (request) => {
     const reader = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
-    const { data, error } = await reader.rpc('read_tux_operations_open_business_day_v1', {
+    const localDayId = new URL(request.url).searchParams.get('localDayId');
+    if (localDayId !== null && !UUID_PATTERN.test(localDayId)) {
+      return jsonResponse(400, { error: 'invalid_local_day_id' });
+    }
+    const { data, error } = await reader.rpc('read_tux_operations_business_day_state_v2', {
       p_auth_user_id: userData.user.id,
       p_device_id: deviceId,
+      p_local_day_id: localDayId,
     });
     if (error) {
       if (error.message?.includes('TUX_DEVICE_NOT_AUTHORIZED')) {
@@ -78,6 +83,7 @@ Deno.serve(async (request) => {
       openDayId: data.openDayId ?? null,
       openDay: data.openDay ?? null,
       openWorkerCount: data.openWorkerCount ?? 0,
+      localDayStatus: data.localDayStatus ?? null,
     });
   }
 

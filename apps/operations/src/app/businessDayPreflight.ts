@@ -1,8 +1,9 @@
-import type { BusinessDay, OpenBusinessDay, ShopId } from '@tux/domain';
+import type { BusinessDay, BusinessDayId, OpenBusinessDay, ShopId } from '@tux/domain';
 
 export interface CanonicalBusinessDayState {
   readonly day: OpenBusinessDay | null;
   readonly openWorkerCount: number;
+  readonly localDayStatus?: 'OPEN' | 'CLOSED' | null;
 }
 
 /**
@@ -15,21 +16,27 @@ export async function reconcileCanonicalBusinessDay(input: {
   readonly shopId: ShopId;
   readonly drainLocalOutbox: () => Promise<void>;
   readonly getLocalOpenDay: () => Promise<OpenBusinessDay | null>;
-  readonly getCanonicalState: (shopId: ShopId) => Promise<CanonicalBusinessDayState>;
+  readonly getCanonicalState: (
+    shopId: ShopId,
+    localDayId: BusinessDayId | null,
+  ) => Promise<CanonicalBusinessDayState>;
   readonly adoptCanonicalDay: (
-    canonical: OpenBusinessDay,
+    canonical: OpenBusinessDay | null,
     previouslyLocal: OpenBusinessDay | null,
   ) => Promise<void>;
 }): Promise<number> {
   await input.drainLocalOutbox();
-  const canonical = await input.getCanonicalState(input.shopId);
+  const local = await input.getLocalOpenDay();
+  const canonical = await input.getCanonicalState(input.shopId, local?.id ?? null);
   if (!Number.isSafeInteger(canonical.openWorkerCount) || canonical.openWorkerCount < 0) {
     throw new Error('Canonical open-worker count is invalid.');
   }
   if (canonical.day !== null && canonical.day.shopId !== input.shopId) {
     throw new Error('Canonical Business Day response belongs to a different shop.');
   }
-  const local = await input.getLocalOpenDay();
+  if (local !== null && canonical.day === null && canonical.localDayStatus === 'CLOSED') {
+    await input.adoptCanonicalDay(null, local);
+  }
   if (
     canonical.day !== null &&
     (canonical.day.id !== local?.id ||
