@@ -71,3 +71,27 @@ for each row execute function private.tux_guard_business_day_dependency_v1();
 create trigger tux_order_status_day_dependency_guard
 before insert or update on public.order_status_events
 for each row execute function private.tux_guard_business_day_dependency_v1();
+
+-- Canonical read is scoped exclusively to the authenticated, active enrolled device.
+-- No client-provided shop identity is used to authorize the read.
+create or replace function public.read_tux_operations_open_business_day_v1(
+  p_auth_user_id uuid,
+  p_device_id uuid
+) returns jsonb language plpgsql security definer
+set search_path = pg_catalog, public, private as $$
+declare v_shop_id uuid; v_day_id uuid;
+begin
+  select d.shop_id into v_shop_id from public.devices d
+  join public.shop_memberships m on m.shop_id = d.shop_id and m.auth_user_id = d.auth_user_id
+  where d.id = p_device_id and d.auth_user_id = p_auth_user_id
+    and d.active and m.active and m.role = 'OPERATIONS_DEVICE';
+  if v_shop_id is null then raise exception 'TUX_DEVICE_NOT_AUTHORIZED'; end if;
+  select bd.id into v_day_id from public.business_days bd
+  where bd.shop_id = v_shop_id and bd.status = 'OPEN' limit 1;
+  return jsonb_build_object('shopId', v_shop_id, 'openDayId', v_day_id);
+end;
+$$;
+revoke all on function public.read_tux_operations_open_business_day_v1(uuid,uuid)
+  from public, anon, authenticated;
+grant execute on function public.read_tux_operations_open_business_day_v1(uuid,uuid)
+  to service_role;

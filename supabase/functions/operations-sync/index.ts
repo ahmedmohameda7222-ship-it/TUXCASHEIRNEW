@@ -33,7 +33,9 @@ function bearerToken(request: Request): string | null {
 }
 
 Deno.serve(async (request) => {
-  if (request.method !== 'POST') return jsonResponse(405, { error: 'method_not_allowed' });
+  if (request.method !== 'POST' && request.method !== 'GET') {
+    return jsonResponse(405, { error: 'method_not_allowed' });
+  }
 
   const token = bearerToken(request);
   const deviceId = request.headers.get('x-tux-device-id')?.trim() ?? '';
@@ -54,6 +56,27 @@ Deno.serve(async (request) => {
   const { data: userData, error: userError } = await userClient.auth.getUser(token);
   if (userError || !userData.user) {
     return jsonResponse(401, { error: 'invalid_access_token' });
+  }
+
+  if (request.method === 'GET') {
+    const reader = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await reader.rpc('read_tux_operations_open_business_day_v1', {
+      p_auth_user_id: userData.user.id,
+      p_device_id: deviceId,
+    });
+    if (error) {
+      if (error.message?.includes('TUX_DEVICE_NOT_AUTHORIZED')) {
+        return jsonResponse(403, { error: 'device_not_authorized' });
+      }
+      console.error('operations-sync canonical business day read failed', error);
+      return jsonResponse(503, { error: 'canonical_business_day_unavailable' });
+    }
+    return jsonResponse(200, {
+      shopId: data.shopId,
+      openDayId: data.openDayId ?? null,
+    });
   }
 
   let envelope: unknown;

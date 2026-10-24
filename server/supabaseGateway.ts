@@ -466,7 +466,8 @@ async function callSupabaseFunction(
 
   return fetch(target, {
     method:
-      functionName === 'operations-sync' || functionName === 'operations-order-rewards'
+      functionName === 'operations-order-rewards' ||
+      (functionName === 'operations-sync' && request.method === 'POST')
         ? 'POST'
         : 'GET',
     headers: {
@@ -491,7 +492,8 @@ export async function proxyAuthenticatedFunction(
     | 'operations-order-rewards',
 ): Promise<void> {
   const expectedMethod =
-    functionName === 'operations-sync' || functionName === 'operations-order-rewards'
+    functionName === 'operations-order-rewards' ||
+    (functionName === 'operations-sync' && request.method !== 'GET')
       ? 'POST'
       : 'GET';
   if (request.method !== expectedMethod) {

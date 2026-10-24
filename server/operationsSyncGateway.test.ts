@@ -60,6 +60,23 @@ afterEach(() => {
 });
 
 describe('operations sync gateway', () => {
+  it('proxies authenticated read-only canonical day lookup without posting an event', async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ shopId: SHOP_ID, openDayId: null }), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    const req = { ...request({}), method: 'GET' } as GatewayRequest;
+    const output = responseCapture();
+    await proxyAuthenticatedFunction(req, output.response, 'operations-sync');
+    expect(output.status()).toBe(200);
+    expect(output.json()).toEqual({ shopId: SHOP_ID, openDayId: null });
+    const [url, init] = fetcher.mock.calls[0] as [URL, RequestInit];
+    expect(String(url)).toBe('https://project.supabase.co/functions/v1/operations-sync');
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+    expect(init.headers).toMatchObject({ 'x-tux-device-id': DEVICE_ID });
+  });
+
   it('forwards the durable envelope with device authentication and preserves a verified receipt', async () => {
     const envelope = {
       eventId: '20000000-0000-4000-8000-000000000001',
