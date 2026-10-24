@@ -16,6 +16,14 @@ describe('Operations shop-scoped background sync lifecycle', () => {
     expect(source).toContain('startRemoteRuntime(result.value.shopId);');
   });
 
+  it('attempts durable worker sign-out delivery before stopping remote sync', () => {
+    const section = source.slice(source.indexOf('const signOut = async'), source.indexOf('if (preferenceRetryStarted'));
+    const flush = section.indexOf('await flushShopOutbox(');
+    const stop = section.indexOf('stopRemoteRuntime();');
+    expect(flush).toBeGreaterThanOrEqual(0);
+    expect(stop).toBeGreaterThan(flush);
+  });
+
   it('stops the background sync at sign out and when a stale server session is fenced', () => {
     expect(source).toContain('const stopRemoteRuntime = (): void => {');
     expect(source).toContain('stopRemoteRuntime();');
