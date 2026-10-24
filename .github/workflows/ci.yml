@@ -2,31 +2,205 @@ name: TUX V2 CI
 
 on:
   pull_request:
-    branches:
-      - main
-      - integration/tux-operations-v2
+    branches: [main, integration/tux-operations-v2]
   push:
-    branches:
-      - main
-      - integration/tux-operations-v2
-      - 'feat/ops-*'
-      - 'fix/operations-*'
-      - 'ui/tux-pos-refinement'
-      - 'work/operations-whatsapp-inbox-live'
-      - 'work/menu-online-orders-integration'
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: tux-v2-ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: tux-v2-fast-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  quality:
-    name: quality
+  changes:
+    name: Changed paths
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 3
+    outputs:
+      static: ${{ steps.scope.outputs.static }}
+      unit: ${{ steps.scope.outputs.unit }}
+      types: ${{ steps.scope.outputs.types }}
+      shared: ${{ steps.scope.outputs.shared }}
+      admin: ${{ steps.scope.outputs.admin }}
+      operations: ${{ steps.scope.outputs.operations }}
+      desktop: ${{ steps.scope.outputs.desktop }}
+      menu: ${{ steps.scope.outputs.menu }}
+      api: ${{ steps.scope.outputs.api }}
+      e2e: ${{ steps.scope.outputs.e2e }}
+      migration: ${{ steps.scope.outputs.migration }}
+      edge: ${{ steps.scope.outputs.edge }}
+      security: ${{ steps.scope.outputs.security }}
+      whatsapp: ${{ steps.scope.outputs.whatsapp }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify change-selector regressions
+        run: node --test scripts/ci-fast-scope.test.mjs
+      - name: Select affected checks
+        id: scope
+        env:
+          TUX_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          TUX_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/ci-fast-scope.mjs
+
+  style:
+    name: Changed-file format and lint
+    needs: changes
+    if: needs.changes.outputs.static == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Check only changed source files
+        shell: bash
+        env:
+          TUX_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          TUX_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          base="$TUX_BASE_SHA"
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then base="$(git rev-parse HEAD^)"; fi
+          mapfile -d '' files < <(git diff --diff-filter=ACMR --name-only -z "$base" "$TUX_HEAD_SHA")
+          format=()
+          lint=()
+          for file in "${files[@]}"; do
+            [[ -f "$file" ]] || continue
+            if [[ "$file" =~ ^(api|server|apps|packages|e2e)/.*\.(ts|tsx|mjs|css|html|json)$ || "$file" =~ ^\.github/workflows/.*\.yml$ || "$file" =~ ^scripts/ci-fast-.*\.mjs$ || "$file" =~ ^(package(-lock)?\.json|playwright.*\.ts)$ ]]; then
+              format+=("$file")
+            fi
+            if [[ "$file" =~ ^(api|server|apps|packages|e2e)/.*\.(ts|tsx|mjs)$ || "$file" =~ ^playwright.*\.ts$ ]]; then
+              lint+=("$file")
+            fi
+          done
+          if (( ${#format[@]} )); then npx prettier --check "${format[@]}"; fi
+          if (( ${#lint[@]} )); then npx eslint "${lint[@]}" --max-warnings 0; fi
+
+  unit:
+    name: Related unit and integration tests
+    needs: changes
+    if: needs.changes.outputs.unit == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Test the modules changed by this PR
+        shell: bash
+        env:
+          TUX_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          TUX_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          base="$TUX_BASE_SHA"
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then base="$(git rev-parse HEAD^)"; fi
+          mapfile -d '' files < <(git diff --diff-filter=ACMR --name-only -z "$base" "$TUX_HEAD_SHA")
+          related=()
+          for file in "${files[@]}"; do
+            if [[ -f "$file" && "$file" =~ ^(api|server|apps|packages)/.*\.(ts|tsx|js|jsx|mjs|cjs)$ ]]; then
+              related+=("$file")
+            fi
+          done
+          if (( ${#related[@]} )); then
+            npx vitest related --run --exclude 'e2e/**' --exclude 'scripts/monorepo-architecture-guard.test.mjs' --exclude 'scripts/catalog-architecture-guard.test.mjs' "${related[@]}"
+          fi
+
+  types:
+    name: Affected workspace typechecks
+    needs: changes
+    if: needs.changes.outputs.types == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      SHARED: ${{ needs.changes.outputs.shared }}
+      ADMIN: ${{ needs.changes.outputs.admin }}
+      OPERATIONS: ${{ needs.changes.outputs.operations }}
+      DESKTOP: ${{ needs.changes.outputs.desktop }}
+      MENU: ${{ needs.changes.outputs.menu }}
+      API: ${{ needs.changes.outputs.api }}
+      E2E: ${{ needs.changes.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Check impacted TypeScript workspaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$SHARED" == true ]]; then
+            npm run typecheck
+          else
+            if [[ "$ADMIN" == true ]]; then npm run typecheck -w @tux/admin; fi
+            if [[ "$OPERATIONS" == true ]]; then npm run typecheck -w @tux/operations; fi
+            if [[ "$DESKTOP" == true ]]; then npm run typecheck -w @tux/operations-desktop; fi
+            if [[ "$MENU" == true ]]; then npm run typecheck -w @tux/menu; fi
+            if [[ "$API" == true ]]; then npx tsc --noEmit -p tsconfig.api.json; fi
+            if [[ "$E2E" == true ]]; then npm run typecheck:e2e; fi
+          fi
+
+  security:
+    name: Relevant security contracts
+    needs: changes
+    if: needs.changes.outputs.security == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      WHATSAPP: ${{ needs.changes.outputs.whatsapp }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Relevant authorization and messaging guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:admin-security
+          if [[ "$WHATSAPP" == true ]]; then
+            npm run test:whatsapp-security
+            npm run test:whatsapp-architecture
+          fi
+
+  migrations:
+    name: Database migration chain
+    needs: changes
+    if: needs.changes.outputs.migration == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
@@ -46,292 +220,71 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v7
-      - name: Verify checkout commit identity
-        shell: bash
-        run: |
-          echo "event=$GITHUB_EVENT_NAME"
-          echo "github_sha=$GITHUB_SHA"
-          echo "git_head=$(git rev-parse HEAD)"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
-      - name: Install locked dependencies
-        run: npm ci
-      - name: Format check
-        run: npm run format:check
-      - name: Lint
-        run: npm run lint
-      - name: Unit and integration tests
-        run: npm run test
-      - name: Sync workspace domain source regression
-        run: npm test -w @tux/sync
-      - name: Admin security gate
-        run: npm run test:admin-security
-      - name: Admin Vercel deployment schema contract
-        run: npm run test:admin-deployment
-      - name: WhatsApp architecture gate
-        run: npm run test:whatsapp-architecture
-      - name: WhatsApp security gate
-        run: npm run test:whatsapp-security
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Production builds
-        run: npm run build
-      - name: Development provisioning safety smoke
-        shell: bash
-        run: |
-          if NODE_ENV=production npm run dev:provision -- --database .tmp/provision-production.sqlite3; then
-            echo 'Production provisioning unexpectedly succeeded.' >&2
-            exit 1
-          fi
-          npm run dev:provision -- --database .tmp/provision.sqlite3 --pin 2468 --secondary-pin 1357
-          test -f apps/operations-desktop/.tmp/provision.sqlite3
-          rm -rf apps/operations-desktop/.tmp
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends postgresql-client
-      - name: Migration-chain smoke
-        run: npm run test:migrations
+      - run: npm ci
+      - name: Install local PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Verify migration chain only when schema changes
+        run: node scripts/test-migrations.mjs
+
+  edge:
+    name: Changed Edge Function typechecks
+    needs: changes
+    if: needs.changes.outputs.edge == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v1.46.3
-      - name: Supabase function auth deployment contract
-        run: deno test --allow-read scripts/supabaseFunctionAuthConfig.deno.ts
-      - name: Edge Function typecheck
-        run: |
-          deno check --config supabase/functions/device-enroll/deno.json supabase/functions/device-enroll/index.ts
-          deno check --config supabase/functions/device-bootstrap/deno.json supabase/functions/device-bootstrap/index.ts
-          deno check --config supabase/functions/operations-config/deno.json supabase/functions/operations-config/index.ts
-          deno check --config supabase/functions/operations-inventory/deno.json supabase/functions/operations-inventory/index.ts
-          deno check --config supabase/functions/operations-sync/deno.json supabase/functions/operations-sync/index.ts
-          deno check --config supabase/functions/worker-auth/deno.json supabase/functions/worker-auth/index.ts
-          deno check --config supabase/functions/catalog-public/deno.json supabase/functions/catalog-public/index.ts
-          deno check --config supabase/functions/catalog-admin/deno.json supabase/functions/catalog-admin/index.ts
-          deno check --config supabase/functions/order-intake/deno.json supabase/functions/order-intake/index.ts
-          deno check --config supabase/functions/online-order-operations/deno.json supabase/functions/online-order-operations/index.ts
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Rendered browser E2E
-        run: npm run test:e2e
-      - name: Upload rendered QA evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: operations-rendered-e2e
-          path: |
-            playwright-report
-            test-results
-          if-no-files-found: warn
-          retention-days: 14
-
-  admin:
-    name: admin
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-    steps:
-      - uses: actions/checkout@v7
-      - name: Verify checkout commit identity
+          deno-version: v2.x
+      - name: Typecheck updated Supabase Functions
         shell: bash
+        env:
+          TUX_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          TUX_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          echo "event=$GITHUB_EVENT_NAME"
-          echo "github_sha=$GITHUB_SHA"
-          echo "git_head=$(git rev-parse HEAD)"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: npm
-      - name: Install locked root dependencies
-        run: npm ci
-      - name: Admin security boundary
-        run: npm run test:admin-security
-      - name: Admin UI deterministic CSS and canonical brand checks
-        run: |
-          node scripts/test-admin-ui-css-ownership.mjs
-          node scripts/test-admin-brand-parity.mjs
-      - name: Admin typecheck
-        run: npm run typecheck:admin
-      - name: Admin production build
-        run: npm run build:admin
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Admin auth, shop isolation, and responsive shell E2E
-        run: npm run test:e2e:admin
-      - name: Upload Admin rendered QA evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: admin-rendered-e2e
-          path: |
-            playwright-report-admin
-            test-results
-          if-no-files-found: warn
-          retention-days: 14
-
-  edge-security:
-    name: edge-security
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-      - uses: denoland/setup-deno@v2
-        with:
-          deno-version: v1.46.3
-      - name: Device bootstrap provenance behavioral tests
-        run: >-
-          deno test --allow-env --allow-net --allow-run --allow-read
-          supabase/functions/device-bootstrap/security.deno.ts
-      - name: Catalog public/admin boundary behavioral tests
-        run: >-
-          deno test
-          supabase/functions/catalog-public/catalog-public.deno.ts
-          supabase/functions/catalog-admin/catalog-admin.deno.ts
-      - name: Public online-order intake behavioral tests
-        run: deno test scripts/order-intake.deno.ts
-      - name: Authenticated online-order Operations behavioral tests
-        run: deno test scripts/online-order-operations.deno.ts
-
-  windows-package:
-    name: windows-package
-    runs-on: windows-latest
-    timeout-minutes: 35
-    env:
-      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: npm
-      - name: Install locked dependencies
-        run: npm ci
-      - name: Build unsigned Windows x64 package
-        run: npm run package:win -- --publish never
-      - name: Upload unsigned Windows package
-        uses: actions/upload-artifact@v4
-        with:
-          name: tux-operations-windows-x64-unsigned
-          path: release/windows/*.exe
-          if-no-files-found: error
-          retention-days: 14
-
-  menu:
-    name: menu
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-    steps:
-      - uses: actions/checkout@v7
-      - name: Verify checkout commit identity
-        shell: bash
-        run: |
-          echo "event=$GITHUB_EVENT_NAME"
-          echo "github_sha=$GITHUB_SHA"
-          echo "git_head=$(git rev-parse HEAD)"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: npm
-      - name: Install locked root dependencies
-        run: npm ci
-      - name: Menu typecheck
-        run: npm run typecheck:menu
-      - name: Menu production build
-        run: npm run build:menu
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Rendered Menu E2E
-        run: npm run test:e2e:menu
-      - name: Upload Menu rendered QA evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: menu-rendered-e2e
-          path: |
-            playwright-report-menu
-            test-results
-          if-no-files-found: warn
-          retention-days: 14
-
-  architecture:
-    name: monorepo-architecture
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-      - name: Monorepo architecture guards
-        run: npm run test:monorepo-architecture
-      - name: Canonical catalog architecture guards
-        run: npm run test:catalog-architecture
+          set -euo pipefail
+          base="$TUX_BASE_SHA"
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then base="$(git rev-parse HEAD^)"; fi
+          mapfile -d '' files < <(git diff --name-only -z "$base" "$TUX_HEAD_SHA")
+          declare -A functions=()
+          for file in "${files[@]}"; do
+            if [[ "$file" =~ ^supabase/functions/([^/]+)/ ]]; then functions["${BASH_REMATCH[1]}"]=1; fi
+          done
+          for function in "${!functions[@]}"; do
+            if [[ -f "supabase/functions/$function/index.ts" ]]; then
+              deno check --config "supabase/functions/$function/deno.json" "supabase/functions/$function/index.ts"
+            fi
+          done
 
   required-quality-gate:
     name: Required quality gate
     if: always()
-    needs:
-      - quality
-      - admin
-      - edge-security
-      - windows-package
-      - menu
-      - architecture
-      - branch-login-e2e
+    needs: [changes, style, unit, types, security, migrations, edge]
     runs-on: ubuntu-latest
-    steps:
-      - name: Require every permanent gate
-        env:
-          QUALITY_RESULT: ${{ needs.quality.result }}
-          ADMIN_RESULT: ${{ needs.admin.result }}
-          EDGE_SECURITY_RESULT: ${{ needs.edge-security.result }}
-          WINDOWS_RESULT: ${{ needs.windows-package.result }}
-          MENU_RESULT: ${{ needs.menu.result }}
-          ARCHITECTURE_RESULT: ${{ needs.architecture.result }}
-          BRANCH_LOGIN_RESULT: ${{ needs.branch-login-e2e.result }}
-        run: |
-          test "$QUALITY_RESULT" = "success"
-          test "$ADMIN_RESULT" = "success"
-          test "$EDGE_SECURITY_RESULT" = "success"
-          test "$WINDOWS_RESULT" = "success"
-          test "$MENU_RESULT" = "success"
-          test "$ARCHITECTURE_RESULT" = "success"
-          test "$BRANCH_LOGIN_RESULT" = "success"
-
-  branch-login-e2e:
-    name: Branch + PIN authenticated Chromium E2E
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 3
     env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      DETECT: ${{ needs.changes.result }}
+      STYLE: ${{ needs.style.result }}
+      UNIT: ${{ needs.unit.result }}
+      TYPES: ${{ needs.types.result }}
+      SECURITY: ${{ needs.security.result }}
+      MIGRATIONS: ${{ needs.migrations.result }}
+      EDGE: ${{ needs.edge.result }}
     steps:
-      - uses: actions/checkout@v7
-      - name: Verify checkout commit identity
-        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: npm
-      - name: Install locked dependencies
-        run: npm ci
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Branch and PIN login across two viewports
-        run: TUX_OPERATIONS_BRANCH_E2E=1 npx playwright test e2e/operations-branch-login.e2e.ts --project=desktop-browser-fallback --project=mobile-browser-fallback
-      - name: Upload branch login evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: operations-branch-login-e2e
-          path: |
-            playwright-report
-            test-results
-          if-no-files-found: warn
-          retention-days: 14
+      - name: Reject failures but accept intentionally skipped checks
+        shell: bash
+        run: |
+          test "$DETECT" = success
+          for outcome in "$STYLE" "$UNIT" "$TYPES" "$SECURITY" "$MIGRATIONS" "$EDGE"; do
+            [[ "$outcome" == success || "$outcome" == skipped ]] || exit 1
+          done

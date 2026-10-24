@@ -1,0 +1,291 @@
+name: TUX Full Regression (Manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tux-v2-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify checkout commit identity
+        shell: bash
+        run: |
+          echo "event=$GITHUB_EVENT_NAME"
+          echo "github_sha=$GITHUB_SHA"
+          echo "git_head=$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Format check
+        run: npm run format:check
+      - name: Lint
+        run: npm run lint
+      - name: Unit and integration tests
+        run: npm run test
+      - name: Sync workspace domain source regression
+        run: npm test -w @tux/sync
+      - name: Admin security gate
+        run: npm run test:admin-security
+      - name: Admin Vercel deployment schema contract
+        run: npm run test:admin-deployment
+      - name: WhatsApp architecture gate
+        run: npm run test:whatsapp-architecture
+      - name: WhatsApp security gate
+        run: npm run test:whatsapp-security
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Production builds
+        run: npm run build
+      - name: Development provisioning safety smoke
+        shell: bash
+        run: |
+          if NODE_ENV=production npm run dev:provision -- --database .tmp/provision-production.sqlite3; then
+            echo 'Production provisioning unexpectedly succeeded.' >&2
+            exit 1
+          fi
+          npm run dev:provision -- --database .tmp/provision.sqlite3 --pin 2468 --secondary-pin 1357
+          test -f apps/operations-desktop/.tmp/provision.sqlite3
+          rm -rf apps/operations-desktop/.tmp
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Migration-chain smoke
+        run: npm run test:migrations
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.46.3
+      - name: Supabase function auth deployment contract
+        run: deno test --allow-read scripts/supabaseFunctionAuthConfig.deno.ts
+      - name: Edge Function typecheck
+        run: |
+          deno check --config supabase/functions/device-enroll/deno.json supabase/functions/device-enroll/index.ts
+          deno check --config supabase/functions/device-bootstrap/deno.json supabase/functions/device-bootstrap/index.ts
+          deno check --config supabase/functions/operations-config/deno.json supabase/functions/operations-config/index.ts
+          deno check --config supabase/functions/operations-inventory/deno.json supabase/functions/operations-inventory/index.ts
+          deno check --config supabase/functions/operations-sync/deno.json supabase/functions/operations-sync/index.ts
+          deno check --config supabase/functions/worker-auth/deno.json supabase/functions/worker-auth/index.ts
+          deno check --config supabase/functions/catalog-public/deno.json supabase/functions/catalog-public/index.ts
+          deno check --config supabase/functions/catalog-admin/deno.json supabase/functions/catalog-admin/index.ts
+          deno check --config supabase/functions/order-intake/deno.json supabase/functions/order-intake/index.ts
+          deno check --config supabase/functions/online-order-operations/deno.json supabase/functions/online-order-operations/index.ts
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Rendered browser E2E
+        run: npm run test:e2e
+      - name: Upload rendered QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: operations-rendered-e2e
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 14
+
+  admin:
+    name: admin
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify checkout commit identity
+        shell: bash
+        run: |
+          echo "event=$GITHUB_EVENT_NAME"
+          echo "github_sha=$GITHUB_SHA"
+          echo "git_head=$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked root dependencies
+        run: npm ci
+      - name: Admin security boundary
+        run: npm run test:admin-security
+      - name: Admin UI deterministic CSS and canonical brand checks
+        run: |
+          node scripts/test-admin-ui-css-ownership.mjs
+          node scripts/test-admin-brand-parity.mjs
+      - name: Admin typecheck
+        run: npm run typecheck:admin
+      - name: Admin production build
+        run: npm run build:admin
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Admin auth, shop isolation, and responsive shell E2E
+        run: npm run test:e2e:admin
+      - name: Upload Admin rendered QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-rendered-e2e
+          path: |
+            playwright-report-admin
+            test-results
+          if-no-files-found: warn
+          retention-days: 14
+
+  edge-security:
+    name: edge-security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.46.3
+      - name: Device bootstrap provenance behavioral tests
+        run: >-
+          deno test --allow-env --allow-net --allow-run --allow-read
+          supabase/functions/device-bootstrap/security.deno.ts
+      - name: Catalog public/admin boundary behavioral tests
+        run: >-
+          deno test
+          supabase/functions/catalog-public/catalog-public.deno.ts
+          supabase/functions/catalog-admin/catalog-admin.deno.ts
+      - name: Public online-order intake behavioral tests
+        run: deno test scripts/order-intake.deno.ts
+      - name: Authenticated online-order Operations behavioral tests
+        run: deno test scripts/online-order-operations.deno.ts
+
+  windows-package:
+    name: windows-package
+    runs-on: windows-latest
+    timeout-minutes: 35
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build unsigned Windows x64 package
+        run: npm run package:win -- --publish never
+      - name: Upload unsigned Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: tux-operations-windows-x64-unsigned
+          path: release/windows/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  menu:
+    name: menu
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify checkout commit identity
+        shell: bash
+        run: |
+          echo "event=$GITHUB_EVENT_NAME"
+          echo "github_sha=$GITHUB_SHA"
+          echo "git_head=$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked root dependencies
+        run: npm ci
+      - name: Menu typecheck
+        run: npm run typecheck:menu
+      - name: Menu production build
+        run: npm run build:menu
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Rendered Menu E2E
+        run: npm run test:e2e:menu
+      - name: Upload Menu rendered QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: menu-rendered-e2e
+          path: |
+            playwright-report-menu
+            test-results
+          if-no-files-found: warn
+          retention-days: 14
+
+  architecture:
+    name: monorepo-architecture
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Monorepo architecture guards
+        run: npm run test:monorepo-architecture
+      - name: Canonical catalog architecture guards
+        run: npm run test:catalog-architecture
+
+  required-quality-gate:
+    name: Required quality gate
+    if: always()
+    needs:
+      - quality
+      - admin
+      - edge-security
+      - windows-package
+      - menu
+      - architecture
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every permanent gate
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          ADMIN_RESULT: ${{ needs.admin.result }}
+          EDGE_SECURITY_RESULT: ${{ needs.edge-security.result }}
+          WINDOWS_RESULT: ${{ needs.windows-package.result }}
+          MENU_RESULT: ${{ needs.menu.result }}
+          ARCHITECTURE_RESULT: ${{ needs.architecture.result }}
+        run: |
+          test "$QUALITY_RESULT" = "success"
+          test "$ADMIN_RESULT" = "success"
+          test "$EDGE_SECURITY_RESULT" = "success"
+          test "$WINDOWS_RESULT" = "success"
+          test "$MENU_RESULT" = "success"
+          test "$ARCHITECTURE_RESULT" = "success"
