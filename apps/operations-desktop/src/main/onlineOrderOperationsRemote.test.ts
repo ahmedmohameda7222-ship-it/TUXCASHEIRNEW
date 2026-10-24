@@ -12,7 +12,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe('SupabaseDesktopOnlineOrderOperationsRemote', () => {
-  it('reports a reserved active origin as a recoverable conflict instead of a remote outage', async () => {
+  it('reports recoverable active reservation ownership instead of an outage', async () => {
     const remote = new SupabaseDesktopOnlineOrderOperationsRemote({
       projectUrl: 'https://project.supabase.co',
       sessionManager: { authorizationHeaders: vi.fn().mockResolvedValue({}) },
@@ -20,7 +20,9 @@ describe('SupabaseDesktopOnlineOrderOperationsRemote', () => {
         .fn()
         .mockResolvedValue(jsonResponse({ error: 'online_order_reservation_owned' }, 409)),
     });
-    await expect(remote.claim(REQUEST_ID)).rejects.toThrow(/Claim and release.*original device.*retry/i);
+    await expect(remote.claim(REQUEST_ID)).rejects.toThrow(
+      /Claim and release.*original device.*retry/i,
+    );
   });
 
   it('uses the main-process device session for list and review mutations', async () => {

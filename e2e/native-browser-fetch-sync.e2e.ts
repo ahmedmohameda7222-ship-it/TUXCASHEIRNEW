@@ -55,9 +55,7 @@ type CapturedRequest = {
   body: unknown;
 };
 
-test('native Chromium fetch delivers canonical outbox POST and honors APPLIED/REPLAY', async ({
-  page,
-}) => {
+test('native Chromium POST accepts APPLIED and REPLAY receipts', async ({ page }) => {
   // Bundle the actual production transport and its dependencies for a browser execution,
   // rather than reproducing the bug with a synthetic copy of the implementation.
   const bundled = await build({
@@ -75,8 +73,11 @@ test('native Chromium fetch delivers canonical outbox POST and honors APPLIED/RE
     },
   });
   const artifact = Array.isArray(bundled) ? bundled[0] : bundled;
+  if (artifact === undefined || !('output' in artifact)) {
+    throw new Error('Native browser probe build did not emit JavaScript output.');
+  }
   const source = artifact.output.find((asset) => asset.type === 'chunk')?.code;
-  expect(source).toBeTruthy();
+  if (!source) throw new Error('Native browser probe output is empty.');
 
   const requests: CapturedRequest[] = [];
   await page.route('**/__tux_native_sync_probe__', (route) =>
@@ -102,7 +103,7 @@ test('native Chromium fetch delivers canonical outbox POST and honors APPLIED/RE
   });
 
   await page.goto('/__tux_native_sync_probe__');
-  await page.addScriptTag({ content: source! });
+  await page.addScriptTag({ content: source });
   await page.evaluate(async (serializedEvent) => {
     const modules = (window as unknown as {
       TuxNativeSyncProbe: {

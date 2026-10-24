@@ -337,7 +337,7 @@ describe('online order review lifecycle', () => {
 });
 
 describe('BrowserOnlineOrderOperationsRemote', () => {
-  it('explains active reservation ownership and the safe original-device claim/release recovery', async () => {
+  it('explains safe original-device release on owned reservation', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ error: 'online_order_reservation_owned' }), {
         status: 409,
@@ -348,7 +348,9 @@ describe('BrowserOnlineOrderOperationsRemote', () => {
     vi.stubGlobal('fetch', fetchMock);
     try {
       const remote = new BrowserOnlineOrderOperationsRemote();
-      await expect(remote.claim(REQUEST_A)).rejects.toThrow(/Claim and release.*original device.*retry/i);
+      await expect(remote.claim(REQUEST_A)).rejects.toThrow(
+        /Claim and release.*original device.*retry/i,
+      );
       expect(fetchMock).toHaveBeenCalledOnce();
     } finally {
       vi.unstubAllGlobals();
