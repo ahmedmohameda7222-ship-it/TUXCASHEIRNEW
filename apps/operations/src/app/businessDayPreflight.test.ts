@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { instant, type BusinessDayId, type OpenBusinessDay, type ShopId } from '@tux/domain';
-import { reconcileCanonicalBusinessDay } from './businessDayPreflight';
+import { reconcileCanonicalBusinessDay, requiresEndDayOnWorkerExit } from './businessDayPreflight';
 
 const SHOP = '12000000-0000-4000-8000-000000000001' as ShopId;
 const OLD = '22000000-0000-4000-8000-000000000001' as BusinessDayId;
@@ -119,5 +119,19 @@ describe('canonical Business Day reconciliation before PIN transition', () => {
         adoptCanonicalDay: async () => undefined,
       }),
     ).rejects.toThrow('device_not_authorized');
+  });
+});
+
+describe('worker exit semantics', () => {
+  it('routes the final active worker to End Day rather than an orphaned Sign Out', () => {
+    expect(requiresEndDayOnWorkerExit(0)).toBe(true);
+    expect(requiresEndDayOnWorkerExit(1)).toBe(true);
+  });
+  it('allows normal Sign Out if two workers still have active sessions', () => {
+    expect(requiresEndDayOnWorkerExit(2)).toBe(false);
+    expect(requiresEndDayOnWorkerExit(3)).toBe(false);
+  });
+  it('refuses an invalid remote session count', () => {
+    expect(() => requiresEndDayOnWorkerExit(-1)).toThrow('invalid');
   });
 });
