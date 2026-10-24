@@ -153,6 +153,44 @@ describe('IndexedDB Business Day outbox ordering', () => {
     }
   });
 
+  it('requeues a previously delivered start when the canonical Business Day was reset', async () => {
+    const name = 'tux-outbox-reset-day-recovery-' + crypto.randomUUID();
+    names.add(name);
+    const db = new IndexedDbOperationsDatabase(name);
+    await db.initialize();
+    try {
+      const resetDayId = parseEntityId<BusinessDayId>(
+        '35000000-0000-4000-8000-000000000003',
+      );
+      const started = {
+        ...outbox(
+          '33000000-0000-4000-8000-000000000013',
+          A,
+          'BUSINESS_DAY_STARTED',
+          '2026-10-10T08:00:00.000Z',
+        ),
+        businessDayId: resetDayId,
+      };
+      await db.transaction(async (tx) => {
+        await tx.outbox.append(started);
+        await tx.outbox.markDelivered(started.id, instant('2026-10-10T08:01:00.000Z'));
+      });
+
+      await expect(
+        db.transaction((tx) => tx.outbox.recoverMissingBusinessDayStart(resetDayId)),
+      ).resolves.toBe('RECOVERED');
+      expect(
+        (
+          await db.transaction((tx) =>
+            tx.outbox.listPending(instant('2026-10-10T09:00:00.000Z'), 50, A),
+          )
+        ).map((event) => event.id),
+      ).toEqual([started.id]);
+    } finally {
+      await db.close();
+    }
+  });
+
   it('does not skip a delayed day start and deliver a dependent worker session', async () => {
     const name = 'tux-business-day-order-' + crypto.randomUUID();
     names.add(name);
