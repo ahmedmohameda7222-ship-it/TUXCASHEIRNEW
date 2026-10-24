@@ -337,6 +337,23 @@ describe('online order review lifecycle', () => {
 });
 
 describe('BrowserOnlineOrderOperationsRemote', () => {
+
+  it('explains active reservation ownership and the safe original-device claim/release recovery', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ error: 'online_order_reservation_owned' }),
+      { status: 409, headers: { 'content-type': 'application/json' } },
+    ));
+    vi.stubGlobal('window', { location: { origin: 'https://operations.example.test' } });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const remote = new BrowserOnlineOrderOperationsRemote();
+      await expect(remote.claim(REQUEST_A)).rejects.toThrow(/original device.*release.*retry/i);
+      expect(fetchMock).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('reads through the same-origin device-session gateway without browser bearer authority', async () => {
     const responseBody = remoteSnapshot([cachedRequest(REQUEST_A, SHOP_A)]);
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(responseBody));
