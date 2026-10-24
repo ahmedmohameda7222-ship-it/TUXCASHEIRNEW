@@ -1,4 +1,4 @@
-export const INDEXED_DB_VERSION = 8;
+export const INDEXED_DB_VERSION = 9;
 
 export const INDEXED_DB_STORES = [
   'shops',
@@ -290,6 +290,33 @@ const MIGRATIONS: readonly IndexedDbMigration[] = [
       // Version 8 was briefly exercised during pre-production recovery work.
       // Keep the version monotonic, but never delete quarantined operations:
       // they remain visible until they are explicitly reconciled.
+    },
+  },
+  {
+    version: 9,
+    name: 'retry_pending_events_after_live_sync_recovery',
+    apply(_database, transaction) {
+      const outbox = transaction.objectStore('outboxEvents');
+      const cursorRequest = outbox.openCursor();
+      cursorRequest.addEventListener('success', () => {
+        const cursor = cursorRequest.result;
+        if (cursor === null) return;
+        const event = cursor.value as Record<string, unknown>;
+        if (
+          event['deliveredAt'] === null &&
+          (event['quarantinedAt'] === null || event['quarantinedAt'] === undefined) &&
+          event['nextAttemptAt'] !== null &&
+          event['nextAttemptAt'] !== undefined
+        ) {
+          cursor.update({
+            ...event,
+            attemptCount: 0,
+            nextAttemptAt: null,
+            lastError: null,
+          });
+        }
+        cursor.continue();
+      });
     },
   },
 ];
