@@ -173,3 +173,34 @@ begin
   end if;
   raise notice 'PASS: End Day recovery, authenticated canonical read, reopen, worker session, Order persistence/replay, Incognito conflict';
 end $body$;
+
+-- Read the exact local day status after an authorized development Force End Day,
+-- without trusting the browser as shop authority or inventing a replacement day.
+do $body$
+declare
+  d1 uuid := '56000000-0000-4000-8000-000000000001';
+  d2 uuid := '56000000-0000-4000-8000-000000000002';
+  payload jsonb;
+begin
+  payload := public.read_tux_operations_business_day_state_v2(
+    '54000000-0000-4000-8000-000000000002',
+    '55000000-0000-4000-8000-000000000002',
+    d1
+  );
+  if payload ->> 'localDayStatus' is distinct from 'CLOSED'
+    or payload ->> 'openDayId' is distinct from d2::text
+    or payload -> 'openDay' ->> 'id' is distinct from d2::text
+    or payload ->> 'openWorkerCount' is distinct from '1' then
+    raise exception 'Canonical recovery did not return CLOSED local identity and resumed OPEN day: %', payload;
+  end if;
+
+  payload := public.read_tux_operations_business_day_state_v2(
+    '54000000-0000-4000-8000-000000000001',
+    '55000000-0000-4000-8000-000000000001',
+    '56000000-0000-4000-8000-000000000099'
+  );
+  if payload ->> 'localDayStatus' is not null then
+    raise exception 'Unknown offline Business Day was incorrectly reported closed';
+  end if;
+  raise notice 'PASS: canonical day resume, forced-closed browser recovery and unknown offline day';
+end $body$;
