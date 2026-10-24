@@ -351,6 +351,16 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
           .sort((left, right) => {
             const chronological = left.createdAt.localeCompare(right.createdAt);
             if (chronological !== 0) return chronological;
+            if (
+              left.shopId === right.shopId &&
+              left.aggregateType === right.aggregateType &&
+              left.aggregateId === right.aggregateId &&
+              left.aggregateRevision !== null &&
+              right.aggregateRevision !== null &&
+              left.aggregateRevision !== right.aggregateRevision
+            ) {
+              return left.aggregateRevision - right.aggregateRevision;
+            }
             // IndexedDB secondary indexes order tied timestamps by random UUID,
             // unlike insertion order in SQLite. Use domain causality for ties.
             const priority = (eventType: string): number => {

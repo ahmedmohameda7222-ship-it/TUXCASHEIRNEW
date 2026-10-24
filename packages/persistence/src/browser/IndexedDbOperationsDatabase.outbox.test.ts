@@ -107,6 +107,37 @@ describe('IndexedDB Business Day outbox ordering', () => {
     }
   });
 
+  it('keeps same-timestamp Order revisions in increasing revision order', async () => {
+    const name = 'tux-order-revision-ties-' + crypto.randomUUID();
+    names.add(name);
+    const db = new IndexedDbOperationsDatabase(name);
+    await db.initialize();
+    try {
+      const at = '2026-10-10T08:00:00.000Z';
+      const placed = {
+        ...outbox('34000000-0000-4000-8000-000000000002', A, 'ORDER_PLACED', at),
+        aggregateType: 'ORDER' as const,
+        aggregateId: 'order-a',
+        aggregateRevision: 0,
+      };
+      const done = {
+        ...outbox('34000000-0000-4000-8000-000000000001', A, 'ORDER_MARKED_DONE', at),
+        aggregateType: 'ORDER' as const,
+        aggregateId: 'order-a',
+        aggregateRevision: 1,
+      };
+      await db.transaction(async (tx) => {
+        await tx.outbox.append(placed);
+        await tx.outbox.append(done);
+      });
+      expect(
+        (await db.transaction((tx) => tx.outbox.listPending(instant(at), 50, A))).map((x) => x.id),
+      ).toEqual([placed.id, done.id]);
+    } finally {
+      await db.close();
+    }
+  });
+
   it('orders same-timestamp day START before worker login regardless of UUID sort', async () => {
     const name = 'tux-business-day-ties-' + crypto.randomUUID();
     names.add(name);
@@ -114,18 +145,8 @@ describe('IndexedDB Business Day outbox ordering', () => {
     await db.initialize();
     try {
       const t = '2026-10-10T08:00:00.000Z';
-      const worker = outbox(
-        '32000000-0000-4000-8000-000000000001',
-        A,
-        'WORKER_SIGNED_IN',
-        t,
-      );
-      const day = outbox(
-        '32000000-0000-4000-8000-000000000002',
-        A,
-        'BUSINESS_DAY_STARTED',
-        t,
-      );
+      const worker = outbox('32000000-0000-4000-8000-000000000001', A, 'WORKER_SIGNED_IN', t);
+      const day = outbox('32000000-0000-4000-8000-000000000002', A, 'BUSINESS_DAY_STARTED', t);
       await db.transaction(async (tx) => {
         await tx.outbox.append(day);
         await tx.outbox.append(worker);
