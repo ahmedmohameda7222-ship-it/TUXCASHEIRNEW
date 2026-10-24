@@ -17,6 +17,14 @@ begin
  env:=jsonb_build_object('eventId',p_event,'shopId',s,'businessDayId',p_day,
    'aggregateType','TEST','aggregateId',p_day,'eventType',p_type,'idempotencyKey',p_event::text,
    'payloadVersion',1,'payload',jsonb_build_object('eventType',p_type),'createdAt','2026-10-10T09:00:00Z');
+ if p_type = 'ORDER_PLACED' then
+   env := jsonb_set(env,'{payload}',jsonb_build_object(
+     'eventType',p_type,'configurationVersion',1,
+     'order',jsonb_build_object('items',jsonb_build_array(
+       jsonb_build_object('productId','58000000-0000-4000-8000-000000000010',
+         'quantity',1,'modifiers','[]'::jsonb,'comboBeverages','[]'::jsonb))),
+     'inventoryMovements','[]'::jsonb));
+ end if;
  plan:=jsonb_build_object('eventId',p_event,'shopId',s,'eventType',p_type,'idempotencyKey',p_event::text,
    'mutations',jsonb_build_array(jsonb_build_object('table',p_table,'mode',p_mode,
      'conflictColumns',jsonb_build_array('id'),'row',p_row,'guard',
@@ -66,6 +74,11 @@ end $body$;
 
 -- Exercise recovery through the same actual RPC: offline End Day reaches the
 -- server first, then the immutable new-day, worker-session and Order events.
+insert into public.operations_configuration_snapshots(shop_id,version,bundle_json)
+values (
+ '52000000-0000-4000-8000-000000000001',1,
+ '{"snapshot":{"products":[{"id":"58000000-0000-4000-8000-000000000010","isCombo":false}],"modifiers":[],"productModifierLinks":[],"comboBeverageOptions":[],"recipeLines":[]}}'::jsonb
+);
 insert into public.order_types(id,shop_id,name,behavior,sort_order)
 values ('57000000-0000-4000-8000-000000000001','52000000-0000-4000-8000-000000000001',
         'Take Away','TAKE_AWAY',0);

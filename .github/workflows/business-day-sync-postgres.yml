@@ -38,13 +38,16 @@ jobs:
         run: node scripts/test-operations-business-day-sync-postgres.mjs
 
       - uses: actions/setup-node@v7
+        if: always()
         with:
           node-version: '24'
       - name: Install formatter for exact formatting diagnostics
+        if: always()
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
         run: npm ci
       - name: Temporary targeted formatter diff diagnostic (remove before closeout)
+        if: always()
         run: |
           npx prettier --write \
             apps/operations/src/app/businessDayPreflight.test.ts \
