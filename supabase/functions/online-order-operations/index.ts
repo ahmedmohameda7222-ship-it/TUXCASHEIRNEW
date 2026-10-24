@@ -1,34 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import {
-  OnlineOrderOperationsStoreError,
+  classifyOnlineOrderOperationsStoreError,
   handleOnlineOrderOperationsRequest,
   type OnlineOrderOperationsStore,
 } from './online-order-operations.ts';
-
-function storeError(message: string): OnlineOrderOperationsStoreError {
-  if (message.includes('TUX_DEVICE_NOT_AUTHORIZED')) {
-    return new OnlineOrderOperationsStoreError('FORBIDDEN');
-  }
-  if (message.includes('TUX_ONLINE_ORDER_NOT_FOUND')) {
-    return new OnlineOrderOperationsStoreError('NOT_FOUND');
-  }
-  if (
-    message.includes('TUX_ONLINE_ORDER_ALREADY_PROCESSING') ||
-    message.includes('TUX_ONLINE_ORDER_ALREADY_RESOLVED') ||
-    message.includes('TUX_ONLINE_ORDER_CLAIM_MISMATCH') ||
-    message.includes('TUX_ONLINE_ORDER_REJECTION_CONFLICT') ||
-    message.includes('TUX_ONLINE_ORDER_REJECTION_FENCED')
-  ) {
-    return new OnlineOrderOperationsStoreError('CONFLICT');
-  }
-  if (
-    message.includes('TUX_ONLINE_ORDER_LIMIT_INVALID') ||
-    message.includes('TUX_ONLINE_ORDER_REJECTION_REASON_INVALID')
-  ) {
-    return new OnlineOrderOperationsStoreError('INVALID');
-  }
-  return new OnlineOrderOperationsStoreError('UNAVAILABLE');
-}
 
 Deno.serve(async (request) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -50,7 +25,7 @@ Deno.serve(async (request) => {
 
   const rpc = async (name: string, parameters: Record<string, unknown>): Promise<unknown> => {
     const { data, error } = await serviceClient.rpc(name, parameters);
-    if (error) throw storeError(error.message ?? '');
+    if (error) throw classifyOnlineOrderOperationsStoreError(error.message ?? '');
     return data;
   };
 
