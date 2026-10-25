@@ -10,6 +10,7 @@ import { useShopScope } from '../shops/ShopScopeProvider';
 import { formatEgp } from '../finance/money';
 import { CancelOrderSheet } from './CancelOrderSheet';
 import { OrderDetailPage } from './OrderDetailPage';
+import { OnlineRequestsPanel } from './OnlineRequestsPanel';
 import { RefundReturnPage } from './RefundReturnPage';
 import { useOrders, type OrderSearchFilters } from './useOrders';
 import { toOrderTimeRange } from './orderDateRange';
@@ -38,6 +39,18 @@ export function OrdersPage() {
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const [location, navigate] = useLocation();
   const selectedId = detailIdFromPath(location, '/orders');
+  const deepLink = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search)
+    : new URLSearchParams();
+  const [onlineView, setOnlineView] = useState(deepLink.get('view') === 'online-requests');
+  const onlineDate = deepLink.get('date') ?? '';
+  const initialOnlineStatus =
+    deepLink.get('status') === 'PENDING' ||
+    deepLink.get('status') === 'PROCESSING' ||
+    deepLink.get('status') === 'ACCEPTED' ||
+    deepLink.get('status') === 'REJECTED'
+      ? (deepLink.get('status') as 'PENDING' | 'PROCESSING' | 'ACCEPTED' | 'REJECTED')
+      : '';
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<AdminOrderStatus | ''>('');
   const [source, setSource] = useState<AdminOrderSource | ''>('');
@@ -132,6 +145,14 @@ export function OrdersPage() {
         <strong>{shopName}</strong>
         <span>Only orders belonging to this authorized shop are shown.</span>
       </div>
+      <nav aria-label="Orders workspace views" className="admin-orders-shop-context">
+        <button type="button" className="admin-secondary-button" aria-current={!onlineView ? 'page' : undefined} onClick={() => setOnlineView(false)}>Canonical orders</button>
+        <button type="button" className="admin-secondary-button" aria-current={onlineView ? 'page' : undefined} onClick={() => setOnlineView(true)}>Online requests</button>
+      </nav>
+      {onlineView ? (
+        <OnlineRequestsPanel shopId={shopId} initialStatus={initialOnlineStatus} date={/^\d{4}-\d{2}-\d{2}$/.test(onlineDate) ? onlineDate : ''} />
+      ) : (
+        <>
       <details
         className="admin-orders-filters"
         open={Boolean(query || status || source || fromInput || toInput)}
@@ -388,6 +409,8 @@ export function OrdersPage() {
           />
         }
       />
+        </>
+      )}
     </PageScaffold>
   );
 }
