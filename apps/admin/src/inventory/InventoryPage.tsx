@@ -286,7 +286,11 @@ export function InventoryPage() {
             <button
               className="admin-primary-button"
               type="button"
-              disabled={inventory.beginStocktake.isPending || stocktakeItems.length === 0 || !stocktakeAllowed}
+              disabled={
+                inventory.beginStocktake.isPending ||
+                stocktakeItems.length === 0 ||
+                !stocktakeAllowed
+              }
               onClick={() => {
                 if (stocktakeItems.length > STOCKTAKE_BATCH_SIZE) {
                   openWorkflow('stocktake-select');
@@ -347,7 +351,9 @@ export function InventoryPage() {
       }
     >
       {canStocktake && stocktakeReason ? (
-        <p role="status" className="admin-inventory-note">{stocktakeReason}</p>
+        <p role="status" className="admin-inventory-note">
+          {stocktakeReason}
+        </p>
       ) : null}
       {adjustmentApprovalPending ? (
         <p className="admin-inventory-note" role="status">
