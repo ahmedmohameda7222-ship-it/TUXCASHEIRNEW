@@ -1,5 +1,5 @@
 import './purchaseOrder.css';
-import type { AdminPurchaseOrder, AdminPurchasingInventoryItem } from '@tux/admin-contracts';
+import type { AdminPurchaseOrder, AdminPurchaseOrderHistory, AdminPurchasingInventoryItem } from '@tux/admin-contracts';
 import { DraftPurchaseOrderLinesEditor } from './DraftPurchaseOrderLinesEditor';
 import { formatPurchaseMicros } from './purchaseOrderDraft';
 import { useEffect, useState } from 'react';
@@ -19,6 +19,10 @@ export function PurchaseOrderPage({
   updating,
   onUpdate,
   inventoryItems = [],
+  history,
+  historyPending = false,
+  historyError = false,
+  onRetryHistory,
   replacing = false,
   onReplaceLines,
   cancelling,
@@ -33,6 +37,10 @@ export function PurchaseOrderPage({
   ordering: boolean;
   updating: boolean;
   inventoryItems?: readonly AdminPurchasingInventoryItem[];
+  history?: AdminPurchaseOrderHistory | null;
+  historyPending?: boolean;
+  historyError?: boolean;
+  onRetryHistory?(): void;
   replacing?: boolean;
   onReplaceLines?(
     lines: readonly {
@@ -320,11 +328,60 @@ export function PurchaseOrderPage({
       ) : null}
       {activeTab === 'history' ? (
         <div className="admin-purchasing-detail-content" role="tabpanel">
-          <p>
-            No receipt or return event history is available from the current purchasing workspace
-            API. Aggregate line quantities above reflect persisted server data; no event chronology
-            is inferred.
-          </p>
+          {historyPending ? <p role="status">Loading persisted purchase history…</p> : null}
+          {historyError ? (
+            <div role="alert">
+              <p>Purchase history could not be loaded.</p>
+              {onRetryHistory ? (
+                <button type="button" className="admin-secondary-button" onClick={onRetryHistory}>
+                  Retry history
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          {!historyPending && !historyError && (!history || history.events.length === 0) ? (
+            <p>No receipt or return event history is available for this purchase order.</p>
+          ) : null}
+          {!historyPending && !historyError && history ? (
+            <ol className="admin-purchasing-history-list">
+              {history.events.map((event) => (
+                <li key={event.id} className="admin-purchasing-history-event">
+                  <div className="admin-purchasing-history-event__header">
+                    <strong>{event.type === 'RECEIPT' ? 'Purchase received' : 'Supplier return'}</strong>
+                    <time dateTime={event.occurredAt}>
+                      {new Date(event.occurredAt).toLocaleString()}
+                    </time>
+                  </div>
+                  <small>Record {event.id}</small>
+                  {event.supplierReference ? (
+                    <p>Supplier reference: {event.supplierReference}</p>
+                  ) : null}
+                  <ul>
+                    {event.lines.map((line) => {
+                      const orderedLine = order.lines.find(
+                        (candidate) => candidate.id === line.purchaseOrderLineId,
+                      );
+                      return (
+                        <li key={line.purchaseOrderLineId}>
+                          {orderedLine?.itemName ?? 'Inventory item'} —{' '}
+                          {formatPurchaseMicros(line.quantityPurchaseUnitsMicros)}{' '}
+                          {orderedLine?.purchaseUnitLabel ?? 'purchase units'}
+                          {line.purchaseUnitCostMinor !== null ? (
+                            <> · Actual cost per purchase unit: {(line.purchaseUnitCostMinor / 100).toFixed(2)} EGP</>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+          {history?.truncated ? (
+            <p className="admin-purchasing-detail-hint">
+              Recent history only: at most 100 receipts and 100 supplier returns are shown.
+            </p>
+          ) : null}
         </div>
       ) : null}
       <div className="admin-purchasing-page-actions">
