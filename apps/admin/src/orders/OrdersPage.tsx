@@ -220,81 +220,81 @@ export function OrdersPage() {
             >
               <summary>Search and filters</summary>
               <section className="admin-order-task-section is-compact" aria-label="Order filters">
-              <label className="admin-field">
-                <span>Status</span>
-                <select
-                  value={status}
-                  onChange={(event) => setStatus(event.target.value as AdminOrderStatus | '')}
-                >
-                  <option value="">All statuses</option>
-                  <option value="ACTIVE">Active</option>
-                  <option value="DONE">Done</option>
-                  <option value="CANCELLED">Cancelled</option>
-                  <option value="RETURNED">Returned</option>
-                </select>
-              </label>
-              <label className="admin-field">
-                <span>Operational Business Day</span>
-                <select
-                  value={businessDayId}
-                  onChange={(event) => setBusinessDayId(event.target.value)}
-                >
-                  <option value="">All business days</option>
-                  {(ordersApi.businessDaysQuery.data?.days ?? []).map((day) => (
-                    <option key={day.id} value={day.id}>
-                      {new Intl.DateTimeFormat('en-EG', {
-                        dateStyle: 'medium',
-                        timeStyle: 'short',
-                        timeZone: 'Africa/Cairo',
-                      }).format(new Date(day.startedAt))}{' '}
-                      · {day.status} · {day.id.slice(0, 8)}
-                    </option>
-                  ))}
-                </select>
-                {ordersApi.businessDaysQuery.isError ? (
-                  <small>Business Days are unavailable; refresh to retry.</small>
+                <label className="admin-field">
+                  <span>Status</span>
+                  <select
+                    value={status}
+                    onChange={(event) => setStatus(event.target.value as AdminOrderStatus | '')}
+                  >
+                    <option value="">All statuses</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="DONE">Done</option>
+                    <option value="CANCELLED">Cancelled</option>
+                    <option value="RETURNED">Returned</option>
+                  </select>
+                </label>
+                <label className="admin-field">
+                  <span>Operational Business Day</span>
+                  <select
+                    value={businessDayId}
+                    onChange={(event) => setBusinessDayId(event.target.value)}
+                  >
+                    <option value="">All business days</option>
+                    {(ordersApi.businessDaysQuery.data?.days ?? []).map((day) => (
+                      <option key={day.id} value={day.id}>
+                        {new Intl.DateTimeFormat('en-EG', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                          timeZone: 'Africa/Cairo',
+                        }).format(new Date(day.startedAt))}{' '}
+                        · {day.status} · {day.id.slice(0, 8)}
+                      </option>
+                    ))}
+                  </select>
+                  {ordersApi.businessDaysQuery.isError ? (
+                    <small>Business Days are unavailable; refresh to retry.</small>
+                  ) : null}
+                </label>
+                <label className="admin-field">
+                  <span>From date/time (Cairo)</span>
+                  <input
+                    type="datetime-local"
+                    value={fromInput}
+                    onChange={(event) => setFromInput(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>To date/time (Cairo)</span>
+                  <input
+                    type="datetime-local"
+                    value={toInput}
+                    min={fromInput || undefined}
+                    onChange={(event) => setToInput(event.currentTarget.value)}
+                  />
+                </label>
+                {fromInput || toInput ? (
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    onClick={() => {
+                      setFromInput('');
+                      setToInput('');
+                    }}
+                  >
+                    Clear date filters
+                  </button>
                 ) : null}
-              </label>
-              <label className="admin-field">
-                <span>From date/time (Cairo)</span>
-                <input
-                  type="datetime-local"
-                  value={fromInput}
-                  onChange={(event) => setFromInput(event.currentTarget.value)}
-                />
-              </label>
-              <label className="admin-field">
-                <span>To date/time (Cairo)</span>
-                <input
-                  type="datetime-local"
-                  value={toInput}
-                  min={fromInput || undefined}
-                  onChange={(event) => setToInput(event.currentTarget.value)}
-                />
-              </label>
-              {fromInput || toInput ? (
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  onClick={() => {
-                    setFromInput('');
-                    setToInput('');
-                  }}
-                >
-                  Clear date filters
-                </button>
-              ) : null}
-              <label className="admin-field">
-                <span>Source</span>
-                <select
-                  value={source}
-                  onChange={(event) => setSource(event.target.value as AdminOrderSource | '')}
-                >
-                  <option value="">All sources</option>
-                  <option value="POS">POS</option>
-                  <option value="ONLINE">Online</option>
-                </select>
-              </label>
+                <label className="admin-field">
+                  <span>Source</span>
+                  <select
+                    value={source}
+                    onChange={(event) => setSource(event.target.value as AdminOrderSource | '')}
+                  >
+                    <option value="">All sources</option>
+                    <option value="POS">POS</option>
+                    <option value="ONLINE">Online</option>
+                  </select>
+                </label>
               </section>
             </details>
           </div>
