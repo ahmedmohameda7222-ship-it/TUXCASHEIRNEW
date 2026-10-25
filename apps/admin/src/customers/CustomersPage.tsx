@@ -6,7 +6,7 @@ import type {
   AdminReasonCodeConfiguration,
 } from '@tux/admin-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { useLocation } from 'wouter';
 
@@ -28,6 +28,14 @@ import './customers.css';
 
 type CrmSection = 'customers' | 'settings';
 
+const EMPTY_PROGRAM_DRAFT = {
+  enabled: true,
+  earnPointsPer100Minor: '1',
+  pointValueEgp: '0.10',
+  minimumRedemptionPoints: '50',
+  pointExpiryDays: '',
+};
+
 function csrfToken(session: ReturnType<typeof useAdminSession>): string {
   if (session.state.status !== 'authenticated') throw new Error('session_required');
   return session.state.session.csrfToken;
@@ -44,13 +52,14 @@ export function CustomersPage() {
   const [query, setQuery] = useState('');
   const [mergeOpen, setMergeOpen] = useState(false);
   const [mergeSearch, setMergeSearch] = useState('');
-  const [programDraft, setProgramDraft] = useState({
-    enabled: true,
-    earnPointsPer100Minor: '1',
-    pointValueEgp: '0.10',
-    minimumRedemptionPoints: '50',
-    pointExpiryDays: '',
-  });
+  const [programDraft, setProgramDraft] = useState({ ...EMPTY_PROGRAM_DRAFT });
+  const programDraftOwnerShop = useRef(shopId);
+  const programDraftEdited = useRef(false);
+
+  function editProgramDraft(update: (current: typeof programDraft) => typeof programDraft) {
+    programDraftEdited.current = true;
+    setProgramDraft(update);
+  }
   const namespace =
     session.state.status === 'authenticated'
       ? `${session.state.session.principal.businessId}:${session.state.session.principal.employeeId}`
@@ -103,8 +112,13 @@ export function CustomersPage() {
   });
 
   useEffect(() => {
+    if (programDraftOwnerShop.current !== shopId) {
+      programDraftOwnerShop.current = shopId;
+      programDraftEdited.current = false;
+      setProgramDraft({ ...EMPTY_PROGRAM_DRAFT });
+    }
     const program = programQuery.data;
-    if (!program) return;
+    if (!program || programDraftEdited.current) return;
     setProgramDraft({
       enabled: program.enabled,
       earnPointsPer100Minor: String(program.earnPointsPer100Minor),
@@ -112,7 +126,7 @@ export function CustomersPage() {
       minimumRedemptionPoints: String(program.minimumRedemptionPoints),
       pointExpiryDays: program.pointExpiryDays === null ? '' : String(program.pointExpiryDays),
     });
-  }, [programQuery.data]);
+  }, [programQuery.data, shopId]);
 
   const adjustLoyalty = useMutation({
     mutationFn: async (input: LoyaltyAdjustmentInput) => {
@@ -199,6 +213,7 @@ export function CustomersPage() {
       );
     },
     onSuccess: async () => {
+      programDraftEdited.current = false;
       await queryClient.invalidateQueries({
         queryKey: ['admin', 'customers', shopId, 'loyalty-program'],
       });
@@ -421,7 +436,7 @@ export function CustomersPage() {
                           type="checkbox"
                           checked={programDraft.enabled}
                           onChange={(event) =>
-                            setProgramDraft((current) => ({
+                            editProgramDraft((current) => ({
                               ...current,
                               enabled: event.target.checked,
                             }))
@@ -438,7 +453,7 @@ export function CustomersPage() {
                           inputMode="numeric"
                           value={programDraft.earnPointsPer100Minor}
                           onChange={(event) =>
-                            setProgramDraft((current) => ({
+                            editProgramDraft((current) => ({
                               ...current,
                               earnPointsPer100Minor: event.target.value,
                             }))
@@ -451,7 +466,7 @@ export function CustomersPage() {
                           inputMode="decimal"
                           value={programDraft.pointValueEgp}
                           onChange={(event) =>
-                            setProgramDraft((current) => ({
+                            editProgramDraft((current) => ({
                               ...current,
                               pointValueEgp: event.target.value,
                             }))
@@ -465,7 +480,7 @@ export function CustomersPage() {
                           inputMode="numeric"
                           value={programDraft.minimumRedemptionPoints}
                           onChange={(event) =>
-                            setProgramDraft((current) => ({
+                            editProgramDraft((current) => ({
                               ...current,
                               minimumRedemptionPoints: event.target.value,
                             }))
@@ -481,7 +496,7 @@ export function CustomersPage() {
                           inputMode="numeric"
                           value={programDraft.pointExpiryDays}
                           onChange={(event) =>
-                            setProgramDraft((current) => ({
+                            editProgramDraft((current) => ({
                               ...current,
                               pointExpiryDays: event.target.value,
                             }))
