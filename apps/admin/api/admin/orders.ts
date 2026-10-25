@@ -448,7 +448,10 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
       // Each PostgREST "or" parameter addresses the same top-level predicate.
       // Combining a cursor and a search requires a single explicit AND logic tree.
       const term = normalizedSearchTerm(input.query ?? null).replace(/^#(?=\d+$)/, '');
-      const searchFilter = !term
+      // UUIDs are globally unique order references, not free-text search terms.
+      const exactOrderId = uuidSchema.safeParse(term).success ? term : null;
+      if (exactOrderId) query.set('id', `eq.${exactOrderId}`);
+      const searchFilter = exactOrderId || !term
         ? null
         : /^\d+$/.test(term)
           ? `(display_order_no.eq.${term},normalized_phone_snapshot.ilike.*${term}*)`
