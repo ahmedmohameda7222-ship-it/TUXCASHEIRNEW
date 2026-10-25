@@ -510,3 +510,48 @@ test('CRM refuses a false success when the server returns an application-level r
   await expect(page.getByText('Loyalty settings saved', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Minimum points to redeem')).toHaveValue('80');
 });
+
+test('background policy refresh preserves unsaved CRM settings edits for the current shop', async ({
+  page,
+}) => {
+  let policyReads = 0;
+  await page.route('**/api/admin/customers**', async (route) => {
+    const url = new URL(route.request().url());
+    if (route.request().method() !== 'GET' || url.searchParams.get('view') !== 'loyalty-program') {
+      await route.fallback();
+      return;
+    }
+    policyReads += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        program: {
+          businessId: session.principal.businessId,
+          enabled: false,
+          earnPointsPer100Minor: 3,
+          redemptionMinorPerPoint: 17,
+          minimumRedemptionPoints: 75,
+          pointExpiryDays: 180,
+          shopIds: [shopId, otherShopId],
+          version: 3,
+          updatedAt: policyReads === 1 ? '2026-09-20T12:00:00Z' : '2026-09-20T12:01:00Z',
+        },
+      }),
+    });
+  });
+  await page.goto('/customers/settings');
+  const minimum = page.getByLabel('Minimum points to redeem');
+  await expect(minimum).toHaveValue('75');
+  await minimum.fill('80');
+
+  await page.evaluate(() => {
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('focus'));
+  });
+  await expect.poll(() => policyReads).toBeGreaterThan(1);
+  await expect(minimum).toHaveValue('80');
+  await expect(page.getByRole('region', { name: 'Current saved loyalty settings' })).toContainText(
+    '75 points',
+  );
+});
