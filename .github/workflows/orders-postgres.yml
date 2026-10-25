@@ -52,6 +52,7 @@ jobs:
     timeout-minutes: 20
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      TUX_ADMIN_EIGHT_TABS_CAPTURE: '1'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -68,6 +69,13 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run Admin Orders Playwright acceptance
         run: npx playwright test --config playwright.admin.config.ts e2e/admin-orders.spec.ts
+      - name: Verify Orders approved review-width screenshots
+        if: success()
+        run: |
+          set -euo pipefail
+          for size in 1536x960 1440x900 1024x900 768x1024 390x844 360x800; do
+            test -s "artifacts/p04-p07/orders-${size}.png"
+          done
       - name: Preserve rendered evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -76,6 +84,7 @@ jobs:
           path: |
             playwright-report-admin
             test-results
+            artifacts/p04-p07
           if-no-files-found: warn
           retention-days: 14
 
