@@ -141,12 +141,12 @@ export function SuppliersPage({
           <span>Contact</span>
           <span>Phone</span>
           <span>Email</span>
-          <span>Actions</span>
+
         </div>
         {visibleSuppliers.map((supplier) => (
           <article
             className={
-              selectedSupplierId === supplier.id
+              selectedSupplier?.id === supplier.id
                 ? 'admin-supplier-card is-selected'
                 : 'admin-supplier-card'
             }
@@ -157,7 +157,7 @@ export function SuppliersPage({
               <button
                 className="admin-supplier-select"
                 type="button"
-                aria-pressed={selectedSupplierId === supplier.id}
+                aria-pressed={selectedSupplier?.id === supplier.id}
                 onClick={() => { setSelectedSupplierId(supplier.id); setMobileInspectorExpanded(true); }}
               >
                 {supplier.name}
