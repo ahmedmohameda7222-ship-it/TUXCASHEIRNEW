@@ -733,7 +733,9 @@ for (const width of [360, 1100] as const) {
     await inspector.getByRole('tab', { name: 'Stock & movements' }).click();
     await expect(inspector.getByText('Bulk stock received')).toBeVisible();
     await inspector.getByRole('tab', { name: 'Settings' }).click();
-    await expect(inspector.getByText('Base unit')).toBeVisible();
+    await expect(
+      inspector.getByRole('tabpanel', { name: 'Settings' }).getByText('Base unit'),
+    ).toBeVisible();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
