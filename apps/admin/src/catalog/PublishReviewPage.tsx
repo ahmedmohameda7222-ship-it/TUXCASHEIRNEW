@@ -1,10 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'wouter';
 
-import type {
-  CatalogPublishPreview,
-  CatalogScheduledChangeSummary,
-} from '@tux/admin-contracts';
+import type { CatalogPublishPreview, CatalogScheduledChangeSummary } from '@tux/admin-contracts';
 
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { useShopScope } from '../shops/ShopScopeProvider';
