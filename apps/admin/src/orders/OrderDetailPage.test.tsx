@@ -279,6 +279,33 @@ describe('OrderDetailPage', () => {
     expect(html).not.toContain('Pending Approval');
   });
 
+  it('shows immutable lifecycle transitions, Cairo timestamps, actor, and revision for audit review', () => {
+    const html = render({
+      ...fixture,
+      status: 'DONE',
+      statusHistory: [
+        {
+          id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          eventType: 'MARKED_DONE',
+          operationalRevision: 9,
+          fromStatus: 'ACTIVE',
+          toStatus: 'DONE',
+          workerName: null,
+          adminEmployeeId: '11111111-2222-4333-8444-555555555555',
+          reason: null,
+          note: 'Prepared on shift',
+          createdAt: '2026-09-21T23:30:00.000Z',
+        },
+      ],
+    });
+    expect(html).toContain('Active → Done');
+    expect(html).toContain('Revision 9');
+    expect(html).toContain('Admin actor: 11111111-2222-4333-8444-555555555555');
+    expect(html).toContain('Sep 22, 2026');
+    expect(html).toContain('Prepared on shift');
+    expect(html).toContain('Audit timestamp');
+  });
+
   it('renders immutable order context needed to investigate a lifecycle action', () => {
     const html = render(fixture);
 
