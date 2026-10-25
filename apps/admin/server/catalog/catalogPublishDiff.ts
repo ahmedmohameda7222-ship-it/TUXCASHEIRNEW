@@ -48,10 +48,7 @@ function collection(bundle: unknown, key: string): readonly unknown[] {
   return values;
 }
 
-function normalized(
-  row: PlainRecord,
-  fields: readonly string[],
-): CatalogJsonObject {
+function normalized(row: PlainRecord, fields: readonly string[]): CatalogJsonObject {
   const result: CatalogJsonObject = {};
   for (const field of fields) {
     const value = row[field];
@@ -79,8 +76,7 @@ function mapRows(
   for (const value of rows) {
     if (!isRecord(value) || value['shopId'] !== shopId) throw new CatalogPublishDiffError();
     const id = value['id'];
-    if (typeof id !== 'string' || !id || result.has(id))
-      throw new CatalogPublishDiffError();
+    if (typeof id !== 'string' || !id || result.has(id)) throw new CatalogPublishDiffError();
     result.set(id, normalized(value, fieldsByKind[kind]));
   }
   return result;
@@ -95,9 +91,7 @@ function diff(
   return allIds.map((id) => {
     const older = before.get(id) ?? null;
     const newer = after.get(id) ?? null;
-    const changedFields = fieldsByKind[kind].filter(
-      (field) => older?.[field] !== newer?.[field],
-    );
+    const changedFields = fieldsByKind[kind].filter((field) => older?.[field] !== newer?.[field]);
     const status = !older
       ? 'added'
       : !newer
