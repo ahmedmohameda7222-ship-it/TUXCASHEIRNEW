@@ -1187,10 +1187,10 @@ export default async function handler(
         sendJson(
           response,
           200,
-          await client.rpc<AdminStocktakeSessions>('read_admin_stocktake_sessions_v1', {
+          { ...(await client.rpc<AdminStocktakeSessions>('read_admin_stocktake_sessions_v1', {
             p_employee_id: context.principal.employeeId,
             p_shop_id: shopId,
-          }),
+          })) },
         );
         return;
       }
