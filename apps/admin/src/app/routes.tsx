@@ -97,6 +97,11 @@ const ExpensesPage = lazy(() =>
 const SettlementsPage = lazy(() =>
   import('../finance/SettlementsPage').then((module) => ({ default: module.SettlementsPage })),
 );
+const FinanceReconciliationPage = lazy(() =>
+  import('../finance/FinanceReconciliationPage').then((module) => ({
+    default: module.FinanceReconciliationPage,
+  })),
+);
 const EndDayPage = lazy(() =>
   import('../finance/EndDayPage').then((module) => ({ default: module.EndDayPage })),
 );
@@ -229,6 +234,7 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   if (route.path === '/purchasing') return <PurchasingPage />;
   if (route.path === '/staff') return <StaffPage />;
   if (route.path === '/finance') {
+    if (location === '/finance/reconciliation') return <FinanceReconciliationPage />;
     if (location.startsWith('/finance/expenses')) return <ExpensesPage />;
     if (location.startsWith('/finance/settlements')) return <SettlementsPage />;
     if (location.startsWith('/finance/end-day')) return <EndDayPage />;
