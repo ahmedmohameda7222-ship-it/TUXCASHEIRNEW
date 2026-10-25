@@ -33,6 +33,7 @@ import {
 } from '../../server/orders/orderFinancialProjection.js';
 import { cairoCalendarDayRange } from '../../server/orders/cairoCalendarDay.js';
 import { readAdminSessionToken } from '../../server/session.js';
+import { AdminRecentReauthError, requireRecentReauth } from '../../server/reauth.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
 
 const uuidSchema = z.string().uuid();
@@ -917,6 +918,13 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
   };
 }
 
+export function requireOrdersWriteReauthentication(
+  reauthenticatedAt: string | null,
+  now = new Date(),
+): void {
+  requireRecentReauth({ reauthenticated_at: reauthenticatedAt }, 300, now);
+}
+
 async function loadContext(
   request: AdminRequest,
   client: AdminSupabaseClient,
@@ -927,6 +935,7 @@ async function loadContext(
   const context = await loadAdminSession(token, client);
   if (csrfRequired) {
     requireSessionCsrf(context, firstHeader(request.headers['x-tux-admin-csrf']).trim());
+    requireOrdersWriteReauthentication(context.session.reauthenticated_at);
   }
   return context;
 }
@@ -991,7 +1000,7 @@ export function classifyOrderReadInputError(
 }
 
 function handleFailure(response: AdminResponse, error: unknown): void {
-  if (error instanceof AdminAuthError) {
+  if (error instanceof AdminAuthError || error instanceof AdminRecentReauthError) {
     sendJson(response, error.status, { error: error.code });
     return;
   }
