@@ -121,7 +121,11 @@ export function OrderDetailPage({
         </small>
       </div>
 
-      <section id="order-detail-overview" className="admin-order-detail__card" aria-label="Order identity">
+      <section
+        id="order-detail-overview"
+        className="admin-order-detail__card"
+        aria-label="Order identity"
+      >
         <h3>Order identity</h3>
         <p>Business day: {order.businessDayId ?? 'Not available'}</p>
         <p>
@@ -141,7 +145,11 @@ export function OrderDetailPage({
         </p>
       </section>
 
-      <section id="order-detail-items" className="admin-order-detail__card" aria-labelledby="admin-order-items-title">
+      <section
+        id="order-detail-items"
+        className="admin-order-detail__card"
+        aria-labelledby="admin-order-items-title"
+      >
         <h3 id="admin-order-items-title">Items</h3>
         <div className="admin-order-detail__list">
           {order.items.map((item) => {
@@ -183,7 +191,11 @@ export function OrderDetailPage({
       </section>
 
       <div className="admin-order-detail__grid">
-        <section id="order-detail-customer" className="admin-order-detail__card" aria-labelledby="admin-order-customer-title">
+        <section
+          id="order-detail-customer"
+          className="admin-order-detail__card"
+          aria-labelledby="admin-order-customer-title"
+        >
           <h3 id="admin-order-customer-title">Customer</h3>
           {order.customer ? (
             <>
@@ -303,7 +315,11 @@ export function OrderDetailPage({
         </section>
       ) : null}
 
-      <section id="order-detail-payments" className="admin-order-detail__card" aria-labelledby="admin-order-payments-title">
+      <section
+        id="order-detail-payments"
+        className="admin-order-detail__card"
+        aria-labelledby="admin-order-payments-title"
+      >
         <h3 id="admin-order-payments-title">Payments</h3>
         {order.payments.length === 0 ? (
           <p>No payment records</p>
@@ -437,7 +453,11 @@ export function OrderDetailPage({
         )}
       </section>
 
-      <section id="order-detail-history" className="admin-order-detail__card" aria-labelledby="admin-order-history-title">
+      <section
+        id="order-detail-history"
+        className="admin-order-detail__card"
+        aria-labelledby="admin-order-history-title"
+      >
         <h3 id="admin-order-history-title">Timeline and history</h3>
         {order.statusHistory.length === 0 ? (
           <p>No status history</p>
