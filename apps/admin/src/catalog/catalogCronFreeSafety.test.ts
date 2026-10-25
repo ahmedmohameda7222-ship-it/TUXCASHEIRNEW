@@ -12,7 +12,7 @@ describe('Cron-free scheduler safety', () => {
     expect(review).not.toContain('<ScheduleEditor');
     expect(review).not.toContain('<RecurringAvailabilityEditor');
     expect(review).toContain('Automatic scheduling is unavailable');
-    expect(review).toContain('existing schedules');
+    expect(review).toContain('Existing schedules');
   });
 
   it('does not accept new scheduled catalog, availability, or shop-settings commands', () => {
