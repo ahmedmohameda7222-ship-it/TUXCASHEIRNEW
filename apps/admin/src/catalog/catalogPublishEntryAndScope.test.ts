@@ -48,7 +48,7 @@ describe('Catalog shop-scoped publishing entry point', () => {
     );
     expect(catalog).toContain('if (busy || !canSwitchCatalogEditor()) return;');
     expect(catalog).toContain('if (!bulkOpen && !canSwitchCatalogEditor()) return;');
-    expect(catalog).toContain("setPendingNavigation(destination)");
+    expect(catalog).toContain('setPendingNavigation(destination)');
     expect(catalog).toContain("document.addEventListener('click', interceptLink, true)");
     expect(catalog).toContain("window.addEventListener('popstate', onPopstate, true)");
     expect(catalog).toContain("window.addEventListener('beforeunload', onBeforeUnload)");

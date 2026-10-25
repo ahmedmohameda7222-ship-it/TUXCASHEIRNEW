@@ -218,7 +218,11 @@ export function ProductEditor({
       })
     : false;
   useUnsavedShopDraft(
-    baseDirty || advancedDirty || selectedImageFile !== null || imageUploading || imageRequiresSaveFirst,
+    baseDirty ||
+      advancedDirty ||
+      selectedImageFile !== null ||
+      imageUploading ||
+      imageRequiresSaveFirst,
   );
 
   const draftPreview = useMemo(() => {

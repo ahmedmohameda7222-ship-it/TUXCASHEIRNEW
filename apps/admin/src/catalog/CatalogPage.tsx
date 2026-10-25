@@ -97,7 +97,8 @@ export function CatalogPage() {
         event.altKey ||
         event.shiftKey ||
         !hasUnsavedDrafts()
-      ) return;
+      )
+        return;
       const node = event.target;
       if (!(node instanceof Element)) return;
       const anchor = node.closest('a[href]');
@@ -455,7 +456,10 @@ export function CatalogPage() {
             aria-labelledby="catalog-navigation-confirm-title"
           >
             <h2 id="catalog-navigation-confirm-title">Discard unsaved product edits?</h2>
-            <p>These product changes have not been saved. Stay to keep editing, or discard them to leave Catalog.</p>
+            <p>
+              These product changes have not been saved. Stay to keep editing, or discard them to
+              leave Catalog.
+            </p>
             <div className="drawer-footer">
               <button
                 className="admin-secondary-button"

@@ -405,7 +405,9 @@ if (process.env['P02_CAPTURE'] === '1') {
   }
 }
 
-test('unsaved product edits are guarded at both Review & Publish entry points', async ({ page }) => {
+test('unsaved product edits are guarded at both Review & Publish entry points', async ({
+  page,
+}) => {
   const fixture = await mockCatalog(page);
   await page.goto('/catalog/products');
   await page.getByRole('button', { name: /Classic Smash/ }).click();
@@ -437,7 +439,9 @@ test('saved product draft permits Review & Publish without false warning', async
   await expect(page.getByRole('dialog', { name: 'Discard unsaved product edits?' })).toHaveCount(0);
 });
 
-test('version history link and browser Back preserve dirty edits until explicitly discarded', async ({ page }) => {
+test('version history link and browser Back preserve dirty edits until explicitly discarded', async ({
+  page,
+}) => {
   await mockCatalog(page);
   await page.goto('/catalog/products');
   await page.getByRole('button', { name: /Classic Smash/ }).click();

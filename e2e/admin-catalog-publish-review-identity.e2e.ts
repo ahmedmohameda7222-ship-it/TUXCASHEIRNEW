@@ -50,44 +50,51 @@ async function publishingFixture(page: Page) {
           shopId: requestedShop,
           currentPublishVersion: publishVersion,
           versions: [],
-          schedules: pendingSchedule ? [{
-            id: '77777777-7777-4777-8777-777777777777',
-            shopId: requestedShop,
-            draftId: firstDraft,
-            expectedDraftRevision: 1,
-            status: 'PENDING',
-            timezone: 'Africa/Cairo',
-            localScheduledAt: '2099-09-11T08:00:00',
-            scheduledFor: '2099-09-11T05:00:00.000Z',
-            targetBasePublishVersion: 48,
-            attemptCount: 0,
-            lastError: null,
-          }] : [],
-          draftPreviews: requestedShop === shop
-            ? drafts.map((draft) => ({
-                shopId: shop,
-                draftId: draft.draftId,
-                draftRevision: draft.draftRevision,
-                basePublishVersion: 48,
-                currentPublishVersion: publishVersion,
-                stale: false,
-                changedProductIds: [product],
-                priceChangedProductIds: [],
-                changedRelationCounts: {
-                  productModifierLinks: 0,
-                  comboBeverageOptions: 0,
-                  recipeLines: 0,
+          schedules: pendingSchedule
+            ? [
+                {
+                  id: '77777777-7777-4777-8777-777777777777',
+                  shopId: requestedShop,
+                  draftId: firstDraft,
+                  expectedDraftRevision: 1,
+                  status: 'PENDING',
+                  timezone: 'Africa/Cairo',
+                  localScheduledAt: '2099-09-11T08:00:00',
+                  scheduledFor: '2099-09-11T05:00:00.000Z',
+                  targetBasePublishVersion: 48,
+                  attemptCount: 0,
+                  lastError: null,
                 },
-                changes: [{
-                  kind: 'product',
-                  id: product,
-                  status: 'modified',
-                  changedFields: ['name'],
-                  before: { name: 'Original' },
-                  after: { name: draft.changedName },
-                }],
-              }))
+              ]
             : [],
+          draftPreviews:
+            requestedShop === shop
+              ? drafts.map((draft) => ({
+                  shopId: shop,
+                  draftId: draft.draftId,
+                  draftRevision: draft.draftRevision,
+                  basePublishVersion: 48,
+                  currentPublishVersion: publishVersion,
+                  stale: false,
+                  changedProductIds: [product],
+                  priceChangedProductIds: [],
+                  changedRelationCounts: {
+                    productModifierLinks: 0,
+                    comboBeverageOptions: 0,
+                    recipeLines: 0,
+                  },
+                  changes: [
+                    {
+                      kind: 'product',
+                      id: product,
+                      status: 'modified',
+                      changedFields: ['name'],
+                      before: { name: 'Original' },
+                      after: { name: draft.changedName },
+                    },
+                  ],
+                }))
+              : [],
         }),
       });
       return;
@@ -121,13 +128,20 @@ async function publishingFixture(page: Page) {
   });
   return {
     publishes,
-    get reads() { return reads; },
-    setDrafts(next: Draft[]) { drafts = next; },
-    setVersion(next: number) { publishVersion = next; },
+    get reads() {
+      return reads;
+    },
+    setDrafts(next: Draft[]) {
+      drafts = next;
+    },
+    setVersion(next: number) {
+      publishVersion = next;
+    },
   };
 }
 
-const publishButton = (page: Page) => page.getByRole('button', { name: 'Publish now', exact: true });
+const publishButton = (page: Page) =>
+  page.getByRole('button', { name: 'Publish now', exact: true });
 const consent = (page: Page) =>
   page.getByRole('checkbox', {
     name: 'I reviewed the changes and confirm publication for this shop.',
@@ -140,7 +154,9 @@ async function refreshPublishing(page: Page, fixture: { readonly reads: number }
   await expect.poll(() => fixture.reads).toBeGreaterThan(prior);
 }
 
-test('new server revision and changed preview invalidate checked publication before POST', async ({ page }) => {
+test('new server revision and changed preview invalidate checked publication before POST', async ({
+  page,
+}) => {
   const fixture = await publishingFixture(page);
   await page.goto('/catalog/products/publishing');
   await expect(consent(page)).toBeVisible();
@@ -183,7 +199,9 @@ test('preview content change without revision invalidates confirmation', async (
   expect(fixture.publishes).toEqual([]);
 });
 
-test('selected draft disappearing never falls back to publishing a different draft', async ({ page }) => {
+test('selected draft disappearing never falls back to publishing a different draft', async ({
+  page,
+}) => {
   const fixture = await publishingFixture(page);
   await page.goto('/catalog/products/publishing');
   await page.getByLabel('Changes to review').selectOption(secondDraft);
@@ -214,7 +232,9 @@ test('selection and shop switch clear confirmation and requester PIN', async ({ 
   await expect(consent(page)).not.toBeChecked();
 });
 
-test('changed between confirmation and preflight fetch fails closed without POST', async ({ page }) => {
+test('changed between confirmation and preflight fetch fails closed without POST', async ({
+  page,
+}) => {
   const fixture = await publishingFixture(page);
   await page.goto('/catalog/products/publishing');
   await consent(page).check();
