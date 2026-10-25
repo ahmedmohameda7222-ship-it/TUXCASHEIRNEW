@@ -28,6 +28,7 @@ import {
   type AdminResponse,
 } from '../../server/http.js';
 import { createOrderService, type OrderStore } from '../../server/orders/orderService.js';
+import { queryOrdersKpis } from '../../server/orders/orderKpiService.js';
 import { ORDER_EXPORT_MAX_ROWS, renderOrdersCsv } from '../../server/orders/orderCsvExport.js';
 import {
   effectiveFinancialState,
@@ -1107,6 +1108,15 @@ export function classifyOrderReadInputError(
   if (error.message === 'invalid_order_cursor') {
     return { status: 400, error: 'invalid_order_cursor' };
   }
+  if (error.message === 'invalid_orders_kpi_range' || error.message === 'orders_kpi_range_invalid') {
+    return { status: 400, error: 'invalid_orders_kpi_range' };
+  }
+  if (error.message === 'permission_forbidden') {
+    return { status: 403, error: 'permission_forbidden' };
+  }
+  if (error.message === 'orders_kpi_overflow' || error.message === 'orders_kpis_invalid') {
+    return { status: 502, error: 'admin_backend_unavailable' };
+  }
   if (error.message === 'invalid_orders_date_filter') {
     return { status: 400, error: 'invalid_orders_date_filter' };
   }
@@ -1257,6 +1267,22 @@ export default async function handler(
       const url = new URL(request.url ?? '/', 'http://admin.local');
       const shopId = uuidSchema.parse(url.searchParams.get('shopId'));
       const context = await loadContext(request, client, false);
+      if (url.searchParams.get('view') === 'kpis') {
+        sendJson(
+          response,
+          200,
+          await queryOrdersKpis(
+            {
+              shopId,
+              from: url.searchParams.get('from'),
+              to: url.searchParams.get('to'),
+            },
+            context.principal,
+            client,
+          ),
+        );
+        return;
+      }
       if (url.searchParams.get('view') === 'business-days') {
         sendJson(response, 200, await service.listBusinessDays({ shopId }, context.principal));
         return;
