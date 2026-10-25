@@ -338,6 +338,7 @@ export function OrdersPage() {
           {actionError ? <p role="alert">{actionError}</p> : null}
 
           <ResponsiveMasterDetail
+            className="admin-orders-master-detail"
             listLabel="Orders"
             detailLabel="Order detail"
             detailActive={selectedId !== null}
