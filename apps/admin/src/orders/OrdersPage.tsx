@@ -192,13 +192,13 @@ export function OrdersPage() {
             metrics={[
               {
                 id: 'total',
-                label: 'Total orders',
+                label: 'Total Orders',
                 value: verifiedKpis?.orderCount ?? null,
                 hint: kpiHint,
               },
               {
                 id: 'revenue',
-                label: 'Total revenue',
+                label: 'Total Revenue',
                 value:
                   principal.permissions.includes('finance.view') &&
                   verifiedKpis?.netSalesMinor != null
@@ -210,7 +210,7 @@ export function OrdersPage() {
               },
               {
                 id: 'average',
-                label: 'Average order value',
+                label: 'Average Order Value',
                 value:
                   principal.permissions.includes('finance.view') &&
                   verifiedKpis?.averageOrderMinor != null
@@ -224,7 +224,7 @@ export function OrdersPage() {
               },
               {
                 id: 'active',
-                label: 'Active orders',
+                label: 'Active Orders',
                 value: verifiedKpis?.activeOrderCount ?? null,
                 hint: kpiHint,
               },
