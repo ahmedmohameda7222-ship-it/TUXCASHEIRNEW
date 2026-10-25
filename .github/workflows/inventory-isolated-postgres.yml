@@ -1,0 +1,52 @@
+name: Inventory isolated PostgreSQL acceptance
+
+on:
+  push:
+    branches:
+      - fix/inventory-approved-ui-production-20261025
+    paths:
+      - '.github/workflows/inventory-isolated-postgres.yml'
+      - 'scripts/test-inventory-isolated-postgres.mjs'
+      - 'scripts/fixtures/inventory-isolated-postgres.sql'
+      - 'supabase/migrations/20261025170000_inventory_offshift_quiescence.sql'
+      - 'supabase/migrations/20261025171000_inventory_transfer_master_identity.sql'
+      - 'supabase/migrations/20261025172000_inventory_transfer_cancel_compensation.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory-postgres:
+    name: Real isolated Inventory RPC acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Confirm syntax and run disposable database acceptance
+        run: |
+          node --check scripts/test-inventory-isolated-postgres.mjs
+          node scripts/test-inventory-isolated-postgres.mjs

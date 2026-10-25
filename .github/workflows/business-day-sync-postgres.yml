@@ -13,7 +13,7 @@ jobs:
   postgres:
     name: Real PostgreSQL RPC
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
     services:
@@ -36,3 +36,134 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Real RPC regression
         run: node scripts/test-operations-business-day-sync-postgres.mjs
+      - name: Inventory independent PostgreSQL acceptance (PR 159 only)
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 159 }}
+        run: |
+          node --check scripts/test-inventory-isolated-postgres.mjs
+          node scripts/test-inventory-isolated-postgres.mjs
+
+  inventory-full-regression:
+    name: Inventory full monorepo regression
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 159 }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Build local-only serial three-stream integration preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'TUX Inventory CI Preview'
+          git config user.email 'inventory-ci@localhost.invalid'
+          git fetch --no-tags origin refs/pull/157/head:refs/remotes/origin/preview-catalog-157
+          git fetch --no-tags origin refs/pull/158/head:refs/remotes/origin/preview-orders-158
+          echo "Inventory checked out: $(git rev-parse HEAD)"
+          echo "Catalog preview: $(git rev-parse refs/remotes/origin/preview-catalog-157)"
+          echo "Orders preview: $(git rev-parse refs/remotes/origin/preview-orders-158)"
+          # These are throwaway LOCAL CI merge commits: no pushes, tags,
+          # migrations, deployments or modifications to either PR's branch.
+          git merge --no-ff --no-edit refs/remotes/origin/preview-catalog-157
+          git merge --no-ff --no-edit refs/remotes/origin/preview-orders-158
+          echo "Three-stream preview HEAD: $(git rev-parse HEAD)"
+          git status --short
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      # Keep evaluating independent integration checks if another unmerged
+      # stream has a formatting defect, but retain a hard red final gate.
+      - name: Root formatting
+        id: preview_formatting
+        continue-on-error: true
+        run: npm run format:check
+      - name: Root lint
+        run: npm run lint
+      - name: All unit and integration tests
+        run: npm run test
+      - name: Sync domain regression
+        run: npm test -w @tux/sync
+      - name: Full Admin security contracts
+        run: npm run test:admin-security
+      - name: Deployment schema contract
+        run: npm run test:admin-deployment
+      - name: WhatsApp architecture and security contracts
+        run: |
+          npm run test:whatsapp-architecture
+          npm run test:whatsapp-security
+      - name: All TypeScript workspaces
+        run: npm run typecheck
+      - name: All production builds
+        run: npm run build
+      - name: Require original unmodified preview to pass formatting
+        if: always()
+        run: test "${{ steps.preview_formatting.outcome }}" = "success"
+
+  inventory-rendered-preview:
+    name: Inventory authenticated rendered browser regression
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 159 }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Build local-only serial integration preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'TUX Inventory CI Preview'
+          git config user.email 'inventory-ci@localhost.invalid'
+          git fetch --no-tags origin refs/pull/157/head:refs/remotes/origin/preview-catalog-157
+          git fetch --no-tags origin refs/pull/158/head:refs/remotes/origin/preview-orders-158
+          echo "Catalog: $(git rev-parse refs/remotes/origin/preview-catalog-157)"
+          echo "Orders: $(git rev-parse refs/remotes/origin/preview-orders-158)"
+          git merge --no-ff --no-edit refs/remotes/origin/preview-catalog-157
+          git merge --no-ff --no-edit refs/remotes/origin/preview-orders-158
+          echo "Throwaway local preview SHA: $(git rev-parse HEAD)"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build Admin for browser regression
+        run: |
+          npm run typecheck:admin
+          npm run build:admin
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Rendered Inventory interaction, viewport, and state regression
+        run: npx playwright test e2e/admin-inventory.spec.ts --config playwright.admin.config.ts
+      - name: Upload reproducible browser failure artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: inventory-three-stream-rendered-preview
+          path: |
+            playwright-report-admin
+            test-results
+          if-no-files-found: warn
+          retention-days: 14

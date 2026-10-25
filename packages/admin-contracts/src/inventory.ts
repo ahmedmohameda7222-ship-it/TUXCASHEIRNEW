@@ -171,6 +171,25 @@ export interface AdminStocktakeSnapshot {
   readonly lines: readonly AdminStocktakeSnapshotLine[];
 }
 
+export interface AdminStocktakeDraftSession {
+  readonly stocktakeId: string;
+  readonly shopId: string;
+  readonly status: 'DRAFT' | 'POSTED' | 'CANCELLED';
+  readonly startedAt: string;
+  readonly postedAt: string | null;
+  readonly cancelledAt: string | null;
+  readonly draftRevision: number;
+  readonly stale: boolean;
+  readonly lines: readonly (AdminStocktakeSnapshotLine & {
+    readonly actualCountMicros: number | null;
+  })[];
+}
+
+export interface AdminStocktakeSessions {
+  readonly ok: true;
+  readonly sessions: readonly AdminStocktakeDraftSession[];
+}
+
 export type AdminInventoryCommand =
   | AdminInventoryDefinitionCommand
   | {
@@ -199,6 +218,23 @@ export type AdminInventoryCommand =
       readonly type: 'stocktake.begin';
       readonly shopId: string;
       readonly inventoryItemIds: readonly string[];
+      readonly commandId: string;
+    }
+  | {
+      readonly type: 'stocktake.save';
+      readonly shopId: string;
+      readonly stocktakeId: string;
+      readonly expectedRevision: number;
+      readonly lines: readonly {
+        readonly inventoryItemId: string;
+        readonly actualCountMicros: number | null;
+      }[];
+      readonly commandId: string;
+    }
+  | {
+      readonly type: 'stocktake.cancel';
+      readonly shopId: string;
+      readonly stocktakeId: string;
       readonly commandId: string;
     }
   | {
@@ -234,7 +270,7 @@ export type AdminInventoryCommand =
       readonly orderMultipleMicros: number | null;
     }
   | {
-      readonly type: 'transfer.receive';
+      readonly type: 'transfer.receive' | 'transfer.cancel';
       readonly shopId: string;
       readonly transferId: string;
       readonly commandId: string;
@@ -248,6 +284,7 @@ export type AdminInventoryCommandResult =
       readonly state?: 'PENDING_APPROVAL';
       readonly approvalRequestId?: string;
       readonly stocktakeId?: string;
+      readonly draftRevision?: number;
       readonly lines?: readonly AdminStocktakeSnapshotLine[];
       readonly transferId?: string;
       readonly entityId?: string;

@@ -74,6 +74,13 @@ export function usePurchasing(shopId: string | undefined) {
     if (shopId) await queryClient.invalidateQueries({ queryKey: queryKey(shopId) });
   }
 
+  async function invalidateInventoryAfterStockMovement(): Promise<void> {
+    await invalidate();
+    if (shopId) {
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'inventory', shopId] });
+    }
+  }
+
   const createSupplier = useMutation({
     mutationFn: async (input: {
       name: string;
@@ -209,7 +216,7 @@ export function usePurchasing(shopId: string | undefined) {
         commandId: retainedCommandId,
       }));
     },
-    onSuccess: invalidate,
+    onSuccess: invalidateInventoryAfterStockMovement,
   });
 
   const returnPurchase = useMutation({
@@ -228,7 +235,7 @@ export function usePurchasing(shopId: string | undefined) {
         commandId: retainedCommandId,
       }));
     },
-    onSuccess: invalidate,
+    onSuccess: invalidateInventoryAfterStockMovement,
   });
 
   return {

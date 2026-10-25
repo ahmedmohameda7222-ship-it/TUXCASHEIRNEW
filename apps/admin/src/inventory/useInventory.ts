@@ -5,6 +5,7 @@ import type {
   AdminInventoryCommandResult,
   AdminInventoryItemHistory,
   AdminInventoryWorkspace,
+  AdminStocktakeSessions,
 } from '@tux/admin-contracts';
 
 import { useAdminSession } from '../auth/useAdminSession';
@@ -49,6 +50,39 @@ export function useInventory(shopId: string | undefined, inventoryItemId: string
         `/api/admin/inventory?shopId=${encodeURIComponent(shopId)}`,
       );
     },
+  });
+
+  const stocktakePermission =
+    session.state.status === 'authenticated' &&
+    session.state.session.principal.permissions.includes('inventory.stocktake');
+
+  const stocktakeEligibilityQuery = useQuery({
+    queryKey: shopId
+      ? [...inventoryQueryKey(shopId), 'stocktake-eligibility']
+      : ['admin', 'inventory', 'no-stocktake-eligibility'],
+    enabled: Boolean(shopId) && stocktakePermission,
+    queryFn: async () => {
+      if (!shopId) throw new InventoryUiError('concrete_shop_required');
+      return adminFetch<{ allowed: boolean; code: string }>(
+        `/api/admin/inventory?shopId=${encodeURIComponent(shopId)}&view=stocktake-eligibility`,
+      );
+    },
+    staleTime: 5_000,
+    refetchInterval: 15_000,
+  });
+
+  const stocktakeSessionsQuery = useQuery({
+    queryKey: shopId
+      ? [...inventoryQueryKey(shopId), 'stocktake-sessions']
+      : ['admin', 'inventory', 'no-stocktake-sessions'],
+    enabled: Boolean(shopId) && stocktakePermission,
+    queryFn: async () => {
+      if (!shopId) throw new InventoryUiError('concrete_shop_required');
+      return adminFetch<AdminStocktakeSessions>(
+        `/api/admin/inventory?shopId=${encodeURIComponent(shopId)}&view=stocktake-sessions`,
+      );
+    },
+    staleTime: 5_000,
   });
 
   const itemHistoryQuery = useQuery({
@@ -183,6 +217,36 @@ export function useInventory(shopId: string | undefined, inventoryItemId: string
     },
   });
 
+  const saveStocktakeDraft = useMutation({
+    mutationFn: async (input: {
+      stocktakeId: string;
+      expectedRevision: number;
+      lines: readonly { inventoryItemId: string; actualCountMicros: number | null }[];
+    }) => {
+      return postRetained('stocktake.save', input, (retainedCommandId) => ({
+        type: 'stocktake.save',
+        shopId: shopId!,
+        stocktakeId: input.stocktakeId,
+        expectedRevision: input.expectedRevision,
+        lines: input.lines,
+        commandId: retainedCommandId,
+      }));
+    },
+    onSuccess: invalidate,
+  });
+
+  const cancelStocktakeDraft = useMutation({
+    mutationFn: async (stocktakeId: string) => {
+      return postRetained('stocktake.cancel', stocktakeId, (retainedCommandId) => ({
+        type: 'stocktake.cancel',
+        shopId: shopId!,
+        stocktakeId,
+        commandId: retainedCommandId,
+      }));
+    },
+    onSuccess: invalidate,
+  });
+
   const postStocktake = useMutation({
     mutationFn: async (input: {
       stocktakeId: string;
@@ -243,16 +307,33 @@ export function useInventory(shopId: string | undefined, inventoryItemId: string
     onSuccess: invalidate,
   });
 
+  const cancelTransfer = useMutation({
+    mutationFn: async (transferId: string) => {
+      return postRetained('transfer.cancel', transferId, (retainedCommandId) => ({
+        type: 'transfer.cancel',
+        shopId: shopId!,
+        transferId,
+        commandId: retainedCommandId,
+      }));
+    },
+    onSuccess: invalidate,
+  });
+
   return {
     workspaceQuery,
     itemHistoryQuery,
+    stocktakeEligibilityQuery,
+    stocktakeSessionsQuery,
     manageDefinition,
     adjustStock,
     recordWaste,
     beginStocktake,
+    saveStocktakeDraft,
+    cancelStocktakeDraft,
     postStocktake,
     updateReplenishment,
     sendTransfer,
     receiveTransfer,
+    cancelTransfer,
   };
 }
