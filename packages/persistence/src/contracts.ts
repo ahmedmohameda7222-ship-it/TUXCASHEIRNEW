@@ -117,6 +117,7 @@ export interface OutboxRepository {
   recoverMissingBusinessDayStart(
     businessDayId: BusinessDayId,
   ): Promise<'RECOVERED' | 'PRESENT' | 'MISSING'>;
+  recoverMissingOrderPlacement(orderId: OrderId): Promise<'RECOVERED' | 'PRESENT' | 'MISSING'>;
 }
 
 export interface OperationsTransaction {

@@ -543,6 +543,56 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
         );
         return 'RECOVERED';
       },
+      async recoverMissingOrderPlacement(orderId: OrderId) {
+        const objectStore = store('outboxEvents');
+        const candidates = (await requestResult(objectStore.getAll())) as StoredOutboxEvent[];
+        const origin = candidates
+          .filter(
+            (event) =>
+              event.aggregateType === 'ORDER' &&
+              event.aggregateId === orderId &&
+              event.eventType === 'ORDER_PLACED',
+          )
+          .sort((left, right) => left.createdAt.localeCompare(right.createdAt))[0];
+        if (origin === undefined) return 'MISSING';
+        const earliestDependentAt = candidates
+          .filter(
+            (event) =>
+              event.id !== origin.id &&
+              event.shopId === origin.shopId &&
+              event.aggregateType === 'ORDER' &&
+              event.aggregateId === orderId &&
+              event.deliveredAt === null,
+          )
+          .map((event) => event.createdAt)
+          .sort()[0];
+        const recoveredCreatedAt =
+          earliestDependentAt !== undefined && origin.createdAt >= earliestDependentAt
+            ? (new Date(Date.parse(earliestDependentAt) - 1).toISOString() as Instant)
+            : origin.createdAt;
+        if (
+          origin.deliveredAt === null &&
+          origin.quarantinedAt === null &&
+          origin.nextAttemptAt === null &&
+          recoveredCreatedAt === origin.createdAt
+        ) {
+          return 'PRESENT';
+        }
+        await requestResult(
+          objectStore.put({
+            ...origin,
+            createdAt: recoveredCreatedAt,
+            attemptCount: 0,
+            nextAttemptAt: null,
+            lastError: null,
+            deliveredAt: null,
+            quarantinedAt: null,
+            permanentFailureReason: null,
+            blockedByEventId: null,
+          } satisfies StoredOutboxEvent),
+        );
+        return 'RECOVERED';
+      },
     },
   };
 }

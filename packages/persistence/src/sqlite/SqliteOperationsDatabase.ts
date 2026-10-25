@@ -863,6 +863,63 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
           .run(recoveredCreatedAt, serialize(recovered), event.id);
         return 'RECOVERED';
       },
+      async recoverMissingOrderPlacement(orderId: OrderId) {
+        const row = database
+          .prepare(
+            `SELECT id, payload_json, delivered_at, quarantined_at, next_attempt_at
+             FROM outbox_events
+             WHERE aggregate_type = 'ORDER' AND aggregate_id = ? AND event_type = 'ORDER_PLACED'
+             ORDER BY created_at ASC LIMIT 1`,
+          )
+          .get(orderId);
+        const event = parseOutboxPayload(row);
+        if (event === null) return 'MISSING';
+        const metadata = row as {
+          readonly quarantined_at?: string | null;
+          readonly next_attempt_at?: string | null;
+          readonly delivered_at?: string | null;
+        };
+        const earliestDependent = database
+          .prepare(
+            `SELECT MIN(created_at) AS created_at
+             FROM outbox_events
+             WHERE shop_id = ? AND aggregate_type = 'ORDER' AND aggregate_id = ?
+               AND id <> ? AND delivered_at IS NULL`,
+          )
+          .get(event.shopId, orderId, event.id) as
+          { readonly created_at?: string | null } | undefined;
+        const earliestDependentAt = earliestDependent?.created_at ?? null;
+        const recoveredCreatedAt =
+          earliestDependentAt !== null && event.createdAt >= earliestDependentAt
+            ? (new Date(Date.parse(earliestDependentAt) - 1).toISOString() as Instant)
+            : event.createdAt;
+        if (
+          metadata.delivered_at == null &&
+          metadata.quarantined_at == null &&
+          metadata.next_attempt_at == null &&
+          recoveredCreatedAt === event.createdAt
+        ) {
+          return 'PRESENT';
+        }
+        const recovered: OutboxEvent = {
+          ...event,
+          createdAt: recoveredCreatedAt,
+          attemptCount: 0,
+          nextAttemptAt: null,
+          lastError: null,
+          deliveredAt: null,
+        };
+        database
+          .prepare(
+            `UPDATE outbox_events
+             SET attempt_count = 0, next_attempt_at = NULL, last_error = NULL,
+                 delivered_at = NULL, quarantined_at = NULL,
+                 permanent_failure_reason = NULL, blocked_by_event_id = NULL,
+                 created_at = ?, payload_json = ? WHERE id = ?`,
+          )
+          .run(recoveredCreatedAt, serialize(recovered), event.id);
+        return 'RECOVERED';
+      },
     },
   };
 }

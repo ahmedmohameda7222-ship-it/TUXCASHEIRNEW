@@ -1,4 +1,10 @@
-import { parseEntityId, type BusinessDayId, type Instant, type ShopId } from '@tux/domain';
+import {
+  parseEntityId,
+  type BusinessDayId,
+  type Instant,
+  type OrderId,
+  type ShopId,
+} from '@tux/domain';
 import type { OperationsDatabase } from '@tux/persistence';
 import {
   AutomaticOutboxScheduler,
@@ -49,6 +55,12 @@ export function startBrowserAutomaticSync(input: {
           shopId: event.shopId,
           createUuid: () => crypto.randomUUID(),
         });
+      },
+      onOrderDependencyMissing: async (_event, missingOrderId) => {
+        const orderId = parseEntityId<OrderId>(missingOrderId);
+        await input.database.transaction((transaction) =>
+          transaction.outbox.recoverMissingOrderPlacement(orderId),
+        );
       },
     }),
     { now: input.now },

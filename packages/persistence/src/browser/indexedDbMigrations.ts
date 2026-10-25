@@ -1,4 +1,4 @@
-export const INDEXED_DB_VERSION = 9;
+export const INDEXED_DB_VERSION = 10;
 
 export const INDEXED_DB_STORES = [
   'shops',
@@ -316,6 +316,84 @@ const MIGRATIONS: readonly IndexedDbMigration[] = [
           });
         }
         cursor.continue();
+      });
+    },
+  },
+  {
+    version: 10,
+    name: 'retry_legacy_order_lifecycle_after_origin_recovery',
+    apply(_database, transaction) {
+      const recoverableLifecycleEvents = new Set([
+        'ORDER_MARKED_DONE',
+        'ORDER_CANCELLED',
+        'ORDER_RETURNED',
+        'ORDER_REOPENED',
+      ]);
+      const outbox = transaction.objectStore('outboxEvents');
+      const allRequest = outbox.getAll();
+      allRequest.addEventListener('success', () => {
+        const events = allRequest.result as Record<string, unknown>[];
+        const recoverableDayIds = new Set(
+          events
+            .filter((event) => {
+              const eventType = event['eventType'];
+              return (
+                event['deliveredAt'] === null &&
+                typeof event['quarantinedAt'] === 'string' &&
+                event['lastError'] === 'Remote outbox endpoint rejected event with HTTP 400.' &&
+                typeof eventType === 'string' &&
+                recoverableLifecycleEvents.has(eventType)
+              );
+            })
+            .map((event) => event['businessDayId'])
+            .filter((value): value is string => typeof value === 'string'),
+        );
+        if (recoverableDayIds.size === 0) return;
+
+        const precedence = (eventType: unknown): number => {
+          if (eventType === 'BUSINESS_DAY_STARTED') return 0;
+          if (eventType === 'WORKER_SIGNED_IN' || eventType === 'WORKER_SWITCHED') return 1;
+          if (eventType === 'ORDER_PLACED') return 2;
+          if (typeof eventType === 'string' && eventType.startsWith('ORDER_')) return 4;
+          if (eventType === 'RECONCILIATION_RECORDED') return 5;
+          if (eventType === 'BUSINESS_DAY_CLOSED') return 6;
+          if (eventType === 'WORKER_SIGNED_OUT') return 7;
+          return 3;
+        };
+        let recoveryTime = Math.max(
+          ...events.map((event) => Date.parse(String(event['createdAt']))).filter(Number.isFinite),
+          0,
+        );
+        const recoveryStream = events
+          .filter((event) => recoverableDayIds.has(String(event['businessDayId'])))
+          .sort((left, right) => {
+            const byPrecedence = precedence(left['eventType']) - precedence(right['eventType']);
+            if (byPrecedence !== 0) return byPrecedence;
+            return String(left['createdAt']).localeCompare(String(right['createdAt']));
+          });
+        for (const event of recoveryStream) {
+          const originalCreatedAt = String(event['createdAt']);
+          const quarantinedAt = event['quarantinedAt'];
+          const reason = event['lastError'];
+          recoveryTime += 1;
+          outbox.put({
+            ...event,
+            createdAt: new Date(recoveryTime).toISOString(),
+            attemptCount: 0,
+            nextAttemptAt: null,
+            lastError: null,
+            deliveredAt: null,
+            quarantinedAt: null,
+            permanentFailureReason: null,
+            blockedByEventId: null,
+            recoveryEvidence: {
+              quarantinedAt: typeof quarantinedAt === 'string' ? quarantinedAt : null,
+              reason: typeof reason === 'string' ? reason : null,
+              originalCreatedAt,
+              migration: 10,
+            },
+          });
+        }
       });
     },
   },

@@ -83,6 +83,22 @@ export type OperationsBulkStockClient = TuxBulkStockApi;
 export type OperationsEndDayClient = TuxEndDayApi;
 export type OperationsWhatsAppClient = TuxWhatsAppApi;
 
+export async function closeBrowserDayAndFlush(input: {
+  readonly shopId: ShopId;
+  readonly input: Parameters<TuxEndDayApi['closeDay']>[0];
+  readonly closeDay: TuxEndDayApi['closeDay'];
+  readonly flushShopOutbox: (shopId: ShopId) => Promise<void>;
+}): ReturnType<TuxEndDayApi['closeDay']> {
+  const result = await input.closeDay(input.input);
+  if (!result.ok) return result;
+  try {
+    await input.flushShopOutbox(input.shopId);
+  } catch {
+    // The local close and immutable outbox remain authoritative for the next reconnect.
+  }
+  return result;
+}
+
 interface BrowserRuntime {
   readonly database: OperationsDatabase;
   readonly session: CoordinatedOperationsSessionService;
@@ -93,6 +109,7 @@ interface BrowserRuntime {
   readonly expenses: OperationsExpensesService;
   readonly bulkStock: OperationsBulkStockService;
   readonly endDay: OperationsEndDayService;
+  closeDay(input: Parameters<TuxEndDayApi['closeDay']>[0]): ReturnType<TuxEndDayApi['closeDay']>;
   getState(): Promise<OperationsSessionResult>;
   submitPin(pin: string, shopId?: string): Promise<OperationsSessionResult>;
   signOut(): Promise<OperationsSessionResult>;
@@ -513,6 +530,11 @@ async function browserRuntime(): Promise<BrowserRuntime> {
                 createUuid: runtime.createUuid,
               });
             },
+            onOrderDependencyMissing: async (_event, missingOrderId) => {
+              await database.transaction((transaction) =>
+                transaction.outbox.recoverMissingOrderPlacement(parseEntityId(missingOrderId)),
+              );
+            },
           }),
           { now: runtime.now },
           shopId,
@@ -740,6 +762,25 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         trackWorkerIdentity(await session.getState());
       }
 
+      const endDay = new OperationsEndDayService(
+        database,
+        readModel,
+        draftStore,
+        expenseStore,
+        runtime,
+        coordinator,
+      );
+      const closeDay: BrowserRuntime['closeDay'] = async (input) => {
+        const before = await session.getState();
+        if (!before.ok || before.value.status !== 'ACTIVE') return endDay.closeDay(input);
+        return closeBrowserDayAndFlush({
+          shopId: before.value.shopId,
+          input,
+          closeDay: (closeInput) => endDay.closeDay(closeInput),
+          flushShopOutbox,
+        });
+      };
+
       return {
         database,
         session,
@@ -769,14 +810,8 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           runtime,
           coordinator,
         ),
-        endDay: new OperationsEndDayService(
-          database,
-          readModel,
-          draftStore,
-          expenseStore,
-          runtime,
-          coordinator,
-        ),
+        endDay,
+        closeDay,
         getState,
         submitPin,
         signOut,
@@ -960,6 +995,6 @@ export function createOperationsEndDayClient(): OperationsEndDayClient {
       (await browserRuntime()).endDay.discardDraft(draftScopeId),
     previewReconciliation: async (input) =>
       (await browserRuntime()).endDay.previewReconciliation(input),
-    closeDay: async (input) => (await browserRuntime()).endDay.closeDay(input),
+    closeDay: async (input) => (await browserRuntime()).closeDay(input),
   };
 }
