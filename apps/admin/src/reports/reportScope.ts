@@ -14,13 +14,16 @@ export function scopeReportFilters(
   scope: SelectedReportScope,
   authorizedShopIds: readonly string[],
   scopeChanged: boolean,
+  allowMultiShop = false,
 ): ReportFilters {
   const authorized = new Set(authorizedShopIds);
   const shopIds =
     scope.kind === 'shop'
-      ? authorized.has(scope.shopId)
-        ? [scope.shopId]
-        : []
+      ? !scopeChanged && allowMultiShop
+        ? filters.shopIds.filter((id) => authorized.has(id))
+        : authorized.has(scope.shopId)
+          ? [scope.shopId]
+          : []
       : scopeChanged
         ? [...authorized]
         : filters.shopIds.filter((id) => authorized.has(id));
