@@ -594,7 +594,9 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   });
 }
 
-test('selected supplier details appear adjacent to compact directory on desktop', async ({ page }) => {
+test('selected supplier details appear adjacent to compact directory on desktop', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockPurchasing(page);
   await page.goto('/purchasing');
