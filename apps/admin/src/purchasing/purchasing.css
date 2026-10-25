@@ -244,3 +244,37 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Mobile Purchasing forms follow the approved bottom-sheet placement.
+   Only Purchasing-owned forms are selected; global AdminDialog and Inventory's
+   concurrent ReceivePurchasePage are intentionally unchanged. */
+@media (max-width: 47.99rem) {
+  dialog.admin-dialog--sheet:has(.admin-po-builder),
+  dialog.admin-dialog--sheet:has(.admin-purchasing-supplier-form) {
+    position: fixed;
+    inset: auto var(--tux-space-3) var(--tux-space-3);
+    margin: 0 auto;
+    width: calc(100% - (2 * var(--tux-space-3)));
+    max-width: calc(100% - (2 * var(--tux-space-3)));
+    max-height: calc(
+      100dvh - (2 * var(--tux-space-3)) - env(safe-area-inset-top) -
+        env(safe-area-inset-bottom)
+    );
+    border-radius: var(--tux-radius-lg);
+  }
+
+  .admin-purchasing-supplier-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .admin-purchasing-supplier-form > :first-child,
+  .admin-purchasing-supplier-form > :nth-child(4),
+  .admin-purchasing-supplier-form > .admin-inline-actions {
+    grid-column: 1 / -1;
+  }
+
+  .admin-purchasing-supplier-form > * {
+    min-width: 0;
+  }
+}
