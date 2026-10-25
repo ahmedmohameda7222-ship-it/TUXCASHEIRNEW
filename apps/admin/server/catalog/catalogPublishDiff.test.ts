@@ -27,13 +27,17 @@ describe('publishing field-level Before → After review', () => {
     const draft = {
       snapshot: {
         products: [{ ...product, name: 'Burger Deluxe', priceMinor: 1400 }],
-        categories: [{ id: 'category-1', shopId: shop, name: 'Burgers', active: true, sortOrder: 10 }],
+        categories: [
+          { id: 'category-1', shopId: shop, name: 'Burgers', active: true, sortOrder: 10 },
+        ],
         modifiers: [],
       },
     };
     const published = {
       snapshot: {
-        categories: [{ id: 'category-1', shopId: shop, name: 'Burgers', active: true, sortOrder: 10 }],
+        categories: [
+          { id: 'category-1', shopId: shop, name: 'Burgers', active: true, sortOrder: 10 },
+        ],
         modifiers: [],
       },
     };
@@ -74,9 +78,14 @@ describe('publishing field-level Before → After review', () => {
 
   it('fails closed on a cross-shop entity instead of leaking its details', () => {
     expect(() =>
-      buildCatalogPublishDiffs(shop, [], {
-        snapshot: { products: [{ ...product, shopId: other }], categories: [], modifiers: [] },
-      }, { snapshot: { categories: [], modifiers: [] } }),
+      buildCatalogPublishDiffs(
+        shop,
+        [],
+        {
+          snapshot: { products: [{ ...product, shopId: other }], categories: [], modifiers: [] },
+        },
+        { snapshot: { categories: [], modifiers: [] } },
+      ),
     ).toThrow(CatalogPublishDiffError);
   });
 });
