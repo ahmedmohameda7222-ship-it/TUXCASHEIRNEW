@@ -80,3 +80,22 @@ jobs:
             playwright-report-admin/
           if-no-files-found: warn
           retention-days: 14
+
+  purchasing-security:
+    name: Purchasing Admin security and deployment contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify Admin authorization and security invariants
+        run: npm run test:admin-security
+      - name: Verify Admin deployment contract
+        run: npm run test:admin-deployment
