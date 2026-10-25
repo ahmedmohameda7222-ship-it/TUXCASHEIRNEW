@@ -18,7 +18,7 @@ describe('shop-scoped Inventory conversions pagination', () => {
     const select = vi.fn(async (table: string, params: URLSearchParams) => {
       expect(table).toBe('inventory_unit_conversions');
       expect(params.get('shop_id')).toBe(`eq.${shopId}`);
-      expect(params.get('order')).toContain('id.asc');
+      expect(params.get('order')).toBe('inventory_item_id.asc,purchase_unit_label.asc,id.asc');
       const offset = Number(params.get('offset') ?? 0);
       offsets.push(offset);
       return rows.slice(offset, offset + 1_000);
