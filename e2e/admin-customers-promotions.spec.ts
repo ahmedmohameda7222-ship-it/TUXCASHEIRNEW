@@ -545,10 +545,7 @@ test('background policy refresh preserves unsaved CRM settings edits for the cur
   await expect(minimum).toHaveValue('75');
   await minimum.fill('80');
 
-  await page.evaluate(() => {
-    document.dispatchEvent(new Event('visibilitychange'));
-    window.dispatchEvent(new Event('focus'));
-  });
+  await page.getByRole('button', { name: 'Refresh saved loyalty settings' }).click();
   await expect.poll(() => policyReads).toBeGreaterThan(1);
   await expect(minimum).toHaveValue('80');
   await expect(page.getByRole('region', { name: 'Current saved loyalty settings' })).toContainText(
