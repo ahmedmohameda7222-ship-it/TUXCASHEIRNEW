@@ -24,6 +24,8 @@ export interface OrderStore {
     status: 'PENDING' | 'PROCESSING' | 'ACCEPTED' | 'REJECTED' | null;
     from: string | null;
     to: string | null;
+    cursor?: string | null;
+    limit?: number;
   }): Promise<AdminOnlineOrderRequestsResult>;
   listActionReasons(input: {
     shopId: string;
@@ -66,6 +68,8 @@ export function createOrderService(store: OrderStore) {
         status: 'PENDING' | 'PROCESSING' | 'ACCEPTED' | 'REJECTED' | null;
         from: string | null;
         to: string | null;
+        cursor?: string | null;
+        limit?: number;
       },
       principal: AdminSessionPrincipal,
     ): Promise<AdminOnlineOrderRequestsResult> {
