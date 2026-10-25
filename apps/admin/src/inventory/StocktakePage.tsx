@@ -35,15 +35,16 @@ export function StocktakePage({
   onCancelDraft?(): void;
 }) {
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
-  const initiallySaved = () => Object.fromEntries(
-    snapshot.lines.map((line) => [
-      line.inventoryItemId,
-      initialActualByItem?.[line.inventoryItemId] === null ||
-      initialActualByItem?.[line.inventoryItemId] === undefined
-        ? ''
-        : String((initialActualByItem[line.inventoryItemId] ?? 0) / 1_000_000),
-    ]),
-  ) as Record<string, string>;
+  const initiallySaved = () =>
+    Object.fromEntries(
+      snapshot.lines.map((line) => [
+        line.inventoryItemId,
+        initialActualByItem?.[line.inventoryItemId] === null ||
+        initialActualByItem?.[line.inventoryItemId] === undefined
+          ? ''
+          : String((initialActualByItem[line.inventoryItemId] ?? 0) / 1_000_000),
+      ]),
+    ) as Record<string, string>;
   const [actualByItem, setActualByItem] = useState<Record<string, string>>(initiallySaved);
   const [savedByItem, setSavedByItem] = useState<Record<string, string>>(initiallySaved);
   const [search, setSearch] = useState('');
@@ -53,13 +54,15 @@ export function StocktakePage({
     item: itemById.get(line.inventoryItemId),
     actualMicros: parseStocktakeMicros(actualByItem[line.inventoryItemId] ?? ''),
   }));
-  const valid = parsed.length > 0 && parsed.every((entry) => entry.item && entry.actualMicros !== null);
+  const valid =
+    parsed.length > 0 && parsed.every((entry) => entry.item && entry.actualMicros !== null);
   const invalidCount = parsed.some(({ line }) => {
     const raw = actualByItem[line.inventoryItemId] ?? '';
     return raw.trim().length > 0 && parseStocktakeMicros(raw) === null;
   });
   const changed = snapshot.lines.some(
-    (line) => (actualByItem[line.inventoryItemId] ?? '') !== (savedByItem[line.inventoryItemId] ?? ''),
+    (line) =>
+      (actualByItem[line.inventoryItemId] ?? '') !== (savedByItem[line.inventoryItemId] ?? ''),
   );
   const counted = parsed.filter((entry) => entry.actualMicros !== null).length;
   const visible = parsed.filter((entry) =>
@@ -77,7 +80,13 @@ export function StocktakePage({
   }, [changed]);
 
   const leave = () => {
-    if (changed && !window.confirm('Discard unsaved count values? The saved server draft remains available to resume.')) return;
+    if (
+      changed &&
+      !window.confirm(
+        'Discard unsaved count values? The saved server draft remains available to resume.',
+      )
+    )
+      return;
     onBack();
   };
 
@@ -111,8 +120,16 @@ export function StocktakePage({
         </p>
       ) : null}
       <div className="admin-inventory-policy-grid">
-        <div><span>Progress</span><strong>{counted} / {parsed.length} counted</strong></div>
-        <div><span>Expected quantities</span><strong>Captured when this count started</strong></div>
+        <div>
+          <span>Progress</span>
+          <strong>
+            {counted} / {parsed.length} counted
+          </strong>
+        </div>
+        <div>
+          <span>Expected quantities</span>
+          <strong>Captured when this count started</strong>
+        </div>
       </div>
 
       <label className="admin-field">
@@ -128,15 +145,23 @@ export function StocktakePage({
         {visible.map(({ line, item, actualMicros }) => {
           if (!item) return null;
           const variance = actualMicros === null ? null : actualMicros - line.snapshotOnHandMicros;
-          const valueVariance = variance === null ? null : (variance / 1_000_000) * line.unitCostMinor;
+          const valueVariance =
+            variance === null ? null : (variance / 1_000_000) * line.unitCostMinor;
           return (
             <article className="admin-inventory-stocktake-row" key={line.inventoryItemId}>
               <div className="admin-inventory-stocktake-row__title">
-                <strong>{item.name}</strong><span>{item.unitLabel}</span>
+                <strong>{item.name}</strong>
+                <span>{item.unitLabel}</span>
               </div>
               <dl>
-                <div><dt>Expected stock</dt><dd>{formatQuantity(line.snapshotOnHandMicros, item.unitLabel)}</dd></div>
-                <div><dt>Reserved</dt><dd>{formatQuantity(line.snapshotReservedMicros, item.unitLabel)}</dd></div>
+                <div>
+                  <dt>Expected stock</dt>
+                  <dd>{formatQuantity(line.snapshotOnHandMicros, item.unitLabel)}</dd>
+                </div>
+                <div>
+                  <dt>Reserved</dt>
+                  <dd>{formatQuantity(line.snapshotReservedMicros, item.unitLabel)}</dd>
+                </div>
               </dl>
               <label className="admin-field">
                 <span>Actual count</span>
@@ -152,11 +177,17 @@ export function StocktakePage({
               </label>
               <div className="admin-inventory-variance">
                 <span>Difference</span>
-                <strong>{variance === null ? '—' : formatQuantity(variance, item.unitLabel)}</strong>
+                <strong>
+                  {variance === null ? '—' : formatQuantity(variance, item.unitLabel)}
+                </strong>
                 <span>Estimated value difference</span>
-                <strong>{valueVariance === null ? '—' : `${new Intl.NumberFormat('en-US', {
-                  maximumFractionDigits: 2,
-                }).format(valueVariance / 100)} EGP`}</strong>
+                <strong>
+                  {valueVariance === null
+                    ? '—'
+                    : `${new Intl.NumberFormat('en-US', {
+                        maximumFractionDigits: 2,
+                      }).format(valueVariance / 100)} EGP`}
+                </strong>
                 <span>Posting</span>
                 <strong>Current stock movements remain preserved</strong>
               </div>
@@ -171,7 +202,12 @@ export function StocktakePage({
             type="button"
             disabled={pending || saving}
             onClick={() => {
-              if (!window.confirm('Cancel this persisted count? This will not change inventory stock.')) return;
+              if (
+                !window.confirm(
+                  'Cancel this persisted count? This will not change inventory stock.',
+                )
+              )
+                return;
               onCancelDraft();
             }}
           >
@@ -198,16 +234,22 @@ export function StocktakePage({
           disabled={!valid || pending || saving || stale || changed}
           onClick={() => {
             if (!valid || changed || stale) return;
-            onSubmit(parsed.map(({ line, actualMicros }) => ({
-              inventoryItemId: line.inventoryItemId,
-              actualCountMicros: actualMicros!,
-            })));
+            onSubmit(
+              parsed.map(({ line, actualMicros }) => ({
+                inventoryItemId: line.inventoryItemId,
+                actualCountMicros: actualMicros!,
+              })),
+            );
           }}
         >
           Post stock count
         </button>
       </div>
-      {changed ? <p className="admin-inventory-muted" role="status">Save draft before posting or leaving this count.</p> : null}
+      {changed ? (
+        <p className="admin-inventory-muted" role="status">
+          Save draft before posting or leaving this count.
+        </p>
+      ) : null}
     </section>
   );
 }
