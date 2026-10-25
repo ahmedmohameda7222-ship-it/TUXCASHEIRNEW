@@ -1,3 +1,15 @@
+## Orders-only O2 checkpoint — 2026-10-26
+
+**Execution lock remains in force:** Orders first. Catalog, Inventory, Purchasing, CRM, Staff, Finance and Reports are still not accepted. No new later-tab features in this checkpoint.
+
+- O2 source: `apps/admin/server/orders/orderKpiService.ts`, `apps/admin/api/admin/orders.ts`, `apps/admin/src/orders/useOrders.ts`, `OrdersPage.tsx`, `packages/admin-contracts/src/orders.ts`; independently authorized `admin_orders_kpis_v1` migration `supabase/migrations/20261026000000_orders_authoritative_kpis.sql`.
+- Strict KPI policy: order count includes complete placement population regardless of browser 50-row cursor; active count uses canonical ACTIVE status; net revenue uses allocated payment ledger minus POSTED refunds at refund event date, aligned to canonical Finance/Reports; AOV denominator is distinct paid orders; zero denominator produces null; denied `finance.view` masks all financial fields. Query is scoped to one authorized shop and UTC instants translated from Cairo local filters.
+- **Real isolated PG acceptance PASS** (Orders PostgreSQL job 121309682825, run 40240041540 on `d8b6cae4e302f950aca697b3d95272a3244a02e4`): 67 total, 17 ACTIVE, 58 distinct paid, 83,000 EGP minor net and 1,431 minor AOV, 8 bounded range, 32 real persisted ONLINE request correlations with trigger kept enabled; denied unauthorized actor/foreign shop and malformed period; `anon` + `authenticated` cannot EXECUTE, `service_role` can. See `scripts/test-admin-orders-kpis-postgres.mjs`.
+- **TUX V2 development Supabase applied:** recorded migration `20261025221507 orders_authoritative_kpis`; `public.admin_orders_kpis_v1(uuid, uuid, timestamptz, timestamptz)` metadata inspected, function digest `a666ce5120b26b25357f760d7c136179f38ac38ba5a695ba9aba00cb23e72b79`; `anon_exec=false`, `authenticated_exec=false`, `service_exec=true`. A read-only invocation for an actively authorized Owner/Admin shop returned `ok=true, orderCount=0, activeOrderCount=0`; AOV correctly undefined. No production deploy or unrelated database data changes in this checkpoint.
+- **O2 STATUS: PARTIAL / NOT TAB-ACCEPTED.** Browser route/visual, the full exact-SHA monorepo build/security suite, real Admin ↔ Operations ↔ Menu ↔ Finance acceptance and full O01–O12 requirement proof must be checked before Orders can close. Do not label O1–O4 or any other tab complete from a single passing PG fixture.
+- Historical paragraphs lower in this ledger describe **prior checkpoints** and may say there was no migration: this O2 checkpoint supersedes those historical statements. Recheck current HEAD and workflow results before every completion claim.
+
+
 ## Owner-mandated sequential execution correction — 2026-10-26
 
 **Mandatory execution order:** Orders (O1–O4) → Catalog → Inventory → Purchasing → Customers/CRM → Staff → Finance → Reports. **Current exclusive implementation workstream: Orders.** This replaces any prior order implied in this ledger. All other tab changes already committed are retained intact but remain **PARTIAL / NOT ACCEPTED** and MUST NOT be expanded until Orders has all O1–O4 gates passed.
