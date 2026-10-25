@@ -1,72 +1,175 @@
-name: Purchasing read-only shadow integration
+name: Purchasing integrated mainline acceptance
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - fix/purchasing-approved-ui-production-20261025
+  pull_request:
+    branches: [main]
     paths:
       - '.github/workflows/purchasing-shadow-integration.yml'
       - 'apps/admin/src/purchasing/**'
+      - 'apps/admin/server/purchasing/**'
+      - 'apps/admin/api/admin/purchasing.ts'
+      - 'packages/admin-contracts/src/purchasing.ts'
+      - 'supabase/migrations/*purchasing*.sql'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: purchasing-shadow-${{ github.ref }}
-  cancel-in-progress: true
+# Exact source ancestry is verified before execution. Avoid overlaying stale
+# Catalog, Orders or Inventory PR tips over the already-merged main branch.
+env:
+  CATALOG_ORDERS_INVENTORY_MAIN_SHA: af4603c2571c700397f70018f0bdbf14681eaff7
+  PURCHASING_APPROVED_SOURCE_SHA: 9c3faf5e4fb7002acf47796353125c62ed555f19
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
 jobs:
-  shadow-source:
-    name: Catalog Orders Inventory Purchasing composite source acceptance
+  integrated-source:
+    name: Combined full source and production regression
     runs-on: ubuntu-latest
-    timeout-minutes: 35
-    env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      BASE_SHA: 639f2a61fdc1272646156db50cea71a9da5d22e5
-      CATALOG_SHA: 40b579ab524add258d9ee32f57168f825c181a1d
-      ORDERS_SHA: 5b14103f2c72846beb31151fbe6afb6b1379ebc9
-      INVENTORY_SHA: 3452c42be50cfeeea908d17864ef7075dd69631d
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Overlay pinned upstream PR files read-only (no merge or push)
+      - name: Assert mainline and Purchasing ancestry
         shell: bash
         run: |
           set -euo pipefail
-          for entry in \
-            "catalog:$CATALOG_SHA:fix/catalog-production-remediation-20261025" \
-            "orders:$ORDERS_SHA:fix/orders-production-remediation-20261025" \
-            "inventory:$INVENTORY_SHA:fix/inventory-approved-ui-production-20261025"; do
-            IFS=: read -r stream sha ref <<< "$entry"
-            actual="$(git ls-remote origin "refs/heads/$ref" | cut -f1)"
-            if [[ "$actual" != "$sha" ]]; then
-              echo "::error::Pinned $stream SHA $sha changed to $actual; refresh the integration matrix."
-              exit 1
-            fi
-            git fetch --no-tags origin "$sha"
-            echo "Applying $stream files from $sha over Purchasing checkout (working tree only)."
-            while IFS= read -r -d '' path; do
-              git restore --source="$sha" --worktree -- "$path"
-            done < <(git diff --name-only --diff-filter=ACMRT -z "$BASE_SHA" "$sha")
-            while IFS= read -r -d '' path; do
-              rm -f -- "$path"
-            done < <(git diff --name-only --diff-filter=D -z "$BASE_SHA" "$sha")
+          for sha in "$CATALOG_ORDERS_INVENTORY_MAIN_SHA" "$PURCHASING_APPROVED_SOURCE_SHA"; do
+            git cat-file -e "$sha^{commit}"
+            git merge-base --is-ancestor "$sha" HEAD
           done
-          echo 'Shadow tree assembled; no branches, refs, or databases were modified.'
+          test -z "$(git status --porcelain)"
+          echo "Combined checkout: $(git rev-parse HEAD)"
+          echo "Catalog + Orders + Inventory baseline: $CATALOG_ORDERS_INVENTORY_MAIN_SHA"
+          echo "Purchasing approved source: $PURCHASING_APPROVED_SOURCE_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - name: Validate all source, including Inventory-owned receipt screen
+      - name: Check all formatting and ESLint
+        run: |
+          npm run format:check
+          npm run lint
+      - name: Verify independent Node CI selector tests
+        run: node --test scripts/ci-fast-scope.test.mjs
+      - name: Run complete unit and integration tests
+        run: npm run test
+      - name: Verify offline sync tests
+        run: npm test -w @tux/sync
+      - name: Check all TypeScript and builds
         run: |
           npm run typecheck
-          npm run test
-          npm run build:admin
+          npm run build
+      - name: Verify security and deployment architecture
+        run: |
           npm run test:admin-security
-      - name: Preserve source acceptance log metadata
+          npm run test:admin-deployment
+          npm run test:whatsapp-architecture
+          npm run test:whatsapp-security
+
+  integrated-database:
+    name: Combined Orders Inventory Purchasing PostgreSQL acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify source identities and migration order
+        shell: bash
+        run: |
+          set -euo pipefail
+          for sha in "$CATALOG_ORDERS_INVENTORY_MAIN_SHA" "$PURCHASING_APPROVED_SOURCE_SHA"; do
+            git merge-base --is-ancestor "$sha" HEAD
+          done
+          node --input-type=module -e "
+            import {readdirSync} from 'node:fs';
+            const all=readdirSync('supabase/migrations').sort();
+            const selected=[
+              '20261025150000_orders_paid_cancel_safety.sql',
+              '20261025170000_inventory_offshift_quiescence.sql',
+              '20261025171000_inventory_transfer_master_identity.sql',
+              '20261025172000_inventory_transfer_cancel_compensation.sql',
+              '20261025173000_inventory_stocktake_draft_recovery.sql',
+              '20261025174000_inventory_stocktake_ledger_replay_fence.sql',
+              '20261025175000_inventory_reservation_replay_payload_integrity.sql',
+              '20261025180000_purchasing_command_payload_replay_fence.sql',
+            ];
+            const positions=selected.map(x=>all.indexOf(x));
+            if(positions.some((p,i)=>p<0||(i>0&&p<=positions[i-1])))throw Error('Invalid cross-domain migration order');
+            console.log(selected.join(' -> '));
+          "
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Verify full migration chain
+        run: npm run test:migrations
+      - name: Verify financial Orders and cancellation safety
+        run: node scripts/test-admin-order-approval-postgres.mjs
+      - name: Verify Inventory ledger stocktake transfer and replay
+        run: node scripts/test-inventory-isolated-postgres.mjs
+      - name: Verify Purchasing receipts returns costs and replay
+        run: node scripts/test-admin-purchasing-postgres.mjs
+      - name: Verify Operations Business Day ledger
+        run: node scripts/test-operations-business-day-sync-postgres.mjs
+
+  integrated-browser:
+    name: Combined Admin Operations and Menu Chromium regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Admin Purchasing Orders Catalog Inventory and Finance
+        run: npm run test:e2e:admin
+      - name: Operations desktop tablet and mobile
+        run: npm run test:e2e
+      - name: Online Menu desktop and mobile
+        run: npm run test:e2e:menu
+      - name: Preserve failure evidence
         if: always()
-        run: git status --short | head -120
+        uses: actions/upload-artifact@v4
+        with:
+          name: purchasing-integrated-browser-evidence
+          path: |
+            playwright-report-admin/
+            playwright-report/
+            playwright-report-menu/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
