@@ -4,10 +4,6 @@ import { DraftPurchaseOrderLinesEditor } from './DraftPurchaseOrderLinesEditor';
 import { formatPurchaseMicros } from './purchaseOrderDraft';
 import { useEffect, useState } from 'react';
 
-function units(value: number, unitLabel: string): string {
-  return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(value / 1_000_000)} ${unitLabel}`;
-}
-
 function statusLabel(status: AdminPurchaseOrder['status']): string {
   return status
     .replaceAll('_', ' ')
