@@ -98,6 +98,12 @@ for (const migration of migrations.slice(0, targetIndex + 1)) {
   psql(['-f', resolve(migrationsDirectory, migration)], migration);
 }
 
+// Apply the independent forward-only Purchasing replay guard on an isolated
+// disposable database. Never run this fixture against Production.
+const replayFenceName = '20261025180000_purchasing_command_payload_replay_fence.sql';
+if (!migrations.includes(replayFenceName)) throw new Error('Purchasing replay fence missing.');
+psql(['-f', resolve(migrationsDirectory, replayFenceName)], replayFenceName);
+
 const BUSINESS_ID = '00000000-0000-4000-8000-000000000001';
 const SHOP_ID = '15000000-0000-4000-8000-000000000001';
 const EMPLOYEE_ID = '25000000-0000-4000-8000-000000000001';
