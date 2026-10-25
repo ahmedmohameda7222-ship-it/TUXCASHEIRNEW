@@ -53,23 +53,51 @@ if (privileges.anonymous || privileges.authenticated || !privileges.service) {
   throw new Error(`Orders KPI RPC permission exposure: ${JSON.stringify(privileges)}`);
 }
 
-// This test probes read-only aggregation across already-persisted mixed sources.
-// Synthetic ONLINE rows are *not* passed through the separate Menu acceptance
-// flow: disable only the online request correlation trigger for fixture seeding.
-// Its integrity and Menu acceptance are verified independently by cross-app tests.
-run(`do $seed$
-declare trigger_name text;
-begin
-  for trigger_name in
-    select t.tgname from pg_trigger t
-    join pg_proc p on p.oid=t.tgfoid
-    where t.tgrelid='public.orders'::regclass
-      and p.proname='resolve_tux_online_order_request_from_order_v1'
-  loop
-    execute format('alter table public.orders disable trigger %I', trigger_name);
-  end loop;
-end;
-$seed$;`, 'Temporarily isolate Online request correlation for aggregate fixtures');
+// Set up a valid Operations-device identity and pending Menu requests first.
+// The online materialization trigger must remain ENABLED throughout the test;
+// it accepts each synthetic ONLINE order only against its exact reservation.
+run(`insert into auth.users(id)
+  values ('68000000-0000-4000-8000-000000000001'::uuid);
+insert into public.shop_memberships(id,shop_id,auth_user_id,role,active)
+  values (
+    '68000000-0000-4000-8000-000000000002'::uuid,
+    '${SHOP}'::uuid,
+    '68000000-0000-4000-8000-000000000001'::uuid,
+    'OPERATIONS_DEVICE',true
+  );
+insert into public.devices(id,shop_id,label,active,auth_user_id)
+  values (
+    '68000000-0000-4000-8000-000000000003'::uuid,
+    '${SHOP}'::uuid,'KPI Origin Device',true,
+    '68000000-0000-4000-8000-000000000001'::uuid
+  );
+
+insert into public.online_order_requests(
+  id,shop_id,idempotency_key,request_sha256,catalog_revision,status,
+  fulfillment_preference,payment_preference,customer_name,normalized_phone,
+  delivery_address,trusted_items,items_subtotal_minor,order_note
+)
+select
+  md5('kpi-fixture-request-'||g)::uuid,
+  '${SHOP}'::uuid,
+  md5('kpi-fixture-request-key-'||g)::uuid,
+  repeat('a',64), repeat('b',64), 'PENDING',
+  'PICKUP','CASH','Orders KPI customer',null,null,
+  '[{"productId":"56000000-0000-4000-8000-000000000001","quantity":1}]'::jsonb,
+  1000,null
+from generate_series(1,64) g where g%2=1;
+
+insert into private.online_order_processing_reservations(
+  processing_order_id,request_id,shop_id,origin_device_id,reserved_at
+)
+select
+  md5('kpi-fixture-order-'||g)::uuid,
+  md5('kpi-fixture-request-'||g)::uuid,
+  '${SHOP}'::uuid,
+  '68000000-0000-4000-8000-000000000003'::uuid,
+  now()
+from generate_series(1,64) g where g%2=1;`,
+'Seed 32 legitimate pending Menu requests with durable Operations-device order reservations');
 
 run(`insert into public.orders(
   id, shop_id, business_day_id, display_order_no, idempotency_key, source, status,
@@ -107,20 +135,19 @@ select md5('kpi-fixture-payment-'||g||'-2')::uuid, '${SHOP}',
 from generate_series(1,64) g where g%8=1;`, 'Insert 64 mixed POS/ONLINE canonical orders with split payments');
 
 
- // Restore the original Online correlation check before any assertions.
-run(`do $restore$
-declare trigger_name text;
-begin
-  for trigger_name in
-    select t.tgname from pg_trigger t
-    join pg_proc p on p.oid=t.tgfoid
+const acceptedOnline = queryJson(`jsonb_build_object(
+  'accepted', (select count(*) from public.online_order_requests
+    where shop_id='${SHOP}'::uuid and status='ACCEPTED'
+      and id::text in (select md5('kpi-fixture-request-'||g)::uuid::text
+        from generate_series(1,64) g where g%2=1)),
+  'triggers_enabled', (select bool_and(t.tgenabled <> 'D')
+    from pg_trigger t join pg_proc p on p.oid=t.tgfoid
     where t.tgrelid='public.orders'::regclass
-      and p.proname='resolve_tux_online_order_request_from_order_v1'
-  loop
-    execute format('alter table public.orders enable trigger %I', trigger_name);
-  end loop;
-end;
-$restore$;`, 'Re-enable Online source correlation for all subsequent queries');
+      and p.proname='resolve_tux_online_order_request_from_order_v1')
+)`, 'Prove 32 genuine Menu request acceptances with intact trigger');
+if (acceptedOnline.accepted !== 32 || acceptedOnline.triggers_enabled !== true) {
+  throw new Error(`Online acceptance integration incorrectly seeded: ${JSON.stringify(acceptedOnline)}`);
+}
 
 const kpis = (from='null', to='null', actor=ACTOR, shop=SHOP) =>
   queryJson(`public.admin_orders_kpis_v1('${actor}'::uuid,'${shop}'::uuid,
