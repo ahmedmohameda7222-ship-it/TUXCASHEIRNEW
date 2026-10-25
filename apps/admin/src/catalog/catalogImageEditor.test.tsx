@@ -77,5 +77,4 @@ describe('Catalog image editor', () => {
     expect(markup).toMatch(/type="file"[^>]*disabled/);
     expect(markup).toMatch(/disabled[^>]*>Upload image/);
   });
-
 });
