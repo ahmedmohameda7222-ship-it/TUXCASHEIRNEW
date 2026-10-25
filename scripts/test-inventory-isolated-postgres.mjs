@@ -356,3 +356,21 @@ eq(query('select count(*) from public.inventory_reservations where order_id='+
   literal(insuffOrder)),'0','Rejected order creates no reservation');
 console.log('Inventory acceptance: canonical POS/Online-labeled recipe-line requirements, '+
   'reserves, replays and consumption ledger PASSED; full Catalog/Operations event path unproven.');
+
+
+// Replay identity must identify the ACTUAL immutable reservation payload, not
+// merely match the number of recipe ingredients. This is a financial/stock
+// safety invariant when a device retries an ambiguous transport response.
+const alteredRecipe=requirements.map((line,index)=>index===0
+  ? {...line,quantityMicros:line.quantityMicros+100000} : line);
+eq(call('reserve_inventory_for_order_v1',S,posOrder,businessDay,worker,
+  alteredRecipe,'recipe-reserve-pos').code,'idempotency_conflict',
+  'Same reserve command with altered recipe quantity must conflict');
+const wrongIngredientRecipe=requirements.map((line,index)=>index===0
+  ? {...line,inventoryItemId:B} : line);
+eq(call('reserve_inventory_for_order_v1',S,posOrder,businessDay,worker,
+  wrongIngredientRecipe,'recipe-reserve-pos').code,'idempotency_conflict',
+  'Same reserve command with altered recipe ingredient must conflict');
+eq(balance(S,A),initialBeef-1000000,
+  'Rejected altered replay never changes consumed stock');
+console.log('Inventory acceptance: changed recipe payload cannot spoof reservation replay.');
