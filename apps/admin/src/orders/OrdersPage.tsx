@@ -55,6 +55,7 @@ export function OrdersPage() {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<AdminOrderStatus | ''>('');
   const [source, setSource] = useState<AdminOrderSource | ''>('');
+  const [businessDayId, setBusinessDayId] = useState('');
   const [fromInput, setFromInput] = useState('');
   const [toInput, setToInput] = useState('');
   const timeRange = useMemo(() => toOrderTimeRange(fromInput, toInput), [fromInput, toInput]);
@@ -66,6 +67,7 @@ export function OrdersPage() {
     if (previousShopId.current === shopId) return;
     previousShopId.current = shopId;
     setAction(null);
+    setBusinessDayId('');
     if (selectedId) navigate('/orders');
   }, [shopId, selectedId, navigate]);
 
@@ -74,11 +76,14 @@ export function OrdersPage() {
       ? principal.shopSummaries?.find((shop) => shop.id === shopId)
       : undefined;
   const shopName = authorizedShop?.name?.trim() || (shopId ? `Shop ${shopId}` : '');
-  const hasActiveFilters = Boolean(query.trim() || status || source || fromInput || toInput);
+  const hasActiveFilters = Boolean(
+    query.trim() || status || source || businessDayId || fromInput || toInput,
+  );
   const clearFilters = () => {
     setQuery('');
     setStatus('');
     setSource('');
+    setBusinessDayId('');
     setFromInput('');
     setToInput('');
   };
@@ -88,11 +93,12 @@ export function OrdersPage() {
       query,
       statuses: status ? [status] : [],
       source: source || null,
+      businessDayId: businessDayId || null,
       from: timeRange.from,
       to: timeRange.to,
       limit: 50,
     }),
-    [query, source, status, timeRange.from, timeRange.to],
+    [query, source, status, businessDayId, timeRange.from, timeRange.to],
   );
   const ordersApi = useOrders(shopId, selectedId, filters, timeRange.error === null);
   const rows = useMemo(
@@ -175,7 +181,7 @@ export function OrdersPage() {
         <>
           <details
             className="admin-orders-filters"
-            open={Boolean(query || status || source || fromInput || toInput)}
+            open={Boolean(query || status || source || businessDayId || fromInput || toInput)}
           >
             <summary>Search and filters</summary>
             <section className="admin-order-task-section is-compact" aria-label="Order filters">
@@ -199,6 +205,27 @@ export function OrdersPage() {
                   <option value="CANCELLED">Cancelled</option>
                   <option value="RETURNED">Returned</option>
                 </select>
+              </label>
+              <label className="admin-field">
+                <span>Operational Business Day</span>
+                <select
+                  value={businessDayId}
+                  onChange={(event) => setBusinessDayId(event.target.value)}
+                >
+                  <option value="">All business days</option>
+                  {(ordersApi.businessDaysQuery.data?.days ?? []).map((day) => (
+                    <option key={day.id} value={day.id}>
+                      {new Intl.DateTimeFormat('en-EG', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                        timeZone: 'Africa/Cairo',
+                      }).format(new Date(day.startedAt))} · {day.status} · {day.id.slice(0, 8)}
+                    </option>
+                  ))}
+                </select>
+                {ordersApi.businessDaysQuery.isError ? (
+                  <small>Business Days are unavailable; refresh to retry.</small>
+                ) : null}
               </label>
               <label className="admin-field">
                 <span>From date/time (Cairo)</span>
