@@ -54,3 +54,12 @@
   .admin-purchasing-search { grid-column: auto; }
   .admin-purchasing-pager > div { flex-wrap: wrap; }
 }
+
+/* Keep the purchase inspector adjacent on desktop, never beside the supplier directory. */
+.admin-purchasing-master { grid-template-columns: minmax(0, 1.45fr) minmax(20rem, 1fr); align-items: start; }
+.admin-purchasing-master.is-suppliers { grid-template-columns: minmax(0, 1fr); }
+.admin-purchasing-master.is-suppliers > .admin-master-detail__detail { display: none; }
+.admin-purchasing-master .admin-master-detail__list, .admin-purchasing-master .admin-master-detail__detail { min-width: 0; }
+@media (max-width: 1000px) {
+  .admin-purchasing-master { grid-template-columns: minmax(0, 1fr); }
+}
