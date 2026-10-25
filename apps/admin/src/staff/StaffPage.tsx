@@ -2,12 +2,14 @@ import { useMemo, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
 
 import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
+import { AdminMetricStrip } from '../components/layout/AdminMetricStrip';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { AdminDialog } from '../components/overlay/AdminDialog';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { EmployeeDetailPage, type StaffDetailSection } from './EmployeeDetailPage';
+import { staffSummaryMetrics } from './staffSummaryMetrics';
 import { useStaff, type StaffApiCommandDraft } from './useStaff';
 import './staff.css';
 
@@ -125,6 +127,17 @@ export function StaffPage() {
       }
     >
       {actionError ? <p role="alert">{actionError}</p> : null}
+
+      {staff.workspaceQuery.isSuccess ? (
+        <AdminMetricStrip
+          label="Staff summary"
+          metrics={staffSummaryMetrics(
+            rows,
+            shopId,
+            staff.workspaceQuery.data.employees.nextCursor === null,
+          )}
+        />
+      ) : null}
 
       <div className="admin-staff-workspace">
         <ResponsiveMasterDetail
