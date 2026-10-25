@@ -73,7 +73,8 @@ function patchProduct(
       return { ...product, categoryId: patch.categoryId };
     }
     case 'archive':
-      if (typeof patch.archived !== 'boolean') throw new CatalogBulkEditError('Invalid archive state.');
+      if (typeof patch.archived !== 'boolean')
+        throw new CatalogBulkEditError('Invalid archive state.');
       return { ...product, active: !patch.archived };
     case 'bestSeller':
       if (typeof patch.enabled !== 'boolean')
@@ -103,7 +104,8 @@ export function previewCatalogBulkEdit(
     throw new CatalogBulkEditError('The product selection contains duplicate IDs.');
   }
   const byId = new Map(products.map((product) => [product.id, product]));
-  if (byId.size !== products.length) throw new CatalogBulkEditError('Duplicate products in bundle.');
+  if (byId.size !== products.length)
+    throw new CatalogBulkEditError('Duplicate products in bundle.');
   return selectedIds.map((id) => {
     const before = byId.get(id);
     if (!before || before.shopId !== shopId)
