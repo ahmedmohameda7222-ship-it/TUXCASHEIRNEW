@@ -34,6 +34,7 @@ export type ProductEditorProps = {
   onSaveDraft(draft: ProductEditorDraft): void | Promise<void>;
   onSetAvailability(soldOut: boolean): void | Promise<void>;
   onUploadImage?: ((file: File) => Promise<{ imageKey: string; publicUrl: string }>) | undefined;
+  imageRequiresSaveFirst?: boolean;
 };
 
 const MAX_POSTGRES_INTEGER = 2_147_483_647;
@@ -88,6 +89,7 @@ export function ProductEditor({
   onSaveDraft,
   onSetAvailability,
   onUploadImage,
+  imageRequiresSaveFirst = false,
 }: ProductEditorProps) {
   const [advancedOpen, setAdvancedOpen] = useState(initialAdvancedOpen);
   const [name, setName] = useState(product.name);
@@ -279,7 +281,7 @@ export function ProductEditor({
   const [archiveConfirmationOpen, setArchiveConfirmationOpen] = useState(false);
 
   async function uploadSelectedImage() {
-    if (readOnly || !selectedImageFile || !onUploadImage) return;
+    if (readOnly || imageRequiresSaveFirst || !selectedImageFile || !onUploadImage) return;
     setImageError(null);
     if (
       selectedImageFile.size === 0 ||
@@ -475,12 +477,17 @@ export function ProductEditor({
         </div>
         {onUploadImage ? (
           <div className="admin-form-grid">
+            {imageRequiresSaveFirst ? (
+              <p className="admin-field__help" role="status">
+                Save this product draft first to enable image upload.
+              </p>
+            ) : null}
             <label className="admin-field">
               <span>Choose product image (PNG, JPEG, WebP, AVIF — maximum 2 MB)</span>
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp,image/avif"
-                disabled={readOnly}
+                disabled={readOnly || imageRequiresSaveFirst}
                 onChange={(event) => {
                   setSelectedImageFile(event.currentTarget.files?.[0] ?? null);
                   setImageError(null);
@@ -490,7 +497,7 @@ export function ProductEditor({
             <button
               className="admin-secondary-button"
               type="button"
-              disabled={readOnly || selectedImageFile === null}
+              disabled={readOnly || imageRequiresSaveFirst || selectedImageFile === null}
               onClick={() => void uploadSelectedImage()}
             >
               {imageUploading ? 'Uploading image…' : 'Upload image'}
