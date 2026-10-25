@@ -1003,9 +1003,9 @@ test('approved Orders 1536×1024 reference composition remains fully navigable',
   await page.getByRole('button', { name: /#101/ }).click();
   await expect(page.getByRole('navigation', { name: 'Order detail sections' })).toBeVisible();
   await expect(page.locator('.admin-master-detail__list')).toBeVisible();
-  expect(
-    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-  ).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
   await capturePremiumScreenshot(page, 'orders-reference');
 });
 
@@ -1052,7 +1052,9 @@ test('O1 reversed Cairo range never submits an invalid list or money-aggregation
   await page.getByText('Search and filters', { exact: true }).click();
   await page.getByLabel('To date/time (Cairo)').fill('2026-10-01T08:30');
   await page.getByLabel('From date/time (Cairo)').fill('2026-10-02T10:30');
-  await expect(page.getByRole('alert')).toContainText('Start date/time must be before end date/time');
+  await expect(page.getByRole('alert')).toContainText(
+    'Start date/time must be before end date/time',
+  );
   const oldSearches = fixture.searches.length;
   const oldKpis = fixture.kpiRequests.length;
   await page.waitForTimeout(100);
@@ -1070,7 +1072,9 @@ test('O4 immutable print action keeps its explanatory text readable without over
   await page.getByRole('button', { name: /#101/ }).click();
   const print = page.locator('.admin-order-detail__print-action');
   await expect(print.getByRole('button', { name: 'Print order summary' })).toBeVisible();
-  await expect(print.getByText('not a new numbered fiscal receipt', { exact: false })).toBeVisible();
+  await expect(
+    print.getByText('not a new numbered fiscal receipt', { exact: false }),
+  ).toBeVisible();
   const layout = await print.evaluate((element) => {
     const style = getComputedStyle(element);
     const gap = Number.parseFloat(style.gap) || 0;
