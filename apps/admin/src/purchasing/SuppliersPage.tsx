@@ -241,7 +241,7 @@ export function SuppliersPage({
                   disabled={pending}
                   onClick={() => {
                     if (selectedSupplier.active) {
-                      setArchiveTarget(supplier);
+                      setArchiveTarget(selectedSupplier);
                     } else {
                       onManage(
                         {
