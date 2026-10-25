@@ -25,4 +25,28 @@ describe('Catalog shop-scoped publishing entry point', () => {
     expect(catalog).toContain('Draft saved');
     expect(catalog).toContain('Review & Publish');
   });
+  it('does not discard an unsaved product or definition through catalog quick actions', () => {
+    const between = (start: string, end: string) => {
+      const startAt = catalog.indexOf(start);
+      const endAt = catalog.indexOf(end, startAt + start.length);
+      expect(startAt).toBeGreaterThanOrEqual(0);
+      expect(endAt).toBeGreaterThan(startAt);
+      return catalog.slice(startAt, endAt);
+    };
+    expect(between('function canSwitchCatalogEditor', 'function openProduct')).toContain(
+      'hasUnsavedDrafts()',
+    );
+    expect(between('function openProduct', 'function handleCategoryFilterChange')).toContain(
+      'if (!canSwitchCatalogEditor()) return;',
+    );
+    expect(between('function startNewProduct', 'function closeEditor')).toContain(
+      'if (!canSwitchCatalogEditor()) return;',
+    );
+    expect(between('function closeEditor', 'if (!shopId)')).toContain(
+      "window.confirm('Discard your unsaved product edits?')",
+    );
+    expect(catalog).toContain('if (busy || !canSwitchCatalogEditor()) return;');
+    expect(catalog).toContain('if (!bulkOpen && !canSwitchCatalogEditor()) return;');
+  });
+
 });
