@@ -35,6 +35,31 @@
 @media (max-width: 480px) {
   .admin-purchasing-order-header {
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* In column direction the desktop flex-basis becomes a 10rem height. */
+  .admin-purchasing-order-header__identity {
+    flex: 0 1 auto;
+    width: 100%;
+  }
+
+  .admin-purchasing-order-header > strong {
+    align-self: flex-start;
+  }
+
+  /* All five inspector tabs must remain visible, without a sideways scroll. */
+  .admin-purchasing-inspector-tabs {
+    gap: 0;
+    overflow-x: visible;
+  }
+
+  .admin-purchasing-inspector-tabs button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 10px 3px;
+    font-size: 11px;
+    white-space: nowrap;
   }
 }
 
