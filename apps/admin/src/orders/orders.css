@@ -150,3 +150,49 @@
     break-inside: avoid;
   }
 }
+
+/* Selected Orders hierarchy: search always visible; advanced filters stay secondary. */
+.admin-orders-toolbar {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: var(--tux-space-4);
+}
+
+.admin-orders-search-persistent {
+  flex: 1 1 340px;
+  min-width: 0;
+}
+
+.admin-orders-search-persistent input {
+  width: 100%;
+  min-height: var(--tux-touch-target);
+}
+
+.admin-orders-toolbar .admin-orders-filters {
+  flex: 0 1 auto;
+  min-width: 180px;
+  max-width: 100%;
+  margin: 0;
+}
+
+.admin-orders-toolbar .admin-orders-filters[open] {
+  flex: 1 1 100%;
+}
+
+.admin-orders-toolbar .admin-order-task-section {
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+}
+
+@media (max-width: 620px) {
+  .admin-orders-toolbar {
+    flex-direction: column;
+  }
+
+  .admin-orders-search-persistent,
+  .admin-orders-toolbar .admin-orders-filters {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+}
