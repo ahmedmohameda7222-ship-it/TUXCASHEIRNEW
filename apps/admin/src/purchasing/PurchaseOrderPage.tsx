@@ -6,7 +6,11 @@ import type {
 } from '@tux/admin-contracts';
 import { DraftPurchaseOrderLinesEditor } from './DraftPurchaseOrderLinesEditor';
 import { formatPurchaseMicros } from './purchaseOrderDraft';
-import { expectedOrderValueMinor, formatExpectedOrderValue, purchaseOrderDisplayReference } from './purchaseOrderValue';
+import {
+  expectedOrderValueMinor,
+  formatExpectedOrderValue,
+  purchaseOrderDisplayReference,
+} from './purchaseOrderValue';
 import { useEffect, useState } from 'react';
 
 function statusLabel(status: AdminPurchaseOrder['status']): string {
