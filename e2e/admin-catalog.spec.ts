@@ -404,3 +404,53 @@ if (process.env['P02_CAPTURE'] === '1') {
     });
   }
 }
+
+test('unsaved product edits are guarded at both Review & Publish entry points', async ({ page }) => {
+  const fixture = await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  const name = page.locator('input[name="name"]');
+  await name.fill('Unsaved review navigation value');
+  await page.getByRole('button', { name: /Review & Publish \(/ }).click();
+  let dialog = page.getByRole('dialog', { name: 'Discard unsaved product edits?' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Stay and keep editing' }).click();
+  await expect(name).toHaveValue('Unsaved review navigation value');
+  expect(fixture.commands).toEqual([]);
+
+  await page.getByRole('button', { name: /Review & Publish \(/ }).click();
+  dialog = page.getByRole('dialog', { name: 'Discard unsaved product edits?' });
+  await dialog.getByRole('button', { name: 'Discard changes and navigate' }).click();
+  await expect(page.getByRole('heading', { name: 'Review & publish' })).toBeVisible();
+  expect(fixture.commands).toEqual([]);
+});
+
+test('saved product draft permits Review & Publish without false warning', async ({ page }) => {
+  await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  await page.locator('input[name="name"]').fill('Saved review navigation');
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Draft saved — not published')).toBeVisible();
+  await page.getByRole('button', { name: 'Review & Publish', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Review & publish' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Discard unsaved product edits?' })).toHaveCount(0);
+});
+
+test('version history link and browser Back preserve dirty edits until explicitly discarded', async ({ page }) => {
+  await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  const name = page.locator('input[name="name"]');
+  await name.fill('Keep through browser navigation');
+  await page.getByRole('button', { name: 'More' }).click();
+  await page.getByRole('button', { name: 'Open version history' }).click();
+  let dialog = page.getByRole('dialog', { name: 'Discard unsaved product edits?' });
+  await dialog.getByRole('button', { name: 'Stay and keep editing' }).click();
+  await expect(name).toHaveValue('Keep through browser navigation');
+  await page.goBack();
+  dialog = page.getByRole('dialog', { name: 'Discard unsaved product edits?' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Stay and keep editing' }).click();
+  await expect(name).toHaveValue('Keep through browser navigation');
+});
