@@ -121,3 +121,32 @@
 .admin-order-task-section h3 {
   margin: 0;
 }
+
+@media print {
+  body:has(.admin-order-detail) * {
+    visibility: hidden;
+  }
+
+  body:has(.admin-order-detail) .admin-order-detail,
+  body:has(.admin-order-detail) .admin-order-detail * {
+    visibility: visible;
+  }
+
+  body:has(.admin-order-detail) .admin-order-detail {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    background: #fff;
+    color: #000;
+  }
+
+  .admin-order-detail__actions,
+  .admin-order-detail__print-action,
+  .admin-order-detail button {
+    display: none;
+  }
+
+  .admin-order-detail__card {
+    break-inside: avoid;
+  }
+}
