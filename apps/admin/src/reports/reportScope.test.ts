@@ -39,6 +39,17 @@ describe('report shop scope transitions', () => {
     expect(result.context).toEqual({ customerId: 'customer-a' });
   });
 
+  it('preserves deliberate authorized cross-shop comparison for an Owner', () => {
+    const result = scopeReportFilters(
+      { ...filters, shopIds: ['shop-a', 'shop-b'] },
+      { kind: 'shop', shopId: 'shop-a' },
+      ['shop-a', 'shop-b'],
+      false,
+      true,
+    );
+    expect(result.shopIds).toEqual(['shop-a', 'shop-b']);
+  });
+
   it('never allows unauthorized stored report selections into a request', () => {
     expect(
       scopeReportFilters({ ...filters, shopIds: ['shop-a', 'foreign-shop'] },
