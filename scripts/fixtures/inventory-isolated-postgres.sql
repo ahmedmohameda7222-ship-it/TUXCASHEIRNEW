@@ -136,3 +136,122 @@ insert into public.inventory_movements(
 ) values
  (gen_random_uuid(),'20000000-0000-4000-8000-000000000001','50000000-0000-4000-8000-000000000001','PURCHASE_RECEIPT',10000000,0,'seed-beef','30000000-0000-4000-8000-000000000001','ADMIN',now()-interval '1 day'),
  (gen_random_uuid(),'20000000-0000-4000-8000-000000000001','50000000-0000-4000-8000-000000000003','PURCHASE_RECEIPT',4000000,0,'seed-name-trap','30000000-0000-4000-8000-000000000001','ADMIN',now()-interval '1 day');
+
+-- Production baseline RECEIVE RPC (read-only captured; local isolated fixture only).
+CREATE OR REPLACE FUNCTION public.receive_stock_transfer_v1(p_employee_id uuid, p_transfer_id uuid, p_command_id text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public', 'private'
+AS $function$
+declare
+  v_transfer public.stock_transfers%rowtype;
+  v_source_line public.stock_transfer_lines%rowtype;
+  v_destination_item_id uuid;
+  v_on_hand bigint;
+  v_current_cost numeric(20, 6);
+  v_new_cost numeric(20, 6);
+begin
+  if p_employee_id is null or p_transfer_id is null
+     or p_command_id is null or btrim(p_command_id) = '' then
+    return jsonb_build_object('ok', false, 'code', 'invalid_transfer_receive_command');
+  end if;
+
+  select t.* into v_transfer
+  from public.stock_transfers t
+  where t.id = p_transfer_id
+  for update;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'code', 'transfer_not_found');
+  end if;
+
+  perform 1
+  from private.admin_inventory_authority_v1(
+    p_employee_id, v_transfer.destination_shop_id, 'inventory.transfer'
+  );
+
+  if v_transfer.status = 'RECEIVED' and v_transfer.receive_command_id = p_command_id then
+    return jsonb_build_object('ok', true, 'idempotentReplay', true);
+  end if;
+  if v_transfer.status <> 'SENT' then
+    return jsonb_build_object('ok', false, 'code', 'transfer_not_receivable');
+  end if;
+
+  for v_destination_item_id in
+    select l.destination_inventory_item_id
+    from public.stock_transfer_lines l
+    where l.transfer_id = p_transfer_id
+    order by l.destination_inventory_item_id
+  loop
+    perform pg_advisory_xact_lock(
+      hashtextextended(
+        'tux-inventory:' || v_transfer.destination_shop_id::text || ':'
+        || v_destination_item_id::text,
+        0
+      )
+    );
+  end loop;
+
+  for v_source_line in
+    select l.*
+    from public.stock_transfer_lines l
+    where l.transfer_id = p_transfer_id
+    order by l.destination_inventory_item_id, l.inventory_item_id
+  loop
+    v_destination_item_id := v_source_line.destination_inventory_item_id;
+
+    select b.on_hand_micros into v_on_hand
+    from private.inventory_balance_v1(
+      v_transfer.destination_shop_id, v_destination_item_id
+    ) b;
+
+    select c.weighted_unit_cost_minor into v_current_cost
+    from public.inventory_cost_state c
+    where c.shop_id = v_transfer.destination_shop_id
+      and c.inventory_item_id = v_destination_item_id
+    for update;
+    v_current_cost := coalesce(v_current_cost, 0);
+
+    if v_on_hand <= 0 then
+      v_new_cost := v_source_line.source_unit_cost_minor;
+    else
+      v_new_cost := (
+        (v_on_hand::numeric * v_current_cost)
+        + (v_source_line.quantity_micros::numeric * v_source_line.source_unit_cost_minor)
+      ) / (v_on_hand + v_source_line.quantity_micros)::numeric;
+    end if;
+
+    insert into public.inventory_cost_state(
+      shop_id, inventory_item_id, weighted_unit_cost_minor, version
+    ) values (
+      v_transfer.destination_shop_id, v_destination_item_id, v_new_cost, 1
+    )
+    on conflict (shop_id, inventory_item_id) do update
+    set weighted_unit_cost_minor = excluded.weighted_unit_cost_minor,
+        version = public.inventory_cost_state.version + 1,
+        updated_at = now();
+
+    insert into public.inventory_movements(
+      id, shop_id, business_day_id, inventory_item_id, movement_type,
+      quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+      compensates_movement_id, idempotency_key, admin_employee_id,
+      source_kind, command_id, unit_cost_minor, created_at
+    ) values (
+      gen_random_uuid(), v_transfer.destination_shop_id, null, v_destination_item_id,
+      'TRANSFER_IN', v_source_line.quantity_micros, 0, null, null, null,
+      'transfer-in:' || p_command_id || ':' || v_destination_item_id::text,
+      p_employee_id, 'ADMIN', p_command_id, v_source_line.source_unit_cost_minor, now()
+    );
+  end loop;
+
+  update public.stock_transfers
+  set status = 'RECEIVED',
+      receive_command_id = p_command_id,
+      received_at = now(),
+      updated_at = now()
+  where id = p_transfer_id;
+
+  return jsonb_build_object('ok', true, 'idempotentReplay', false);
+end;
+$function$;
