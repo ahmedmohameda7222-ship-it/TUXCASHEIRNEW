@@ -25,21 +25,16 @@ export function CancelOrderSheet({
   const [reasonCodeId, setReasonCodeId] = useState(reasons[0]?.id ?? '');
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('');
-  const recordedPaymentMinor = order?.payments.reduce(
-    (sum, payment) => sum + payment.allocatedMinor, 0,
-  ) ?? 0;
-  const postedRefundMinor = order?.payments.reduce(
-    (sum, payment) => sum + (payment.postedRefundMinor ?? 0), 0,
-  ) ?? 0;
-  const pendingRefundMinor = order?.payments.reduce(
-    (sum, payment) => sum + (payment.pendingRefundMinor ?? 0), 0,
-  ) ?? 0;
-  const remainingRefundableMinor = order?.payments.reduce(
-    (sum, payment) => sum + (payment.remainingRefundableMinor ?? 0), 0,
-  ) ?? 0;
+  const recordedPaymentMinor =
+    order?.payments.reduce((sum, payment) => sum + payment.allocatedMinor, 0) ?? 0;
+  const postedRefundMinor =
+    order?.payments.reduce((sum, payment) => sum + (payment.postedRefundMinor ?? 0), 0) ?? 0;
+  const pendingRefundMinor =
+    order?.payments.reduce((sum, payment) => sum + (payment.pendingRefundMinor ?? 0), 0) ?? 0;
+  const remainingRefundableMinor =
+    order?.payments.reduce((sum, payment) => sum + (payment.remainingRefundableMinor ?? 0), 0) ?? 0;
   const paidActiveOrder = order?.status === 'ACTIVE' && recordedPaymentMinor > 0;
   const money = (minor: number) => `${(minor / 100).toFixed(2)} EGP`;
-
 
   useEffect(() => {
     if (reasons.some((reason) => reason.id === reasonCodeId)) return;
@@ -65,25 +60,35 @@ export function CancelOrderSheet({
       }}
     >
       {order ? (
-        <section className="admin-order-task-section is-compact" aria-label="Financial and inventory consequences">
+        <section
+          className="admin-order-task-section is-compact"
+          aria-label="Financial and inventory consequences"
+        >
           <h3>Financial consequences</h3>
           <p>Order total: {money(order.totalMinor)}</p>
           <p>Recorded payments: {money(recordedPaymentMinor)}</p>
           {order.payments.map((payment) => (
-            <p key={payment.id}>{payment.methodLabel}: {money(payment.allocatedMinor)}</p>
+            <p key={payment.id}>
+              {payment.methodLabel}: {money(payment.allocatedMinor)}
+            </p>
           ))}
           <p>Previously posted refunds: {money(postedRefundMinor)}</p>
           <p>Pending refund requests: {money(pendingRefundMinor)}</p>
           <p>Remaining refundable amount: {money(remainingRefundableMinor)}</p>
-          <p>Inventory: unpaid cancellation releases eligible active reservations;
-            consumed stock is not automatically restocked.</p>
+          <p>
+            Inventory: unpaid cancellation releases eligible active reservations; consumed stock
+            is not automatically restocked.
+          </p>
           {paidActiveOrder ? (
-            <p role="alert">You cannot cancel an ACTIVE order with recorded payments.
-              This action does not refund the customer. Request authorized financial
-              settlement before any lifecycle correction; refunds and external payment
-              reversals must be confirmed separately.</p>
+            <p role="alert">
+              You cannot cancel an ACTIVE order with recorded payments. This action does not
+              refund the customer. Request authorized financial settlement before any lifecycle
+              correction; refunds and external payment reversals must be confirmed separately.
+            </p>
           ) : (
-            <p>Unpaid ACTIVE order: cancellation uses the normal audited reservation-release flow.</p>
+            <p>
+              Unpaid ACTIVE order: cancellation uses the normal audited reservation-release flow.
+            </p>
           )}
         </section>
       ) : null}
