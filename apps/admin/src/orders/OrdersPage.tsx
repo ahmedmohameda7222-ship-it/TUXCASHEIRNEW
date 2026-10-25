@@ -102,8 +102,7 @@ export function OrdersPage() {
     [query, source, status, businessDayId, timeRange.from, timeRange.to],
   );
   const ordersApi = useOrders(shopId, selectedId, filters, timeRange.error === null);
-  const verifiedKpis =
-    ordersApi.kpiQuery.data?.shopId === shopId ? ordersApi.kpiQuery.data : null;
+  const verifiedKpis = ordersApi.kpiQuery.data?.shopId === shopId ? ordersApi.kpiQuery.data : null;
   const kpiHint = ordersApi.kpiQuery.isLoading
     ? 'Loading verified shop total'
     : ordersApi.kpiQuery.isError
