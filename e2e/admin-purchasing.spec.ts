@@ -263,7 +263,7 @@ for (const viewport of [
     await selectPurchaseOrder(page);
     await expect(page.getByRole('tab', { name: 'Overview', exact: true })).toBeVisible();
     await page.getByRole('tab', { name: 'Items', exact: true }).click();
-    await expect(page.getByRole('tabpanel').getByText('Beef')).toBeVisible();
+    await expect(page.locator('.admin-purchasing-line-item strong', { hasText: 'Beef' })).toBeVisible();
     await page.getByRole('tab', { name: 'History', exact: true }).click();
     await expect(page.getByText(/No receipt or return event history is available/)).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -291,7 +291,7 @@ test('purchasing renders suppliers and can order a draft PO through the trusted 
   await page.goto('/purchasing');
 
   await expect(page.getByRole('heading', { name: 'Purchasing' })).toBeVisible();
-  await expect(page.getByText('Prime Foods').first()).toBeVisible();
+  await expect(page.locator('.admin-purchasing-row-supplier', { hasText: 'Prime Foods' })).toBeVisible();
   await expect(page.getByText('PO-100').first()).toBeVisible();
 
   await selectPurchaseOrder(page);
@@ -445,7 +445,7 @@ test('purchase order defaults adopt the first supplier created after an initiall
   const dialog = await openSupplierDialog(page);
   await dialog.getByLabel('Supplier name').fill('Prime Foods');
   await dialog.getByRole('button', { name: 'Add supplier' }).click();
-  await expect(page.getByText('Prime Foods').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Prime Foods', exact: true })).toBeVisible();
 
   await openPurchaseOrders(page);
   await page.getByRole('button', { name: 'New purchase order' }).click();
@@ -480,7 +480,7 @@ test('purchasing posts partial receiving and purchase returns without pretending
 
   await selectPurchaseOrder(page);
   await page.getByRole('button', { name: 'Mark ordered' }).click();
-  await expect(page.getByText('ORDERED').first()).toBeVisible();
+  await expect(page.locator('.admin-purchasing-order-header').getByText('Ordered')).toBeVisible();
 
   await page.getByRole('button', { name: 'Receive purchase' }).click();
   await page.getByLabel('Receive Beef').fill('2');
@@ -488,7 +488,7 @@ test('purchasing posts partial receiving and purchase returns without pretending
   await page.getByLabel('Supplier reference').fill('INV-100');
   await page.getByRole('button', { name: 'Post receipt' }).click();
 
-  await expect(page.getByText('PARTIALLY RECEIVED').first()).toBeVisible();
+  await expect(page.locator('.admin-purchasing-order-header').getByText('Partially received')).toBeVisible();
   await expect(page.getByText(/6 kg remaining/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Return purchase' }).click();
