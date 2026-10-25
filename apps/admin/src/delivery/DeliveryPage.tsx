@@ -56,6 +56,10 @@ export function DeliveryPage() {
   const session = useAdminSession();
   const queryClient = useQueryClient();
   const [location, navigate] = useLocation();
+  const requestedOrderId =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('orderId')
+      : null;
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const section: DeliverySection =
     location === '/delivery/zones'
@@ -171,6 +175,9 @@ export function DeliveryPage() {
   }
 
   const workspace = workspaceQuery.data;
+  const visibleDeliveryOrders = requestedOrderId
+    ? (workspace?.orders ?? []).filter((order) => order.orderId === requestedOrderId)
+    : (workspace?.orders ?? []);
   const canManage = principal.permissions.includes('delivery.manage');
   const editingZone =
     typeof editingZoneId === 'string'
@@ -351,13 +358,23 @@ export function DeliveryPage() {
           {section === 'active' ? (
             <section aria-label="Active deliveries">
               <h2>Active deliveries</h2>
-              {workspace.orders.length === 0 ? (
+              {requestedOrderId ? (
+                <p>
+                  Filtered to order <code>{requestedOrderId}</code>.{' '}
+                  <a href="/delivery">Show all active deliveries</a>
+                </p>
+              ) : null}
+              {visibleDeliveryOrders.length === 0 ? (
                 <EmptyState
                   title="No active delivery orders"
-                  description="Delivery orders that need dispatch attention will appear here."
+                  description={
+                    requestedOrderId
+                      ? 'This order has no active delivery task in this shop. Historical transitions remain visible in the order detail.'
+                      : 'Delivery orders that need dispatch attention will appear here.'
+                  }
                 />
               ) : (
-                workspace.orders.map((order) =>
+                visibleDeliveryOrders.map((order) =>
                   canManage ? (
                     <DeliveryOrderPanel
                       key={order.orderId}

@@ -46,6 +46,10 @@ const order: AdminOrderDetail = {
       allocatedMinor: 12500,
       receivedMinor: 12500,
       changeMinor: 0,
+      refundAllowedSnapshot: true,
+      postedRefundMinor: 0,
+      pendingRefundMinor: 0,
+      remainingRefundableMinor: 12500,
     },
   ],
   items: [
@@ -58,6 +62,9 @@ const order: AdminOrderDetail = {
       itemNote: null,
       modifiers: [],
       comboBeverages: [],
+      postedReturnQuantity: 0,
+      pendingReturnQuantity: 0,
+      remainingReturnableQuantity: 2,
     },
   ],
   statusHistory: [],
@@ -67,6 +74,88 @@ const order: AdminOrderDetail = {
 };
 
 describe('Orders Task 2 controls', () => {
+  it('clearly separates estimated return gross valuation from customer refunds and stock effects', () => {
+    const html = renderToStaticMarkup(
+      <RefundReturnPage
+        mode="return"
+        order={order}
+        reasons={[refundReason]}
+        refunding={false}
+        returning={false}
+        onCancel={vi.fn()}
+        onRefund={vi.fn()}
+        onReturn={vi.fn()}
+      />,
+    );
+    expect(html).toContain('Estimated gross return item valuation');
+    expect(html).toContain('This is not a refund or stock movement');
+    expect(html).toContain('order-level discounts');
+  });
+
+  it('shows only eligible remaining refundable balance and excludes blocked methods', () => {
+    const html = renderToStaticMarkup(
+      <RefundReturnPage
+        mode="refund"
+        order={{
+          ...order,
+          payments: [
+            {
+              ...order.payments[0]!,
+              remainingRefundableMinor: 4500,
+              postedRefundMinor: 5000,
+              pendingRefundMinor: 3000,
+            },
+            {
+              ...order.payments[0]!,
+              id: '30000000-0000-4000-8000-000000000002',
+              methodLabel: 'Nonrefundable digital',
+              refundAllowedSnapshot: false,
+              remainingRefundableMinor: 0,
+            },
+          ],
+        }}
+        reasons={[refundReason]}
+        refunding={false}
+        returning={false}
+        onCancel={vi.fn()}
+        onRefund={vi.fn()}
+        onReturn={vi.fn()}
+      />,
+    );
+    expect(html).toContain('Available to refund');
+    expect(html).toContain('45.00 EGP');
+    expect(html).toContain('Pending approval');
+    expect(html).not.toContain('Nonrefundable digital');
+  });
+
+  it('shows actual remaining returnable quantity instead of original quantity', () => {
+    const html = renderToStaticMarkup(
+      <RefundReturnPage
+        mode="return"
+        order={{
+          ...order,
+          items: [
+            {
+              ...order.items[0]!,
+              postedReturnQuantity: 1,
+              pendingReturnQuantity: 0,
+              remainingReturnableQuantity: 1,
+            },
+          ],
+        }}
+        reasons={[refundReason]}
+        refunding={false}
+        returning={false}
+        onCancel={vi.fn()}
+        onRefund={vi.fn()}
+        onReturn={vi.fn()}
+      />,
+    );
+    expect(html).toContain('remaining 1');
+    expect(html).toContain('already returned 1');
+    expect(html).toContain('max="1"');
+  });
+
   it('mounts the real OrdersPage at /orders', async () => {
     const source = await readFile(resolve('apps/admin/src/app/routes.tsx'), 'utf8');
     expect(source).toContain('const OrdersPage = lazy(() =>');
@@ -141,6 +230,7 @@ describe('Orders Task 2 controls', () => {
     expect(refundHtml).not.toContain('Return selected items');
     expect(returnHtml).toContain('TUX Burger');
     expect(returnHtml).toContain('Return selected items');
+    expect(returnHtml).toContain('does not refund or restock');
     expect(returnHtml).not.toContain('Submit refund');
   });
 });

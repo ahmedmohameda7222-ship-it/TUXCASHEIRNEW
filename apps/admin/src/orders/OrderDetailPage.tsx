@@ -25,6 +25,8 @@ export function OrderDetailPage({
   order,
   canCancel,
   canRefund,
+  canReviewApprovals,
+  canViewDelivery,
   cancelling,
   refunding,
   returning,
@@ -35,6 +37,8 @@ export function OrderDetailPage({
   order: AdminOrderDetail;
   canCancel: boolean;
   canRefund: boolean;
+  canReviewApprovals?: boolean;
+  canViewDelivery?: boolean;
   cancelling: boolean;
   refunding: boolean;
   returning: boolean;
@@ -42,7 +46,27 @@ export function OrderDetailPage({
   onRefund(): void;
   onReturn(): void;
 }) {
-  const canCancelActive = order.status === 'ACTIVE' && canCancel;
+  const recordedPaymentMinor = order.payments.reduce(
+    (sum, payment) => sum + payment.allocatedMinor,
+    0,
+  );
+  const hasRecordedPayment = recordedPaymentMinor > 0;
+  const postedRefundMinor = order.financialEvents
+    .filter((event) => event.kind === 'REFUND' && event.state === 'POSTED')
+    .reduce((sum, event) => sum + event.amountMinor, 0);
+  const pendingRefundMinor = order.financialEvents
+    .filter(
+      (event) =>
+        event.kind === 'REFUND' &&
+        ['PENDING_APPROVAL', 'APPROVED', 'EXECUTING'].includes(event.state),
+    )
+    .reduce((sum, event) => sum + event.amountMinor, 0);
+  const postedReturnValuationMinor = order.financialEvents
+    .filter((event) => event.kind === 'RETURN' && event.state === 'POSTED')
+    .reduce((sum, event) => sum + event.amountMinor, 0);
+  const netAfterPostedRefundsMinor = order.totalMinor - postedRefundMinor;
+  const outstandingSettlementMinor = order.totalMinor - recordedPaymentMinor;
+  const canCancelActive = order.status === 'ACTIVE' && canCancel && !hasRecordedPayment;
   const canRefundOrReturn = ['DONE', 'RETURNED'].includes(order.status) && canRefund;
 
   return (
@@ -60,30 +84,73 @@ export function OrderDetailPage({
         <strong className="admin-order-detail__total">{money(order.totalMinor)}</strong>
       </header>
 
+      <div className="admin-order-detail__print-action">
+        <button className="admin-secondary-button" type="button" onClick={() => window.print()}>
+          Print order summary
+        </button>
+        <small>
+          This prints the immutable Admin order summary, not a new numbered fiscal receipt.
+        </small>
+      </div>
+
+      <section className="admin-order-detail__card" aria-label="Order identity">
+        <h3>Order identity</h3>
+        <p>Business day: {order.businessDayId ?? 'Not available'}</p>
+        <p>
+          Unique order reference: <code>{order.id}</code>
+        </p>
+        {order.operatorName ? <p>Operator: {order.operatorName}</p> : null}
+        <p>
+          Created:{' '}
+          <time dateTime={order.createdAt}>
+            {new Intl.DateTimeFormat('en-EG', {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+              timeZone: 'Africa/Cairo',
+            }).format(new Date(order.createdAt))}{' '}
+            (Cairo)
+          </time>
+        </p>
+      </section>
+
       <section className="admin-order-detail__card" aria-labelledby="admin-order-items-title">
         <h3 id="admin-order-items-title">Items</h3>
         <div className="admin-order-detail__list">
-          {order.items.map((item) => (
-            <article className="admin-order-detail__row" key={item.id}>
-              <div>
-                <strong>
-                  {item.quantity} × {item.productName}
-                </strong>
-                {item.itemNote ? <small>{item.itemNote}</small> : null}
-                {item.modifiers.map((modifier, index) => (
-                  <small key={modifier.id ?? `${item.id}:modifier:${index}`}>
-                    {modifier.quantity} × {modifier.label} · {money(modifier.unitPriceMinor)}
-                  </small>
-                ))}
-                {item.comboBeverages.map((beverage, index) => (
-                  <small key={`${item.id}:beverage:${beverage.productId}:${index}`}>
-                    {beverage.label}
-                  </small>
-                ))}
-              </div>
-              <strong>{money(item.unitPriceMinor * item.quantity)}</strong>
-            </article>
-          ))}
+          {order.items.map((item) => {
+            const modifierUnitMinor = item.modifiers.reduce(
+              (total, modifier) => total + modifier.quantity * modifier.unitPriceMinor,
+              0,
+            );
+            const effectiveUnitMinor = item.unitPriceMinor + modifierUnitMinor;
+            return (
+              <article className="admin-order-detail__row" key={item.id}>
+                <div>
+                  <strong>
+                    {item.quantity} × {item.productName}
+                  </strong>
+                  <small>Base unit · {money(item.unitPriceMinor)}</small>
+                  {item.itemNote ? <small>{item.itemNote}</small> : null}
+                  {item.modifiers.map((modifier, index) => (
+                    <small key={modifier.id ?? `${item.id}:modifier:${index}`}>
+                      {modifier.quantity} × {modifier.label} · {money(modifier.unitPriceMinor)} each
+                    </small>
+                  ))}
+                  {item.comboBeverages.map((beverage, index) => (
+                    <small key={`${item.id}:beverage:${beverage.productId}:${index}`}>
+                      {beverage.label} · included in combo snapshot
+                    </small>
+                  ))}
+                  <small>Modifier extras per unit · {money(modifierUnitMinor)}</small>
+                  <small>Effective unit · {money(effectiveUnitMinor)}</small>
+                  <small>Quantity · {item.quantity}</small>
+                </div>
+                <span>
+                  <strong>{money(effectiveUnitMinor * item.quantity)}</strong>
+                  <small>Line total before discounts</small>
+                </span>
+              </article>
+            );
+          })}
         </div>
       </section>
 
@@ -120,6 +187,93 @@ export function OrderDetailPage({
         </section>
       </div>
 
+      <section className="admin-order-detail__card" aria-label="Order financial breakdown">
+        <h3>Order financial breakdown</h3>
+        <dl>
+          <dt>Items subtotal</dt>
+          <dd>
+            {order.itemsSubtotalMinor === undefined
+              ? 'Not available'
+              : money(order.itemsSubtotalMinor)}
+          </dd>
+          <dt>Discount</dt>
+          <dd>
+            {order.discountMinor === undefined ? 'Not available' : money(order.discountMinor)}
+          </dd>
+          <dt>Delivery fee</dt>
+          <dd>{money(order.fulfillment?.finalDeliveryFeeMinor ?? 0)}</dd>
+          <dt>Service charge</dt>
+          <dd>
+            {order.serviceChargeMinor === undefined
+              ? 'Not available'
+              : money(order.serviceChargeMinor)}
+          </dd>
+          <dt>Tax</dt>
+          <dd>{order.taxMinor === undefined ? 'Not available' : money(order.taxMinor)}</dd>
+          <dt>Grand total</dt>
+          <dd>
+            <strong>{money(order.totalMinor)}</strong>
+          </dd>
+          <dt>Allocated payments</dt>
+          <dd>{money(recordedPaymentMinor)}</dd>
+          <dt>Posted refunds</dt>
+          <dd>{money(postedRefundMinor)}</dd>
+          <dt>Pending refunds (not posted)</dt>
+          <dd>{money(pendingRefundMinor)}</dd>
+          <dt>Posted return valuation (not a refund)</dt>
+          <dd>{money(postedReturnValuationMinor)}</dd>
+          <dt>Net after posted refunds</dt>
+          <dd>{money(netAfterPostedRefundsMinor)}</dd>
+          <dt>Outstanding settlement</dt>
+          <dd>{money(outstandingSettlementMinor)}</dd>
+        </dl>
+        <small>
+          Figures are calculated from recorded order snapshots and financial adjustments. Payment
+          allocation does not prove external collection, and a posted accounting refund does not
+          prove a completed external payout. Return valuation is not a refund.
+        </small>
+      </section>
+
+      {order.fulfillment?.behavior === 'DELIVERY' ? (
+        <section className="admin-order-detail__card" aria-label="Delivery tracking">
+          <h3>Delivery tracking</h3>
+          <p>
+            Current delivery state:{' '}
+            {order.delivery?.state ? friendly(order.delivery.state) : 'Not recorded'}
+          </p>
+          <p>Assigned rider: {order.delivery?.riderName ?? 'Not assigned'}</p>
+          {order.delivery?.timeline.length ? (
+            <ol className="admin-order-detail__list">
+              {order.delivery.timeline.map((event) => (
+                <li key={event.id}>
+                  <strong>
+                    {event.fromState ? friendly(event.fromState) : 'New'} →{' '}
+                    {friendly(event.toState)}
+                  </strong>
+                  <small>
+                    {' '}
+                    ·{' '}
+                    {new Intl.DateTimeFormat('en-EG', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                      timeZone: 'Africa/Cairo',
+                    }).format(new Date(event.createdAt))}
+                  </small>
+                  {event.note ? <small> · {event.note}</small> : null}
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p>No delivery transitions recorded.</p>
+          )}
+          {canViewDelivery ? (
+            <a href={`/delivery?orderId=${encodeURIComponent(order.id)}`}>
+              Open this order in Delivery workspace
+            </a>
+          ) : null}
+        </section>
+      ) : null}
+
       <section className="admin-order-detail__card" aria-labelledby="admin-order-payments-title">
         <h3 id="admin-order-payments-title">Payments</h3>
         {order.payments.length === 0 ? (
@@ -128,7 +282,18 @@ export function OrderDetailPage({
           <ul className="admin-order-detail__list">
             {order.payments.map((payment) => (
               <li className="admin-order-detail__row" key={payment.id}>
-                <span>{payment.methodLabel}</span>
+                <span>
+                  {payment.methodLabel}
+                  {payment.receivedMinor !== null ? (
+                    <small>
+                      Cash received {money(payment.receivedMinor)} · change{' '}
+                      {money(payment.changeMinor ?? 0)}
+                    </small>
+                  ) : null}
+                  {payment.refundAllowedSnapshot === false ? (
+                    <small>Nonrefundable method</small>
+                  ) : null}
+                </span>
                 <strong>{money(payment.allocatedMinor)}</strong>
               </li>
             ))}
@@ -150,6 +315,69 @@ export function OrderDetailPage({
                     {friendly(event.state)} · {event.reason.label}
                   </small>
                   {event.note ? <small>{event.note}</small> : null}
+                  {event.kind === 'RETURN' && event.returnItems?.length ? (
+                    <ul>
+                      {event.returnItems.map((line) => (
+                        <li key={line.orderItemId}>
+                          <small>
+                            Returned {line.quantity} × {line.productName}
+                          </small>
+                          <small>Return valuation: {money(line.valuationMinor)}</small>
+                          <small>Order-item reference: {line.orderItemId}</small>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <small>
+                    Requested:{' '}
+                    {new Intl.DateTimeFormat('en-EG', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                      timeZone: 'Africa/Cairo',
+                    }).format(new Date(event.createdAt))}
+                  </small>
+                  {event.requestedByEmployeeId ? (
+                    <small>Requester: {event.requestedByEmployeeId}</small>
+                  ) : null}
+                  {event.approvedByEmployeeId ? (
+                    <small>Approver: {event.approvedByEmployeeId}</small>
+                  ) : null}
+                  {event.decidedAt ? (
+                    <small>
+                      Decision:{' '}
+                      {new Intl.DateTimeFormat('en-EG', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                        timeZone: 'Africa/Cairo',
+                      }).format(new Date(event.decidedAt))}
+                    </small>
+                  ) : null}
+                  {event.executedAt ? (
+                    <small>
+                      Execution:{' '}
+                      {new Intl.DateTimeFormat('en-EG', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                        timeZone: 'Africa/Cairo',
+                      }).format(new Date(event.executedAt))}
+                    </small>
+                  ) : null}
+                  {event.decisionReason ? (
+                    <small>Decision reason: {event.decisionReason}</small>
+                  ) : null}
+                  {event.approvalRequestId ? (
+                    <>
+                      <small>Approval reference: {event.approvalRequestId}</small>
+                      {canReviewApprovals ? (
+                        <a href={`/approvals/${event.approvalRequestId}`}>Review approval</a>
+                      ) : null}
+                    </>
+                  ) : null}
+                  <small>
+                    {event.kind === 'RETURN'
+                      ? 'Return valuation; no payment refund implied'
+                      : 'Refund record; external payout not confirmed'}
+                  </small>
                 </span>
                 <strong>{money(event.amountMinor)}</strong>
               </li>
@@ -190,8 +418,26 @@ export function OrderDetailPage({
               <li className="admin-order-detail__row" key={event.id}>
                 <span>
                   <strong>{friendly(event.eventType)}</strong>
-                  {event.workerName ? <small>{event.workerName}</small> : null}
-                  {event.reason ? <small>{event.reason.label}</small> : null}
+                  <small>
+                    {event.fromStatus ? friendly(event.fromStatus) : 'New'} →{' '}
+                    {friendly(event.toStatus)}
+                  </small>
+                  <small>
+                    {new Intl.DateTimeFormat('en-EG', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                      timeZone: 'Africa/Cairo',
+                    }).format(new Date(event.createdAt))}{' '}
+                    (Cairo)
+                  </small>
+                  {event.workerName ? <small>Worker: {event.workerName}</small> : null}
+                  {event.adminEmployeeId ? (
+                    <small>Admin actor: {event.adminEmployeeId}</small>
+                  ) : null}
+                  {!event.workerName && !event.adminEmployeeId ? (
+                    <small>Actor not recorded</small>
+                  ) : null}
+                  {event.reason ? <small>Reason: {event.reason.label}</small> : null}
                   {event.note ? <small>{event.note}</small> : null}
                 </span>
               </li>
@@ -203,12 +449,46 @@ export function OrderDetailPage({
             <summary>Administrative history</summary>
             <ul>
               {order.auditEvents.map((event) => (
-                <li key={event.id}>{friendly(event.actionType)}</li>
+                <li key={event.id}>
+                  <strong>{friendly(event.actionType)}</strong>
+                  <small>
+                    {' '}
+                    Audit timestamp:{' '}
+                    {new Intl.DateTimeFormat('en-EG', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                      timeZone: 'Africa/Cairo',
+                    }).format(new Date(event.createdAt))}{' '}
+                    (Cairo)
+                  </small>
+                  {event.actorEmployeeId ? (
+                    <small> · Admin actor: {event.actorEmployeeId}</small>
+                  ) : null}
+                </li>
               ))}
             </ul>
           </details>
         ) : null}
       </section>
+
+      {order.status === 'ACTIVE' && hasRecordedPayment ? (
+        <section
+          className="admin-order-detail__card"
+          role="status"
+          aria-label="Paid active order cancellation restriction"
+        >
+          <h3>Paid active order</h3>
+          <p>
+            Recorded payments: {money(recordedPaymentMinor)}. Admin cancellation is blocked until an
+            authorized financial settlement policy is available.
+          </p>
+          <p>
+            Keep the order active or complete the existing Operations lifecycle and use the
+            authorized refund workflow when eligible. Nonrefundable payment methods require an
+            explicit finance resolution. A ledger adjustment does not confirm an external refund.
+          </p>
+        </section>
+      ) : null}
 
       {canCancelActive || canRefundOrReturn ? (
         <section

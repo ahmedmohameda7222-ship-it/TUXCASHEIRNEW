@@ -126,7 +126,9 @@ export function HomeDashboard() {
     {
       label: 'Failed online orders',
       count: current?.failedOnlineOrderCount,
-      href: canOrders ? '/orders' : null,
+      href: canOrders
+        ? `/orders?view=online-requests&status=REJECTED&date=${encodeURIComponent(today)}`
+        : null,
     },
     ...(canApprovals
       ? [{ label: 'Pending approvals', count: current?.pendingApprovalCount, href: '/approvals' }]

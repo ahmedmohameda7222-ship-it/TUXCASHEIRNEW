@@ -95,12 +95,14 @@ const fixture: AdminOrderDetail = {
   ],
 };
 
-function render(order: AdminOrderDetail): string {
+function render(order: AdminOrderDetail, canViewDelivery = false): string {
   return renderToStaticMarkup(
     <OrderDetailPage
       order={order}
       canCancel
       canRefund
+      canReviewApprovals
+      canViewDelivery={canViewDelivery}
       cancelling={false}
       refunding={false}
       returning={false}
@@ -108,12 +110,100 @@ function render(order: AdminOrderDetail): string {
       onRefund={vi.fn()}
       onReturn={vi.fn()}
     />,
-  );
+  ).replace(/[\u00a0\u202f]/g, ' ');
 }
 
 describe('OrderDetailPage', () => {
-  it('offers cancel for active orders and separate refund and return actions for completed orders', () => {
-    expect(render({ ...fixture, status: 'ACTIVE' })).toContain('Cancel order');
+  it('shows scoped delivery status, assigned rider and immutable transition timestamps', () => {
+    const html = render(
+      {
+        ...fixture,
+        delivery: {
+          state: 'OUT_FOR_DELIVERY',
+          riderName: 'Hassan',
+          timeline: [
+            {
+              id: '12121212-1212-4121-8121-121212121212',
+              fromState: 'ASSIGNED',
+              toState: 'OUT_FOR_DELIVERY',
+              employeeId: null,
+              riderId: null,
+              note: 'Handed to rider',
+              createdAt: '2026-09-21T04:00:00.000Z',
+            },
+          ],
+        },
+      },
+      true,
+    );
+    expect(html).toContain('Delivery tracking');
+    expect(html).toContain('Out For Delivery');
+    expect(html).toContain('Hassan');
+    expect(html).toContain('Handed to rider');
+    expect(html).toContain('/delivery?orderId=11111111-1111-4111-8111-111111111111');
+  });
+
+  it('renders immutable financial snapshots and distinct refund / return accounting totals', () => {
+    const html = render({
+      ...fixture,
+      status: 'DONE',
+      businessDayId: '2026-day-1',
+      operatorName: 'Cashier A',
+      itemsSubtotalMinor: 11500,
+      discountMinor: 1000,
+      serviceChargeMinor: 500,
+      taxMinor: 0,
+      financialEvents: [
+        {
+          id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          kind: 'REFUND',
+          state: 'POSTED',
+          amountMinor: 2500,
+          approvalRequestId: null,
+          reason: {
+            id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+            key: 'QUALITY_ISSUE',
+            label: 'Quality issue',
+            family: 'REFUND_RETURN',
+            configurationVersion: 3,
+          },
+          createdAt: '2026-09-21T03:10:00.000Z',
+        },
+      ],
+    });
+    expect(html).toContain('Business day');
+    expect(html).toContain('Cashier A');
+    expect(html).toContain('Items subtotal');
+    expect(html).toContain('Discount');
+    expect(html).toContain('Service charge');
+    expect(html).toContain('Tax');
+    expect(html).toContain('Posted refunds');
+    expect(html).toContain('Net after posted refunds');
+    expect(html).toContain('Outstanding settlement');
+  });
+
+  it('uses immutable modifier snapshots in the complete line total for multiple items', () => {
+    const html = render({
+      ...fixture,
+      items: [
+        {
+          ...fixture.items[0]!,
+          quantity: 2,
+          unitPriceMinor: 11000,
+          modifiers: [{ id: null, label: 'Extra cheese', quantity: 2, unitPriceMinor: 500 }],
+        },
+      ],
+    });
+    expect(html).toContain('Base unit');
+    expect(html).toContain('Modifier extras');
+    expect(html).toContain('EGP 120.00');
+    expect(html).toContain('EGP 240.00');
+    expect(html).toContain('Line total before discounts');
+  });
+
+  it('only offers cancellation for unpaid active orders and refund/return for completed orders', () => {
+    expect(render({ ...fixture, status: 'ACTIVE', payments: [] })).toContain('Cancel order');
+    expect(render({ ...fixture, status: 'ACTIVE' })).not.toContain('Cancel order</button>');
     const done = render({ ...fixture, status: 'DONE' });
     expect(done).toContain('Refund payment');
     expect(done).toContain('Return items');
@@ -218,6 +308,94 @@ describe('OrderDetailPage', () => {
     expect(html).toContain('Rejected');
     expect(html).toContain('Failed');
     expect(html).not.toContain('Pending Approval');
+  });
+
+  it('shows immutable lifecycle transitions, Cairo timestamps, and actor without exposing internal revision numbers', () => {
+    const html = render({
+      ...fixture,
+      status: 'DONE',
+      statusHistory: [
+        {
+          id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          eventType: 'MARKED_DONE',
+          operationalRevision: 9,
+          fromStatus: 'ACTIVE',
+          toStatus: 'DONE',
+          workerName: null,
+          adminEmployeeId: '11111111-2222-4333-8444-555555555555',
+          reason: null,
+          note: 'Prepared on shift',
+          createdAt: '2026-09-21T23:30:00.000Z',
+        },
+      ],
+    });
+    expect(html).toContain('Active → Done');
+    expect(html).not.toContain('Revision 9');
+    expect(html).toContain('Admin actor: 11111111-2222-4333-8444-555555555555');
+    expect(html).toContain('Sep 22, 2026');
+    expect(html).toContain('Prepared on shift');
+    expect(html).toContain('Audit timestamp');
+  });
+
+  it('offers authorized approval deep links to financial corrections', () => {
+    const html = render({
+      ...fixture,
+      status: 'DONE',
+      financialEvents: [
+        {
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          kind: 'REFUND',
+          state: 'PENDING_APPROVAL',
+          amountMinor: 500,
+          approvalRequestId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          reason: {
+            id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            key: 'CUSTOMER_REQUEST',
+            label: 'Customer request',
+            family: 'REFUND_RETURN',
+            configurationVersion: 1,
+          },
+          createdAt: '2026-10-25T12:00:00.000Z',
+        },
+      ],
+    });
+    expect(html).toContain('/approvals/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+    expect(html).toContain('Review approval');
+  });
+
+  it('shows each returned item with immutable name, quantity and valuation separately from refunds', () => {
+    const html = render({
+      ...fixture,
+      status: 'DONE',
+      financialEvents: [
+        {
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          kind: 'RETURN',
+          state: 'POSTED',
+          amountMinor: 5750,
+          approvalRequestId: null,
+          reason: {
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            key: 'QUALITY_ISSUE',
+            label: 'Quality issue',
+            family: 'REFUND_RETURN',
+            configurationVersion: 2,
+          },
+          createdAt: '2026-09-21T11:00:00Z',
+          returnItems: [
+            {
+              orderItemId: '55555555-5555-4555-8555-555555555555',
+              productName: 'TUX Burger',
+              quantity: 1,
+              valuationMinor: 5750,
+            },
+          ],
+        },
+      ],
+    });
+    expect(html).toContain('Returned 1 × TUX Burger');
+    expect(html).toContain('Return valuation: EGP 57.50');
+    expect(html).toContain('Return valuation; no payment refund implied');
   });
 
   it('renders immutable order context needed to investigate a lifecycle action', () => {
