@@ -7,7 +7,7 @@ if (!new Set(['127.0.0.1','localhost','::1']).has(new URL(databaseUrl).hostname)
   throw new Error('Inventory PostgreSQL acceptance refuses non-loopback databases.');
 }
 function execute(args, purpose, mustFail = false, expectedError = '') {
-  const result = spawnSync('psql', [databaseUrl,'-X','-v','ON_ERROR_STOP=1',...args], {
+  const result = spawnSync('psql', [databaseUrl,'-X','-q','-v','ON_ERROR_STOP=1',...args], {
     encoding:'utf8',maxBuffer: 4 * 1024 * 1024
   });
   const success = result.status === 0;
