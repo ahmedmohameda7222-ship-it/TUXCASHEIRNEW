@@ -66,6 +66,25 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Build local-only serial three-stream integration preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'TUX Inventory CI Preview'
+          git config user.email 'inventory-ci@localhost.invalid'
+          git fetch --no-tags origin refs/pull/157/head:refs/remotes/origin/preview-catalog-157
+          git fetch --no-tags origin refs/pull/158/head:refs/remotes/origin/preview-orders-158
+          echo "Inventory checked out: $(git rev-parse HEAD)"
+          echo "Catalog preview: $(git rev-parse refs/remotes/origin/preview-catalog-157)"
+          echo "Orders preview: $(git rev-parse refs/remotes/origin/preview-orders-158)"
+          # These are throwaway LOCAL CI merge commits: no pushes, tags,
+          # migrations, deployments or modifications to either PR's branch.
+          git merge --no-ff --no-edit refs/remotes/origin/preview-catalog-157
+          git merge --no-ff --no-edit refs/remotes/origin/preview-orders-158
+          echo "Three-stream preview HEAD: $(git rev-parse HEAD)"
+          git status --short
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
