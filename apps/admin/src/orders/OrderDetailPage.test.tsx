@@ -101,6 +101,7 @@ function render(order: AdminOrderDetail): string {
       order={order}
       canCancel
       canRefund
+      canReviewApprovals
       cancelling={false}
       refunding={false}
       returning={false}
@@ -304,6 +305,30 @@ describe('OrderDetailPage', () => {
     expect(html).toContain('Sep 22, 2026');
     expect(html).toContain('Prepared on shift');
     expect(html).toContain('Audit timestamp');
+  });
+
+  it('offers authorized approval deep links to financial corrections', () => {
+    const html = render({
+      ...fixture,
+      status: 'DONE',
+      financialEvents: [{
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        kind: 'REFUND',
+        state: 'PENDING_APPROVAL',
+        amountMinor: 500,
+        approvalRequestId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        reason: {
+          id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          key: 'CUSTOMER_REQUEST',
+          label: 'Customer request',
+          family: 'REFUND_RETURN',
+          configurationVersion: 1,
+        },
+        createdAt: '2026-10-25T12:00:00.000Z',
+      }],
+    });
+    expect(html).toContain('/approvals/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+    expect(html).toContain('Review approval');
   });
 
   it('shows each returned item with immutable name, quantity and valuation separately from refunds', () => {
