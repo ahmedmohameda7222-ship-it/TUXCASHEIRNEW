@@ -42,8 +42,15 @@ export function RefundReturnPage({
   onReturn(input: ReturnDraft): void | Promise<void>;
 }) {
   const [reasonCodeId, setReasonCodeId] = useState(reasons[0]?.id ?? '');
-  const [paymentId, setPaymentId] = useState(order.payments[0]?.id ?? '');
-  const [amountMinor, setAmountMinor] = useState(String(order.payments[0]?.allocatedMinor ?? ''));
+  const refundablePayments = useMemo(
+    () => order.payments.filter(
+      (payment) => payment.refundAllowedSnapshot === true &&
+        (payment.remainingRefundableMinor ?? 0) > 0,
+    ),
+    [order.payments],
+  );
+  const [paymentId, setPaymentId] = useState(refundablePayments[0]?.id ?? '');
+  const [amountMinor, setAmountMinor] = useState(String(refundablePayments[0]?.remainingRefundableMinor ?? ''));
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('');
   const [returnQuantities, setReturnQuantities] = useState<Record<string, string>>({});
@@ -54,11 +61,21 @@ export function RefundReturnPage({
   }, [reasonCodeId, reasons]);
 
   useEffect(() => {
-    if (order.payments.some((payment) => payment.id === paymentId)) return;
-    const payment = order.payments[0];
-    setPaymentId(payment?.id ?? '');
-    setAmountMinor(String(payment?.allocatedMinor ?? ''));
-  }, [order.payments, paymentId]);
+    const selected = refundablePayments.find((payment) => payment.id === paymentId);
+    if (!selected) {
+      const next = refundablePayments[0];
+      setPaymentId(next?.id ?? '');
+      setAmountMinor(String(next?.remainingRefundableMinor ?? ''));
+      return;
+    }
+    const maximum = selected.remainingRefundableMinor ?? 0;
+    setAmountMinor((current) => {
+      const amount = Number(current);
+      return String(Number.isSafeInteger(amount) && amount > 0 && amount <= maximum
+        ? amount
+        : maximum);
+    });
+  }, [refundablePayments, paymentId]);
 
   const returnItems = useMemo(
     () =>
@@ -66,7 +83,7 @@ export function RefundReturnPage({
         .map((item) => ({
           orderItemId: item.id,
           quantity: Number(returnQuantities[item.id] ?? '0'),
-          maximum: item.quantity,
+          maximum: item.remainingReturnableQuantity ?? 0,
         }))
         .filter(
           (item) =>
@@ -81,12 +98,14 @@ export function RefundReturnPage({
   async function submitRefund(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parsedAmount = Number(amountMinor);
+    const payment = refundablePayments.find((candidate) => candidate.id === paymentId);
     if (
-      !paymentId ||
+      !payment ||
       !reasonCodeId ||
       !pin ||
       !Number.isSafeInteger(parsedAmount) ||
-      parsedAmount <= 0
+      parsedAmount <= 0 ||
+      parsedAmount > (payment.remainingRefundableMinor ?? 0)
     )
       return;
     await onRefund({
@@ -167,27 +186,39 @@ export function RefundReturnPage({
               disabled={refunding || returning}
               onChange={(event) => {
                 setPaymentId(event.target.value);
-                const payment = order.payments.find(
+                const payment = refundablePayments.find(
                   (candidate) => candidate.id === event.target.value,
                 );
-                if (payment) setAmountMinor(String(payment.allocatedMinor));
+                if (payment) setAmountMinor(String(payment.remainingRefundableMinor));
               }}
             >
-              {order.payments.map((payment) => (
+              {refundablePayments.map((payment) => (
                 <option key={payment.id} value={payment.id}>
-                  {payment.methodLabel} · {money(payment.allocatedMinor)}
+                  {payment.methodLabel} · available {money(payment.remainingRefundableMinor ?? 0)}
                 </option>
               ))}
             </select>
           </label>
+          {(() => {
+            const selected = refundablePayments.find((payment) => payment.id === paymentId);
+            return selected ? (
+              <p>
+                Original allocation: {money(selected.allocatedMinor)} ·
+                Posted refunds: {money(selected.postedRefundMinor ?? 0)} ·
+                Pending approval: {money(selected.pendingRefundMinor ?? 0)} ·
+                Available to refund: {money(selected.remainingRefundableMinor ?? 0)}
+              </p>
+            ) : <p role="status">No eligible refundable payment balance remains.</p>;
+          })()}
           <label className="admin-field">
             <span>Refund amount (EGP)</span>
             <input
               type="number"
               min={0.01}
+              max={(refundablePayments.find((payment) => payment.id === paymentId)?.remainingRefundableMinor ?? 0) / 100}
               step={0.01}
               value={Number(amountMinor) / 100 || ''}
-              disabled={refunding || returning}
+              disabled={refunding || returning || !paymentId}
               onChange={(event) =>
                 setAmountMinor(String(Math.round(Number(event.target.value) * 100)))
               }
@@ -196,7 +227,11 @@ export function RefundReturnPage({
           <button
             className="admin-primary-button"
             type="submit"
-            disabled={refunding || returning || !reasonCodeId || !paymentId || !pin}
+            disabled={
+              refunding || returning || !reasonCodeId || !paymentId || !pin ||
+              !Number.isSafeInteger(Number(amountMinor)) || Number(amountMinor) <= 0 ||
+              Number(amountMinor) > (refundablePayments.find((payment) => payment.id === paymentId)?.remainingRefundableMinor ?? 0)
+            }
           >
             {refunding ? 'Refunding…' : 'Submit refund'}
           </button>
@@ -211,16 +246,17 @@ export function RefundReturnPage({
           {order.items.map((item) => (
             <label className="admin-field" key={item.id}>
               <span>
-                {item.productName} · max {item.quantity}
+                {item.productName} · purchased {item.quantity} · already returned {item.postedReturnQuantity ?? 0}
+                {' '}· pending {item.pendingReturnQuantity ?? 0} · remaining {item.remainingReturnableQuantity ?? 0}
               </span>
               <input
                 aria-label={`Return quantity for ${item.productName}`}
                 type="number"
                 min={0}
-                max={item.quantity}
+                max={item.remainingReturnableQuantity ?? 0}
                 step={1}
                 value={returnQuantities[item.id] ?? '0'}
-                disabled={refunding || returning}
+                disabled={refunding || returning || (item.remainingReturnableQuantity ?? 0) <= 0}
                 onChange={(event) =>
                   setReturnQuantities((current) => ({ ...current, [item.id]: event.target.value }))
                 }
