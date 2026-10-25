@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'wouter';
 
 import type { CatalogPublishPreview, CatalogScheduledChangeSummary } from '@tux/admin-contracts';
@@ -6,6 +6,7 @@ import type { CatalogPublishPreview, CatalogScheduledChangeSummary } from '@tux/
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { CatalogCopyPanel } from './CatalogCopyPanel';
+import { PublishReviewChanges } from './PublishReviewChanges';
 import { VersionHistory } from './VersionHistory';
 import { CatalogUiError, useCatalogPublishing } from './useCatalog';
 import './catalog.css';
@@ -115,6 +116,15 @@ export function PublishReviewPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingRestoreVersion, setPendingRestoreVersion] = useState<number | null>(null);
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
+  const [confirmedPublish, setConfirmedPublish] = useState(false);
+
+  useEffect(() => {
+    setSelectedDraftId(null);
+    setConfirmedPublish(false);
+    setRequesterPin('');
+    setNotice(null);
+    setActionError(null);
+  }, [shopId]);
 
   if (!shopId) {
     return (
@@ -126,7 +136,7 @@ export function PublishReviewPage() {
         <div className="admin-callout is-warning">
           <div>
             <strong>Select a shop</strong>
-            <span>Publishing, scheduling, and restores never run against All Shops.</span>
+            <span>Publishing and restores never run against All Shops.</span>
           </div>
         </div>
       </PageScaffold>
@@ -153,7 +163,7 @@ export function PublishReviewPage() {
   }
 
   async function publishNow() {
-    if (!preview) return;
+    if (!preview || preview.shopId !== shopId || !confirmedPublish) return;
     await runAction(async () => {
       const result = await publishing.publishDraft.mutateAsync({
         draftId: preview.draftId,
@@ -162,6 +172,7 @@ export function PublishReviewPage() {
         ...(requesterPin.trim() ? { requesterPin: requesterPin.trim() } : {}),
       });
       setRequesterPin('');
+      setConfirmedPublish(false);
       if ('state' in result && result.state === 'PENDING_APPROVAL') {
         setNotice(
           'Catalog publication requested. A second person must approve before it goes live.',
@@ -268,7 +279,10 @@ export function PublishReviewPage() {
               <select
                 aria-label="Changes to review"
                 value={preview?.draftId ?? ''}
-                onChange={(event) => setSelectedDraftId(event.target.value)}
+                onChange={(event) => {
+                  setSelectedDraftId(event.target.value);
+                  setConfirmedPublish(false);
+                }}
               >
                 {draftPreviews.map((candidate, index) => (
                   <option key={candidate.draftId} value={candidate.draftId}>
@@ -293,6 +307,7 @@ export function PublishReviewPage() {
               ) : null}
 
               <PublishSummary preview={preview} />
+              {preview.changes ? <PublishReviewChanges changes={preview.changes} /> : null}
 
               <section className="admin-publish-card" aria-labelledby="publish-now-heading">
                 <div className="admin-publish-card__heading">
@@ -319,10 +334,21 @@ export function PublishReviewPage() {
                     onChange={(event) => setRequesterPin(event.currentTarget.value)}
                   />
                 </label>
+                <label className="admin-field">
+                  <span>
+                    <input
+                      type="checkbox"
+                      checked={confirmedPublish}
+                      disabled={!canPublish || preview.stale || publishing.publishDraft.isPending}
+                      onChange={(event) => setConfirmedPublish(event.currentTarget.checked)}
+                    />
+                    {' '}I reviewed the changes and confirm publication for this shop.
+                  </span>
+                </label>
                 <button
                   className="admin-primary-button"
                   type="button"
-                  disabled={!canPublish || preview.stale || publishing.publishDraft.isPending}
+                  disabled={!canPublish || !confirmedPublish || preview.stale || publishing.publishDraft.isPending}
                   onClick={() => void publishNow()}
                 >
                   {publishing.publishDraft.isPending ? 'Publishing…' : 'Publish now'}
