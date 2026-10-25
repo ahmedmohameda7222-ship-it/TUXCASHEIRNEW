@@ -236,6 +236,54 @@ async function openSupplierDialog(page: Page) {
   return dialog;
 }
 
+// Approved design evidence: rendered Admin app, not the standalone HTML prototype.
+// Network responses below are UI fixtures; transactional integration is exercised
+// separately against disposable PostgreSQL.
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 1100, height: 850 },
+  { width: 768, height: 1024 },
+  { width: 390, height: 844 },
+  { width: 360, height: 760 },
+]) {
+  test(`approved Purchasing list/detail/supplier layouts at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await mockPurchasing(page);
+    await page.goto('/purchasing');
+
+    const search = page.getByRole('searchbox', { name: 'Search purchase orders' });
+    await expect(search).toBeVisible();
+    await search.fill('not-in-workspace');
+    await expect(page.getByText('No purchase orders match these filters.')).toBeVisible();
+    await page.getByRole('button', { name: 'Reset filters' }).click();
+    await expect(page.getByRole('button', { name: /PO-100/ })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: `test-results/purchasing-approved-orders-${viewport.width}.png`, fullPage: true });
+
+    await selectPurchaseOrder(page);
+    await expect(page.getByRole('tab', { name: 'Overview', exact: true })).toBeVisible();
+    await page.getByRole('tab', { name: 'Items', exact: true }).click();
+    await expect(page.getByRole('tabpanel').getByText('Beef')).toBeVisible();
+    await page.getByRole('tab', { name: 'History', exact: true }).click();
+    await expect(page.getByText(/No receipt or return event history is available/)).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: `test-results/purchasing-approved-detail-${viewport.width}.png`, fullPage: true });
+
+    if (viewport.width <= 480) {
+      await page.getByRole('link', { name: /back to purchasing/i }).click();
+    }
+    await openSuppliers(page);
+    await expect(page.getByRole('combobox', { name: 'Filter suppliers by status' })).toBeVisible();
+    await page.getByRole('combobox', { name: 'Filter suppliers by status' }).selectOption('archived');
+    await expect(page.getByText('No suppliers match these filters.')).toBeVisible();
+    await page.getByRole('button', { name: 'Reset filters' }).click();
+    await page.getByRole('button', { name: 'Prime Foods', exact: true }).click();
+    await expect(page.getByRole('complementary', { name: 'Selected supplier detail' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: `test-results/purchasing-approved-suppliers-${viewport.width}.png`, fullPage: true });
+  });
+}
+
 test('purchasing renders suppliers and can order a draft PO through the trusted BFF', async ({
   page,
 }) => {
@@ -371,7 +419,9 @@ test('purchase order creation excludes inactive suppliers from options and defau
   await openPurchaseOrders(page);
   await page.getByRole('button', { name: 'New purchase order' }).click();
   const purchaseOrders = page.getByRole('region', { name: 'Purchase orders' });
-  const supplierSelect = purchaseOrders.getByRole('combobox').first();
+  const supplierSelect = page
+    .getByRole('dialog', { name: 'New purchase order' })
+    .getByRole('combobox', { name: 'Supplier' });
   await expect(supplierSelect.getByRole('option', { name: 'Archived Foods' })).toHaveCount(0);
   await expect(supplierSelect).toHaveValue(supplierId);
 
