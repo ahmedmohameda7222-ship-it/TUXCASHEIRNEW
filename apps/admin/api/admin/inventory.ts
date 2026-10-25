@@ -6,6 +6,7 @@ import type {
   AdminInventoryReasonCode,
   AdminInventoryTransfer,
   AdminInventoryWorkspace,
+  AdminStocktakeSessions,
 } from '@tux/admin-contracts';
 import { z } from 'zod';
 
@@ -212,6 +213,34 @@ const commandSchema = z.discriminatedUnion('type', [
       type: z.literal('stocktake.begin'),
       shopId: uuidSchema,
       inventoryItemIds: z.array(uuidSchema).min(1).max(500),
+      commandId: commandIdSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('stocktake.save'),
+      shopId: uuidSchema,
+      stocktakeId: uuidSchema,
+      expectedRevision: microsSchema.nonnegative(),
+      lines: z
+        .array(
+          z
+            .object({
+              inventoryItemId: uuidSchema,
+              actualCountMicros: microsSchema.nonnegative().nullable(),
+            })
+            .strict(),
+        )
+        .min(1)
+        .max(500),
+      commandId: commandIdSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('stocktake.cancel'),
+      shopId: uuidSchema,
+      stocktakeId: uuidSchema,
       commandId: commandIdSchema,
     })
     .strict(),
@@ -1013,6 +1042,24 @@ async function executeCommand(
         p_command_id: command.commandId,
       });
     }
+    case 'stocktake.save':
+      requirePermission(context.principal, 'inventory.stocktake', command.shopId);
+      return client.rpc<AdminInventoryCommandResult>('save_admin_stocktake_draft_v1', {
+        p_employee_id: context.principal.employeeId,
+        p_shop_id: command.shopId,
+        p_stocktake_id: command.stocktakeId,
+        p_expected_revision: command.expectedRevision,
+        p_lines: command.lines,
+        p_command_id: command.commandId,
+      });
+    case 'stocktake.cancel':
+      requirePermission(context.principal, 'inventory.stocktake', command.shopId);
+      return client.rpc<AdminInventoryCommandResult>('cancel_admin_stocktake_draft_v1', {
+        p_employee_id: context.principal.employeeId,
+        p_shop_id: command.shopId,
+        p_stocktake_id: command.stocktakeId,
+        p_command_id: command.commandId,
+      });
     case 'replenishment.update':
       requirePermission(context.principal, 'purchasing.manage', command.shopId);
       await updateReplenishmentPolicy(client, {
@@ -1135,6 +1182,14 @@ export default async function handler(
       const inventoryItemId = url.searchParams.get('inventoryItemId');
       const context = await loadContext(request, client, false);
       const view = url.searchParams.get('view');
+      if (view === 'stocktake-sessions') {
+        requirePermission(context.principal, 'inventory.stocktake', shopId);
+        sendJson(response, 200, await client.rpc<AdminStocktakeSessions>(
+          'read_admin_stocktake_sessions_v1',
+          { p_employee_id: context.principal.employeeId, p_shop_id: shopId },
+        ));
+        return;
+      }
       if (view === 'stocktake-eligibility') {
         sendJson(response, 200, await loadStocktakeEligibility(client, context, shopId));
         return;
