@@ -522,6 +522,11 @@
   .admin-inventory-master-detail .admin-master-detail__detail {
     display: none;
   }
+  /* The shared shell hides Back at >=48rem; Inventory changes to a
+     single-pane inspector all the way through 1150px, so restore Back. */
+  .admin-inventory-master-detail .admin-master-detail__back {
+    display: inline-flex;
+  }
   .admin-inventory-master-detail[data-detail-active='true'] .admin-master-detail__list {
     display: none;
   }
