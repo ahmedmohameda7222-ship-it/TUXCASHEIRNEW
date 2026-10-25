@@ -301,3 +301,79 @@ describe('Admin purchasing workspace pagination', () => {
     expect(itemQueries.map((query) => query.get('offset'))).toEqual(['0', '1000', '1250']);
   });
 });
+
+
+describe('Admin persisted purchase history read boundaries', () => {
+  it('does not read event tables for an order outside its authorized business and shop', async () => {
+    const select = vi.fn(async (table: string, query: URLSearchParams) => {
+      expect(table).toBe('purchase_orders');
+      expect(query.get('shop_id')).toBe('eq.shop-a');
+      expect(query.get('business_id')).toBe('eq.business-1');
+      expect(query.get('id')).toBe('eq.po-outside');
+      return [];
+    });
+    const result = await createPurchasingStore({
+      select,
+    } as unknown as AdminSupabaseClient).loadHistory('shop-a', 'business-1', 'po-outside');
+    expect(result).toBeNull();
+    expect(select).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows genuine receipt costs and aggregated return allocations with exact PO scoping', async () => {
+    const headers = [
+      { id: 'receipt-a', supplier_reference: 'INV-42', received_at: '2026-10-25T10:00:00Z' },
+    ];
+    const returns = [
+      { id: 'return-a', supplier_reference: 'RET-3', returned_at: '2026-10-25T11:00:00Z' },
+    ];
+    const receiptLines = [{
+      id: 'receipt-line-a',
+      purchase_receipt_id: 'receipt-a',
+      purchase_order_line_id: 'po-line-a',
+      received_purchase_units_micros: '500000',
+      purchase_unit_cost_minor: '12500.000000',
+    }];
+    const returnLines = [
+      { id: 'return-line-a', purchase_return_id: 'return-a', purchase_order_line_id: 'po-line-a', returned_purchase_units_micros: '100000' },
+      { id: 'return-line-b', purchase_return_id: 'return-a', purchase_order_line_id: 'po-line-a', returned_purchase_units_micros: '50000' },
+    ];
+    const select = vi.fn(async (table: string, query: URLSearchParams) => {
+      if (table === 'purchase_orders') {
+        expect(query.get('shop_id')).toBe('eq.shop-a');
+        expect(query.get('business_id')).toBe('eq.business-1');
+        expect(query.get('id')).toBe('eq.po-a');
+        return [{ id: 'po-a' }];
+      }
+      if (table === 'purchase_receipts' || table === 'purchase_returns') {
+        expect(query.get('shop_id')).toBe('eq.shop-a');
+        expect(query.get('purchase_order_id')).toBe('eq.po-a');
+        return table === 'purchase_receipts' ? headers : returns;
+      }
+      if (table === 'purchase_receipt_lines') {
+        expect(query.get('purchase_receipt_id')).toBe('in.(receipt-a)');
+        return query.get('offset') === '0' ? receiptLines : [];
+      }
+      if (table === 'purchase_return_lines') {
+        expect(query.get('purchase_return_id')).toBe('in.(return-a)');
+        return query.get('offset') === '0' ? returnLines : [];
+      }
+      throw new Error('unexpected history table: ' + table);
+    });
+    const result = await createPurchasingStore({
+      select,
+    } as unknown as AdminSupabaseClient).loadHistory('shop-a', 'business-1', 'po-a');
+    expect(result).toMatchObject({ shopId: 'shop-a', purchaseOrderId: 'po-a', truncated: false });
+    expect(result?.events).toHaveLength(2);
+    expect(result?.events[0]).toMatchObject({
+      type: 'RETURN',
+      occurredAt: '2026-10-25T11:00:00Z',
+      supplierReference: 'RET-3',
+      lines: [{ purchaseOrderLineId: 'po-line-a', quantityPurchaseUnitsMicros: 150000, purchaseUnitCostMinor: null }],
+    });
+    expect(result?.events[1]).toMatchObject({
+      type: 'RECEIPT',
+      supplierReference: 'INV-42',
+      lines: [{ purchaseOrderLineId: 'po-line-a', quantityPurchaseUnitsMicros: 500000, purchaseUnitCostMinor: 12500 }],
+    });
+  });
+});
