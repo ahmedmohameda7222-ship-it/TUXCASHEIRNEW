@@ -196,8 +196,8 @@ describe('OrderDetailPage', () => {
     });
     expect(html).toContain('Base unit');
     expect(html).toContain('Modifier extras');
-    expect(html).toContain('EGP 120.00');
-    expect(html).toContain('EGP 240.00');
+    expect(html).toContain('EGP 120.00');
+    expect(html).toContain('EGP 240.00');
     expect(html).toContain('Line total before discounts');
   });
 
