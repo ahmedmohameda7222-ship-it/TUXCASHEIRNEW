@@ -79,8 +79,10 @@ async function publishingFixture(page: Page) {
                   recipeLines: 0,
                 },
                 changes: [{
-                  entityType: 'product',
-                  entityId: product,
+                  kind: 'product',
+                  id: product,
+                  status: 'modified',
+                  changedFields: ['name'],
                   before: { name: 'Original' },
                   after: { name: draft.changedName },
                 }],
