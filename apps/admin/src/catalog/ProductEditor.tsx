@@ -103,6 +103,37 @@ export function ProductEditor({
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
+
+  useEffect(() => {
+    if (!imageKey || uploadedImageUrl) return;
+    let cancelled = false;
+    const params = new URLSearchParams({ shopId: product.shopId, imageKey });
+    void fetch(`/api/admin/catalog-image?${params.toString()}`, {
+      credentials: 'same-origin',
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('image_preview_unavailable');
+        const data: unknown = await response.json();
+        if (
+          typeof data !== 'object' ||
+          data === null ||
+          !('publicUrl' in data) ||
+          typeof data.publicUrl !== 'string'
+        ) {
+          throw new Error('image_preview_invalid');
+        }
+        return data.publicUrl;
+      })
+      .then((publicUrl) => {
+        if (!cancelled) setUploadedImageUrl(publicUrl);
+      })
+      .catch(() => {
+        // Keep image assignment intact if the public preview is temporarily unavailable.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [imageKey, product.shopId, uploadedImageUrl]);
   const [modifierState, setModifierState] = useState<
     Record<string, { linked: boolean; maxQuantity: string }>
   >({});
