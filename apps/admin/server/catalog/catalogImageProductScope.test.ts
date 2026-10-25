@@ -32,13 +32,19 @@ describe('catalog product-scoped image authorization', () => {
   });
 
   it('allows an unpublished product saved in a compatible shop draft', async () => {
-    const { client, select } = reader([], [
-      { shop_id: shopId, business_id: businessId, status: 'DRAFT',
-        working_bundle_json: {
-          snapshot: { products: [{ id: productId, shopId }] },
+    const { client, select } = reader(
+      [],
+      [
+        {
+          shop_id: shopId,
+          business_id: businessId,
+          status: 'DRAFT',
+          working_bundle_json: {
+            snapshot: { products: [{ id: productId, shopId }] },
+          },
         },
-      },
-    ]);
+      ],
+    );
     await expect(
       assertCatalogImageProductScope(client, { businessId, shopId, productId }),
     ).resolves.toBeUndefined();
@@ -50,12 +56,24 @@ describe('catalog product-scoped image authorization', () => {
 
   it('rejects missing, foreign-shop, and inactive-draft products', async () => {
     for (const draft of [
-      { shop_id: otherShopId, business_id: businessId, status: 'DRAFT',
-        working_bundle_json: { snapshot: { products: [{ id: productId, shopId: otherShopId }] } } },
-      { shop_id: shopId, business_id: businessId, status: 'PUBLISHED',
-        working_bundle_json: { snapshot: { products: [{ id: productId, shopId }] } } },
-      { shop_id: shopId, business_id: businessId, status: 'DRAFT',
-        working_bundle_json: { snapshot: { products: [{ id: 'different', shopId }] } } },
+      {
+        shop_id: otherShopId,
+        business_id: businessId,
+        status: 'DRAFT',
+        working_bundle_json: { snapshot: { products: [{ id: productId, shopId: otherShopId }] } },
+      },
+      {
+        shop_id: shopId,
+        business_id: businessId,
+        status: 'PUBLISHED',
+        working_bundle_json: { snapshot: { products: [{ id: productId, shopId }] } },
+      },
+      {
+        shop_id: shopId,
+        business_id: businessId,
+        status: 'DRAFT',
+        working_bundle_json: { snapshot: { products: [{ id: 'different', shopId }] } },
+      },
     ]) {
       const { client } = reader([], [draft]);
       await expect(
@@ -68,10 +86,17 @@ describe('catalog product-scoped image authorization', () => {
   });
 
   it('fails closed on malformed draft snapshots', async () => {
-    const { client } = reader([], [
-      { shop_id: shopId, business_id: businessId, status: 'DRAFT',
-        working_bundle_json: { snapshot: { products: 'invalid' } } },
-    ]);
+    const { client } = reader(
+      [],
+      [
+        {
+          shop_id: shopId,
+          business_id: businessId,
+          status: 'DRAFT',
+          working_bundle_json: { snapshot: { products: 'invalid' } },
+        },
+      ],
+    );
     await expect(
       assertCatalogImageProductScope(client, { businessId, shopId, productId }),
     ).rejects.toMatchObject({ code: 'image_product_not_staged' });
