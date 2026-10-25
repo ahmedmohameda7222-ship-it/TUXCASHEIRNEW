@@ -1,11 +1,17 @@
 import './purchaseOrder.css';
-import type { AdminPurchaseOrder, AdminPurchasingInventoryItem } from '@tux/admin-contracts';
+import type {
+  AdminPurchaseOrder,
+  AdminPurchaseOrderHistory,
+  AdminPurchasingInventoryItem,
+} from '@tux/admin-contracts';
 import { DraftPurchaseOrderLinesEditor } from './DraftPurchaseOrderLinesEditor';
+import { formatPurchaseMicros } from './purchaseOrderDraft';
+import {
+  expectedOrderValueMinor,
+  formatExpectedOrderValue,
+  purchaseOrderDisplayReference,
+} from './purchaseOrderValue';
 import { useEffect, useState } from 'react';
-
-function units(value: number, unitLabel: string): string {
-  return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(value / 1_000_000)} ${unitLabel}`;
-}
 
 function statusLabel(status: AdminPurchaseOrder['status']): string {
   return status
@@ -22,6 +28,10 @@ export function PurchaseOrderPage({
   updating,
   onUpdate,
   inventoryItems = [],
+  history,
+  historyPending = false,
+  historyError = false,
+  onRetryHistory,
   replacing = false,
   onReplaceLines,
   cancelling,
@@ -36,6 +46,10 @@ export function PurchaseOrderPage({
   ordering: boolean;
   updating: boolean;
   inventoryItems?: readonly AdminPurchasingInventoryItem[];
+  history?: AdminPurchaseOrderHistory | null;
+  historyPending?: boolean;
+  historyError?: boolean;
+  onRetryHistory?(): void;
   replacing?: boolean;
   onReplaceLines?(
     lines: readonly {
@@ -57,6 +71,9 @@ export function PurchaseOrderPage({
   onReturn(): void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'items' | 'receiving' | 'returns' | 'history'
+  >('overview');
   const [editingLines, setEditingLines] = useState(false);
   const [reference, setReference] = useState(order.reference ?? '');
   const [expectedDate, setExpectedDate] = useState(order.expectedDeliveryDate ?? '');
@@ -79,17 +96,98 @@ export function PurchaseOrderPage({
     <section className="admin-card" aria-label="Purchase order detail">
       <div className="admin-purchasing-order-header">
         <div className="admin-purchasing-order-header__identity">
-          <strong>{order.reference ?? `Purchase order · ${order.supplierName}`}</strong>
+          <strong>{purchaseOrderDisplayReference(order)}</strong>
           <small>{order.supplierName}</small>
         </div>
         <strong>{statusLabel(order.status)}</strong>
       </div>
-      <dl className="admin-definition-grid">
-        <div>
-          <dt>Expected delivery</dt>
-          <dd>{order.expectedDeliveryDate ?? 'Not set'}</dd>
+      <div
+        className="admin-purchasing-inspector-tabs"
+        role="tablist"
+        aria-label="Purchase order sections"
+      >
+        {(['overview', 'items', 'receiving', 'returns', 'history'] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            className={activeTab === tab ? 'is-active' : ''}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+      </div>
+      {activeTab === 'overview' ? (
+        <div className="admin-purchasing-detail-content" role="tabpanel">
+          <dl className="admin-definition-grid admin-purchasing-overview">
+            <div>
+              <dt>PO date</dt>
+              <dd>{order.createdAt.slice(0, 10)}</dd>
+            </div>
+            <div>
+              <dt>Expected delivery</dt>
+              <dd>{order.expectedDeliveryDate ?? 'Not set'}</dd>
+            </div>
+            <div>
+              <dt>Supplier</dt>
+              <dd>{order.supplierName}</dd>
+            </div>
+            <div>
+              <dt>Expected order value</dt>
+              <dd>{formatExpectedOrderValue(expectedOrderValueMinor(order.lines))}</dd>
+            </div>
+            <div>
+              <dt>Line items</dt>
+              <dd>{order.lines.length}</dd>
+            </div>
+            <div>
+              <dt>Lines fully received</dt>
+              <dd>
+                {
+                  order.lines.filter(
+                    (line) => line.receivedPurchaseUnitsMicros >= line.orderedPurchaseUnitsMicros,
+                  ).length
+                }
+              </dd>
+            </div>
+            <div>
+              <dt>Lines with recorded returns</dt>
+              <dd>{order.lines.filter((line) => line.returnedPurchaseUnitsMicros > 0).length}</dd>
+            </div>
+          </dl>
+          {order.lines.length > 0 ? (
+            <div className="admin-purchasing-progress">
+              <h3>Receiving progress</h3>
+              {order.lines.map((line) => {
+                const fraction =
+                  line.orderedBaseMicros > 0
+                    ? Math.min(100, (line.receivedBaseMicros / line.orderedBaseMicros) * 100)
+                    : 0;
+                return (
+                  <div key={line.id} className="admin-purchasing-progress-line">
+                    <div>
+                      <strong>{line.itemName}</strong>
+                      <span>
+                        {formatPurchaseMicros(line.remainingBaseMicros)} {line.unitLabel} remaining
+                      </span>
+                    </div>
+                    <progress
+                      value={fraction}
+                      max={100}
+                      aria-label={`${line.itemName} receiving progress`}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+          <p className="admin-purchasing-detail-hint">
+            Quantities are kept in each item's purchase unit; different units are not summed.
+          </p>
         </div>
-      </dl>
+      ) : null}
       {order.status === 'DRAFT' && canManage ? (
         editing ? (
           <form
@@ -159,17 +257,152 @@ export function PurchaseOrderPage({
           </button>
         )
       ) : null}
-      <div className="admin-card-grid">
-        {order.lines.map((line) => (
-          <article className="admin-card" key={line.id}>
-            <strong>{line.itemName}</strong>
-            <span>{units(line.orderedBaseMicros, line.unitLabel)} ordered</span>
-            <span>{units(line.receivedBaseMicros, line.unitLabel)} received</span>
-            <span>{units(line.remainingBaseMicros, line.unitLabel)} remaining</span>
-            <span>{units(line.returnedBaseMicros, line.unitLabel)} returned</span>
-          </article>
-        ))}
-      </div>
+      {activeTab === 'items' ? (
+        <div className="admin-purchasing-detail-content" role="tabpanel">
+          {order.lines.length === 0 ? (
+            <p>No line items recorded.</p>
+          ) : (
+            <div className="admin-purchasing-line-list">
+              {order.lines.map((line) => (
+                <article key={line.id} className="admin-purchasing-line-item">
+                  <strong>{line.itemName}</strong>
+                  <small>Purchase unit: {line.purchaseUnitLabel}</small>
+                  <dl>
+                    <div>
+                      <dt>Ordered</dt>
+                      <dd>{formatPurchaseMicros(line.orderedPurchaseUnitsMicros)}</dd>
+                    </div>
+                    <div>
+                      <dt>Received</dt>
+                      <dd>{formatPurchaseMicros(line.receivedPurchaseUnitsMicros)}</dd>
+                    </div>
+                    <div>
+                      <dt>Remaining</dt>
+                      <dd>
+                        {formatPurchaseMicros(
+                          Math.max(
+                            0,
+                            line.orderedPurchaseUnitsMicros - line.receivedPurchaseUnitsMicros,
+                          ),
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Returned</dt>
+                      <dd>{formatPurchaseMicros(line.returnedPurchaseUnitsMicros)}</dd>
+                    </div>
+                    <div>
+                      <dt>Expected unit cost</dt>
+                      <dd>{(line.expectedPurchaseUnitCostMinor / 100).toFixed(2)} EGP</dd>
+                    </div>
+                  </dl>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+      {activeTab === 'receiving' ? (
+        <div className="admin-purchasing-detail-content" role="tabpanel">
+          <h3>Recorded receiving quantities</h3>
+          {order.lines.length === 0 ? (
+            <p>No receiving lines recorded.</p>
+          ) : (
+            order.lines.map((line) => (
+              <p key={line.id}>
+                {line.itemName}: {formatPurchaseMicros(line.receivedPurchaseUnitsMicros)} received /{' '}
+                {formatPurchaseMicros(line.orderedPurchaseUnitsMicros)} ordered{' '}
+                {line.purchaseUnitLabel}
+              </p>
+            ))
+          )}
+          <p className="admin-purchasing-detail-hint">
+            Individual receipt events and actual costs are not exposed by the current workspace API.
+          </p>
+        </div>
+      ) : null}
+      {activeTab === 'returns' ? (
+        <div className="admin-purchasing-detail-content" role="tabpanel">
+          <h3>Recorded supplier returns</h3>
+          {order.lines.length === 0 ? (
+            <p>No returnable lines recorded.</p>
+          ) : (
+            order.lines.map((line) => (
+              <p key={line.id}>
+                {line.itemName}: {formatPurchaseMicros(line.returnedPurchaseUnitsMicros)} returned,{' '}
+                {formatPurchaseMicros(
+                  Math.max(0, line.receivedPurchaseUnitsMicros - line.returnedPurchaseUnitsMicros),
+                )}{' '}
+                remaining returnable {line.purchaseUnitLabel}
+              </p>
+            ))
+          )}
+        </div>
+      ) : null}
+      {activeTab === 'history' ? (
+        <div className="admin-purchasing-detail-content" role="tabpanel">
+          {historyPending ? <p role="status">Loading persisted purchase history…</p> : null}
+          {historyError ? (
+            <div role="alert">
+              <p>Purchase history could not be loaded.</p>
+              {onRetryHistory ? (
+                <button type="button" className="admin-secondary-button" onClick={onRetryHistory}>
+                  Retry history
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          {!historyPending && !historyError && (!history || history.events.length === 0) ? (
+            <p>No receipt or return event history is available for this purchase order.</p>
+          ) : null}
+          {!historyPending && !historyError && history ? (
+            <ol className="admin-purchasing-history-list">
+              {history.events.map((event) => (
+                <li key={event.id} className="admin-purchasing-history-event">
+                  <div className="admin-purchasing-history-event__header">
+                    <strong>
+                      {event.type === 'RECEIPT' ? 'Purchase received' : 'Supplier return'}
+                    </strong>
+                    <time dateTime={event.occurredAt}>
+                      {new Date(event.occurredAt).toLocaleString()}
+                    </time>
+                  </div>
+                  <small>Record {event.id}</small>
+                  {event.supplierReference ? (
+                    <p>Supplier reference: {event.supplierReference}</p>
+                  ) : null}
+                  <ul>
+                    {event.lines.map((line) => {
+                      const orderedLine = order.lines.find(
+                        (candidate) => candidate.id === line.purchaseOrderLineId,
+                      );
+                      return (
+                        <li key={line.purchaseOrderLineId}>
+                          {orderedLine?.itemName ?? 'Inventory item'} —{' '}
+                          {formatPurchaseMicros(line.quantityPurchaseUnitsMicros)}{' '}
+                          {orderedLine?.purchaseUnitLabel ?? 'purchase units'}
+                          {line.purchaseUnitCostMinor !== null ? (
+                            <>
+                              {' '}
+                              · Actual cost per purchase unit:{' '}
+                              {(line.purchaseUnitCostMinor / 100).toFixed(2)} EGP
+                            </>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+          {history?.truncated ? (
+            <p className="admin-purchasing-detail-hint">
+              Recent history only: at most 100 receipts and 100 supplier returns are shown.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="admin-purchasing-page-actions">
         {(order.status === 'DRAFT' || order.status === 'ORDERED') && canManage ? (
           confirmCancel ? (

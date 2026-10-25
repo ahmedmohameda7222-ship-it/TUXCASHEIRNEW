@@ -1,5 +1,6 @@
 import type {
   AdminPurchaseOrder,
+  AdminPurchaseOrderHistory,
   AdminPurchasingWorkspace,
   AdminSupplier,
   PurchasingCommandResult,
@@ -204,6 +205,28 @@ const commandSchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 
+type PurchasingHistoryHeader = {
+  id: string;
+  supplier_reference: string | null;
+  received_at?: string;
+  returned_at?: string;
+};
+
+type PurchasingReceiptHistoryLine = {
+  id: string;
+  purchase_receipt_id: string;
+  purchase_order_line_id: string;
+  received_purchase_units_micros: number | string;
+  purchase_unit_cost_minor: number | string;
+};
+
+type PurchasingReturnHistoryLine = {
+  id: string;
+  purchase_return_id: string;
+  purchase_order_line_id: string;
+  returned_purchase_units_micros: number | string;
+};
+
 type SupplierRow = {
   id: string;
   business_id: string;
@@ -283,6 +306,40 @@ async function loadContext(
     requireSessionCsrf(context, firstHeader(request.headers['x-tux-admin-csrf']).trim());
   }
   return context;
+}
+
+const PURCHASE_EVENT_LIMIT = 100;
+const PURCHASE_EVENT_LINE_BATCH_SIZE = 100;
+const PURCHASE_EVENT_LINE_PAGE_SIZE = 1_000;
+
+async function loadPersistedPurchaseEventLines<T>(
+  client: AdminSupabaseClient,
+  table: string,
+  parentColumn: string,
+  columns: string,
+  ids: readonly string[],
+): Promise<T[]> {
+  const results: T[] = [];
+  for (let start = 0; start < ids.length; start += PURCHASE_EVENT_LINE_BATCH_SIZE) {
+    const batch = ids.slice(start, start + PURCHASE_EVENT_LINE_BATCH_SIZE);
+    let offset = 0;
+    for (;;) {
+      const page = await client.select<T[]>(
+        table,
+        new URLSearchParams({
+          select: columns,
+          [parentColumn]: `in.(${batch.join(',')})`,
+          order: `${parentColumn}.asc,id.asc`,
+          limit: String(PURCHASE_EVENT_LINE_PAGE_SIZE),
+          offset: String(offset),
+        }),
+      );
+      if (page.length === 0) break;
+      results.push(...page);
+      offset += page.length;
+    }
+  }
+  return results;
 }
 
 const PURCHASE_ORDER_HISTORY_LIMIT = 500;
@@ -584,6 +641,120 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
       };
     },
 
+    async loadHistory(
+      shopId,
+      businessId,
+      purchaseOrderId,
+    ): Promise<AdminPurchaseOrderHistory | null> {
+      // The service enforces purchasing.view. The PostgREST service client can
+      // bypass RLS, so the order must also match BOTH authorized scopes here.
+      const matchingOrders = await client.select<{ id: string }[]>(
+        'purchase_orders',
+        new URLSearchParams({
+          select: 'id',
+          id: `eq.${purchaseOrderId}`,
+          shop_id: `eq.${shopId}`,
+          business_id: `eq.${businessId}`,
+          limit: '1',
+        }),
+      );
+      if (matchingOrders.length === 0) return null;
+
+      const [receiptHeaders, returnHeaders] = await Promise.all([
+        client.select<PurchasingHistoryHeader[]>(
+          'purchase_receipts',
+          new URLSearchParams({
+            select: 'id,supplier_reference,received_at',
+            shop_id: `eq.${shopId}`,
+            purchase_order_id: `eq.${purchaseOrderId}`,
+            order: 'received_at.desc,id.desc',
+            limit: String(PURCHASE_EVENT_LIMIT + 1),
+          }),
+        ),
+        client.select<PurchasingHistoryHeader[]>(
+          'purchase_returns',
+          new URLSearchParams({
+            select: 'id,supplier_reference,returned_at',
+            shop_id: `eq.${shopId}`,
+            purchase_order_id: `eq.${purchaseOrderId}`,
+            order: 'returned_at.desc,id.desc',
+            limit: String(PURCHASE_EVENT_LIMIT + 1),
+          }),
+        ),
+      ]);
+      const truncated =
+        receiptHeaders.length > PURCHASE_EVENT_LIMIT || returnHeaders.length > PURCHASE_EVENT_LIMIT;
+      const receipts = receiptHeaders.slice(0, PURCHASE_EVENT_LIMIT);
+      const returns = returnHeaders.slice(0, PURCHASE_EVENT_LIMIT);
+      const [receiptLines, returnLines] = await Promise.all([
+        loadPersistedPurchaseEventLines<PurchasingReceiptHistoryLine>(
+          client,
+          'purchase_receipt_lines',
+          'purchase_receipt_id',
+          'id,purchase_receipt_id,purchase_order_line_id,received_purchase_units_micros,purchase_unit_cost_minor',
+          receipts.map((row) => row.id),
+        ),
+        loadPersistedPurchaseEventLines<PurchasingReturnHistoryLine>(
+          client,
+          'purchase_return_lines',
+          'purchase_return_id',
+          'id,purchase_return_id,purchase_order_line_id,returned_purchase_units_micros',
+          returns.map((row) => row.id),
+        ),
+      ]);
+
+      const receiptsById = new Map<
+        string,
+        AdminPurchaseOrderHistory['events'][number]['lines'][number][]
+      >();
+      for (const row of receiptLines) {
+        const lines = receiptsById.get(row.purchase_receipt_id) ?? [];
+        lines.push({
+          purchaseOrderLineId: row.purchase_order_line_id,
+          quantityPurchaseUnitsMicros: safeInteger(row.received_purchase_units_micros),
+          purchaseUnitCostMinor: safeInteger(row.purchase_unit_cost_minor),
+        });
+        receiptsById.set(row.purchase_receipt_id, lines);
+      }
+      const returnsById = new Map<string, Map<string, number>>();
+      for (const row of returnLines) {
+        const lines = returnsById.get(row.purchase_return_id) ?? new Map<string, number>();
+        const next =
+          (lines.get(row.purchase_order_line_id) ?? 0) +
+          safeInteger(row.returned_purchase_units_micros);
+        if (!Number.isSafeInteger(next)) throw new Error('purchasing_backend_contract_invalid');
+        lines.set(row.purchase_order_line_id, next);
+        returnsById.set(row.purchase_return_id, lines);
+      }
+      const events: AdminPurchaseOrderHistory['events'][number][] = [
+        ...receipts.map((row) => ({
+          id: row.id,
+          type: 'RECEIPT' as const,
+          occurredAt: row.received_at!,
+          supplierReference: row.supplier_reference,
+          lines: receiptsById.get(row.id) ?? [],
+        })),
+        ...returns.map((row) => ({
+          id: row.id,
+          type: 'RETURN' as const,
+          occurredAt: row.returned_at!,
+          supplierReference: row.supplier_reference,
+          lines: [...(returnsById.get(row.id)?.entries() ?? [])].map(
+            ([purchaseOrderLineId, quantityPurchaseUnitsMicros]) => ({
+              purchaseOrderLineId,
+              quantityPurchaseUnitsMicros,
+              purchaseUnitCostMinor: null,
+            }),
+          ),
+        })),
+      ].sort(
+        (left, right) =>
+          right.occurredAt.localeCompare(left.occurredAt) || right.id.localeCompare(left.id),
+      );
+
+      return { shopId, purchaseOrderId, events, truncated };
+    },
+
     createSupplier(input) {
       return client.rpc<PurchasingCommandResult>('create_supplier_v1', {
         p_employee_id: input.employeeId,
@@ -744,10 +915,19 @@ export default async function handler(
     const service = createPurchasingService(createPurchasingStore(client));
 
     if (request.method === 'GET') {
-      const shopId = uuidSchema.parse(
-        new URL(request.url ?? '/', 'http://admin.local').searchParams.get('shopId'),
-      );
+      const query = new URL(request.url ?? '/', 'http://admin.local').searchParams;
+      const shopId = uuidSchema.parse(query.get('shopId'));
       const context = await loadContext(request, client, false);
+      if (query.has('purchaseOrderId')) {
+        const purchaseOrderId = uuidSchema.parse(query.get('purchaseOrderId'));
+        const history = await service.loadHistory(shopId, purchaseOrderId, context.principal);
+        if (!history) {
+          sendJson(response, 404, { error: 'purchase_order_not_found' });
+          return;
+        }
+        sendJson(response, 200, history);
+        return;
+      }
       sendJson(response, 200, await service.loadWorkspace(shopId, context.principal));
       return;
     }

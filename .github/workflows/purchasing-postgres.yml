@@ -1,0 +1,110 @@
+name: Purchasing isolated PostgreSQL acceptance
+
+on:
+  push:
+    branches:
+      - fix/purchasing-approved-ui-production-20261025
+    paths:
+      - 'scripts/test-admin-purchasing-postgres.mjs'
+      - 'e2e/admin-purchasing.spec.ts'
+      - 'apps/admin/api/admin/purchasing.ts'
+      - 'apps/admin/server/purchasing/**'
+      - 'apps/admin/src/purchasing/**'
+      - 'packages/admin-contracts/src/purchasing.ts'
+      - 'supabase/migrations/*purchasing*.sql'
+      - '.github/workflows/purchasing-postgres.yml'
+  pull_request:
+    paths:
+      - 'scripts/test-admin-purchasing-postgres.mjs'
+      - 'supabase/migrations/*purchasing*.sql'
+      - 'apps/admin/api/admin/purchasing.ts'
+      - 'apps/admin/server/purchasing/**'
+      - 'apps/admin/src/purchasing/**'
+      - 'packages/admin-contracts/src/purchasing.ts'
+      - 'e2e/admin-purchasing.spec.ts'
+      - '.github/workflows/purchasing-postgres.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  purchasing-postgres:
+    name: Purchasing purchase-order and inventory transaction acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Test shop-scoped receiving returns retries and weighted cost
+        run: node scripts/test-admin-purchasing-postgres.mjs
+
+  purchasing-rendered:
+    name: Purchasing rendered Chromium acceptance and screenshot evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify Admin TypeScript and build
+        run: |
+          npm run typecheck:admin
+          npm run build:admin
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Execute authenticated mock-BFF rendered Purchasing flows
+        run: npx playwright test --config playwright.admin.config.ts e2e/admin-purchasing.spec.ts
+      - name: Preserve real rendered viewport captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: purchasing-admin-rendered-screenshots
+          path: |
+            test-results/
+            playwright-report-admin/
+          if-no-files-found: warn
+          retention-days: 14
+
+  purchasing-security:
+    name: Purchasing Admin security contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify Admin authorization and security invariants
+        run: npm run test:admin-security
+      # A historical repo-level deployment contract script still targets the
+      # removed admin-foundation-tdd.yml workflow. It is not a Purchasing gate.
+      # Admin's actual TypeScript/build is verified in purchasing-rendered.

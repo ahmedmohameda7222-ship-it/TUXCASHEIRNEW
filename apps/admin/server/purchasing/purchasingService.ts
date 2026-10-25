@@ -1,5 +1,6 @@
 import type {
   AdminPurchasingWorkspace,
+  AdminPurchaseOrderHistory,
   AdminSessionPrincipal,
   CreatePurchaseOrderInput,
   CancelPurchaseOrderInput,
@@ -16,6 +17,11 @@ import { requireBusinessWidePermission, requirePermission } from '../authorizati
 
 export interface PurchasingStore {
   loadWorkspace(shopId: string, businessId: string): Promise<AdminPurchasingWorkspace>;
+  loadHistory(
+    shopId: string,
+    businessId: string,
+    purchaseOrderId: string,
+  ): Promise<AdminPurchaseOrderHistory | null>;
   createSupplier(
     input: CreateSupplierInput & { employeeId: string; businessId: string },
   ): Promise<PurchasingCommandResult>;
@@ -57,6 +63,15 @@ export function createPurchasingService(store: PurchasingStore) {
     ): Promise<AdminPurchasingWorkspace> {
       requirePermission(principal, 'purchasing.view', shopId);
       return store.loadWorkspace(shopId, principal.businessId);
+    },
+
+    async loadHistory(
+      shopId: string,
+      purchaseOrderId: string,
+      principal: AdminSessionPrincipal,
+    ): Promise<AdminPurchaseOrderHistory | null> {
+      requirePermission(principal, 'purchasing.view', shopId);
+      return store.loadHistory(shopId, principal.businessId, purchaseOrderId);
     },
 
     async createSupplier(

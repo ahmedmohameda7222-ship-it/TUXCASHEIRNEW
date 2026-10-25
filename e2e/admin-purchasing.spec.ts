@@ -77,6 +77,20 @@ async function mockPurchasing(
   await page.route('**/api/admin/purchasing**', async (route: Route) => {
     const request = route.request();
     if (request.method() === 'GET') {
+      const requestedOrder = new URL(request.url()).searchParams.get('purchaseOrderId');
+      if (requestedOrder) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            shopId,
+            purchaseOrderId: requestedOrder,
+            truncated: false,
+            events: [],
+          }),
+        });
+        return;
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -236,6 +250,87 @@ async function openSupplierDialog(page: Page) {
   return dialog;
 }
 
+// Approved design evidence: rendered Admin app, not the standalone HTML prototype.
+// Network responses below are UI fixtures; transactional integration is exercised
+// separately against disposable PostgreSQL.
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 1100, height: 850 },
+  { width: 768, height: 1024 },
+  { width: 390, height: 844 },
+  { width: 360, height: 760 },
+]) {
+  test(`approved Purchasing list/detail/supplier layouts at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await mockPurchasing(page);
+    await page.goto('/purchasing');
+
+    const search = page.getByRole('searchbox', { name: 'Search purchase orders' });
+    await expect(search).toBeVisible();
+    await search.fill('not-in-workspace');
+    await expect(page.getByText('No purchase orders match these filters.')).toBeVisible();
+    await page.getByRole('button', { name: 'Reset filters' }).click();
+    await expect(page.getByRole('button', { name: /PO-100/ })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({
+      path: `test-results/purchasing-approved-orders-${viewport.width}.png`,
+      fullPage: true,
+    });
+
+    await selectPurchaseOrder(page);
+    if (viewport.width <= 390) {
+      const headerHeight = await page
+        .locator('.admin-purchasing-order-header')
+        .evaluate((element) => element.getBoundingClientRect().height);
+      expect(headerHeight).toBeLessThan(110);
+      const tabsFit = await page
+        .locator('.admin-purchasing-inspector-tabs')
+        .evaluate((element) => element.scrollWidth <= element.clientWidth + 1);
+      expect(tabsFit).toBe(true);
+    }
+    await expect(page.getByRole('tab', { name: 'Overview', exact: true })).toBeVisible();
+    await page.getByRole('tab', { name: 'Items', exact: true }).click();
+    await expect(
+      page.locator('.admin-purchasing-line-item strong', { hasText: 'Beef' }),
+    ).toBeVisible();
+    await page.getByRole('tab', { name: 'History', exact: true }).click();
+    await expect(page.getByText(/No receipt or return event history is available/)).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({
+      path: `test-results/purchasing-approved-detail-${viewport.width}.png`,
+      fullPage: true,
+    });
+
+    if (viewport.width <= 480) {
+      await page.getByRole('link', { name: /back to purchasing/i }).click();
+    }
+    await openSuppliers(page);
+    await expect(page.getByRole('combobox', { name: 'Filter suppliers by status' })).toBeVisible();
+    await page
+      .getByRole('combobox', { name: 'Filter suppliers by status' })
+      .selectOption('archived');
+    await expect(page.getByText('No suppliers match these filters.')).toBeVisible();
+    await page.getByRole('button', { name: 'Reset filters' }).click();
+    await page.getByRole('button', { name: 'Prime Foods', exact: true }).click();
+    await expect(
+      page.getByRole('complementary', { name: 'Selected supplier detail' }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({
+      path: `test-results/purchasing-approved-suppliers-${viewport.width}.png`,
+      fullPage: true,
+    });
+  });
+}
+
 test('purchasing renders suppliers and can order a draft PO through the trusted BFF', async ({
   page,
 }) => {
@@ -243,7 +338,9 @@ test('purchasing renders suppliers and can order a draft PO through the trusted 
   await page.goto('/purchasing');
 
   await expect(page.getByRole('heading', { name: 'Purchasing' })).toBeVisible();
-  await expect(page.getByText('Prime Foods').first()).toBeVisible();
+  await expect(
+    page.locator('.admin-purchasing-row-supplier', { hasText: 'Prime Foods' }),
+  ).toBeVisible();
   await expect(page.getByText('PO-100').first()).toBeVisible();
 
   await selectPurchaseOrder(page);
@@ -370,8 +467,9 @@ test('purchase order creation excludes inactive suppliers from options and defau
   await expect(page.getByText('Archived Foods').first()).toBeVisible();
   await openPurchaseOrders(page);
   await page.getByRole('button', { name: 'New purchase order' }).click();
-  const purchaseOrders = page.getByRole('region', { name: 'Purchase orders' });
-  const supplierSelect = purchaseOrders.getByRole('combobox').first();
+  const supplierSelect = page
+    .getByRole('dialog', { name: 'New purchase order' })
+    .getByRole('combobox', { name: 'Supplier' });
   await expect(supplierSelect.getByRole('option', { name: 'Archived Foods' })).toHaveCount(0);
   await expect(supplierSelect).toHaveValue(supplierId);
 
@@ -395,7 +493,7 @@ test('purchase order defaults adopt the first supplier created after an initiall
   const dialog = await openSupplierDialog(page);
   await dialog.getByLabel('Supplier name').fill('Prime Foods');
   await dialog.getByRole('button', { name: 'Add supplier' }).click();
-  await expect(page.getByText('Prime Foods').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Prime Foods', exact: true })).toBeVisible();
 
   await openPurchaseOrders(page);
   await page.getByRole('button', { name: 'New purchase order' }).click();
@@ -430,7 +528,7 @@ test('purchasing posts partial receiving and purchase returns without pretending
 
   await selectPurchaseOrder(page);
   await page.getByRole('button', { name: 'Mark ordered' }).click();
-  await expect(page.getByText('ORDERED').first()).toBeVisible();
+  await expect(page.locator('.admin-purchasing-order-header').getByText('Ordered')).toBeVisible();
 
   await page.getByRole('button', { name: 'Receive purchase' }).click();
   await page.getByLabel('Receive Beef').fill('2');
@@ -438,7 +536,9 @@ test('purchasing posts partial receiving and purchase returns without pretending
   await page.getByLabel('Supplier reference').fill('INV-100');
   await page.getByRole('button', { name: 'Post receipt' }).click();
 
-  await expect(page.getByText('PARTIALLY RECEIVED').first()).toBeVisible();
+  await expect(
+    page.locator('.admin-purchasing-order-header').getByText('Partially received'),
+  ).toBeVisible();
   await expect(page.getByText(/6 kg remaining/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Return purchase' }).click();
@@ -503,6 +603,46 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   });
 }
 
+test('selected supplier details appear adjacent to compact directory on desktop', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockPurchasing(page);
+  await page.goto('/purchasing');
+  await openSuppliers(page);
+  const directory = page.locator('.admin-supplier-directory');
+  const inspector = page.getByRole('complementary', { name: 'Selected supplier detail' });
+  await expect(inspector).toBeVisible();
+  await expect(inspector.getByRole('heading', { name: 'Prime Foods' })).toBeVisible();
+  const listBounds = await directory.boundingBox();
+  const detailBounds = await inspector.boundingBox();
+  expect(listBounds).not.toBeNull();
+  expect(detailBounds).not.toBeNull();
+  expect(detailBounds!.x).toBeGreaterThan(listBounds!.x + listBounds!.width - 3);
+  expect(detailBounds!.y).toBeLessThanOrEqual(listBounds!.y + 40);
+  expect(listBounds!.y - detailBounds!.y).toBeLessThan(180);
+});
+
+test('supplier and new PO sheets anchor to the bottom safe area on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockPurchasing(page);
+  await page.goto('/purchasing');
+  const supplier = await openSupplierDialog(page);
+  const supplierRect = await supplier.boundingBox();
+  expect(supplierRect).not.toBeNull();
+  expect(Math.abs(844 - (supplierRect!.y + supplierRect!.height))).toBeLessThanOrEqual(16);
+  await page.keyboard.press('Escape');
+  await expect(supplier).toBeHidden();
+
+  await openPurchaseOrders(page);
+  await page.getByRole('button', { name: 'New purchase order' }).click();
+  const po = page.getByRole('dialog', { name: 'New purchase order' });
+  const poRect = await po.boundingBox();
+  expect(poRect).not.toBeNull();
+  expect(Math.abs(844 - (poRect!.y + poRect!.height))).toBeLessThanOrEqual(16);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 test('supplier form exposes linked field guidance and restores focus after Escape', async ({
   page,
 }) => {
@@ -539,7 +679,7 @@ for (const viewport of [
     ).toBeLessThan(4);
     expect(supplierBounds!.y).toBeGreaterThanOrEqual(8);
     expect(supplierBounds!.y + supplierBounds!.height).toBeLessThanOrEqual(viewport.height - 8);
-    if (supplierBounds!.height < viewport.height * 0.8) {
+    if (viewport.width >= 768 && supplierBounds!.height < viewport.height * 0.8) {
       expect(
         Math.abs(supplierBounds!.y + supplierBounds!.height / 2 - viewport.height / 2),
       ).toBeLessThan(8);
