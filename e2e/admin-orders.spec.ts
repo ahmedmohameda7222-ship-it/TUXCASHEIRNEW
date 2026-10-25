@@ -997,7 +997,7 @@ test('approved Orders 1536×1024 reference composition remains fully navigable',
   page,
 }) => {
   await page.setViewportSize({ width: 1536, height: 1024 });
-  await mockOrders(page);
+  await mockOrders(page, { financeVisible: true });
   await page.goto('/orders');
   await expect(page.getByLabel('Orders key metrics')).toContainText('Total orders');
   await page.getByRole('button', { name: /#101/ }).click();
