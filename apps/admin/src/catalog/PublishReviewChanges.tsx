@@ -30,7 +30,11 @@ function title(change: CatalogPublishEntityChange): string {
   return typeof preferred === 'string' && preferred ? preferred : change.id;
 }
 
-export function PublishReviewChanges({ changes }: { changes: readonly CatalogPublishEntityChange[] }) {
+export function PublishReviewChanges({
+  changes,
+}: {
+  changes: readonly CatalogPublishEntityChange[];
+}) {
   const modified = changes.filter((change) => change.status !== 'unchanged');
   const unchanged = changes.filter((change) => change.status === 'unchanged');
 
@@ -83,8 +87,8 @@ export function PublishReviewChanges({ changes }: { changes: readonly CatalogPub
         </details>
       ) : null}
       <p className="admin-publish-card__copy">
-        Relationship changes are summarized separately. No change takes effect until it passes
-        the authorized publish and approval workflow.
+        Relationship changes are summarized separately. No change takes effect until it passes the
+        authorized publish and approval workflow.
       </p>
     </section>
   );
