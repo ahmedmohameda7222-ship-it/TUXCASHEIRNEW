@@ -1,5 +1,4 @@
 import type { AdminOrderDetail } from '@tux/admin-contracts';
-import { Link } from 'wouter';
 
 function money(minor: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -268,9 +267,9 @@ export function OrderDetailPage({
             <p>No delivery transitions recorded.</p>
           )}
           {canViewDelivery ? (
-            <Link href={`/delivery?orderId=${encodeURIComponent(order.id)}`}>
+            <a href={`/delivery?orderId=${encodeURIComponent(order.id)}`}>
               Open this order in Delivery workspace
-            </Link>
+            </a>
           ) : null}
         </section>
       ) : null}
@@ -370,7 +369,7 @@ export function OrderDetailPage({
                     <>
                       <small>Approval reference: {event.approvalRequestId}</small>
                       {canReviewApprovals ? (
-                        <Link href={`/approvals/${event.approvalRequestId}`}>Review approval</Link>
+                        <a href={`/approvals/${event.approvalRequestId}`}>Review approval</a>
                       ) : null}
                     </>
                   ) : null}
