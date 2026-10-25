@@ -1,3 +1,27 @@
+## Orders-only execution acceptance ledger — 2026-10-26 (latest evidence, supersedes historical rows)
+
+**Owner's strict sequential lock:** Orders **ONLY** until O1–O4 final acceptance. All other tabs remain **NOT ACCEPTED**, with previous partial code preserved and no further non-Orders changes. Current PR is #165, Draft/HOLD. Always re-check HEAD/CI before advancing.
+
+| Scope | Actual work/evidence | Verdict |
+|---|---|---|
+| **O1 — list, search, server filters, cursor/detail** | Persistent search/filter disclosure, seven factual desktop columns with compact mobile layout, honest shop context; working source-preserved backend cursor `Load more`, dynamic shop reset, online mode. Browser cases including 2-page fixture added `e2e/admin-orders.spec.ts`; latest exact-head Chromium check required | **PARTIAL, not accepted** |
+| **O2 — full authoritative KPIs** | New `GET /api/admin/orders?view=kpis` → `queryOrdersKpis` → service-role-only `admin_orders_kpis_v1`, with both app-server permission and DB scope checks; independent of 50-row page; recognized allocated payments minus POSTED refunds, distinct paid denominator, null zero AOV and masked money for non-finance users. Unit and >50 real PG security/ledger tests. Development Supabase migration applied; parity verified against existing canonical orders/payments. Browser/e2e screens and exact-head all-green still required | **PARTIAL, not accepted** |
+| **O3 — detail, sensitive action/financial and inventory chronology** | Existing `OrderDetailPage`, `CancelOrderSheet`, `RefundReturnPage`, PIN/reasons/second approval paths preserved. Existing standalone Orders full-regression PG verifies refund, approval, paid-ACTIVE cancel rollback, command replay. Additional deliberate O3 double-submit/changed-payload/cross-app acceptance, exact UI inspector parity remain to be evidenced | **PARTIAL, not accepted** |
+| **O4 — visual and cross-app acceptance** | Existing screenshot capture widths 360/390/768/1024/1440/1536 in `admin-eight-tabs-rendered.yml` and approved Desktop reference inspected. Exact image comparison, hosted authenticated POS → Orders → Finance/Reports and Menu ONLINE → Orders verification, no-overflow/full accessibility proof and Owner sign-off not complete | **NOT ACCEPTED** |
+| **Orders requirement coverage** | O01–O12 each requires evidence; no final PASS inferred solely from source edits or isolated tests | **INCOMPLETE** |
+| **Remaining tab order** | Catalog → Inventory → Purchasing → Customers/CRM → Staff → Finance → Reports, one tab at a time | **LOCKED; none accepted** |
+
+### Development Supabase migration and direct independent evidence
+
+- **Code migration file:** `supabase/migrations/20261026000000_orders_authoritative_kpis.sql`, source blob digest `2566597e0335140943982cde62f3b1c05ede089c`.
+- **Actually applied to authorized TUX V2 dev Supabase project `awpdcsayuwbsruwvaosg`:** migration history `20261025221507 orders_authoritative_kpis`, source and assigned version deliberately recorded separately. Do not reapply the SQL or mistake history's generated version for repository filename.
+- **Runtime ACL:** security definer with pinned search_path; anon and authenticated cannot EXECUTE; service_role can. Unauthorized actor returned `permission_forbidden`. No Production deployment/migration.
+- **Actual existing dev data:** one authorized shop has 5 orders, zero active, 5 paid, 106000 minor recognized net, 21200 minor AOV; four independent shop-scope comparisons returned `true`. Existing five orders were not mutated.
+- **Disposable PostgreSQL:** `scripts/test-admin-orders-kpis-postgres.mjs` reuses current orders approval fixture, seeds 64 more canonical mixed POS/ONLINE records under real Menu pending-request/Operations-device reservations with ONLINE correlation trigger **always enabled**, split Card/Cash payments, verifies complete counts beyond page 50, source and date filtering, permission denials, null average and EXECUTE grants. Job 121310275366 in Orders acceptance run 40240239485 **SUCCESS**; same run Orders rendered job 121310275090 and all monorepo build/regression job 121310275331 **SUCCESS**, at prior exact HEAD `2156138a4df3000b04c105af54fc79e473278c73`. Do not transfer PASS to a new HEAD.
+- Earlier fixture attempts bypassed trigger temporarily; that defective technique was corrected and replaced with actual valid pending-request/reservation setup **before these passing results**. This checkpoint must retain the corrected enabled-trigger source.
+- Last direct exact-head checks and browser screenshots still pending when this ledger was written; continue only Orders and preserve failed/cancelled runs transparently.
+
+
 ## Orders-only O2 checkpoint — 2026-10-26
 
 **Execution lock remains in force:** Orders first. Catalog, Inventory, Purchasing, CRM, Staff, Finance and Reports are still not accepted. No new later-tab features in this checkpoint.
