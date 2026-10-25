@@ -1357,4 +1357,58 @@ psql(
   'Duplicate purchase-return no-mutation assertion',
 );
 
+// The PO row lock plus persisted canonical request fingerprint must make
+// *concurrent* identical calls replay once and changed calls conflict, without
+// duplicate stock movements. These checks run only on disposable PostgreSQL.
+const CONCURRENT_LINE_ID = '65000000-0000-4000-8000-0000000000c1';
+psql(['-c', `insert into public.purchase_order_lines(
+  id, purchase_order_id, inventory_item_id, purchase_unit_label,
+  base_micros_per_purchase_unit, ordered_purchase_units_micros, ordered_base_micros,
+  expected_purchase_unit_cost_minor, expected_unit_cost_minor
+) values (
+  '${CONCURRENT_LINE_ID}', '${SECOND_PO_ID}', '${ITEM_ID}', 'kg',
+  1000000000, 1000, 1000000, 180000, 180
+);`], 'Concurrent purchasing isolated PO line fixture');
+
+function concurrencyCommand(kind, command, quantity) {
+  const line = kind === 'receipt'
+    ? { lineId: CONCURRENT_LINE_ID, receivedPurchaseUnitsMicros: quantity, purchaseUnitCostMinor: 180000 }
+    : { lineId: CONCURRENT_LINE_ID, returnedPurchaseUnitsMicros: quantity };
+  const fn = kind === 'receipt' ? 'receive_purchase_order_v1' : 'return_purchase_order_v1';
+  return `select public.${fn}(
+    '${EMPLOYEE_ID}', '${SHOP_ID}', '${SECOND_PO_ID}', '${command}',
+    'CONCURRENCY-TEST', '${JSON.stringify([line])}'::jsonb
+  )::text`;
+}
+function assertConcurrentResults(results, expectedReplay, label) {
+  const values = results.map((result) => JSON.parse(result.trim()));
+  const successes = values.filter((value) => value.ok === true);
+  const conflicts = values.filter((value) => value.ok === false && value.code === 'idempotency_conflict');
+  if (expectedReplay) {
+    if (successes.length !== 2 || successes.filter((value) => value.idempotentReplay).length !== 1) {
+      throw new Error(`${label}: identical attempts did not produce one write and one replay: ${JSON.stringify(values)}`);
+    }
+  } else if (successes.length !== 1 || conflicts.length !== 1 || successes[0]?.idempotentReplay !== false) {
+    throw new Error(`${label}: conflicting attempts were not fenced atomically: ${JSON.stringify(values)}`);
+  }
+}
+async function racePurchasing(kind, command, quantities, expectedReplay) {
+  const results = await Promise.all(
+    quantities.map((quantity, index) => psqlAsync(
+      ['-At', '-c', concurrencyCommand(kind, command, quantity)],
+      `${kind} concurrent ${command} attempt ${index + 1}`
+    ))
+  );
+  assertConcurrentResults(results, expectedReplay, `${kind} ${command}`);
+  const movementType = kind === 'receipt' ? 'PURCHASE_RECEIPT' : 'PURCHASE_RETURN';
+  const movementCount = psql(['-At', '-c', `select count(*) from public.inventory_movements
+    where shop_id = '${SHOP_ID}' and movement_type = '${movementType}'
+      and command_id = '${command}'`], 'Concurrent inventory movement count').trim();
+  if (movementCount !== '1') throw new Error(`expected one ${kind} ledger movement, got ${movementCount}`);
+}
+await racePurchasing('receipt', 'receive-concurrent-identical', [500, 500], true);
+await racePurchasing('receipt', 'receive-concurrent-conflict', [200, 300], false);
+await racePurchasing('return', 'return-concurrent-identical', [100, 100], true);
+await racePurchasing('return', 'return-concurrent-conflict', [50, 75], false);
+
 console.log('Admin purchasing PostgreSQL partial-receipt/return behavior passed.');
