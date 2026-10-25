@@ -124,8 +124,8 @@ afterEach(async () => {
 
 describe('IndexedDB migration registry', () => {
   it('declares a contiguous production migration chain', () => {
-    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
-    expect(INDEXED_DB_VERSION).toBe(12);
+    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+    expect(INDEXED_DB_VERSION).toBe(13);
   });
 
   it('retries legacy quarantined order lifecycle events once on v10 while preserving evidence', async () => {
@@ -333,6 +333,58 @@ describe('IndexedDB migration registry', () => {
       expect(row.recoveryEvidence.retiredAt).toEqual(expect.any(String));
     } finally {
       v12.close();
+    }
+  });
+
+  it('retries a quarantined order placement once on v13 while preserving failure evidence', async () => {
+    const name = `tux-indexeddb-v13-order-placement-retry-${crypto.randomUUID()}`;
+    const v12 = await openAtVersion(name, 12);
+    const write = v12.transaction('outboxEvents', 'readwrite');
+    const id = '60000000-0000-4000-8000-000000000016';
+    write.objectStore('outboxEvents').put({
+      id,
+      shopId: '10000000-0000-4000-8000-000000000001',
+      businessDayId: '20000000-0000-4000-8000-000000000001',
+      aggregateType: 'ORDER',
+      aggregateId: '30000000-0000-4000-8000-000000000001',
+      aggregateRevision: 0,
+      eventType: 'ORDER_PLACED',
+      payloadVersion: 1,
+      payload: { configurationVersion: 7 },
+      idempotencyKey: 'retry-order-placement-v13',
+      createdAt: '2026-10-25T06:30:00.000Z',
+      attemptCount: 1,
+      nextAttemptAt: null,
+      lastError: 'Remote outbox endpoint rejected event with HTTP 400.',
+      deliveredAt: null,
+      quarantinedAt: '2026-10-25T06:31:00.000Z',
+      permanentFailureReason: 'Remote outbox endpoint rejected event with HTTP 400.',
+      blockedByEventId: null,
+    });
+    await transactionDone(write);
+    v12.close();
+
+    const v13 = await openAtVersion(name, 13);
+    try {
+      await expect(
+        requestResult(
+          v13.transaction('outboxEvents', 'readonly').objectStore('outboxEvents').get(id),
+        ),
+      ).resolves.toMatchObject({
+        attemptCount: 0,
+        nextAttemptAt: null,
+        lastError: null,
+        deliveredAt: null,
+        quarantinedAt: null,
+        permanentFailureReason: null,
+        recoveryEvidence: {
+          migration: 13,
+          quarantinedAt: '2026-10-25T06:31:00.000Z',
+          reason: 'Remote outbox endpoint rejected event with HTTP 400.',
+        },
+      });
+    } finally {
+      v13.close();
     }
   });
 
