@@ -256,6 +256,18 @@ export function useInventory(shopId: string | undefined, inventoryItemId: string
     onSuccess: invalidate,
   });
 
+  const cancelTransfer = useMutation({
+    mutationFn: async (transferId: string) => {
+      return postRetained('transfer.cancel', transferId, (retainedCommandId) => ({
+        type: 'transfer.cancel',
+        shopId: shopId!,
+        transferId,
+        commandId: retainedCommandId,
+      }));
+    },
+    onSuccess: invalidate,
+  });
+
   return {
     workspaceQuery,
     itemHistoryQuery,
@@ -268,5 +280,6 @@ export function useInventory(shopId: string | undefined, inventoryItemId: string
     updateReplenishment,
     sendTransfer,
     receiveTransfer,
+    cancelTransfer,
   };
 }
