@@ -7,6 +7,7 @@ import { PageScaffold } from '../components/layout/PageScaffold';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import './catalog.css';
 import { createCatalogProductSlug } from './catalogProductSlug';
+import { BulkProductEditor } from './BulkProductEditor';
 import { CatalogDefinitionsEditor } from './CatalogDefinitionsEditor';
 import { ProductInspector } from './ProductInspector';
 import { ProductList, type CatalogStatusFilter } from './ProductList';
@@ -60,7 +61,7 @@ function newProductForShop(
 }
 
 export function CatalogPage() {
-  const { principal, scope } = useShopScope();
+  const { principal, scope, hasUnsavedDrafts } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const catalog = useCatalog(shopId);
   const [location, navigate] = useLocation();
@@ -71,6 +72,8 @@ export function CatalogPage() {
   const [unsavedProduct, setUnsavedProduct] = useState<CatalogProductDetail | null>(null);
   const [definitionsOpen, setDefinitionsOpen] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [modeError, setModeError] = useState<string | null>(null);
   const scopedUnsavedProduct = unsavedProduct?.shopId === shopId ? unsavedProduct : null;
   const selectedProductId =
     scopedUnsavedProduct?.id ?? detailIdFromPath(location, '/catalog/products');
@@ -86,6 +89,8 @@ export function CatalogPage() {
   useEffect(() => {
     setUnsavedProduct(null);
     setDefinitionsOpen(false);
+    setBulkOpen(false);
+    setModeError(null);
     setDraftSaved(false);
   }, [shopId]);
 
@@ -109,6 +114,7 @@ export function CatalogPage() {
       catalog.prepareDefinitionsDraft.error ??
       catalog.saveProduct.error ??
       catalog.saveDefinitions.error ??
+      catalog.saveBulkProducts.error ??
       catalog.setAvailability.error,
   );
   const busy =
@@ -117,6 +123,7 @@ export function CatalogPage() {
     catalog.prepareDefinitionsDraft.isPending ||
     catalog.saveProduct.isPending ||
     catalog.saveDefinitions.isPending ||
+    catalog.saveBulkProducts.isPending ||
     catalog.setAvailability.isPending;
 
   function openProduct(productId: string) {
@@ -212,6 +219,11 @@ export function CatalogPage() {
                   setDefinitionsOpen(false);
                   return;
                 }
+                if (hasUnsavedDrafts()) {
+                  setModeError('Save or discard unfinished changes before editing definitions.');
+                  return;
+                }
+                setBulkOpen(false);
                 void catalog.prepareDefinitionsDraft
                   .mutateAsync()
                   .then(() => {
@@ -223,6 +235,28 @@ export function CatalogPage() {
               }}
             >
               {definitionsOpen ? 'Back to products' : 'Manage categories & extras'}
+            </button>
+          ) : null}
+          {canEdit ? (
+            <button
+              className="admin-secondary-button"
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setModeError(null);
+                if (!bulkOpen && hasUnsavedDrafts()) {
+                  setModeError('Save or discard unfinished editor changes before opening Bulk Edit.');
+                  return;
+                }
+                if (!bulkOpen) {
+                  setDefinitionsOpen(false);
+                  setUnsavedProduct(null);
+                  navigate('/catalog/products');
+                }
+                setBulkOpen(!bulkOpen);
+              }}
+            >
+              {bulkOpen ? 'Close Bulk Edit' : 'Bulk Edit'}
             </button>
           ) : null}
           <Link className="admin-secondary-button" href="/catalog/products/publishing">
@@ -328,6 +362,13 @@ export function CatalogPage() {
         </div>
       ) : null}
 
+      {modeError ? (
+        <div className="admin-callout is-warning" role="alert">
+          <strong>Unfinished edits</strong>
+          <span>{modeError}</span>
+        </div>
+      ) : null}
+
       {actionError ? (
         <div className="admin-callout is-danger" role="alert">
           <strong>Change not saved.</strong>
@@ -348,7 +389,21 @@ export function CatalogPage() {
         </span>
       </div>
 
-      {definitionsOpen ? (
+      {bulkOpen ? (
+        <BulkProductEditor
+          key={shopId}
+          shopId={shopId}
+          products={scopedProducts}
+          categories={categories}
+          canEdit={canEdit}
+          canPrice={canPrice}
+          busy={busy}
+          onSave={async (input) => {
+            await catalog.saveBulkProducts.mutateAsync(input);
+            setDraftSaved(true);
+          }}
+        />
+      ) : definitionsOpen ? (
         <CatalogDefinitionsEditor
           key={shopId}
           shopId={shopId}
