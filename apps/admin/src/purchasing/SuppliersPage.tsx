@@ -340,7 +340,7 @@ export function SuppliersPage({
           }}
         >
           <form
-            className="admin-form-grid"
+            className="admin-form-grid admin-purchasing-supplier-form"
             onSubmit={(event) => {
               event.preventDefault();
               const trimmed = name.trim();
