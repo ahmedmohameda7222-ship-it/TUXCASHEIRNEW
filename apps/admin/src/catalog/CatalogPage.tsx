@@ -1,6 +1,6 @@
 import type { CatalogProductDetail } from '@tux/admin-contracts';
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'wouter';
+import { Link, useLocation } from 'wouter';
 
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { PageScaffold } from '../components/layout/PageScaffold';
@@ -70,14 +70,24 @@ export function CatalogPage() {
   const [newProductCategoryId, setNewProductCategoryId] = useState('');
   const [unsavedProduct, setUnsavedProduct] = useState<CatalogProductDetail | null>(null);
   const [definitionsOpen, setDefinitionsOpen] = useState(false);
-  const selectedProductId = unsavedProduct?.id ?? detailIdFromPath(location, '/catalog/products');
+  const [draftSaved, setDraftSaved] = useState(false);
+  const scopedUnsavedProduct = unsavedProduct?.shopId === shopId ? unsavedProduct : null;
+  const selectedProductId =
+    scopedUnsavedProduct?.id ?? detailIdFromPath(location, '/catalog/products');
   const mobileEditing = selectedProductId !== null;
 
   const canEdit = permission(principal, 'catalog.edit');
   const canPrice = permission(principal, 'catalog.pricing');
-  const categories = catalog.categories;
+  const categories = catalog.categories.filter((category) => category.shopId === shopId);
+  const scopedProducts = catalog.products.filter((product) => product.shopId === shopId);
   const activeCategories = categories.filter((category) => category.active);
   const firstActiveCategory = activeCategories[0];
+
+  useEffect(() => {
+    setUnsavedProduct(null);
+    setDefinitionsOpen(false);
+    setDraftSaved(false);
+  }, [shopId]);
 
   useEffect(() => {
     if (activeCategories.some((category) => category.id === newProductCategoryId)) return;
@@ -85,13 +95,13 @@ export function CatalogPage() {
   }, [activeCategories, firstActiveCategory?.id, newProductCategoryId]);
 
   const selectedProduct = useMemo(() => {
-    if (unsavedProduct) return unsavedProduct;
+    if (scopedUnsavedProduct) return scopedUnsavedProduct;
     if (selectedProductId) {
-      const selected = catalog.products.find((product) => product.id === selectedProductId);
+      const selected = scopedProducts.find((product) => product.id === selectedProductId);
       if (selected) return selected;
     }
     return null;
-  }, [catalog.products, selectedProductId, unsavedProduct]);
+  }, [scopedProducts, selectedProductId, scopedUnsavedProduct]);
 
   const actionError = mutationMessage(
     catalog.resumeDraft.error ??
@@ -123,7 +133,8 @@ export function CatalogPage() {
 
   function startNewProduct() {
     if (!shopId || !newProductCategoryId || !canEdit || !canPrice) return;
-    const product = newProductForShop(shopId, newProductCategoryId, catalog.products);
+    const product = newProductForShop(shopId, newProductCategoryId, scopedProducts);
+    setDraftSaved(false);
     setUnsavedProduct(product);
     navigate(detailPath('/catalog/products', product.id));
   }
@@ -214,6 +225,9 @@ export function CatalogPage() {
               {definitionsOpen ? 'Back to products' : 'Manage categories & extras'}
             </button>
           ) : null}
+          <Link className="admin-secondary-button" href="/catalog/products/publishing">
+            Review & Publish ({catalog.compatibleDrafts.length})
+          </Link>
           <label>
             <span>New product category</span>
             <select
@@ -241,6 +255,33 @@ export function CatalogPage() {
         </div>
       }
     >
+      <div className="admin-catalog-draft-banner" role="status">
+        <div>
+          <strong>
+            {principal.shopSummaries?.find((shop) => shop.id === shopId)?.name ?? 'Selected shop'}
+            {' · '}Published version {catalog.workspaceQuery.data.currentPublishVersion}
+          </strong>
+          <span>
+            Save Draft keeps changes private. Review & Publish, then Publish Now after any required
+            approval, to update Operations and the public menu.
+          </span>
+        </div>
+        <span className="admin-status-pill">
+          {catalog.compatibleDrafts.length} pending{' '}
+          {catalog.compatibleDrafts.length === 1 ? 'draft' : 'drafts'}
+        </span>
+      </div>
+
+      {draftSaved ? (
+        <div className="admin-callout" role="status">
+          <strong>Draft saved — not published</strong>
+          <span>Your changes are saved for this shop but are not live.</span>
+          <Link className="admin-secondary-button" href="/catalog/products/publishing">
+            Review & Publish
+          </Link>
+        </div>
+      ) : null}
+
       {!catalog.activeDraft && catalog.compatibleDrafts.length > 0 ? (
         <div className="admin-callout" role="status">
           <strong>Saved draft work is available.</strong>
@@ -317,13 +358,14 @@ export function CatalogPage() {
           pending={busy}
           onSave={async (input) => {
             await catalog.saveDefinitions.mutateAsync(input);
+            setDraftSaved(true);
           }}
         />
       ) : (
         <div className={mobileEditing ? 'admin-catalog-layout is-editing' : 'admin-catalog-layout'}>
           <div className="admin-catalog-layout__list">
             <ProductList
-              products={catalog.products}
+              products={scopedProducts}
               categories={categories}
               selectedProductId={selectedProduct?.id ?? null}
               search={search}
@@ -352,6 +394,7 @@ export function CatalogPage() {
                 }}
                 onSaveDraft={async (draft) => {
                   await catalog.saveProduct.mutateAsync(draft);
+                  setDraftSaved(true);
                   setUnsavedProduct(null);
                   navigate(detailPath('/catalog/products', draft.product.id), { replace: true });
                 }}
