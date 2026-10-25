@@ -84,6 +84,34 @@ export function OrderDetailPage({
         <strong className="admin-order-detail__total">{money(order.totalMinor)}</strong>
       </header>
 
+      <nav className="admin-order-detail__nav" aria-label="Order detail sections">
+        <a href="#order-detail-overview">Overview</a>
+        <a href="#order-detail-items">Items</a>
+        <a href="#order-detail-payments">Payments</a>
+        <a href="#order-detail-customer">Customer</a>
+        <a href="#order-detail-fulfillment">Fulfillment</a>
+        <a href="#order-detail-history">History</a>
+      </nav>
+
+      <dl className="admin-order-detail__facts" aria-label="Order overview facts">
+        <div>
+          <dt>Total amount</dt>
+          <dd>{money(order.totalMinor)}</dd>
+        </div>
+        <div>
+          <dt>Items</dt>
+          <dd>{order.items.reduce((total, item) => total + item.quantity, 0)}</dd>
+        </div>
+        <div>
+          <dt>Source</dt>
+          <dd>{order.source === 'POS' ? 'In-store' : 'Online'}</dd>
+        </div>
+        <div>
+          <dt>Type</dt>
+          <dd>{order.fulfillment?.orderTypeLabel ?? 'Not recorded'}</dd>
+        </div>
+      </dl>
+
       <div className="admin-order-detail__print-action">
         <button className="admin-secondary-button" type="button" onClick={() => window.print()}>
           Print order summary
@@ -93,7 +121,7 @@ export function OrderDetailPage({
         </small>
       </div>
 
-      <section className="admin-order-detail__card" aria-label="Order identity">
+      <section id="order-detail-overview" className="admin-order-detail__card" aria-label="Order identity">
         <h3>Order identity</h3>
         <p>Business day: {order.businessDayId ?? 'Not available'}</p>
         <p>
@@ -113,7 +141,7 @@ export function OrderDetailPage({
         </p>
       </section>
 
-      <section className="admin-order-detail__card" aria-labelledby="admin-order-items-title">
+      <section id="order-detail-items" className="admin-order-detail__card" aria-labelledby="admin-order-items-title">
         <h3 id="admin-order-items-title">Items</h3>
         <div className="admin-order-detail__list">
           {order.items.map((item) => {
@@ -155,7 +183,7 @@ export function OrderDetailPage({
       </section>
 
       <div className="admin-order-detail__grid">
-        <section className="admin-order-detail__card" aria-labelledby="admin-order-customer-title">
+        <section id="order-detail-customer" className="admin-order-detail__card" aria-labelledby="admin-order-customer-title">
           <h3 id="admin-order-customer-title">Customer</h3>
           {order.customer ? (
             <>
@@ -168,6 +196,7 @@ export function OrderDetailPage({
         </section>
 
         <section
+          id="order-detail-fulfillment"
           className="admin-order-detail__card"
           aria-labelledby="admin-order-fulfillment-title"
         >
@@ -274,7 +303,7 @@ export function OrderDetailPage({
         </section>
       ) : null}
 
-      <section className="admin-order-detail__card" aria-labelledby="admin-order-payments-title">
+      <section id="order-detail-payments" className="admin-order-detail__card" aria-labelledby="admin-order-payments-title">
         <h3 id="admin-order-payments-title">Payments</h3>
         {order.payments.length === 0 ? (
           <p>No payment records</p>
@@ -408,7 +437,7 @@ export function OrderDetailPage({
         )}
       </section>
 
-      <section className="admin-order-detail__card" aria-labelledby="admin-order-history-title">
+      <section id="order-detail-history" className="admin-order-detail__card" aria-labelledby="admin-order-history-title">
         <h3 id="admin-order-history-title">Timeline and history</h3>
         {order.statusHistory.length === 0 ? (
           <p>No status history</p>
