@@ -41,3 +41,54 @@ jobs:
         run: |
           node --check scripts/test-inventory-isolated-postgres.mjs
           node scripts/test-inventory-isolated-postgres.mjs
+
+  inventory-full-regression:
+    name: Inventory full monorepo regression
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 159 }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Root formatting
+        run: npm run format:check
+      - name: Root lint
+        run: npm run lint
+      - name: All unit and integration tests
+        run: npm run test
+      - name: Sync domain regression
+        run: npm test -w @tux/sync
+      - name: Full Admin security contracts
+        run: npm run test:admin-security
+      - name: Deployment schema contract
+        run: npm run test:admin-deployment
+      - name: WhatsApp architecture and security contracts
+        run: |
+          npm run test:whatsapp-architecture
+          npm run test:whatsapp-security
+      - name: All TypeScript workspaces
+        run: npm run typecheck
+      - name: All production builds
+        run: npm run build
