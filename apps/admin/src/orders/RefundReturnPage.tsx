@@ -22,6 +22,42 @@ function money(minor: number): string {
   return `${(minor / 100).toFixed(2)} EGP`;
 }
 
+type ReturnSelectableItem = Pick<
+  AdminOrderDetail['items'][number],
+  'id' | 'remainingReturnableQuantity'
+>;
+
+/** Reject the complete form if any selected line is invalid; never submit a silent subset. */
+export function buildReturnItemSelection(
+  items: readonly ReturnSelectableItem[],
+  quantities: Readonly<Record<string, string>>,
+): {
+  items: { orderItemId: string; quantity: number }[];
+  hasInvalidQuantity: boolean;
+} {
+  const selected: { orderItemId: string; quantity: number }[] = [];
+  let hasInvalidQuantity = false;
+  for (const item of items) {
+    const raw = (quantities[item.id] ?? '0').trim();
+    if (raw === '' || raw === '0') continue;
+    const quantity = Number(raw);
+    if (
+      !/^\d+$/.test(raw) ||
+      !Number.isSafeInteger(quantity) ||
+      quantity <= 0 ||
+      quantity > (item.remainingReturnableQuantity ?? 0)
+    ) {
+      hasInvalidQuantity = true;
+      continue;
+    }
+    selected.push({ orderItemId: item.id, quantity });
+  }
+  return {
+    items: hasInvalidQuantity ? [] : selected,
+    hasInvalidQuantity,
+  };
+}
+
 export function RefundReturnPage({
   mode,
   order,
@@ -80,33 +116,11 @@ export function RefundReturnPage({
     });
   }, [refundablePayments, paymentId]);
 
-  const returnItems = useMemo(
-    () =>
-      order.items
-        .map((item) => ({
-          orderItemId: item.id,
-          quantity: Number(returnQuantities[item.id] ?? '0'),
-          maximum: item.remainingReturnableQuantity ?? 0,
-        }))
-        .filter(
-          (item) =>
-            Number.isSafeInteger(item.quantity) &&
-            item.quantity > 0 &&
-            item.quantity <= item.maximum,
-        )
-        .map(({ orderItemId, quantity }) => ({ orderItemId, quantity })),
+  const returnSelection = useMemo(
+    () => buildReturnItemSelection(order.items, returnQuantities),
     [order.items, returnQuantities],
   );
-
-  const returnEstimatedGrossMinor = returnItems.reduce((total, requested) => {
-    const purchased = order.items.find((item) => item.id === requested.orderItemId);
-    if (!purchased) return total;
-    const modifierUnitMinor = purchased.modifiers.reduce(
-      (sum, modifier) => sum + modifier.quantity * modifier.unitPriceMinor,
-      0,
-    );
-    return total + requested.quantity * (purchased.unitPriceMinor + modifierUnitMinor);
-  }, 0);
+  const returnItems = returnSelection.items;
 
   async function submitRefund(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -133,7 +147,7 @@ export function RefundReturnPage({
 
   async function submitReturn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!reasonCodeId || !pin || returnItems.length === 0) return;
+    if (!reasonCodeId || !pin || returnSelection.hasInvalidQuantity || returnItems.length === 0) return;
     await onReturn({ items: returnItems, reasonCodeId, note: note.trim() || null, pin });
     setPin('');
   }
@@ -294,10 +308,23 @@ export function RefundReturnPage({
             Calculated from purchase-time base and modifier snapshots before order-level discounts,
             tax, delivery fees or service charges. This is not a refund or stock movement.
           </p>
+          {returnSelection.hasInvalidQuantity ? (
+            <p role="alert">
+              A selected return quantity is invalid or exceeds the remaining quantity.
+              Correct every item before submitting.
+            </p>
+          ) : null}
           <button
             className="admin-primary-button"
             type="submit"
-            disabled={refunding || returning || !reasonCodeId || !pin || returnItems.length === 0}
+            disabled={
+              refunding ||
+              returning ||
+              !reasonCodeId ||
+              !pin ||
+              returnSelection.hasInvalidQuantity ||
+              returnItems.length === 0
+            }
           >
             {returning ? 'Returning…' : 'Return selected items'}
           </button>
