@@ -91,7 +91,11 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      # Keep evaluating independent integration checks if another unmerged
+      # stream has a formatting defect, but retain a hard red final gate.
       - name: Root formatting
+        id: preview_formatting
+        continue-on-error: true
         run: npm run format:check
       - name: Root lint
         run: npm run lint
@@ -111,6 +115,9 @@ jobs:
         run: npm run typecheck
       - name: All production builds
         run: npm run build
+      - name: Require original unmodified preview to pass formatting
+        if: always()
+        run: test "${{ steps.preview_formatting.outcome }}" = "success"
 
   inventory-rendered-preview:
     name: Inventory authenticated rendered browser regression
