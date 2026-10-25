@@ -27,6 +27,7 @@ export function OrderDetailPage({
   canCancel,
   canRefund,
   canReviewApprovals,
+  canViewDelivery,
   cancelling,
   refunding,
   returning,
@@ -38,6 +39,7 @@ export function OrderDetailPage({
   canCancel: boolean;
   canRefund: boolean;
   canReviewApprovals?: boolean;
+  canViewDelivery?: boolean;
   cancelling: boolean;
   refunding: boolean;
   returning: boolean;
@@ -230,6 +232,34 @@ export function OrderDetailPage({
           prove a completed external payout. Return valuation is not a refund.
         </small>
       </section>
+
+      {order.fulfillment?.behavior === 'DELIVERY' ? (
+        <section className="admin-order-detail__card" aria-label="Delivery tracking">
+          <h3>Delivery tracking</h3>
+          <p>Current delivery state: {order.delivery?.state ? friendly(order.delivery.state) : 'Not recorded'}</p>
+          <p>Assigned rider: {order.delivery?.riderName ?? 'Not assigned'}</p>
+          {order.delivery?.timeline.length ? (
+            <ol className="admin-order-detail__list">
+              {order.delivery.timeline.map((event) => (
+                <li key={event.id}>
+                  <strong>{event.fromState ? friendly(event.fromState) : 'New'} → {friendly(event.toState)}</strong>
+                  <small> · {new Intl.DateTimeFormat('en-EG', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                    timeZone: 'Africa/Cairo',
+                  }).format(new Date(event.createdAt))}</small>
+                  {event.note ? <small> · {event.note}</small> : null}
+                </li>
+              ))}
+            </ol>
+          ) : <p>No delivery transitions recorded.</p>}
+          {canViewDelivery ? (
+            <Link href={`/delivery?orderId=${encodeURIComponent(order.id)}`}>
+              Open this order in Delivery workspace
+            </Link>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="admin-order-detail__card" aria-labelledby="admin-order-payments-title">
         <h3 id="admin-order-payments-title">Payments</h3>
