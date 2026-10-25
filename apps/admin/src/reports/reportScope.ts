@@ -1,8 +1,6 @@
 import type { ReportFilters } from './useReports';
 
-export type SelectedReportScope =
-  | { kind: 'shop'; shopId: string }
-  | { kind: 'all-shops' };
+export type SelectedReportScope = { kind: 'shop'; shopId: string } | { kind: 'all-shops' };
 
 /**
  * Rebind report query filters synchronously to the authorized shop selector.
