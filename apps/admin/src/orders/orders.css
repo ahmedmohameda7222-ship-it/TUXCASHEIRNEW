@@ -552,3 +552,39 @@
     visibility: visible !important;
   }
 }
+
+/* Approved 1536px composition: KPI strip, filters and canonical rows occupy
+   the left ~60%, while the real order inspector begins beside the KPI strip.
+   At smaller widths use the existing responsive stack/full-width detail. */
+@media (min-width: 1280px) {
+  .admin-orders-canonical-view {
+    position: relative;
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: calc(100vh - 250px);
+    padding-right: calc(40% + 12px);
+  }
+
+  .admin-orders-canonical-view > .admin-orders-master-detail {
+    display: contents;
+  }
+
+  .admin-orders-canonical-view .admin-master-detail__list {
+    display: block;
+    min-width: 0;
+  }
+
+  .admin-orders-canonical-view .admin-master-detail__detail {
+    position: absolute;
+    display: block;
+    top: 0;
+    right: 0;
+    width: 40%;
+    max-height: calc(100vh - 130px);
+    overflow: auto;
+  }
+
+  .admin-orders-canonical-view .admin-master-detail__back {
+    display: none;
+  }
+}
