@@ -199,7 +199,8 @@
 
 /* Approved desktop order directory: factual columns without synthetic bulk actions. */
 .admin-orders-list {
-  --admin-orders-grid: minmax(0, 0.72fr) minmax(0, 1.45fr) minmax(0, 0.86fr) minmax(0, 0.73fr) minmax(0, 0.95fr) minmax(0, 0.85fr) minmax(0, 1.22fr);
+  --admin-orders-grid: minmax(0, 0.72fr) minmax(0, 1.45fr) minmax(0, 0.86fr) minmax(0, 0.73fr)
+    minmax(0, 0.95fr) minmax(0, 0.85fr) minmax(0, 1.22fr);
 }
 
 .admin-orders-list__columns,
