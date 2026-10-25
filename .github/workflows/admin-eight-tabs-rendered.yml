@@ -7,6 +7,7 @@ on:
       - 'apps/admin/src/finance/**'
       - 'apps/admin/src/customers/**'
       - 'apps/admin/src/reports/**'
+      - 'apps/admin/src/staff/**'
       - 'apps/admin/src/orders/**'
       - 'apps/admin/src/inventory/**'
       - 'apps/admin/src/components/layout/**'
@@ -14,6 +15,7 @@ on:
       - 'e2e/admin-finance.spec.ts'
       - 'e2e/admin-customers-promotions.spec.ts'
       - 'e2e/admin-reports.spec.ts'
+      - 'e2e/admin-workforce.spec.ts'
       - 'e2e/admin-orders.spec.ts'
       - 'e2e/admin-inventory.spec.ts'
       - '.github/workflows/admin-eight-tabs-rendered.yml'
@@ -28,7 +30,7 @@ concurrency:
 
 jobs:
   rendered:
-    name: Orders, Inventory, Finance, CRM and Reports browser acceptance
+    name: Orders, Inventory, Finance, CRM, Reports and Staff browser acceptance
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
@@ -51,12 +53,12 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run rendered acceptance
-        run: npx playwright test --config playwright.admin.config.ts e2e/admin-orders.spec.ts e2e/admin-inventory.spec.ts e2e/admin-finance.spec.ts e2e/admin-customers-promotions.spec.ts e2e/admin-reports.spec.ts
+        run: npx playwright test --config playwright.admin.config.ts e2e/admin-orders.spec.ts e2e/admin-inventory.spec.ts e2e/admin-finance.spec.ts e2e/admin-customers-promotions.spec.ts e2e/admin-reports.spec.ts e2e/admin-workforce.spec.ts
       - name: Assert approved-width mock-auth screenshot evidence
         if: success()
         run: |
           set -euo pipefail
-          for scene in orders inventory finance crm reports; do
+          for scene in orders inventory finance crm reports workforce-list; do
             for size in 1536x960 1440x900 1024x900 768x1024 390x844 360x800; do
               test -s "artifacts/p04-p07/${scene}-${size}.png"
             done
