@@ -236,8 +236,14 @@ test('Reports blocks an inverted date range instead of sending a misleading quer
   const { queries } = await mockReports(page);
   await page.goto('/reports');
   await expect(page.getByRole('table')).toBeVisible();
-  await page.getByLabel('From', { exact: true }).fill('2026-10-26');
-  await page.getByLabel('To', { exact: true }).fill('2026-10-01');
+  await page
+    .getByRole('region', { name: 'Report filters' })
+    .getByLabel('From', { exact: true })
+    .fill('2026-10-26');
+  await page
+    .getByRole('region', { name: 'Report filters' })
+    .getByLabel('To', { exact: true })
+    .fill('2026-10-01');
   await expect(
     page.getByRole('alert').filter({ hasText: 'Select a valid From/To date range' }),
   ).toBeVisible();
