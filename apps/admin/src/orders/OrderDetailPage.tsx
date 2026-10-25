@@ -73,13 +73,20 @@ export function OrderDetailPage({
     <article className="admin-order-detail" aria-labelledby="admin-order-detail-title">
       <header className="admin-order-detail__summary">
         <div>
-          <p className="admin-page__eyebrow">
-            {order.displayOrderLabel ?? `#${order.displayOrderNo}`}
-          </p>
-          <h2 id="admin-order-detail-title">Order detail</h2>
+          <h2 id="admin-order-detail-title">
+            Order {order.displayOrderLabel ?? `#${order.displayOrderNo}`}
+          </h2>
           <p>
             {friendly(order.status)} · {order.source === 'POS' ? 'In-store' : 'Online'}
+            {order.fulfillment?.orderTypeLabel ? ` · ${order.fulfillment.orderTypeLabel}` : ''}
           </p>
+          <time dateTime={order.createdAt}>
+            {new Intl.DateTimeFormat('en-EG', {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+              timeZone: 'Africa/Cairo',
+            }).format(new Date(order.createdAt))} (Cairo)
+          </time>
         </div>
         <strong className="admin-order-detail__total">{money(order.totalMinor)}</strong>
       </header>
@@ -93,7 +100,7 @@ export function OrderDetailPage({
         <a href="#order-detail-history">History</a>
       </nav>
 
-      <dl className="admin-order-detail__facts" aria-label="Order overview facts">
+      <dl id="order-detail-overview" className="admin-order-detail__facts" aria-label="Order overview facts">
         <div>
           <dt>Total amount</dt>
           <dd>{money(order.totalMinor)}</dd>
@@ -121,29 +128,43 @@ export function OrderDetailPage({
         </small>
       </div>
 
-      <section
-        id="order-detail-overview"
-        className="admin-order-detail__card"
-        aria-label="Order identity"
-      >
-        <h3>Order identity</h3>
-        <p>Business day: {order.businessDayId ?? 'Not available'}</p>
-        <p>
-          Unique order reference: <code>{order.id}</code>
-        </p>
-        {order.operatorName ? <p>Operator: {order.operatorName}</p> : null}
-        <p>
-          Created:{' '}
-          <time dateTime={order.createdAt}>
-            {new Intl.DateTimeFormat('en-EG', {
-              dateStyle: 'medium',
-              timeStyle: 'short',
-              timeZone: 'Africa/Cairo',
-            }).format(new Date(order.createdAt))}{' '}
-            (Cairo)
-          </time>
-        </p>
-      </section>
+      <div className="admin-order-detail__grid">
+        <section
+          id="order-detail-customer"
+          className="admin-order-detail__card"
+          aria-labelledby="admin-order-customer-title"
+        >
+          <h3 id="admin-order-customer-title">Customer</h3>
+          {order.customer ? (
+            <>
+              <strong>{order.customer.name ?? 'Unnamed customer'}</strong>
+              {order.customer.normalizedPhone ? <p>{order.customer.normalizedPhone}</p> : null}
+            </>
+          ) : (
+            <p>Walk-in customer</p>
+          )}
+        </section>
+
+        <section
+          id="order-detail-fulfillment"
+          className="admin-order-detail__card"
+          aria-labelledby="admin-order-fulfillment-title"
+        >
+          <h3 id="admin-order-fulfillment-title">Fulfillment</h3>
+          {order.fulfillment ? (
+            <>
+              <strong>{order.fulfillment.orderTypeLabel}</strong>
+              {order.fulfillment.address ? <p>{order.fulfillment.address}</p> : null}
+              {order.fulfillment.deliveryZoneLabel ? (
+                <p>{order.fulfillment.deliveryZoneLabel}</p>
+              ) : null}
+              <p>Delivery fee {money(order.fulfillment.finalDeliveryFeeMinor)}</p>
+            </>
+          ) : (
+            <p>No fulfillment details</p>
+          )}
+        </section>
+      </div>
 
       <section
         id="order-detail-items"
@@ -190,45 +211,8 @@ export function OrderDetailPage({
         </div>
       </section>
 
-      <div className="admin-order-detail__grid">
-        <section
-          id="order-detail-customer"
-          className="admin-order-detail__card"
-          aria-labelledby="admin-order-customer-title"
-        >
-          <h3 id="admin-order-customer-title">Customer</h3>
-          {order.customer ? (
-            <>
-              <strong>{order.customer.name ?? 'Unnamed customer'}</strong>
-              {order.customer.normalizedPhone ? <p>{order.customer.normalizedPhone}</p> : null}
-            </>
-          ) : (
-            <p>Walk-in customer</p>
-          )}
-        </section>
-
-        <section
-          id="order-detail-fulfillment"
-          className="admin-order-detail__card"
-          aria-labelledby="admin-order-fulfillment-title"
-        >
-          <h3 id="admin-order-fulfillment-title">Fulfillment</h3>
-          {order.fulfillment ? (
-            <>
-              <strong>{order.fulfillment.orderTypeLabel}</strong>
-              {order.fulfillment.address ? <p>{order.fulfillment.address}</p> : null}
-              {order.fulfillment.deliveryZoneLabel ? (
-                <p>{order.fulfillment.deliveryZoneLabel}</p>
-              ) : null}
-              <p>Delivery fee {money(order.fulfillment.finalDeliveryFeeMinor)}</p>
-            </>
-          ) : (
-            <p>No fulfillment details</p>
-          )}
-        </section>
-      </div>
-
-      <section className="admin-order-detail__card" aria-label="Order financial breakdown">
+      <details className="admin-order-detail__card admin-order-detail__disclosure" aria-label="Order financial breakdown">
+        <summary>Financial reconciliation breakdown</summary>
         <h3>Order financial breakdown</h3>
         <dl>
           <dt>Items subtotal</dt>
@@ -273,7 +257,7 @@ export function OrderDetailPage({
           allocation does not prove external collection, and a posted accounting refund does not
           prove a completed external payout. Return valuation is not a refund.
         </small>
-      </section>
+      </details>
 
       {order.fulfillment?.behavior === 'DELIVERY' ? (
         <section className="admin-order-detail__card" aria-label="Delivery tracking">
@@ -452,6 +436,27 @@ export function OrderDetailPage({
           </ul>
         )}
       </section>
+
+      <details className="admin-order-detail__card admin-order-detail__disclosure">
+        <summary>Full order identity and references</summary>
+        <h3>Order identity</h3>
+        <p>Business day: {order.businessDayId ?? 'Not available'}</p>
+        <p>
+          Unique order reference: <code>{order.id}</code>
+        </p>
+        {order.operatorName ? <p>Operator: {order.operatorName}</p> : null}
+        <p>
+          Created:{' '}
+          <time dateTime={order.createdAt}>
+            {new Intl.DateTimeFormat('en-EG', {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+              timeZone: 'Africa/Cairo',
+            }).format(new Date(order.createdAt))}{' '}
+            (Cairo)
+          </time>
+        </p>
+      </details>
 
       <section
         id="order-detail-history"
