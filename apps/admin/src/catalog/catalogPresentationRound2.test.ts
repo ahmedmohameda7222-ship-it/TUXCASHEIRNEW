@@ -24,12 +24,13 @@ describe('Catalog Round 2 presentation contract', () => {
     expect(recurring).not.toMatch(/version-fenced|Rule version/);
   });
 
-  it('uses client-side links for catalog navigation', () => {
-    expect(source('ProductEditor.tsx')).toContain('<Link');
-    expect(source('PublishReviewPage.tsx')).toContain('<Link');
-    expect(source('ProductEditor.tsx')).not.toMatch(
-      /<a[^>]+href="\/catalog\/products\/publishing"/,
+  it('uses guarded client-side product history navigation without raw page reloads', () => {
+    expect(source('ProductEditor.tsx')).toContain('onClick={onReviewPublish}');
+    expect(source('ProductEditor.tsx')).not.toContain('href="/catalog/products/publishing"');
+    expect(source('CatalogPage.tsx')).toContain(
+      "requestCatalogNavigation('/catalog/products/publishing')",
     );
-    expect(source('PublishReviewPage.tsx')).not.toMatch(/<a[^>]+href="\/catalog\/products"/);
+    expect(source('PublishReviewPage.tsx')).toContain('<Link');
+    expect(source('PublishReviewPage.tsx')).not.toMatch(/<a[^>]+href="\\/catalog\\/products"/);
   });
 });
