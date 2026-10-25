@@ -10,6 +10,7 @@ import './catalog.css';
 import { createCatalogProductSlug } from './catalogProductSlug';
 import { BulkProductEditor } from './BulkProductEditor';
 import { CatalogDefinitionsEditor } from './CatalogDefinitionsEditor';
+import { CatalogFirstRunGuide } from './CatalogFirstRunGuide';
 import { ProductInspector } from './ProductInspector';
 import { ProductList, type CatalogStatusFilter } from './ProductList';
 import { CatalogUiError, useCatalog } from './useCatalog';
@@ -392,6 +393,28 @@ export function CatalogPage() {
               : 'Browse live catalog'}
         </span>
       </div>
+
+      {!bulkOpen && !definitionsOpen && scopedProducts.length === 0 ? (
+        <CatalogFirstRunGuide
+          hasCategories={activeCategories.length > 0}
+          productCount={scopedProducts.length}
+          canEdit={canEdit}
+          canPrice={canPrice}
+          hasCopySources={principal.shopIds.some((id) => id !== shopId)}
+          onManageCategories={() => {
+            if (busy) return;
+            void catalog.prepareDefinitionsDraft
+              .mutateAsync()
+              .then(() => {
+                setUnsavedProduct(null);
+                navigate('/catalog/products');
+                setDefinitionsOpen(true);
+              })
+              .catch(() => undefined);
+          }}
+          onCreateProduct={startNewProduct}
+        />
+      ) : null}
 
       {bulkOpen ? (
         <BulkProductEditor
