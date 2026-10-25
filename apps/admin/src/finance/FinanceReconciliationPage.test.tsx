@@ -37,7 +37,7 @@ describe('read-only Finance reconciliation', () => {
       />,
     );
     expect(html).toContain('Finance-posted cashier reconciliation');
-    expect(html).toContain('-2.00 EGP');
+    expect(html).toContain('EGP -2.00');
     expect(html).toContain('Short count');
     expect(html).toContain('Card');
     expect(html).toContain('Not available');
