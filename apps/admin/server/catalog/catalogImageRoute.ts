@@ -2,25 +2,25 @@ import {
   AdminAuthError,
   loadAdminSession,
   requireSessionCsrf,
-} from '../../server/adminAuthService.js';
-import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
+} from '../adminAuthService.js';
+import { AdminAuthorizationError, requirePermission } from '../authorization.js';
 import {
   CatalogImageUploadError,
   MAX_CATALOG_IMAGE_BYTES,
   resolveCatalogImagePublicUrl,
   uploadCatalogProductImage,
-} from '../../server/catalog/catalogImageUpload.js';
-import { assertCatalogImageProductScope } from '../../server/catalog/catalogImageProductScope.js';
-import { getAdminServerEnv } from '../../server/env.js';
+} from './catalogImageUpload.js';
+import { assertCatalogImageProductScope } from './catalogImageProductScope.js';
+import { getAdminServerEnv } from '../env.js';
 import {
   firstHeader,
   requireSameOrigin,
   sendJson,
   type AdminRequest,
   type AdminResponse,
-} from '../../server/http.js';
-import { readAdminSessionToken } from '../../server/session.js';
-import { AdminSupabaseClient } from '../../server/supabaseAdmin.js';
+} from '../http.js';
+import { readAdminSessionToken } from '../session.js';
+import { AdminSupabaseClient } from '../supabaseAdmin.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -46,7 +46,7 @@ async function readUpload(request: AdminRequest): Promise<Uint8Array> {
   return Buffer.concat(chunks, length);
 }
 
-export default async function handler(
+export async function handleCatalogImageRequest(
   request: AdminRequest,
   response: AdminResponse,
 ): Promise<void> {

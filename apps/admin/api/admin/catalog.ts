@@ -8,6 +8,7 @@ import {
 } from '../../server/adminAuthService.js';
 import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
 import { executeCatalogPricePublish } from '../../server/catalog/catalogPricePublishRoute.js';
+import { handleCatalogImageRequest } from '../../server/catalog/catalogImageRoute.js';
 import { resumeCatalogDraft } from '../../server/catalog/catalogDraftResume.js';
 import {
   CatalogServiceError,
@@ -239,6 +240,16 @@ export default async function handler(
   if (request.method !== 'GET' && request.method !== 'POST') {
     response.setHeader('allow', 'GET, POST');
     sendJson(response, 405, { error: 'method_not_allowed' });
+    return;
+  }
+
+  // Reuse the existing Catalog serverless function for binary image requests.
+  // Its delegated handler enforces its own session, CSRF, tenant and upload limits.
+  if (
+    new URL(request.url ?? '/', 'http://admin.local').searchParams.get('__adminResource') ===
+    'catalog-image'
+  ) {
+    await handleCatalogImageRequest(request, response);
     return;
   }
 

@@ -100,7 +100,7 @@ test('does not treat fast-CI commands as evidence of full regression coverage', 
       'npm run build:menu',
       'npm run test:e2e:menu',
       'npm run test:monorepo-architecture',
-    ].join('\\n'),
+    ].join('\n'),
     '.github/workflows/ci-full.yml': 'npm run build',
   });
   try {

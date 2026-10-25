@@ -74,7 +74,8 @@ describe('Plan 2 final review round 7 regressions', () => {
     expect(settingsHook).toContain('queryKey: settingsScheduleQueryKey(shopId)');
     expect(panel).toContain('workspace.shopConfigSchedules');
     expect(panel).toContain('Needs attention');
-    expect(panel).toContain('Choose a new time');
+    expect(panel).toContain('Automatic scheduling is unavailable');
+    expect(panel).toContain('Existing schedule history is preserved');
     expect(panel).not.toContain('attemptCount');
     expect(panel).not.toContain('lastError');
   });
