@@ -1144,6 +1144,12 @@ test('O3 inspector archives stay keyboard-discoverable and print includes their 
   await identity.click();
   await reconciliation.click();
   await page.emulateMedia({ media: 'print' });
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
   await expect(detail.getByText('Unique order reference:', { exact: false })).toBeVisible();
   await expect(detail.getByText('Allocated payments', { exact: true })).toBeVisible();
+
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+  await page.emulateMedia({ media: 'screen' });
+  await expect(detail.getByText('Unique order reference:', { exact: false })).toBeHidden();
+  await expect(detail.getByText('Allocated payments', { exact: true })).toBeHidden();
 });
