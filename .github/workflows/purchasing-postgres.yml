@@ -7,13 +7,21 @@ on:
     paths:
       - 'scripts/test-admin-purchasing-postgres.mjs'
       - 'e2e/admin-purchasing.spec.ts'
+      - 'apps/admin/api/admin/purchasing.ts'
+      - 'apps/admin/server/purchasing/**'
+      - 'apps/admin/src/purchasing/**'
+      - 'packages/admin-contracts/src/purchasing.ts'
       - 'supabase/migrations/*purchasing*.sql'
       - '.github/workflows/purchasing-postgres.yml'
   pull_request:
     paths:
       - 'scripts/test-admin-purchasing-postgres.mjs'
       - 'supabase/migrations/*purchasing*.sql'
+      - 'apps/admin/api/admin/purchasing.ts'
+      - 'apps/admin/server/purchasing/**'
       - 'apps/admin/src/purchasing/**'
+      - 'packages/admin-contracts/src/purchasing.ts'
+      - 'e2e/admin-purchasing.spec.ts'
       - '.github/workflows/purchasing-postgres.yml'
   workflow_dispatch:
 
