@@ -326,6 +326,7 @@ export function OrdersPage() {
               />
               {action === 'cancel' ? (
                 <CancelOrderSheet
+                  order={detail}
                   reasons={cancellationReasons}
                   pending={ordersApi.cancelOrder.isPending}
                   onCancel={() => setAction(null)}
