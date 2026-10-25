@@ -6,7 +6,7 @@ import type {
 } from '@tux/admin-contracts';
 import { DraftPurchaseOrderLinesEditor } from './DraftPurchaseOrderLinesEditor';
 import { formatPurchaseMicros } from './purchaseOrderDraft';
-import { expectedOrderValueMinor, formatExpectedOrderValue } from './purchaseOrderValue';
+import { expectedOrderValueMinor, formatExpectedOrderValue, purchaseOrderDisplayReference } from './purchaseOrderValue';
 import { useEffect, useState } from 'react';
 
 function statusLabel(status: AdminPurchaseOrder['status']): string {
@@ -92,7 +92,7 @@ export function PurchaseOrderPage({
     <section className="admin-card" aria-label="Purchase order detail">
       <div className="admin-purchasing-order-header">
         <div className="admin-purchasing-order-header__identity">
-          <strong>{order.reference?.trim() || `PO-${order.id.slice(0, 8).toUpperCase()}`}</strong>
+          <strong>{purchaseOrderDisplayReference(order)}</strong>
           <small>{order.supplierName}</small>
         </div>
         <strong>{statusLabel(order.status)}</strong>
