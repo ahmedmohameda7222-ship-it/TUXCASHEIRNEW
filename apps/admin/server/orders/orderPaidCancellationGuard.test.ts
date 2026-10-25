@@ -19,7 +19,9 @@ describe('P1 paid ACTIVE cancellation financial safety', () => {
     expect(sql).toContain('new.cancelled_by_admin_employee_id is not null');
     expect(sql).toContain('from public.payments');
     expect(sql).toContain('p.allocated_minor > 0');
-    expect(sql).toMatch(/create trigger orders_paid_admin_cancel_guard\s+before update of status on public.orders/);
+    expect(sql).toMatch(
+      /create trigger orders_paid_admin_cancel_guard\s+before update of status on public.orders/,
+    );
     expect(sql).toContain('tux_admin_paid_cancel_requires_settlement');
   });
 
@@ -32,9 +34,11 @@ describe('P1 paid ACTIVE cancellation financial safety', () => {
   });
 
   it('classifies the database denial as HTTP 409 and never as a successful cancellation', () => {
-    expect(classifyPaidOrderCancellationDatabaseError(
-      '{"message":"TUX_ADMIN_PAID_CANCEL_REQUIRES_SETTLEMENT"}',
-    )).toEqual({ status: 409, error: 'paid_active_cancellation_requires_settlement' });
+    expect(
+      classifyPaidOrderCancellationDatabaseError(
+        '{"message":"TUX_ADMIN_PAID_CANCEL_REQUIRES_SETTLEMENT"}',
+      ),
+    ).toEqual({ status: 409, error: 'paid_active_cancellation_requires_settlement' });
     expect(classifyPaidOrderCancellationDatabaseError('unrelated failure')).toBeNull();
   });
 });
