@@ -481,3 +481,32 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
     }
   }
 }
+
+test('CRM refuses a false success when the server returns an application-level rejection', async ({
+  page,
+}) => {
+  await page.route('**/api/admin/customers**', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const command = route.request().postDataJSON() as { type?: string };
+    if (command.type !== 'loyalty.program.upsert') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: false, code: 'loyalty_policy_version_conflict' }),
+    });
+  });
+  await page.goto('/customers');
+  await page.getByRole('tab', { name: 'CRM settings' }).click();
+  await expect(page.getByLabel('Minimum points to redeem')).toHaveValue('75');
+  await page.getByLabel('Minimum points to redeem').fill('80');
+  await page.getByRole('button', { name: 'Save loyalty program' }).click();
+  await expect(page.getByText('Loyalty settings could not be saved')).toBeVisible();
+  await expect(page.getByText('Loyalty settings saved', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Minimum points to redeem')).toHaveValue('80');
+});
