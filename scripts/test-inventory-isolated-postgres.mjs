@@ -235,3 +235,21 @@ const raceStatus=query('select status from public.stock_transfers where id='+lit
 verify(raceStatus === 'RECEIVED' || raceStatus === 'CANCELLED',
   'Concurrently finalized transfer has one authoritative terminal state');
 console.log('Inventory acceptance: two-connection RECEIVE/CANCEL race serializes without lost or duplicated stock.');
+
+
+// Regression: a delayed offline movement can carry an event timestamp OLDER
+// than the physical count. A created_at comparison alone must not certify it.
+const backdatedCount='60000000-0000-4000-8000-000000000004';
+beginCount(backdatedCount);
+query("insert into public.inventory_movements(id,shop_id,inventory_item_id,movement_type,quantity_delta_micros,reserved_delta_micros,idempotency_key,admin_employee_id,source_kind,created_at) values(gen_random_uuid(),"+
+  literal(S)+','+literal(A)+",'PURCHASE_RECEIPT',1000000,0,'backdated-offline-replay',"+
+  literal(E)+",'ADMIN',now()-interval '2 days')",'Backdated replay after physical snapshot');
+const backdatedSession=call('read_admin_stocktake_sessions_v1',E,S).sessions.find(x=>x.stocktakeId===backdatedCount);
+verify(backdatedSession?.stale===true,
+  'Backdated new movement must mark the persisted stocktake stale regardless of created_at');
+eq(call('save_admin_stocktake_draft_v1',E,S,backdatedCount,0,
+  [{inventoryItemId:A,actualCountMicros:8000000}],'save-after-backdated-replay').code,
+  'stocktake_snapshot_stale','Backdated late replay must prohibit physical count draft save');
+reject(post(backdatedCount,'backdated-post'),'stocktake_snapshot_stale',
+  'Backdated late replay must prohibit physical count posting even with same expected snapshot');
+console.log('Inventory acceptance: server-side ledger fence catches backdated late replay.');
