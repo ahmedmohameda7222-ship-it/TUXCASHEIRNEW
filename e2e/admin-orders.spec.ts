@@ -64,16 +64,19 @@ function detail(input: {
       deliveryZoneLabel: input.source === 'ONLINE' ? 'Maadi' : null,
       finalDeliveryFeeMinor: input.source === 'ONLINE' ? 1500 : 0,
     },
-    payments: input.status === 'ACTIVE' ? [] : [
-      {
-        id: paymentId,
-        methodLabel: 'Cash',
-        logicType: 'CASH',
-        allocatedMinor: 12500,
-        receivedMinor: 12500,
-        changeMinor: 0,
-      },
-    ],
+    payments:
+      input.status === 'ACTIVE'
+        ? []
+        : [
+            {
+              id: paymentId,
+              methodLabel: 'Cash',
+              logicType: 'CASH',
+              allocatedMinor: 12500,
+              receivedMinor: 12500,
+              changeMinor: 0,
+            },
+          ],
     items: [
       {
         id: input.itemId,
@@ -136,7 +139,7 @@ async function mockOrders(
     phone: '+201000000001',
     itemId: activeItemId,
   });
-  let done = detail({
+  const done = detail({
     id: doneOrderId,
     status: 'DONE',
     source: 'ONLINE',
@@ -493,7 +496,9 @@ test('paid ACTIVE order blocks Admin cancellation while keeping immutable paymen
   await page.goto('/orders');
   await page.getByRole('button', { name: /#101/ }).click();
   await expect(page.getByRole('button', { name: 'Cancel order' })).toHaveCount(0);
-  await expect(page.getByRole('status', { name: 'Paid active order cancellation restriction' })).toBeVisible();
+  await expect(
+    page.getByRole('status', { name: 'Paid active order cancellation restriction' }),
+  ).toBeVisible();
   expect(fixture.commands).toHaveLength(0);
 });
 
