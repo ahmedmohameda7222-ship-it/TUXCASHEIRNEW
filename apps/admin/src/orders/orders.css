@@ -415,3 +415,34 @@
     display: inline-flex;
   }
 }
+
+/* O4 approved compact inspector: the immutable print action and legal
+   explanation are separate, readable controls instead of inline text. */
+.admin-order-detail__print-action {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.admin-order-detail__print-action small {
+  display: block;
+  flex: 1 1 180px;
+  min-width: 0;
+  line-height: 1.45;
+  font-size: 0.75rem;
+  color: var(--tux-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 620px) {
+  .admin-order-detail__print-action {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-order-detail__print-action small {
+    flex: 0 0 auto;
+  }
+}
