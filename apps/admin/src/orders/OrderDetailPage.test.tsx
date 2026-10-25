@@ -128,7 +128,6 @@ describe('OrderDetailPage', () => {
     expect(html).toContain('Business day: Not available');
   });
 
-
   it('provides six accessible inspector landmarks without concealing financial or inventory chronology', () => {
     const html = render({ ...fixture, status: 'DONE' });
     const navigation = html.match(
