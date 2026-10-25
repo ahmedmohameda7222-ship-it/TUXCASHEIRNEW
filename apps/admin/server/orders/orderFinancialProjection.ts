@@ -91,6 +91,6 @@ export function projectReturnQuantities(
       remainingReturnableQuantity: Math.max(
         0, item.quantity - postedReturnQuantity - pendingReturnQuantity,
       ),
-    }];
+    }] as const;
   }));
 }
