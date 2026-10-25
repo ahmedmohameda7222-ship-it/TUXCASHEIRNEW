@@ -1183,3 +1183,25 @@ test('O3 inspector archives stay keyboard-discoverable and print includes their 
   await expect(detail.getByText('Unique order reference:', { exact: false })).toBeHidden();
   await expect(detail.getByText('Allocated payments', { exact: true })).toBeHidden();
 });
+
+test('O11 mobile Escape restores cancellation focus and clears unsent PIN', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const fixture = await mockOrders(page);
+  await page.goto('/orders');
+  await page.getByRole('button', { name: /#101/ }).click();
+
+  const cancelAction = page.getByRole('button', { name: 'Cancel order' });
+  await cancelAction.click();
+  const dialog = page.getByRole('dialog', { name: 'Cancel order' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel('Admin PIN').fill('1234');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(cancelAction).toBeFocused();
+  expect(fixture.commands).toHaveLength(0);
+
+  await cancelAction.click();
+  await expect(
+    page.getByRole('dialog', { name: 'Cancel order' }).getByLabel('Admin PIN'),
+  ).toHaveValue('');
+});
