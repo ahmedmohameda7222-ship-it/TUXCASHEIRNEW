@@ -168,8 +168,9 @@ describe('OrderDetailPage', () => {
     expect(html).toContain('Line total before discounts');
   });
 
-  it('offers cancel for active orders and separate refund and return actions for completed orders', () => {
-    expect(render({ ...fixture, status: 'ACTIVE' })).toContain('Cancel order');
+  it('only offers cancellation for unpaid active orders and refund/return for completed orders', () => {
+    expect(render({ ...fixture, status: 'ACTIVE', payments: [] })).toContain('Cancel order');
+    expect(render({ ...fixture, status: 'ACTIVE' })).not.toContain('Cancel order</button>');
     const done = render({ ...fixture, status: 'DONE' });
     expect(done).toContain('Refund payment');
     expect(done).toContain('Return items');
