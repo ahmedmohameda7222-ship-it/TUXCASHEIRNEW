@@ -50,6 +50,10 @@ export type AdminOrderPayment = {
   allocatedMinor: number;
   receivedMinor: number | null;
   changeMinor: number | null;
+  refundAllowedSnapshot?: boolean;
+  postedRefundMinor?: number;
+  pendingRefundMinor?: number;
+  remainingRefundableMinor?: number;
 };
 
 export type AdminOrderItemModifier = {
@@ -68,6 +72,9 @@ export type AdminOrderItem = {
   itemNote: string | null;
   modifiers: readonly AdminOrderItemModifier[];
   comboBeverages: readonly { productId: string; label: string }[];
+  postedReturnQuantity?: number;
+  pendingReturnQuantity?: number;
+  remainingReturnableQuantity?: number;
 };
 
 export type AdminOrderStatusEvent = {
@@ -86,9 +93,15 @@ export type AdminOrderStatusEvent = {
 export type AdminOrderFinancialEvent = {
   id: string;
   kind: 'REFUND' | 'RETURN';
-  state: 'PENDING_APPROVAL' | 'POSTED' | 'REJECTED' | 'FAILED';
+  state: 'PENDING_APPROVAL' | 'APPROVED' | 'EXECUTING' | 'POSTED' | 'REJECTED' | 'FAILED';
   amountMinor: number;
   approvalRequestId: string | null;
+  paymentId?: string | null;
+  requestedByEmployeeId?: string | null;
+  approvedByEmployeeId?: string | null;
+  decidedAt?: string | null;
+  executedAt?: string | null;
+  decisionReason?: string | null;
   reason: AdminOrderReasonSnapshot;
   note?: string | null;
   createdAt: string;
