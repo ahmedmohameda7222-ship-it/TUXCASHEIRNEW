@@ -136,6 +136,32 @@ export function PurchaseOrderPage({
               <dd>{order.lines.filter((line) => line.returnedPurchaseUnitsMicros > 0).length}</dd>
             </div>
           </dl>
+          {order.lines.length > 0 ? (
+            <div className="admin-purchasing-progress">
+              <h3>Receiving progress</h3>
+              {order.lines.map((line) => {
+                const fraction =
+                  line.orderedBaseMicros > 0
+                    ? Math.min(100, (line.receivedBaseMicros / line.orderedBaseMicros) * 100)
+                    : 0;
+                return (
+                  <div key={line.id} className="admin-purchasing-progress-line">
+                    <div>
+                      <strong>{line.itemName}</strong>
+                      <span>
+                        {formatPurchaseMicros(line.remainingBaseMicros)} {line.unitLabel} remaining
+                      </span>
+                    </div>
+                    <progress
+                      value={fraction}
+                      max={100}
+                      aria-label={`${line.itemName} receiving progress`}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
           <p className="admin-purchasing-detail-hint">
             Quantities are kept in each item's purchase unit; different units are not summed.
           </p>
