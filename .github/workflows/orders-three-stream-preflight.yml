@@ -1,0 +1,269 @@
+name: Orders serial three-stream disposable integration
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/orders-three-stream-preflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# These are the independently captured, immutable inputs to THIS integration
+# checkpoint. Re-pin only after review when other streams advance.
+env:
+  BASE_SHA: 639f2a61fdc1272646156db50cea71a9da5d22e5
+  CATALOG_SHA: a2dffcb387c26fd995ad69b1065b664a4af492b5
+  ORDERS_SHA: 5406af30d32b509f61238cfdc80177072574a104
+  INVENTORY_SHA: 7e1782592c715e68d78d7befbff106d70a39e80e
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+jobs:
+  source:
+    name: Three-stream full source regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Assemble immutable three-stream checkout (local only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'TUX Orders Disposable Integration'
+          git config user.email 'tux-orders-ci@localhost.invalid'
+          git fetch --no-tags origin \
+            refs/heads/main:refs/remotes/origin/ci-preflight-main \
+            refs/pull/157/head:refs/remotes/origin/ci-preflight-catalog \
+            refs/pull/158/head:refs/remotes/origin/ci-preflight-orders \
+            refs/pull/159/head:refs/remotes/origin/ci-preflight-inventory
+          for sha in "$BASE_SHA" "$CATALOG_SHA" "$ORDERS_SHA" "$INVENTORY_SHA"; do
+            git cat-file -e "$sha^{commit}"
+          done
+          test "$(git rev-parse HEAD)" = "$ORDERS_SHA"
+          git switch --detach "$BASE_SHA"
+          git switch -c ci-orders-disposable
+          export GIT_AUTHOR_DATE=2026-10-25T00:00:00Z
+          export GIT_COMMITTER_DATE=2026-10-25T00:00:00Z
+          git merge --no-ff --no-edit "$CATALOG_SHA"
+          git merge --no-ff --no-edit "$ORDERS_SHA"
+          git merge --no-ff --no-edit "$INVENTORY_SHA"
+          test -z "$(git status --porcelain)"
+          echo "main=$BASE_SHA"
+          echo "catalog=$CATALOG_SHA"
+          echo "orders=$ORDERS_SHA"
+          echo "inventory=$INVENTORY_SHA"
+          echo "disposable_three_stream=$(git rev-parse HEAD)"
+          {
+            echo "### Ordered, disposable Catalog → Orders → Inventory integration"
+            echo "- Main: \`$BASE_SHA\`"
+            echo "- Catalog: \`$CATALOG_SHA\`"
+            echo "- Orders: \`$ORDERS_SHA\`"
+            echo "- Inventory: \`$INVENTORY_SHA\`"
+            echo "- Local merge SHA: \`$(git rev-parse HEAD)\`"
+            echo "- No remote push, production migration, or live deployment."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install immutable lockfile dependencies
+        run: npm ci
+      - name: Full format verification
+        run: npm run format:check
+      - name: Full ESLint
+        run: npm run lint
+      - name: Full monorepo unit and integration tests
+        run: npm run test
+      - name: Independent Node CI selector tests
+        run: node --test scripts/ci-fast-scope.test.mjs
+      - name: Sync package regression
+        run: npm test -w @tux/sync
+      - name: All workspace and API TypeScript checks
+        run: npm run typecheck
+      - name: All production workspace builds
+        run: npm run build
+      - name: Admin, architecture and security contracts
+        run: |
+          npm run test:admin-security
+          npm run test:admin-deployment
+          npm run test:whatsapp-architecture
+          npm run test:whatsapp-security
+
+  database:
+    name: Three-stream PostgreSQL migrations and financial acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Assemble immutable three-stream checkout (local only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'TUX Orders Disposable Integration'
+          git config user.email 'tux-orders-ci@localhost.invalid'
+          git fetch --no-tags origin \
+            refs/heads/main:refs/remotes/origin/ci-preflight-main \
+            refs/pull/157/head:refs/remotes/origin/ci-preflight-catalog \
+            refs/pull/158/head:refs/remotes/origin/ci-preflight-orders \
+            refs/pull/159/head:refs/remotes/origin/ci-preflight-inventory
+          for sha in "$BASE_SHA" "$CATALOG_SHA" "$ORDERS_SHA" "$INVENTORY_SHA"; do
+            git cat-file -e "$sha^{commit}"
+          done
+          test "$(git rev-parse HEAD)" = "$ORDERS_SHA"
+          git switch --detach "$BASE_SHA"
+          git switch -c ci-orders-disposable
+          export GIT_AUTHOR_DATE=2026-10-25T00:00:00Z
+          export GIT_COMMITTER_DATE=2026-10-25T00:00:00Z
+          git merge --no-ff --no-edit "$CATALOG_SHA"
+          git merge --no-ff --no-edit "$ORDERS_SHA"
+          git merge --no-ff --no-edit "$INVENTORY_SHA"
+          test -z "$(git status --porcelain)"
+          echo "main=$BASE_SHA"
+          echo "catalog=$CATALOG_SHA"
+          echo "orders=$ORDERS_SHA"
+          echo "inventory=$INVENTORY_SHA"
+          echo "disposable_three_stream=$(git rev-parse HEAD)"
+          {
+            echo "### Ordered, disposable Catalog → Orders → Inventory integration"
+            echo "- Main: \`$BASE_SHA\`"
+            echo "- Catalog: \`$CATALOG_SHA\`"
+            echo "- Orders: \`$ORDERS_SHA\`"
+            echo "- Inventory: \`$INVENTORY_SHA\`"
+            echo "- Local merge SHA: \`$(git rev-parse HEAD)\`"
+            echo "- No remote push, production migration, or live deployment."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked packages
+        run: npm ci
+      - name: Install local PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Assert exact chronological cross-stream migration sequence
+        run: |
+          node --input-type=module -e "
+            import {readdirSync} from 'node:fs';
+            const f = readdirSync('supabase/migrations').sort();
+            const names = [
+              '20261025150000_orders_paid_cancel_safety.sql',
+              '20261025170000_inventory_offshift_quiescence.sql',
+              '20261025171000_inventory_transfer_master_identity.sql',
+              '20261025172000_inventory_transfer_cancel_compensation.sql',
+              '20261025173000_inventory_stocktake_draft_recovery.sql',
+              '20261025174000_inventory_stocktake_ledger_replay_fence.sql',
+            ];
+            const indices = names.map(n=>f.indexOf(n));
+            if(indices.some(i=>i<0)||indices.some((i,k)=>k>0&&i<=indices[k-1])){
+              throw Error('Invalid Orders/Inventory migration sequence: '+JSON.stringify(indices));
+            }
+            console.log(names.join(' -> '));
+          "
+      - name: Apply complete ordered migration chain and assert schema security in disposable PostgreSQL
+        run: npm run test:migrations
+      - name: Orders cancellation/refund/return/approval/replay PostgreSQL
+        run: node scripts/test-admin-order-approval-postgres.mjs
+      - name: Business Day/Operations PostgreSQL RPC
+        run: node scripts/test-operations-business-day-sync-postgres.mjs
+      - name: Inventory five-migration real PostgreSQL stocktake/transfer/replay acceptance
+        run: node scripts/test-inventory-isolated-postgres.mjs
+
+  browser:
+    name: Three-stream rendered Admin Operations Menu
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Assemble immutable three-stream checkout (local only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'TUX Orders Disposable Integration'
+          git config user.email 'tux-orders-ci@localhost.invalid'
+          git fetch --no-tags origin \
+            refs/heads/main:refs/remotes/origin/ci-preflight-main \
+            refs/pull/157/head:refs/remotes/origin/ci-preflight-catalog \
+            refs/pull/158/head:refs/remotes/origin/ci-preflight-orders \
+            refs/pull/159/head:refs/remotes/origin/ci-preflight-inventory
+          for sha in "$BASE_SHA" "$CATALOG_SHA" "$ORDERS_SHA" "$INVENTORY_SHA"; do
+            git cat-file -e "$sha^{commit}"
+          done
+          test "$(git rev-parse HEAD)" = "$ORDERS_SHA"
+          git switch --detach "$BASE_SHA"
+          git switch -c ci-orders-disposable
+          export GIT_AUTHOR_DATE=2026-10-25T00:00:00Z
+          export GIT_COMMITTER_DATE=2026-10-25T00:00:00Z
+          git merge --no-ff --no-edit "$CATALOG_SHA"
+          git merge --no-ff --no-edit "$ORDERS_SHA"
+          git merge --no-ff --no-edit "$INVENTORY_SHA"
+          test -z "$(git status --porcelain)"
+          echo "main=$BASE_SHA"
+          echo "catalog=$CATALOG_SHA"
+          echo "orders=$ORDERS_SHA"
+          echo "inventory=$INVENTORY_SHA"
+          echo "disposable_three_stream=$(git rev-parse HEAD)"
+          {
+            echo "### Ordered, disposable Catalog → Orders → Inventory integration"
+            echo "- Main: \`$BASE_SHA\`"
+            echo "- Catalog: \`$CATALOG_SHA\`"
+            echo "- Orders: \`$ORDERS_SHA\`"
+            echo "- Inventory: \`$INVENTORY_SHA\`"
+            echo "- Local merge SHA: \`$(git rev-parse HEAD)\`"
+            echo "- No remote push, production migration, or live deployment."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked packages
+        id: node_install
+        run: npm ci
+      - name: Install Chromium browser and system libraries
+        id: browser_install
+        run: npx playwright install --with-deps chromium
+      - name: Admin authenticated shell, Catalog, Orders, Inventory, Finance rendered Playwright
+        if: ${{ always() && steps.node_install.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:e2e:admin
+      - name: Operations desktop/tablet/mobile rendered Playwright
+        if: ${{ always() && steps.node_install.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:e2e
+      - name: Menu desktop/mobile rendered Playwright
+        if: ${{ always() && steps.node_install.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:e2e:menu
+      - name: Preserve temporary-render evidence on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orders-three-stream-rendered-evidence
+          path: |
+            playwright-report-admin
+            playwright-report
+            playwright-report-menu
+            test-results
+          if-no-files-found: warn
+          retention-days: 14
