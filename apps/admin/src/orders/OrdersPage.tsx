@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 
 import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
+import { AdminMetricStrip } from '../components/layout/AdminMetricStrip';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
@@ -180,6 +181,29 @@ export function OrdersPage() {
         />
       ) : (
         <>
+          <AdminMetricStrip
+            label="Orders key metrics"
+            metrics={[
+              { id: 'total', label: 'Total orders', value: null },
+              {
+                id: 'revenue',
+                label: 'Total revenue',
+                value: null,
+                hint: principal.permissions.includes('finance.view')
+                  ? 'Verified shop-wide total unavailable'
+                  : 'Requires finance access',
+              },
+              {
+                id: 'average',
+                label: 'Average order value',
+                value: null,
+                hint: principal.permissions.includes('finance.view')
+                  ? 'Verified shop-wide average unavailable'
+                  : 'Requires finance access',
+              },
+              { id: 'active', label: 'Active orders', value: null },
+            ]}
+          />
           <details
             className="admin-orders-filters"
             open={Boolean(query || status || source || businessDayId || fromInput || toInput)}
