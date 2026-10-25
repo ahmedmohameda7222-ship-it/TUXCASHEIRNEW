@@ -18,6 +18,7 @@ export function ProductInspector({
   onRequestAdvanced,
   onSaveDraft,
   onSetAvailability,
+  onUploadImage,
 }: {
   product: CatalogProductDetail;
   categories?: readonly CatalogCategorySummary[];
@@ -30,6 +31,7 @@ export function ProductInspector({
   onRequestAdvanced(): void | Promise<void>;
   onSaveDraft(draft: ProductEditorDraft): void | Promise<void>;
   onSetAvailability(soldOut: boolean): void | Promise<void>;
+  onUploadImage?(file: File): Promise<{ imageKey: string; publicUrl: string }>;
 }) {
   return (
     <section className="admin-catalog-inspector" data-catalog-inspector>
@@ -61,6 +63,7 @@ export function ProductInspector({
         onRequestAdvanced={onRequestAdvanced}
         onSaveDraft={onSaveDraft}
         onSetAvailability={onSetAvailability}
+        onUploadImage={onUploadImage}
       />
     </section>
   );
