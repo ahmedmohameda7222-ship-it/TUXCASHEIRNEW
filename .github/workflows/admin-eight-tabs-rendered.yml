@@ -31,6 +31,7 @@ jobs:
     timeout-minutes: 35
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      TUX_ADMIN_EIGHT_TABS_CAPTURE: '1'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -49,6 +50,15 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run rendered acceptance
         run: npx playwright test --config playwright.admin.config.ts e2e/admin-orders.spec.ts e2e/admin-inventory.spec.ts e2e/admin-finance.spec.ts e2e/admin-customers-promotions.spec.ts
+      - name: Assert approved-width mock-auth screenshot evidence
+        if: success()
+        run: |
+          set -euo pipefail
+          for scene in orders inventory finance crm; do
+            for size in 1536x960 1440x900 1024x900 768x1024 390x844 360x800; do
+              test -s "artifacts/p04-p07/${scene}-${size}.png"
+            done
+          done
       - name: Preserve browser evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -57,5 +67,6 @@ jobs:
           path: |
             playwright-report-admin
             test-results
+            artifacts/p04-p07
           if-no-files-found: warn
           retention-days: 14
