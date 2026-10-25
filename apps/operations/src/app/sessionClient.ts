@@ -99,6 +99,16 @@ export async function closeBrowserDayAndFlush(input: {
   return result;
 }
 
+export async function deliverWorkerSessionOriginBeforeHeartbeat(input: {
+  readonly flushShopOutbox: () => Promise<unknown>;
+  readonly hasPendingSessionOrigin: () => Promise<boolean>;
+  readonly touchWorkerSession: () => Promise<unknown>;
+}): Promise<void> {
+  await input.flushShopOutbox();
+  if (await input.hasPendingSessionOrigin()) return;
+  await input.touchWorkerSession();
+}
+
 interface BrowserRuntime {
   readonly database: OperationsDatabase;
   readonly session: CoordinatedOperationsSessionService;
@@ -219,6 +229,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       let sessionLeaseHeartbeat: (() => Promise<void>) | null = null;
       let preferenceRetryStarted = false;
       let menuLayoutRetryStarted = false;
+      let flushShopOutbox: (shopId: ShopId) => Promise<void> = async () => undefined;
 
       const retryPreferences = (): void => {
         void preferencesRetry.syncActive();
@@ -294,7 +305,24 @@ async function browserRuntime(): Promise<BrowserRuntime> {
               if (day?.status !== 'OPEN') return;
               const workerSession = await readModel.getOpenWorkerSession(day.id);
               if (workerSession === null) return;
-              await remoteGateway.touchWorkerSession(day.id, workerSession.id);
+              await deliverWorkerSessionOriginBeforeHeartbeat({
+                flushShopOutbox: () => flushShopOutbox(shopId),
+                hasPendingSessionOrigin: async () => {
+                  const pending = await database.transaction((tx) =>
+                    tx.outbox.listPending(instant('9999-12-31T23:59:59Z'), 100000, shopId),
+                  );
+                  return pending.some(
+                    (event) =>
+                      event.businessDayId === day.id &&
+                      (event.eventType === 'BUSINESS_DAY_STARTED' ||
+                        ((event.eventType === 'WORKER_SIGNED_IN' ||
+                          event.eventType === 'WORKER_SWITCHED') &&
+                          event.aggregateId === workerSession.id)),
+                  );
+                },
+                touchWorkerSession: () =>
+                  remoteGateway.touchWorkerSession(day.id, workerSession.id),
+              });
             } catch (cause) {
               if (cause instanceof WorkerSessionLeaseLostError) {
                 // Canonical authority has explicitly ended this session. Fence
@@ -516,7 +544,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         },
       };
 
-      const flushShopOutbox = async (shopId: ShopId): Promise<void> => {
+      flushShopOutbox = async (shopId: ShopId): Promise<void> => {
         const endpoint = new URL('/api/operations-sync', window.location.origin).toString();
         const service = new OutboxSyncService(
           database,
