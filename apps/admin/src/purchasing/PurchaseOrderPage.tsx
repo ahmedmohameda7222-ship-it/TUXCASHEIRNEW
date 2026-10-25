@@ -1,5 +1,9 @@
 import './purchaseOrder.css';
-import type { AdminPurchaseOrder, AdminPurchaseOrderHistory, AdminPurchasingInventoryItem } from '@tux/admin-contracts';
+import type {
+  AdminPurchaseOrder,
+  AdminPurchaseOrderHistory,
+  AdminPurchasingInventoryItem,
+} from '@tux/admin-contracts';
 import { DraftPurchaseOrderLinesEditor } from './DraftPurchaseOrderLinesEditor';
 import { formatPurchaseMicros } from './purchaseOrderDraft';
 import { useEffect, useState } from 'react';
@@ -347,7 +351,9 @@ export function PurchaseOrderPage({
               {history.events.map((event) => (
                 <li key={event.id} className="admin-purchasing-history-event">
                   <div className="admin-purchasing-history-event__header">
-                    <strong>{event.type === 'RECEIPT' ? 'Purchase received' : 'Supplier return'}</strong>
+                    <strong>
+                      {event.type === 'RECEIPT' ? 'Purchase received' : 'Supplier return'}
+                    </strong>
                     <time dateTime={event.occurredAt}>
                       {new Date(event.occurredAt).toLocaleString()}
                     </time>
@@ -367,7 +373,11 @@ export function PurchaseOrderPage({
                           {formatPurchaseMicros(line.quantityPurchaseUnitsMicros)}{' '}
                           {orderedLine?.purchaseUnitLabel ?? 'purchase units'}
                           {line.purchaseUnitCostMinor !== null ? (
-                            <> · Actual cost per purchase unit: {(line.purchaseUnitCostMinor / 100).toFixed(2)} EGP</>
+                            <>
+                              {' '}
+                              · Actual cost per purchase unit:{' '}
+                              {(line.purchaseUnitCostMinor / 100).toFixed(2)} EGP
+                            </>
                           ) : null}
                         </li>
                       );
