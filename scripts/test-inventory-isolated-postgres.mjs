@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -193,3 +193,45 @@ for(const signature of [
  eq(grants,'false,true','Draft RPC BFF service boundary: '+signature);
 }
 console.log('Inventory acceptance: authorized persisted session resume, exact saved counts, version conflict, off-shift save, cancel, replay and grants PASSED.');
+
+
+// Exercise REAL concurrent PostgreSQL connections against RECEIVE/CANCEL FOR UPDATE.
+function concurrently(statement, description) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('psql', [
+      databaseUrl, '-X', '-q', '-At', '-v', 'ON_ERROR_STOP=1', '-c', statement,
+    ]);
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (data) => { stdout += data.toString(); });
+    child.stderr.on('data', (data) => { stderr += data.toString(); });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0) return reject(new Error(description + ': ' + stderr));
+      try { resolve(JSON.parse(stdout.trim())); }
+      catch (error) { reject(error); }
+    });
+  });
+}
+const raceBefore = balance(S,A) + balance(D,B);
+const raceTransfer = send([{inventoryItemId:A,quantityMicros:1000000}],'race-transfer-send');
+verify(raceTransfer.ok && raceTransfer.transferId,'Race fixture sends transferable stock');
+const raceId = raceTransfer.transferId;
+const [raceReceive,raceCancel] = await Promise.all([
+  concurrently('select (public.receive_stock_transfer_v1('+
+    [E,raceId,'race-receive'].map(literal).join(',')+'))::text','Concurrent receive'),
+  concurrently('select (public.cancel_stock_transfer_v1('+
+    [E,raceId,'race-cancel'].map(literal).join(',')+'))::text','Concurrent cancel'),
+]);
+verify(Number(raceReceive.ok === true) + Number(raceCancel.ok === true) === 1,
+  'Exactly one of competing receive/cancel transactions wins transfer row lock');
+verify(
+  (raceReceive.ok && raceCancel.code === 'transfer_not_cancellable') ||
+  (raceCancel.ok && raceReceive.code === 'transfer_not_receivable'),
+  'Losing transfer operation returns a precise terminal-state conflict'
+);
+eq(balance(S,A)+balance(D,B),raceBefore,'Concurrent terminal operations conserve source/destination total');
+const raceStatus=query('select status from public.stock_transfers where id='+literal(raceId));
+verify(raceStatus === 'RECEIVED' || raceStatus === 'CANCELLED',
+  'Concurrently finalized transfer has one authoritative terminal state');
+console.log('Inventory acceptance: two-connection RECEIVE/CANCEL race serializes without lost or duplicated stock.');
