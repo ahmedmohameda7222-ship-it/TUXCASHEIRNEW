@@ -9,6 +9,7 @@ on:
       - 'apps/admin/src/orders/**'
       - 'apps/admin/server/orders/**'
       - 'apps/admin/api/admin/orders.ts'
+      - 'e2e/admin-orders.spec.ts'
   workflow_dispatch:
 
 permissions:
