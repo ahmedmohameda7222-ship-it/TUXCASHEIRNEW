@@ -724,6 +724,16 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
             .filter((item) => item.return_id === orderReturn.id)
             .reduce((total, item) => total + safeInteger(item.amount_minor), 0),
           approvalRequestId: orderReturn.approval_request_id,
+          returnItems: returnItemRows
+            .filter((line) => line.return_id === orderReturn.id)
+            .map((line) => ({
+              orderItemId: line.order_item_id,
+              productName:
+                items.find((item) => item.id === line.order_item_id)?.product_name_snapshot ??
+                'Historical item',
+              quantity: safeInteger(line.quantity),
+              valuationMinor: safeInteger(line.amount_minor),
+            })),
           reason: {
             id: orderReturn.reason_code_id,
             key: orderReturn.reason_code_key,
