@@ -51,7 +51,7 @@ const migrationPaths=[
 for (const path of migrationPaths) {
   execute(['-f',resolve('supabase/migrations',path)],'Apply '+path);
 }
-console.log('Inventory acceptance: all 3 migrations executed in isolated PostgreSQL fixture.');
+console.log('Inventory acceptance: all 4 migrations executed in isolated PostgreSQL fixture.');
 
 function send(items,command,source=S,destination=D,actor=E) {
   return call('send_stock_transfer_v1',actor,source,destination,items,command);
