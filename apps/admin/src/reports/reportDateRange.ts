@@ -11,10 +11,5 @@ function exactIsoDate(value: string): number | null {
 export function validReportDateRange(from: string, to: string): boolean {
   const startMs = exactIsoDate(from);
   const endMs = exactIsoDate(to);
-  return (
-    startMs !== null &&
-    endMs !== null &&
-    startMs <= endMs &&
-    endMs - startMs <= 730 * DAY_MS
-  );
+  return startMs !== null && endMs !== null && startMs <= endMs && endMs - startMs <= 730 * DAY_MS;
 }
