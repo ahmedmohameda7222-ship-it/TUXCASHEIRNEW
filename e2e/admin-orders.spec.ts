@@ -1057,3 +1057,35 @@ test('O1 reversed Cairo range never submits an invalid list or money-aggregation
   expect(fixture.kpiRequests).toHaveLength(oldKpis);
   await expect(page.getByRole('link', { name: /Export up to/ })).toHaveCount(0);
 });
+
+test('O4 immutable print action keeps its explanatory text readable without overlap', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockOrders(page);
+  await page.goto('/orders');
+  await page.getByRole('button', { name: /#101/ }).click();
+  const print = page.locator('.admin-order-detail__print-action');
+  await expect(print.getByRole('button', { name: 'Print order summary' })).toBeVisible();
+  await expect(print.getByText('not a new numbered fiscal receipt', { exact: false })).toBeVisible();
+  const layout = await print.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const gap = Number.parseFloat(style.gap) || 0;
+    const buttonRect = element.querySelector('button')?.getBoundingClientRect();
+    const explanationRect = element.querySelector('small')?.getBoundingClientRect();
+    return {
+      display: style.display,
+      gap,
+      buttonRight: buttonRect?.right ?? 0,
+      buttonBottom: buttonRect?.bottom ?? 0,
+      explanationLeft: explanationRect?.left ?? 0,
+      explanationTop: explanationRect?.top ?? 0,
+    };
+  });
+  expect(['flex', 'grid']).toContain(layout.display);
+  expect(layout.gap).toBeGreaterThanOrEqual(8);
+  expect(
+    layout.explanationTop >= layout.buttonBottom ||
+      layout.explanationLeft - layout.buttonRight >= 8,
+  ).toBe(true);
+});
