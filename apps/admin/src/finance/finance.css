@@ -468,3 +468,86 @@
   border-radius: var(--tux-radius-lg);
   background: var(--tux-surface-panel);
 }
+
+/* Three primary Finance destinations; advanced governance stays secondary. */
+.tux-finance-navigation {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+}
+
+.tux-finance-advanced {
+  max-width: max-content;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
+
+.tux-finance-advanced summary {
+  min-height: var(--tux-touch-target);
+  padding: 0.65rem 0.85rem;
+  color: var(--tux-text-secondary);
+  cursor: pointer;
+}
+
+.tux-finance-advanced nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0 0.85rem 0.85rem;
+}
+
+.tux-finance-advanced a {
+  color: var(--tux-text-primary);
+  font-weight: 600;
+}
+
+.tux-finance-reconciliation-facts,
+.tux-finance-reconciliation-section {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.tux-finance-reconciliation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: 0.75rem;
+}
+
+.tux-finance-reconciliation-card,
+.tux-finance-reconciliation-list li {
+  display: grid;
+  min-width: 0;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
+
+.tux-finance-reconciliation-card dt {
+  font-weight: 750;
+}
+
+.tux-finance-reconciliation-card dd {
+  margin: 0;
+  color: var(--tux-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.tux-finance-reconciliation-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 620px) {
+  .tux-finance-section-nav {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
