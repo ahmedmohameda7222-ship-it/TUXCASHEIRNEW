@@ -110,7 +110,7 @@ function render(order: AdminOrderDetail, canViewDelivery = false): string {
       onRefund={vi.fn()}
       onReturn={vi.fn()}
     />,
-  );
+  ).replace(/[\u00a0\u202f]/g, ' ');
 }
 
 describe('OrderDetailPage', () => {
