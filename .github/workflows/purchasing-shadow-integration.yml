@@ -1,0 +1,72 @@
+name: Purchasing read-only shadow integration
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/purchasing-approved-ui-production-20261025
+    paths:
+      - '.github/workflows/purchasing-shadow-integration.yml'
+      - 'apps/admin/src/purchasing/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: purchasing-shadow-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shadow-source:
+    name: Catalog Orders Inventory Purchasing composite source acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      BASE_SHA: 639f2a61fdc1272646156db50cea71a9da5d22e5
+      CATALOG_SHA: 40b579ab524add258d9ee32f57168f825c181a1d
+      ORDERS_SHA: 5b14103f2c72846beb31151fbe6afb6b1379ebc9
+      INVENTORY_SHA: 3452c42be50cfeeea908d17864ef7075dd69631d
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Overlay pinned upstream PR files read-only (no merge or push)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for entry in \
+            "catalog:$CATALOG_SHA:fix/catalog-production-remediation-20261025" \
+            "orders:$ORDERS_SHA:fix/orders-production-remediation-20261025" \
+            "inventory:$INVENTORY_SHA:fix/inventory-approved-ui-production-20261025"; do
+            IFS=: read -r stream sha ref <<< "$entry"
+            actual="$(git ls-remote origin "refs/heads/$ref" | cut -f1)"
+            if [[ "$actual" != "$sha" ]]; then
+              echo "::error::Pinned $stream SHA $sha changed to $actual; refresh the integration matrix."
+              exit 1
+            fi
+            git fetch --no-tags origin "$sha"
+            echo "Applying $stream files from $sha over Purchasing checkout (working tree only)."
+            while IFS= read -r -d '' path; do
+              git restore --source="$sha" --worktree -- "$path"
+            done < <(git diff --name-only --diff-filter=ACMRT -z "$BASE_SHA" "$sha")
+            while IFS= read -r -d '' path; do
+              rm -f -- "$path"
+            done < <(git diff --name-only --diff-filter=D -z "$BASE_SHA" "$sha")
+          done
+          echo 'Shadow tree assembled; no branches, refs, or databases were modified.'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Validate all source, including Inventory-owned receipt screen
+        run: |
+          npm run typecheck
+          npm run test
+          npm run build:admin
+          npm run test:admin-security
+      - name: Preserve source acceptance log metadata
+        if: always()
+        run: git status --short | head -120
