@@ -200,7 +200,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.migration == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    # Full validated migration chain can outlast three minutes even when SQL succeeds.
+    # Avoid marking the completed PostgreSQL test cancelled during job teardown.
+    timeout-minutes: 12
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
