@@ -287,10 +287,18 @@ for (const viewport of [
         .locator('.admin-purchasing-order-header')
         .evaluate((element) => element.getBoundingClientRect().height);
       expect(headerHeight).toBeLessThan(110);
-      const tabsFit = await page
-        .locator('.admin-purchasing-inspector-tabs')
-        .evaluate((element) => element.scrollWidth <= element.clientWidth + 1);
-      expect(tabsFit).toBe(true);
+      const tabs = await page.locator('.admin-purchasing-inspector-tabs').evaluate((element) => ({
+        client: element.clientWidth,
+        scroll: element.scrollWidth,
+        display: getComputedStyle(element).display,
+        children: [...element.querySelectorAll('button')].map((button) => ({
+          label: button.textContent,
+          width: button.getBoundingClientRect().width,
+          scroll: button.scrollWidth,
+          client: button.clientWidth,
+        })),
+      }));
+      expect(tabs.scroll, JSON.stringify(tabs)).toBeLessThanOrEqual(tabs.client + 1);
     }
     await expect(page.getByRole('tab', { name: 'Overview', exact: true })).toBeVisible();
     await page.getByRole('tab', { name: 'Items', exact: true }).click();
