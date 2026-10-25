@@ -47,7 +47,6 @@ describe('purchase order draft metadata editor', () => {
     expect(html).toContain('aria-selected="true"');
   });
 
-
   it('exposes draft editing to purchasing managers', () => {
     expect(render('DRAFT')).toContain('Edit draft');
   });

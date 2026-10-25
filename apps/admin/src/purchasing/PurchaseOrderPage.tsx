@@ -54,7 +54,9 @@ export function PurchaseOrderPage({
   onReturn(): void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'receiving' | 'returns' | 'history'>('overview');
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'items' | 'receiving' | 'returns' | 'history'
+  >('overview');
   const [editingLines, setEditingLines] = useState(false);
   const [reference, setReference] = useState(order.reference ?? '');
   const [expectedDate, setExpectedDate] = useState(order.expectedDeliveryDate ?? '');
@@ -82,7 +84,11 @@ export function PurchaseOrderPage({
         </div>
         <strong>{statusLabel(order.status)}</strong>
       </div>
-      <div className="admin-purchasing-inspector-tabs" role="tablist" aria-label="Purchase order sections">
+      <div
+        className="admin-purchasing-inspector-tabs"
+        role="tablist"
+        aria-label="Purchase order sections"
+      >
         {(['overview', 'items', 'receiving', 'returns', 'history'] as const).map((tab) => (
           <button
             key={tab}
@@ -99,14 +105,40 @@ export function PurchaseOrderPage({
       {activeTab === 'overview' ? (
         <div className="admin-purchasing-detail-content" role="tabpanel">
           <dl className="admin-definition-grid admin-purchasing-overview">
-            <div><dt>PO date</dt><dd>{order.createdAt.slice(0, 10)}</dd></div>
-            <div><dt>Expected delivery</dt><dd>{order.expectedDeliveryDate ?? 'Not set'}</dd></div>
-            <div><dt>Supplier</dt><dd>{order.supplierName}</dd></div>
-            <div><dt>Line items</dt><dd>{order.lines.length}</dd></div>
-            <div><dt>Lines fully received</dt><dd>{order.lines.filter((line) => line.receivedPurchaseUnitsMicros >= line.orderedPurchaseUnitsMicros).length}</dd></div>
-            <div><dt>Lines with recorded returns</dt><dd>{order.lines.filter((line) => line.returnedPurchaseUnitsMicros > 0).length}</dd></div>
+            <div>
+              <dt>PO date</dt>
+              <dd>{order.createdAt.slice(0, 10)}</dd>
+            </div>
+            <div>
+              <dt>Expected delivery</dt>
+              <dd>{order.expectedDeliveryDate ?? 'Not set'}</dd>
+            </div>
+            <div>
+              <dt>Supplier</dt>
+              <dd>{order.supplierName}</dd>
+            </div>
+            <div>
+              <dt>Line items</dt>
+              <dd>{order.lines.length}</dd>
+            </div>
+            <div>
+              <dt>Lines fully received</dt>
+              <dd>
+                {
+                  order.lines.filter(
+                    (line) => line.receivedPurchaseUnitsMicros >= line.orderedPurchaseUnitsMicros,
+                  ).length
+                }
+              </dd>
+            </div>
+            <div>
+              <dt>Lines with recorded returns</dt>
+              <dd>{order.lines.filter((line) => line.returnedPurchaseUnitsMicros > 0).length}</dd>
+            </div>
           </dl>
-          <p className="admin-purchasing-detail-hint">Quantities are kept in each item's purchase unit; different units are not summed.</p>
+          <p className="admin-purchasing-detail-hint">
+            Quantities are kept in each item's purchase unit; different units are not summed.
+          </p>
         </div>
       ) : null}
       {order.status === 'DRAFT' && canManage ? (
@@ -180,18 +212,42 @@ export function PurchaseOrderPage({
       ) : null}
       {activeTab === 'items' ? (
         <div className="admin-purchasing-detail-content" role="tabpanel">
-          {order.lines.length === 0 ? <p>No line items recorded.</p> : (
+          {order.lines.length === 0 ? (
+            <p>No line items recorded.</p>
+          ) : (
             <div className="admin-purchasing-line-list">
               {order.lines.map((line) => (
                 <article key={line.id} className="admin-purchasing-line-item">
                   <strong>{line.itemName}</strong>
                   <small>Purchase unit: {line.purchaseUnitLabel}</small>
                   <dl>
-                    <div><dt>Ordered</dt><dd>{formatPurchaseMicros(line.orderedPurchaseUnitsMicros)}</dd></div>
-                    <div><dt>Received</dt><dd>{formatPurchaseMicros(line.receivedPurchaseUnitsMicros)}</dd></div>
-                    <div><dt>Remaining</dt><dd>{formatPurchaseMicros(Math.max(0, line.orderedPurchaseUnitsMicros - line.receivedPurchaseUnitsMicros))}</dd></div>
-                    <div><dt>Returned</dt><dd>{formatPurchaseMicros(line.returnedPurchaseUnitsMicros)}</dd></div>
-                    <div><dt>Expected unit cost</dt><dd>{(line.expectedPurchaseUnitCostMinor / 100).toFixed(2)} EGP</dd></div>
+                    <div>
+                      <dt>Ordered</dt>
+                      <dd>{formatPurchaseMicros(line.orderedPurchaseUnitsMicros)}</dd>
+                    </div>
+                    <div>
+                      <dt>Received</dt>
+                      <dd>{formatPurchaseMicros(line.receivedPurchaseUnitsMicros)}</dd>
+                    </div>
+                    <div>
+                      <dt>Remaining</dt>
+                      <dd>
+                        {formatPurchaseMicros(
+                          Math.max(
+                            0,
+                            line.orderedPurchaseUnitsMicros - line.receivedPurchaseUnitsMicros,
+                          ),
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Returned</dt>
+                      <dd>{formatPurchaseMicros(line.returnedPurchaseUnitsMicros)}</dd>
+                    </div>
+                    <div>
+                      <dt>Expected unit cost</dt>
+                      <dd>{(line.expectedPurchaseUnitCostMinor / 100).toFixed(2)} EGP</dd>
+                    </div>
                   </dl>
                 </article>
               ))}
@@ -202,23 +258,47 @@ export function PurchaseOrderPage({
       {activeTab === 'receiving' ? (
         <div className="admin-purchasing-detail-content" role="tabpanel">
           <h3>Recorded receiving quantities</h3>
-          {order.lines.length === 0 ? <p>No receiving lines recorded.</p> : order.lines.map((line) => (
-            <p key={line.id}>{line.itemName}: {formatPurchaseMicros(line.receivedPurchaseUnitsMicros)} received / {formatPurchaseMicros(line.orderedPurchaseUnitsMicros)} ordered {line.purchaseUnitLabel}</p>
-          ))}
-          <p className="admin-purchasing-detail-hint">Individual receipt events and actual costs are not exposed by the current workspace API.</p>
+          {order.lines.length === 0 ? (
+            <p>No receiving lines recorded.</p>
+          ) : (
+            order.lines.map((line) => (
+              <p key={line.id}>
+                {line.itemName}: {formatPurchaseMicros(line.receivedPurchaseUnitsMicros)} received /{' '}
+                {formatPurchaseMicros(line.orderedPurchaseUnitsMicros)} ordered{' '}
+                {line.purchaseUnitLabel}
+              </p>
+            ))
+          )}
+          <p className="admin-purchasing-detail-hint">
+            Individual receipt events and actual costs are not exposed by the current workspace API.
+          </p>
         </div>
       ) : null}
       {activeTab === 'returns' ? (
         <div className="admin-purchasing-detail-content" role="tabpanel">
           <h3>Recorded supplier returns</h3>
-          {order.lines.length === 0 ? <p>No returnable lines recorded.</p> : order.lines.map((line) => (
-            <p key={line.id}>{line.itemName}: {formatPurchaseMicros(line.returnedPurchaseUnitsMicros)} returned, {formatPurchaseMicros(Math.max(0, line.receivedPurchaseUnitsMicros - line.returnedPurchaseUnitsMicros))} remaining returnable {line.purchaseUnitLabel}</p>
-          ))}
+          {order.lines.length === 0 ? (
+            <p>No returnable lines recorded.</p>
+          ) : (
+            order.lines.map((line) => (
+              <p key={line.id}>
+                {line.itemName}: {formatPurchaseMicros(line.returnedPurchaseUnitsMicros)} returned,{' '}
+                {formatPurchaseMicros(
+                  Math.max(0, line.receivedPurchaseUnitsMicros - line.returnedPurchaseUnitsMicros),
+                )}{' '}
+                remaining returnable {line.purchaseUnitLabel}
+              </p>
+            ))
+          )}
         </div>
       ) : null}
       {activeTab === 'history' ? (
         <div className="admin-purchasing-detail-content" role="tabpanel">
-          <p>No receipt or return event history is available from the current purchasing workspace API. Aggregate line quantities above reflect persisted server data; no event chronology is inferred.</p>
+          <p>
+            No receipt or return event history is available from the current purchasing workspace
+            API. Aggregate line quantities above reflect persisted server data; no event chronology
+            is inferred.
+          </p>
         </div>
       ) : null}
       <div className="admin-purchasing-page-actions">

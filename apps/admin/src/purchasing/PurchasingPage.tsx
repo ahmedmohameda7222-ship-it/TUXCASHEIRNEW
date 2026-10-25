@@ -127,7 +127,11 @@ export function PurchasingPage() {
         </p>
       ) : null}
       <ResponsiveMasterDetail
-        className={section === 'suppliers' ? 'admin-purchasing-master is-suppliers' : 'admin-purchasing-master'}
+        className={
+          section === 'suppliers'
+            ? 'admin-purchasing-master is-suppliers'
+            : 'admin-purchasing-master'
+        }
         listLabel="Purchasing"
         detailLabel="Purchase order detail"
         detailActive={selectedId !== null}
