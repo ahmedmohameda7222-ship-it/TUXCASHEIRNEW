@@ -1032,8 +1032,14 @@ test('approved Orders 1536×1024 reference composition remains fully navigable',
   );
   expect(statusHeight).toBeLessThanOrEqual(28);
 
-  const itemAmount = page.locator('.admin-order-detail__row').first().locator('span:last-child strong');
-  const itemCaption = page.locator('.admin-order-detail__row').first().locator('span:last-child small');
+  const itemAmount = page
+    .locator('.admin-order-detail__row')
+    .first()
+    .locator('span:last-child strong');
+  const itemCaption = page
+    .locator('.admin-order-detail__row')
+    .first()
+    .locator('span:last-child small');
   const amountBox = await itemAmount.boundingBox();
   const captionBox = await itemCaption.boundingBox();
   expect(amountBox).not.toBeNull();
