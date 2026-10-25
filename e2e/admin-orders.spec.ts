@@ -1019,6 +1019,16 @@ test('approved Orders 1536×1024 reference composition remains fully navigable',
     true,
   );
   await capturePremiumScreenshot(page, 'orders-reference');
+  // The approved static reference is exactly one 1536 × 1024 viewport, not
+  // a browser full-page image extending below the fold.
+  if (process.env['TUX_ADMIN_EIGHT_TABS_CAPTURE'] === '1') {
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+    await page.screenshot({
+      path: 'artifacts/p04-p07/orders-reference-1536x1024.png',
+      fullPage: false,
+      animations: 'disabled',
+    });
+  }
 });
 
 test('O1 date filters transmit Cairo-converted UTC instants to both Orders and full-shop KPIs', async ({
