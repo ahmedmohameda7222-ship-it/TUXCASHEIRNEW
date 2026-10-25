@@ -494,3 +494,46 @@
     width: 100%;
   }
 }
+
+/* O3: keep the high-value customer, fulfillment, item and payment facts ahead
+   of archival identity and reconciliation details in the approved inspector. */
+.admin-order-detail__summary time {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--tux-text-secondary);
+  font-size: 0.75rem;
+}
+
+.admin-order-detail__disclosure {
+  overflow-wrap: anywhere;
+}
+
+.admin-order-detail__disclosure > summary {
+  min-height: var(--tux-touch-target);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.83rem;
+}
+
+.admin-order-detail__disclosure > summary:focus-visible {
+  outline: 2px solid var(--tux-accent);
+  outline-offset: 2px;
+}
+
+.admin-order-detail__disclosure[open] > summary {
+  margin-bottom: 0.75rem;
+}
+
+.admin-order-detail__disclosure code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 1280px) {
+  .admin-orders-list .admin-order-row {
+    min-height: 58px;
+    padding-block: 0.55rem;
+  }
+}
