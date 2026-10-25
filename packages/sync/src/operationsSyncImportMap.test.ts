@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import { shouldApplyRemoteMutation, type RemoteTableMutation } from './remoteMaterializer';
 
-const reviewedSha = 'f26b4eb040050226412668d84461dd4697d1069b';
+const reviewedDomainSha = 'f26b4eb040050226412668d84461dd4697d1069b';
+const reviewedMaterializerSha = 'cccefb47726a11b61aafae0092cd4d1b0f374a67';
 const rawBase = 'https://raw.githubusercontent.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/';
 
 describe('operations-sync deployment dependency provenance', () => {
@@ -33,13 +34,15 @@ describe('operations-sync deployment dependency provenance', () => {
     const imports = (JSON.parse(rawJson) as { imports: Record<string, string> }).imports;
 
     expect(imports['@tux/remote-materializer']).toBe(
-      `${rawBase}${reviewedSha}/packages/sync/src/remoteMaterializer.ts`,
+      `${rawBase}${reviewedMaterializerSha}/packages/sync/src/remoteMaterializer.ts`,
     );
-    expect(imports['@tux/domain']).toBe(`${rawBase}${reviewedSha}/packages/domain/src/index.ts`);
+    expect(imports['@tux/domain']).toBe(
+      `${rawBase}${reviewedDomainSha}/packages/domain/src/index.ts`,
+    );
 
     // Raw GitHub serves TypeScript sources, not the compiled .js imports emitted by the
     // workspace barrel. Map each .js specifier back to its immutable .ts source.
-    const domainPrefix = `${rawBase}${reviewedSha}/packages/domain/src/`;
+    const domainPrefix = `${rawBase}${reviewedDomainSha}/packages/domain/src/`;
     const domainSourceAliases = Object.entries(imports).filter(
       ([specifier, target]) =>
         specifier.startsWith(domainPrefix) &&
@@ -61,10 +64,14 @@ describe('operations-sync deployment dependency provenance', () => {
 
     for (const [specifier, target] of Object.entries(imports)) {
       if (specifier.startsWith(rawBase)) {
-        expect(specifier).toContain(`/${reviewedSha}/`);
+        expect([reviewedDomainSha, reviewedMaterializerSha]).toContain(
+          specifier.slice(rawBase.length).split('/')[0],
+        );
       }
       if (target.startsWith(rawBase)) {
-        expect(target).toContain(`/${reviewedSha}/`);
+        expect([reviewedDomainSha, reviewedMaterializerSha]).toContain(
+          target.slice(rawBase.length).split('/')[0],
+        );
       }
     }
   });
