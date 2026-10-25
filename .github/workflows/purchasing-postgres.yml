@@ -1,0 +1,48 @@
+name: Purchasing isolated PostgreSQL acceptance
+
+on:
+  push:
+    branches:
+      - fix/purchasing-approved-ui-production-20261025
+    paths:
+      - 'scripts/test-admin-purchasing-postgres.mjs'
+      - 'supabase/migrations/*purchasing*.sql'
+      - '.github/workflows/purchasing-postgres.yml'
+  pull_request:
+    paths:
+      - 'scripts/test-admin-purchasing-postgres.mjs'
+      - 'supabase/migrations/*purchasing*.sql'
+      - 'apps/admin/src/purchasing/**'
+      - '.github/workflows/purchasing-postgres.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  purchasing-postgres:
+    name: Purchasing purchase-order and inventory transaction acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Test shop-scoped receiving returns retries and weighted cost
+        run: node scripts/test-admin-purchasing-postgres.mjs
