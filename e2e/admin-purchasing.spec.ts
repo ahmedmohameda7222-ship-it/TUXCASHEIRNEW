@@ -604,7 +604,7 @@ test('selected supplier details appear adjacent to compact directory on desktop'
   const directory = page.locator('.admin-supplier-directory');
   const inspector = page.getByRole('complementary', { name: 'Selected supplier detail' });
   await expect(inspector).toBeVisible();
-  await expect(inspector.getByText('Prime Foods')).toBeVisible();
+  await expect(inspector.getByRole('heading', { name: 'Prime Foods' })).toBeVisible();
   const listBounds = await directory.boundingBox();
   const detailBounds = await inspector.boundingBox();
   expect(listBounds).not.toBeNull();
