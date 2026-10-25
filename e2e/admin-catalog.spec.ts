@@ -452,9 +452,14 @@ test('version history link and browser Back preserve dirty edits until explicitl
   let dialog = page.getByRole('dialog', { name: 'Discard unsaved product edits?' });
   await dialog.getByRole('button', { name: 'Stay and keep editing' }).click();
   await expect(name).toHaveValue('Keep through browser navigation');
+  let confirmedBack = false;
+  page.once('dialog', async (confirmation) => {
+    expect(confirmation.type()).toBe('confirm');
+    expect(confirmation.message()).toContain('Discard unsaved product edits');
+    confirmedBack = true;
+    await confirmation.dismiss();
+  });
   await page.goBack();
-  dialog = page.getByRole('dialog', { name: 'Discard unsaved product edits?' });
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole('button', { name: 'Stay and keep editing' }).click();
+  expect(confirmedBack).toBe(true);
   await expect(name).toHaveValue('Keep through browser navigation');
 });

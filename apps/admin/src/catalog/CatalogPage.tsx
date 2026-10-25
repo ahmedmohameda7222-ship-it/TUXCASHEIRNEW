@@ -80,12 +80,17 @@ export function CatalogPage() {
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const routeRef = useRef(location);
   const ignorePopstate = useRef(false);
+  const approvedNavigation = useRef<string | null>(null);
   const scopedUnsavedProduct = unsavedProduct?.shopId === shopId ? unsavedProduct : null;
   const selectedProductId =
     scopedUnsavedProduct?.id ?? detailIdFromPath(location, '/catalog/products');
   const mobileEditing = selectedProductId !== null;
 
   routeRef.current = location;
+
+  useEffect(() => {
+    if (approvedNavigation.current === location) approvedNavigation.current = null;
+  }, [location]);
 
   useEffect(() => {
     function interceptLink(event: MouseEvent) {
@@ -114,15 +119,20 @@ export function CatalogPage() {
         ignorePopstate.current = false;
         return;
       }
-      if (!hasUnsavedDrafts() || window.location.pathname === routeRef.current) return;
       const requested = window.location.pathname + window.location.search + window.location.hash;
+      if (approvedNavigation.current === requested) {
+        approvedNavigation.current = null;
+        return;
+      }
+      if (!hasUnsavedDrafts() || window.location.pathname === routeRef.current) return;
+      // Back/Forward can notify the router before this page's own listener.
+      // Use a synchronous native confirmation so there is no render/unmount
+      // gap in which the editor's local form can disappear.
+      if (window.confirm('Discard unsaved product edits and leave Catalog?')) return;
       event.stopImmediatePropagation();
-      // popstate cannot be cancelled; restore the current editor URL before
-      // allowing React's router to discard the editor's local form values.
       window.history.pushState(window.history.state, '', routeRef.current);
       ignorePopstate.current = true;
       window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
-      setPendingNavigation(requested);
     }
     function onBeforeUnload(event: BeforeUnloadEvent) {
       if (!hasUnsavedDrafts()) return;
@@ -475,6 +485,7 @@ export function CatalogPage() {
                 onClick={() => {
                   const destination = pendingNavigation;
                   setPendingNavigation(null);
+                  approvedNavigation.current = destination;
                   setUnsavedProduct(null);
                   navigate(destination);
                 }}

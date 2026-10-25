@@ -151,8 +151,8 @@ export function PublishReviewPage() {
   shopRef.current = shopId;
 
   useEffect(() => {
-    if (!data || selectedDraftId !== null) return;
-    setSelectedDraftId(data.draftPreviews[0]?.draftId ?? '');
+    if (!data || selectedDraftId !== null || !data.draftPreviews[0]) return;
+    setSelectedDraftId(data.draftPreviews[0].draftId);
   }, [data, selectedDraftId]);
 
   useEffect(() => {
