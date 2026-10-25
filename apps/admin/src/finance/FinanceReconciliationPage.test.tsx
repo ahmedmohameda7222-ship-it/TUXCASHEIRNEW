@@ -7,7 +7,11 @@ describe('read-only Finance reconciliation', () => {
   it('does not substitute zero or guessed physical count for an open day', () => {
     const html = renderToStaticMarkup(
       <FinanceReconciliationFacts
-        facts={{ businessDayStatus: 'OPEN', paymentBreakdown: { Cash: 10000 }, cashierReconciliations: [] }}
+        facts={{
+          businessDayStatus: 'OPEN',
+          paymentBreakdown: { Cash: 10000 },
+          cashierReconciliations: [],
+        }}
       />,
     );
     expect(html).toContain('Awaiting Operations count');
