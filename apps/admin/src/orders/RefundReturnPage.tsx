@@ -121,6 +121,15 @@ export function RefundReturnPage({
     [order.items, returnQuantities],
   );
   const returnItems = returnSelection.items;
+  const returnEstimatedGrossMinor = returnItems.reduce((total, line) => {
+    const item = order.items.find((candidate) => candidate.id === line.orderItemId);
+    if (!item) return total;
+    const extrasMinor = item.modifiers.reduce(
+      (sum, modifier) => sum + modifier.quantity * modifier.unitPriceMinor,
+      0,
+    );
+    return total + (item.unitPriceMinor + extrasMinor) * line.quantity;
+  }, 0);
 
   async function submitRefund(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
