@@ -258,9 +258,9 @@ test('Chromium delivers a locally created Order and exposes its canonical Admin 
     '/api/operations-session-exit',
   ]);
   expect(capture.auxiliaryUnavailablePaths.length).toBeGreaterThan(0);
-  expect(
-    capture.auxiliaryUnavailablePaths.filter((path) => !allowedUnavailable.has(path)),
-  ).toEqual([]);
+  expect(capture.auxiliaryUnavailablePaths.filter((path) => !allowedUnavailable.has(path))).toEqual(
+    [],
+  );
   // Browser console 503s belong exclusively to the deliberately unavailable
   // auxiliary fixture paths above, never the asserted Order Sync endpoint.
   const expectedAuxiliary503 =
