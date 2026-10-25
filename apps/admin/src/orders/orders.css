@@ -588,3 +588,43 @@
     display: none;
   }
 }
+
+/* Protect dense 60/40 desktop layout from numeric and status wrapping. */
+@media (min-width: 1280px) {
+  .admin-orders-canonical-view .admin-metric-strip__tile {
+    padding: 0.75rem;
+  }
+
+  .admin-orders-canonical-view .admin-metric-strip__tile dd {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    font-size: clamp(0.94rem, 1.05vw, 1.06rem);
+    letter-spacing: -0.02em;
+  }
+
+  .admin-orders-canonical-view .admin-metric-strip__tile small {
+    font-size: 0.7rem;
+  }
+
+  .admin-orders-canonical-view .admin-order-row__status {
+    font-size: 0.69rem;
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
+}
+
+.admin-order-detail__row > span:last-child {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.admin-order-detail__row > span:last-child small {
+  display: block;
+  text-align: right;
+  white-space: normal;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
