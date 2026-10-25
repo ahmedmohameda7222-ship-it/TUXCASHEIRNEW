@@ -19,17 +19,13 @@ export type FinanceReconciliationFactsModel = Pick<
  * These payment totals are NOT physical method counts. Do not display an
  * actual/variance for a payment method until Operations owns and exposes one.
  */
-export function FinanceReconciliationFacts({
-  facts,
-}: {
-  facts: FinanceReconciliationFactsModel;
-}) {
+export function FinanceReconciliationFacts({ facts }: { facts: FinanceReconciliationFactsModel }) {
   return (
     <div className="tux-finance-reconciliation-facts">
       {facts.businessDayStatus !== 'CLOSED' ? (
         <p role="status">
-          Awaiting Operations count. This Business Day remains open; no physical actual or
-          variance has been verified.
+          Awaiting Operations count. This Business Day remains open; no physical actual or variance
+          has been verified.
         </p>
       ) : (
         <p role="status">
@@ -98,9 +94,7 @@ export function FinanceReconciliationPage() {
   const reportQuery = useFinanceOperations(shopId, activeDay?.id, ['day']);
   const report = reportQuery.dayQuery.data;
   const authorizedReport =
-    report && report.shopId === shopId && report.businessDayId === activeDay?.id
-      ? report
-      : null;
+    report && report.shopId === shopId && report.businessDayId === activeDay?.id ? report : null;
 
   if (!shopId) {
     return (
@@ -179,7 +173,10 @@ export function FinanceReconciliationPage() {
         />
       ) : null}
       {authorizedReport ? <FinanceReconciliationFacts facts={authorizedReport} /> : null}
-      {activeDay && !authorizedReport && !reportQuery.dayQuery.isLoading && !reportQuery.dayQuery.isError ? (
+      {activeDay &&
+      !authorizedReport &&
+      !reportQuery.dayQuery.isLoading &&
+      !reportQuery.dayQuery.isError ? (
         <EmptyState
           title="No verified reconciliation facts"
           description="The selected Business Day has no authorized financial report available."
