@@ -6,9 +6,9 @@ import { buildRemoteMaterializationPlanV1 } from '../packages/sync/src/remoteMat
 import {
   SHOP,
   WORKER,
-  enterActiveOrders,
   minimalConfiguration,
   prepareRenderedOrderControls,
+  waitForActiveShell,
 } from './worker-system-color-test-helpers';
 
 const REMOTE_ORIGIN = 'https://tux.localhost:4173';
@@ -29,6 +29,36 @@ async function routeRemoteRuntime(
   const request = route.request();
   const url = new URL(request.url());
 
+  if (url.pathname === '/api/operations-shops') {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ shops: [{ id: SHOP, name: 'TUX E2E Shop' }] }),
+    });
+    return;
+  }
+  if (url.pathname === '/api/device-bootstrap' && request.method() === 'POST') {
+    const body = request.postDataJSON() as { pin?: string; shopId?: string };
+    expect(body.pin).toBe('1234');
+    expect(body.shopId).toBe(SHOP);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        shopId: SHOP,
+        deviceId: DEVICE_ID,
+        shop: { id: SHOP, name: 'TUX E2E Shop', active: true },
+        worker: {
+          id: WORKER,
+          shopId: SHOP,
+          displayName: 'Demo Worker One',
+          pinHash: workerPinHash('1234'),
+          active: true,
+        },
+      }),
+    });
+    return;
+  }
   if (url.pathname === '/api/device-session') {
     await route.fulfill({
       status: 200,
@@ -92,6 +122,20 @@ async function routeRemoteRuntime(
     });
     return;
   }
+  if (url.pathname === '/api/operations-sync' && request.method() === 'GET') {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        shopId: SHOP,
+        openDayId: null,
+        openDay: null,
+        openWorkerCount: 0,
+        localDayStatus: null,
+      }),
+    });
+    return;
+  }
   if (url.pathname === '/api/operations-sync' && request.method() === 'POST') {
     const envelope = request.postDataJSON();
     const plan = buildRemoteMaterializationPlanV1(envelope);
@@ -122,6 +166,10 @@ test('Chromium delivers a locally created Order and exposes its canonical Admin 
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  test.skip(
+    process.env['TUX_OPERATIONS_BRANCH_E2E'] !== '1',
+    'Requires the authenticated Operations build; legacy fallback intentionally disables remote sync.',
+  );
   const capture: {
     orderRow: Readonly<Record<string, unknown>> | null;
     orderPosts: number;
@@ -132,7 +180,13 @@ test('Chromium delivers a locally created Order and exposes its canonical Admin 
   });
   await page.route(`${REMOTE_ORIGIN}/**`, (route) => routeRemoteRuntime(route, capture));
 
-  await enterActiveOrders(page, REMOTE_ORIGIN);
+  await page.goto(REMOTE_ORIGIN);
+  await page.getByRole('combobox', { name: 'Branch' }).selectOption(SHOP);
+  await page.getByLabel('Enter PIN to Sign In').fill('1234');
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+  const greeting = page.locator('.welcome-action');
+  if (await greeting.isVisible().catch(() => false)) await greeting.click();
+  await waitForActiveShell(page);
   await prepareRenderedOrderControls(page);
   await page.getByRole('button', { name: 'Place Order', exact: true }).click();
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
