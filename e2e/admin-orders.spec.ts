@@ -903,3 +903,32 @@ test('approved desktop order directory exposes named data columns without fake s
     true,
   );
 });
+
+test('O2 KPIs remain shop-wide when only two directory rows are loaded', async ({ page }) => {
+  const fixture = await mockOrders(page, { financeVisible: true });
+  await page.goto('/orders');
+  const strip = page.locator('dl[aria-label="Orders key metrics"]');
+  await expect(strip).toContainText('65');
+  await expect(strip).toContainText('7');
+  await expect(strip).toContainText('EGP 4,715.50');
+  await expect(strip).toContainText('EGP 79.18');
+  expect(fixture.kpiRequests).toHaveLength(1);
+  expect(fixture.kpiRequests[0]?.searchParams.get('cursor')).toBeNull();
+});
+
+test('O2 financial KPI fields never reveal money to orders-only viewer', async ({ page }) => {
+  await mockOrders(page);
+  await page.goto('/orders');
+  const strip = page.locator('dl[aria-label="Orders key metrics"]');
+  await expect(strip).toContainText('Requires finance access');
+  await expect(strip).not.toContainText('EGP 4,715.50');
+  await expect(strip).toContainText('65');
+});
+
+test('O2 zero paid orders have null AOV rather than fabricated zero', async ({ page }) => {
+  await mockOrders(page, { emptyOrders: true, financeVisible: true });
+  await page.goto('/orders');
+  const strip = page.locator('dl[aria-label="Orders key metrics"]');
+  await expect(strip).toContainText('No paid orders in selected period');
+  await expect(strip).toContainText('Unavailable');
+});
