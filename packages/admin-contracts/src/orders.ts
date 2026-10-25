@@ -22,6 +22,19 @@ export type AdminOnlineOrderRequestsResult = {
   nextCursor: string | null;
 };
 
+export type AdminOrderBusinessDay = {
+  id: string;
+  shopId: string;
+  startedAt: string;
+  endedAt: string | null;
+  status: string;
+};
+
+export type AdminOrderBusinessDaysResult = {
+  shopId: string;
+  days: readonly AdminOrderBusinessDay[];
+};
+
 export const ADMIN_ORDER_STATUSES = ['ACTIVE', 'DONE', 'CANCELLED', 'RETURNED'] as const;
 export type AdminOrderStatus = (typeof ADMIN_ORDER_STATUSES)[number];
 
@@ -32,6 +45,7 @@ export type AdminOrderSearchInput = {
   query?: string | null;
   statuses?: readonly AdminOrderStatus[];
   source?: AdminOrderSource | null;
+  businessDayId?: string | null;
   from?: string | null;
   to?: string | null;
   cursor?: string | null;
