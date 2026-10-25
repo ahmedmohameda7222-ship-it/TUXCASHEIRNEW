@@ -102,7 +102,7 @@ export function CatalogPage() {
       if (!(node instanceof Element)) return;
       const anchor = node.closest('a[href]');
       if (!anchor || anchor.hasAttribute('download') || anchor.getAttribute('target')) return;
-      const url = new URL(anchor.href, window.location.href);
+      const url = new URL(anchor.getAttribute('href') ?? '', window.location.href);
       if (url.origin !== window.location.origin || url.pathname === routeRef.current) return;
       event.preventDefault();
       event.stopPropagation();

@@ -15,6 +15,7 @@ async function publishingFixture(page: Page) {
   ];
   let publishVersion = 48;
   let reads = 0;
+  let pendingSchedule = true;
   const publishes: Record<string, unknown>[] = [];
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
@@ -49,7 +50,19 @@ async function publishingFixture(page: Page) {
           shopId: requestedShop,
           currentPublishVersion: publishVersion,
           versions: [],
-          schedules: [],
+          schedules: pendingSchedule ? [{
+            id: '77777777-7777-4777-8777-777777777777',
+            shopId: requestedShop,
+            draftId: firstDraft,
+            expectedDraftRevision: 1,
+            status: 'PENDING',
+            timezone: 'Africa/Cairo',
+            localScheduledAt: '2099-09-11T08:00:00',
+            scheduledFor: '2099-09-11T05:00:00.000Z',
+            targetBasePublishVersion: 48,
+            attemptCount: 0,
+            lastError: null,
+          }] : [],
           draftPreviews: requestedShop === shop
             ? drafts.map((draft) => ({
                 shopId: shop,
@@ -80,6 +93,15 @@ async function publishingFixture(page: Page) {
     if (request.method() === 'POST') {
       expect(request.headers()['x-tux-admin-csrf']).toBe(csrfToken);
       const body = request.postDataJSON() as Record<string, unknown>;
+      if (body['type'] === 'schedule.cancel') {
+        pendingSchedule = false;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true, status: 'CANCELLED' }),
+        });
+        return;
+      }
       publishes.push(body);
       await route.fulfill({
         status: 200,
@@ -110,10 +132,9 @@ const consent = (page: Page) =>
   });
 async function refreshPublishing(page: Page, fixture: { readonly reads: number }) {
   const prior = fixture.reads;
-  await page.evaluate(() => {
-    window.dispatchEvent(new Event('focus'));
-    document.dispatchEvent(new Event('visibilitychange'));
-  });
+  // Cancelling a preserved schedule invalidates the publishing query and forces
+  // a server refresh without waiting for the query's 15-second stale timeout.
+  await page.getByRole('button', { name: 'Cancel scheduled publish' }).click();
   await expect.poll(() => fixture.reads).toBeGreaterThan(prior);
 }
 

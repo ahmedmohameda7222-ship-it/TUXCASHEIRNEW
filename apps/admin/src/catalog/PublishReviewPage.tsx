@@ -140,7 +140,9 @@ export function PublishReviewPage() {
       ? draftPreviews[0]
       : draftPreviews.find((candidate) => candidate.draftId === selectedDraftId);
   const reviewedIdentity =
-    preview && data?.shopId === shopId ? publishReviewIdentity(shopId, preview) : null;
+    preview && shopId && data?.shopId === shopId
+      ? publishReviewIdentity(shopId, preview)
+      : null;
   const confirmedPublish =
     reviewedIdentity !== null &&
     confirmedPreviewIdentity === reviewedIdentity &&

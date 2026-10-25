@@ -31,7 +31,7 @@ export type ProductEditorProps = {
   busy?: boolean;
   onRequestAdvanced?(): void | Promise<void>;
   onSaveDraft(draft: ProductEditorDraft): void | Promise<void>;
-  onReviewPublish?(): void;
+  onReviewPublish?: (() => void) | undefined;
   onSetAvailability(soldOut: boolean): void | Promise<void>;
   onUploadImage?: ((file: File) => Promise<{ imageKey: string; publicUrl: string }>) | undefined;
   imageRequiresSaveFirst?: boolean;
