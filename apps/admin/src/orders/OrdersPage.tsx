@@ -152,33 +152,34 @@ export function OrdersPage() {
 
   return (
     <PageScaffold
-      eyebrow="Order supervision"
       title="Orders"
       description={`Search order history for ${shopName} and complete authorized order actions.`}
     >
-      <div className="admin-orders-shop-context" aria-label="Current order shop">
-        <span>Current shop</span>
-        <strong>{shopName}</strong>
-        <span>Only orders belonging to this authorized shop are shown.</span>
+      <div className="admin-orders-context-bar">
+        <div className="admin-orders-shop-context" aria-label="Current order shop">
+          <span>Current shop</span>
+          <strong>{shopName}</strong>
+          <span>Only orders belonging to this authorized shop are shown.</span>
+        </div>
+        <nav aria-label="Orders workspace views" className="admin-orders-shop-context">
+          <button
+            type="button"
+            className="admin-secondary-button"
+            aria-current={!onlineView ? 'page' : undefined}
+            onClick={() => setOnlineView(false)}
+          >
+            Canonical orders
+          </button>
+          <button
+            type="button"
+            className="admin-secondary-button"
+            aria-current={onlineView ? 'page' : undefined}
+            onClick={() => setOnlineView(true)}
+          >
+            Online requests
+          </button>
+        </nav>
       </div>
-      <nav aria-label="Orders workspace views" className="admin-orders-shop-context">
-        <button
-          type="button"
-          className="admin-secondary-button"
-          aria-current={!onlineView ? 'page' : undefined}
-          onClick={() => setOnlineView(false)}
-        >
-          Canonical orders
-        </button>
-        <button
-          type="button"
-          className="admin-secondary-button"
-          aria-current={onlineView ? 'page' : undefined}
-          onClick={() => setOnlineView(true)}
-        >
-          Online requests
-        </button>
-      </nav>
       {onlineView ? (
         <OnlineRequestsPanel
           shopId={shopId}
