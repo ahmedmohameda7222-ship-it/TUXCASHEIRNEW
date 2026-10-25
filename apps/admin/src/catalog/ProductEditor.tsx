@@ -33,7 +33,7 @@ export type ProductEditorProps = {
   onRequestAdvanced?(): void | Promise<void>;
   onSaveDraft(draft: ProductEditorDraft): void | Promise<void>;
   onSetAvailability(soldOut: boolean): void | Promise<void>;
-  onUploadImage?(file: File): Promise<{ imageKey: string; publicUrl: string }>;
+  onUploadImage?: ((file: File) => Promise<{ imageKey: string; publicUrl: string }>) | undefined;
 };
 
 const MAX_POSTGRES_INTEGER = 2_147_483_647;
