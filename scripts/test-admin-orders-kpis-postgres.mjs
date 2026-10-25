@@ -101,8 +101,9 @@ insert into public.payments(
   logic_type_snapshot,allocated_minor,received_minor,change_minor,created_at
 )
 select md5('kpi-fixture-payment-'||g||'-2')::uuid, '${SHOP}',
-  md5('kpi-fixture-order-'||g)::uuid, 2, '${METHOD}', 'Card', 'CARD',
-  400, null, null, '2026-09-23T05:10:00Z'::timestamptz + g*interval '1 minute'
+  md5('kpi-fixture-order-'||g)::uuid, 2,
+  '58000000-0000-4000-8000-000000000092', 'Test Cash', 'CASH',
+  400, 400, 0, '2026-09-23T05:10:00Z'::timestamptz + g*interval '1 minute'
 from generate_series(1,64) g where g%8=1;`, 'Insert 64 mixed POS/ONLINE canonical orders with split payments');
 
 
