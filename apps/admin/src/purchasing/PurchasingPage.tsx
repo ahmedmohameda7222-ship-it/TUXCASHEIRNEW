@@ -127,6 +127,7 @@ export function PurchasingPage() {
         </p>
       ) : null}
       <ResponsiveMasterDetail
+        className={section === 'suppliers' ? 'admin-purchasing-master is-suppliers' : 'admin-purchasing-master'}
         listLabel="Purchasing"
         detailLabel="Purchase order detail"
         detailActive={selectedId !== null}
@@ -135,7 +136,13 @@ export function PurchasingPage() {
           <AdminTabs<PurchasingSection>
             label="Purchasing sections"
             value={section}
-            onChange={setSection}
+            onChange={(nextSection) => {
+              setSection(nextSection);
+              if (nextSection === 'suppliers') {
+                navigate('/purchasing');
+                setAction(null);
+              }
+            }}
             tabs={[
               {
                 id: 'orders',
