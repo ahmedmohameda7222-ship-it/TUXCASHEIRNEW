@@ -3,6 +3,7 @@ import type {
   AdminOrderDetail,
   AdminOrderFinancialMutationResult,
   AdminOrderSearchResult,
+  AdminOrderBusinessDaysResult,
   AdminOrderSummary,
   AdminOrderStatus,
   AdminOnlineOrderRequestsResult,
@@ -103,6 +104,14 @@ const commandSchema = z.discriminatedUnion('type', [
     })
     .strict(),
 ]);
+
+type BusinessDayRow = {
+  id: string;
+  shop_id: string;
+  status: string;
+  started_at: string;
+  ended_at: string | null;
+};
 
 type DeliveryStateRow = {
   order_id: string;
@@ -371,6 +380,29 @@ async function assertBusinessShop(
 
 export function createOrderStore(client: AdminSupabaseClient): OrderStore {
   return {
+    async listBusinessDays(input): Promise<AdminOrderBusinessDaysResult> {
+      await assertBusinessShop(client, input.businessId, input.shopId);
+      const rows = await client.select<BusinessDayRow[]>(
+        'business_days',
+        new URLSearchParams({
+          select: 'id,shop_id,status,started_at,ended_at',
+          shop_id: `eq.${input.shopId}`,
+          order: 'started_at.desc,id.desc',
+          limit: '100',
+        }),
+      );
+      return {
+        shopId: input.shopId,
+        days: rows.map((row) => ({
+          id: row.id,
+          shopId: row.shop_id,
+          status: row.status,
+          startedAt: row.started_at,
+          endedAt: row.ended_at,
+        })),
+      };
+    },
+
     async listOnlineOrderRequests(input): Promise<AdminOnlineOrderRequestsResult> {
       await assertBusinessShop(client, input.businessId, input.shopId);
       const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
@@ -459,6 +491,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
         query.set('status', `in.(${input.statuses.join(',')})`);
       }
       if (input.source) query.set('source', `eq.${input.source}`);
+      if (input.businessDayId) query.set('business_day_id', `eq.${input.businessDayId}`);
       if (input.from) query.set('created_at', `gte.${input.from}`);
       if (input.to) query.append('created_at', `lte.${input.to}`);
 
@@ -1223,6 +1256,10 @@ export default async function handler(
       const url = new URL(request.url ?? '/', 'http://admin.local');
       const shopId = uuidSchema.parse(url.searchParams.get('shopId'));
       const context = await loadContext(request, client, false);
+      if (url.searchParams.get('view') === 'business-days') {
+        sendJson(response, 200, await service.listBusinessDays({ shopId }, context.principal));
+        return;
+      }
       if (url.searchParams.get('view') === 'export') {
         requirePermission(context.principal, 'reports.view', shopId);
         const requestedStatuses = url.searchParams
@@ -1241,6 +1278,9 @@ export default async function handler(
               query: url.searchParams.get('q'),
               statuses: requestedStatuses,
               source,
+              businessDayId: url.searchParams.get('businessDayId')
+                ? uuidSchema.parse(url.searchParams.get('businessDayId'))
+                : null,
               from: url.searchParams.get('from'),
               to: url.searchParams.get('to'),
               cursor,
@@ -1347,6 +1387,9 @@ export default async function handler(
           query: url.searchParams.get('q'),
           statuses,
           source,
+          businessDayId: url.searchParams.get('businessDayId')
+            ? uuidSchema.parse(url.searchParams.get('businessDayId'))
+            : null,
           from: url.searchParams.get('from'),
           to: url.searchParams.get('to'),
           cursor: url.searchParams.get('cursor'),
