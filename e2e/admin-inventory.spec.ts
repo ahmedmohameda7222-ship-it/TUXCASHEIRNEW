@@ -709,3 +709,35 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
     }
   }
 }
+
+for (const width of [360, 1100] as const) {
+  test(`inventory preserves approved single-pane navigation and no overflow at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: width === 360 ? 800 : 940 });
+    await mockInventory(page);
+    await page.goto('/inventory');
+    await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Stock count' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Export CSV' })).toBeVisible();
+
+    const list = page.getByRole('region', { name: 'Inventory items' });
+    await expect(list).toBeVisible();
+    await list.getByRole('button', { name: /Beef/ }).click();
+    await expect(list).toBeHidden();
+    const inspector = page.getByLabel('Inventory item detail');
+    await expect(inspector).toBeVisible();
+    await expect(
+      inspector.getByRole('link', { name: /back to inventory items/i }),
+    ).toBeVisible();
+    await inspector.getByRole('tab', { name: 'Stock & movements' }).click();
+    await expect(inspector.getByText('Bulk stock received')).toBeVisible();
+    await inspector.getByRole('tab', { name: 'Settings' }).click();
+    await expect(inspector.getByText('Base unit')).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await inspector.getByRole('link', { name: /back to inventory items/i }).click();
+    await expect(list).toBeVisible();
+  });
+}
