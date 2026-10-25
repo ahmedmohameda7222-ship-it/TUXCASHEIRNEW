@@ -1,4 +1,4 @@
-export const INDEXED_DB_VERSION = 11;
+export const INDEXED_DB_VERSION = 12;
 
 export const INDEXED_DB_STORES = [
   'shops',
@@ -433,6 +433,48 @@ const MIGRATIONS: readonly IndexedDbMigration[] = [
             quarantinedAt: null,
             permanentFailureReason: null,
             blockedByEventId: null,
+          });
+        }
+        cursor.continue();
+      });
+    },
+  },
+  {
+    version: 12,
+    name: 'retire_preproduction_v10_recovery_artifacts',
+    apply(_database, transaction) {
+      const outbox = transaction.objectStore('outboxEvents');
+      const cursorRequest = outbox.openCursor();
+      cursorRequest.addEventListener('success', () => {
+        const cursor = cursorRequest.result;
+        if (cursor === null) return;
+        const event = cursor.value as Record<string, unknown>;
+        const evidence = event['recoveryEvidence'];
+        const migratedByLegacyReplay =
+          typeof evidence === 'object' &&
+          evidence !== null &&
+          !Array.isArray(evidence) &&
+          (evidence as Record<string, unknown>)['migration'] === 10;
+        if (
+          migratedByLegacyReplay &&
+          event['deliveredAt'] === null &&
+          typeof event['quarantinedAt'] === 'string'
+        ) {
+          const retiredAt = new Date().toISOString();
+          cursor.update({
+            ...event,
+            attemptCount: 0,
+            nextAttemptAt: null,
+            lastError: null,
+            deliveredAt: retiredAt,
+            quarantinedAt: null,
+            permanentFailureReason: null,
+            blockedByEventId: null,
+            recoveryEvidence: {
+              ...(evidence as Record<string, unknown>),
+              retiredAt,
+              retirementReason: 'PREPRODUCTION_V10_RECOVERY_RETIRED',
+            },
           });
         }
         cursor.continue();

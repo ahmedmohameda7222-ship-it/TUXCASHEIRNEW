@@ -124,8 +124,8 @@ afterEach(async () => {
 
 describe('IndexedDB migration registry', () => {
   it('declares a contiguous production migration chain', () => {
-    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
-    expect(INDEXED_DB_VERSION).toBe(11);
+    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(INDEXED_DB_VERSION).toBe(12);
   });
 
   it('retries legacy quarantined order lifecycle events once on v10 while preserving evidence', async () => {
@@ -282,6 +282,57 @@ describe('IndexedDB migration registry', () => {
       });
     } finally {
       v11.close();
+    }
+  });
+
+  it('retires quarantined pre-production v10 replay artifacts on v12 without deleting evidence', async () => {
+    const name = `tux-indexeddb-v12-retire-v10-${crypto.randomUUID()}`;
+    const v11 = await openAtVersion(name, 11);
+    const write = v11.transaction('outboxEvents', 'readwrite');
+    const id = '60000000-0000-4000-8000-000000000015';
+    write.objectStore('outboxEvents').put({
+      id,
+      shopId: '10000000-0000-4000-8000-000000000001',
+      businessDayId: '20000000-0000-4000-8000-000000000001',
+      aggregateType: 'ORDER',
+      aggregateId: '30000000-0000-4000-8000-000000000001',
+      aggregateRevision: 0,
+      eventType: 'ORDER_PLACED',
+      payloadVersion: 1,
+      payload: {},
+      idempotencyKey: 'retire-preproduction-v10',
+      createdAt: '2026-10-24T13:00:00.000Z',
+      attemptCount: 1,
+      nextAttemptAt: null,
+      lastError: 'Remote outbox endpoint rejected event with HTTP 400.',
+      deliveredAt: null,
+      quarantinedAt: '2026-10-24T13:01:00.000Z',
+      permanentFailureReason: 'Remote outbox endpoint rejected event with HTTP 400.',
+      blockedByEventId: null,
+      recoveryEvidence: { migration: 10, originalCreatedAt: '2026-10-23T13:00:00.000Z' },
+    });
+    await transactionDone(write);
+    v11.close();
+
+    const v12 = await openAtVersion(name, 12);
+    try {
+      const row = await requestResult(
+        v12.transaction('outboxEvents', 'readonly').objectStore('outboxEvents').get(id),
+      );
+      expect(row).toMatchObject({
+        lastError: null,
+        quarantinedAt: null,
+        permanentFailureReason: null,
+        recoveryEvidence: {
+          migration: 10,
+          originalCreatedAt: '2026-10-23T13:00:00.000Z',
+          retirementReason: 'PREPRODUCTION_V10_RECOVERY_RETIRED',
+        },
+      });
+      expect(row.deliveredAt).toEqual(expect.any(String));
+      expect(row.recoveryEvidence.retiredAt).toEqual(expect.any(String));
+    } finally {
+      v12.close();
     }
   });
 
