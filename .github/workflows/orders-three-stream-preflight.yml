@@ -71,22 +71,31 @@ jobs:
           node-version: '24'
           cache: npm
       - name: Install immutable lockfile dependencies
+        id: source_install
         run: npm ci
       - name: Full format verification
+        if: ${{ always() && steps.source_install.outcome == 'success' }}
         run: npm run format:check
       - name: Full ESLint
+        if: ${{ always() && steps.source_install.outcome == 'success' }}
         run: npm run lint
       - name: Full monorepo unit and integration tests
+        if: ${{ always() && steps.source_install.outcome == 'success' }}
         run: npm run test
       - name: Independent Node CI selector tests
+        if: ${{ always() && steps.source_install.outcome == 'success' }}
         run: node --test scripts/ci-fast-scope.test.mjs
       - name: Sync package regression
+        if: ${{ always() && steps.source_install.outcome == 'success' }}
         run: npm test -w @tux/sync
       - name: All workspace and API TypeScript checks
+        if: ${{ always() && steps.source_install.outcome == 'success' }}
         run: npm run typecheck
       - name: All production workspace builds
+        if: ${{ always() && steps.source_install.outcome == 'success' }}
         run: npm run build
       - name: Admin, architecture and security contracts
+        if: ${{ always() && steps.source_install.outcome == 'success' }}
         run: |
           npm run test:admin-security
           npm run test:admin-deployment
