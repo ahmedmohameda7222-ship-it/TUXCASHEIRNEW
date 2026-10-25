@@ -548,11 +548,65 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
               }),
             );
 
+      const approvalIds = [
+        ...new Set(
+          [...refundRows, ...returnRows]
+            .map((row) => row.approval_request_id)
+            .filter((id): id is string => id !== null),
+        ),
+      ];
+      const approvalRows =
+        approvalIds.length === 0
+          ? []
+          : await client.select<ApprovalRow[]>(
+              'admin_approval_requests',
+              new URLSearchParams({
+                select:
+                  'id,status,requester_employee_id,approver_employee_id,decided_at,executed_at,decision_reason',
+                id: `in.(${approvalIds.join(',')})`,
+                business_id: `eq.${input.businessId}`,
+                shop_id: `eq.${input.shopId}`,
+              }),
+            );
+      const approvalsById = new Map(approvalRows.map((approval) => [approval.id, approval]));
+      const approvalFor = (id: string | null) =>
+        id === null ? undefined : approvalsById.get(id);
+      const effectiveState = (
+        row: RefundRow | ReturnRow,
+      ) => effectiveFinancialState(row.state, approvalFor(row.approval_request_id)?.status ?? null);
+      const paymentBalances = projectPaymentRefundBalances(
+        payments.map((payment) => ({
+          id: payment.id,
+          allocatedMinor: safeInteger(payment.allocated_minor),
+          refundAllowedSnapshot: payment.refund_allowed_snapshot,
+        })),
+        refundRows.map((refund) => ({
+          paymentId: refund.payment_id,
+          amountMinor: safeInteger(refund.amount_minor),
+          state: effectiveState(refund),
+        })),
+      );
+      const returnQuantities = projectReturnQuantities(
+        items.map((item) => ({ id: item.id, quantity: safeInteger(item.quantity) })),
+        returnItemRows.flatMap((line) => {
+          const parent = returnRows.find((itemReturn) => itemReturn.id === line.return_id);
+          return parent
+            ? [{ orderItemId: line.order_item_id, quantity: safeInteger(line.quantity), state: effectiveState(parent) }]
+            : [];
+        }),
+      );
+
       const financialEvents = [
         ...refundRows.map((refund) => ({
           id: refund.id,
           kind: 'REFUND' as const,
-          state: refund.state,
+          state: effectiveState(refund),
+          paymentId: refund.payment_id,
+          requestedByEmployeeId: refund.created_by_employee_id,
+          approvedByEmployeeId: approvalFor(refund.approval_request_id)?.approver_employee_id ?? null,
+          decidedAt: approvalFor(refund.approval_request_id)?.decided_at ?? null,
+          executedAt: approvalFor(refund.approval_request_id)?.executed_at ?? null,
+          decisionReason: approvalFor(refund.approval_request_id)?.decision_reason ?? null,
           amountMinor: safeInteger(refund.amount_minor),
           approvalRequestId: refund.approval_request_id,
           reason: {
@@ -568,7 +622,12 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
         ...returnRows.map((orderReturn) => ({
           id: orderReturn.id,
           kind: 'RETURN' as const,
-          state: orderReturn.state,
+          state: effectiveState(orderReturn),
+          requestedByEmployeeId: orderReturn.created_by_employee_id,
+          approvedByEmployeeId: approvalFor(orderReturn.approval_request_id)?.approver_employee_id ?? null,
+          decidedAt: approvalFor(orderReturn.approval_request_id)?.decided_at ?? null,
+          executedAt: approvalFor(orderReturn.approval_request_id)?.executed_at ?? null,
+          decisionReason: approvalFor(orderReturn.approval_request_id)?.decision_reason ?? null,
           amountMinor: returnItemRows
             .filter((item) => item.return_id === orderReturn.id)
             .reduce((total, item) => total + safeInteger(item.amount_minor), 0),
@@ -620,6 +679,8 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           receivedMinor:
             payment.received_minor === null ? null : safeInteger(payment.received_minor),
           changeMinor: payment.change_minor === null ? null : safeInteger(payment.change_minor),
+          refundAllowedSnapshot: payment.refund_allowed_snapshot,
+          ...paymentBalances.get(payment.id),
         })),
         items: items.map((item) => ({
           id: item.id,
@@ -628,6 +689,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           quantity: safeInteger(item.quantity),
           unitPriceMinor: safeInteger(item.unit_price_minor),
           itemNote: item.item_note,
+          ...returnQuantities.get(item.id),
           modifiers: modifiers
             .filter((modifier) => modifier.order_item_id === item.id)
             .map((modifier) => ({
