@@ -3,6 +3,7 @@ import type {
   AdminOrderDetail,
   AdminOrderFinancialMutationResult,
   AdminOrderSearchResult,
+  AdminOrderSummary,
   AdminOrderStatus,
   AdminOnlineOrderRequestsResult,
   AdminReasonCodeConfiguration,
@@ -15,7 +16,7 @@ import {
   requireSessionCsrf,
   type AdminSessionContext,
 } from '../../server/adminAuthService.js';
-import { AdminAuthorizationError } from '../../server/authorization.js';
+import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
 import { getAdminServerEnv } from '../../server/env.js';
 import {
   firstHeader,
@@ -26,6 +27,7 @@ import {
   type AdminResponse,
 } from '../../server/http.js';
 import { createOrderService, type OrderStore } from '../../server/orders/orderService.js';
+import { ORDER_EXPORT_MAX_ROWS, renderOrdersCsv } from '../../server/orders/orderCsvExport.js';
 import {
   effectiveFinancialState,
   projectPaymentRefundBalances,
@@ -1146,6 +1148,44 @@ export default async function handler(
       const url = new URL(request.url ?? '/', 'http://admin.local');
       const shopId = uuidSchema.parse(url.searchParams.get('shopId'));
       const context = await loadContext(request, client, false);
+      if (url.searchParams.get('view') === 'export') {
+        requirePermission(context.principal, 'reports.view', shopId);
+        const requestedStatuses = url.searchParams
+          .getAll('status')
+          .filter((value): value is AdminOrderStatus =>
+            ['ACTIVE', 'DONE', 'CANCELLED', 'RETURNED'].includes(value),
+          );
+        const rawSource = url.searchParams.get('source');
+        const source = rawSource === 'POS' || rawSource === 'ONLINE' ? rawSource : null;
+        let cursor: string | null = null;
+        const rows: AdminOrderSummary[] = [];
+        do {
+          const page = await service.searchOrders(
+            {
+              shopId,
+              query: url.searchParams.get('q'),
+              statuses: requestedStatuses,
+              source,
+              from: url.searchParams.get('from'),
+              to: url.searchParams.get('to'),
+              cursor,
+              limit: Math.min(100, ORDER_EXPORT_MAX_ROWS - rows.length),
+            },
+            context.principal,
+          );
+          rows.push(...page.rows);
+          cursor = page.nextCursor;
+        } while (cursor && rows.length < ORDER_EXPORT_MAX_ROWS);
+
+        response.statusCode = 200;
+        response.setHeader('content-type', 'text/csv; charset=utf-8');
+        response.setHeader('content-disposition', 'attachment; filename="tux-orders.csv"');
+        response.setHeader('cache-control', 'no-store');
+        response.setHeader('x-content-type-options', 'nosniff');
+        response.setHeader('x-tux-export-truncated', cursor ? 'true' : 'false');
+        response.end(renderOrdersCsv(rows));
+        return;
+      }
       if (url.searchParams.get('view') === 'online-requests') {
         const rawStatus = url.searchParams.get('status');
         const status =
