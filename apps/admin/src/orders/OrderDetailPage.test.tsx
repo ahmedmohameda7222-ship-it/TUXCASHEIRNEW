@@ -310,7 +310,7 @@ describe('OrderDetailPage', () => {
     expect(html).not.toContain('Pending Approval');
   });
 
-  it('shows immutable lifecycle transitions, Cairo timestamps, actor, and revision for audit review', () => {
+  it('shows immutable lifecycle transitions, Cairo timestamps, and actor without exposing internal revision numbers', () => {
     const html = render({
       ...fixture,
       status: 'DONE',
@@ -330,7 +330,7 @@ describe('OrderDetailPage', () => {
       ],
     });
     expect(html).toContain('Active → Done');
-    expect(html).toContain('Revision 9');
+    expect(html).not.toContain('Revision 9');
     expect(html).toContain('Admin actor: 11111111-2222-4333-8444-555555555555');
     expect(html).toContain('Sep 22, 2026');
     expect(html).toContain('Prepared on shift');
