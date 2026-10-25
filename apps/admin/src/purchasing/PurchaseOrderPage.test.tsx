@@ -38,6 +38,15 @@ function render(status: AdminPurchaseOrder['status'], canManage = true) {
 }
 
 describe('purchase order draft metadata editor', () => {
+  it('exposes approved details tabs without inventing persisted history', () => {
+    const html = render('RECEIVED');
+    for (const label of ['Overview', 'Items', 'Receiving', 'Returns', 'History']) {
+      expect(html).toContain(label);
+    }
+    expect(html).toContain('No receipt or return event history is available');
+  });
+
+
   it('exposes draft editing to purchasing managers', () => {
     expect(render('DRAFT')).toContain('Edit draft');
   });
