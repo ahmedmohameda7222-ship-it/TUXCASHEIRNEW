@@ -350,6 +350,7 @@ export function CatalogPage() {
 
       {definitionsOpen ? (
         <CatalogDefinitionsEditor
+          key={shopId}
           shopId={shopId}
           categories={categories}
           modifiers={catalog.modifiers}
