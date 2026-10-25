@@ -102,6 +102,13 @@ export function OrdersPage() {
     [query, source, status, businessDayId, timeRange.from, timeRange.to],
   );
   const ordersApi = useOrders(shopId, selectedId, filters, timeRange.error === null);
+  const verifiedKpis =
+    ordersApi.kpiQuery.data?.shopId === shopId ? ordersApi.kpiQuery.data : null;
+  const kpiHint = ordersApi.kpiQuery.isLoading
+    ? 'Loading verified shop total'
+    : ordersApi.kpiQuery.isError
+      ? 'Verified shop totals unavailable; retry using refresh'
+      : 'Full shop, selected date/time range';
   const rows = useMemo(
     () =>
       timeRange.error === null
@@ -184,24 +191,44 @@ export function OrdersPage() {
           <AdminMetricStrip
             label="Orders key metrics"
             metrics={[
-              { id: 'total', label: 'Total orders', value: null },
+              {
+                id: 'total',
+                label: 'Total orders',
+                value: verifiedKpis?.orderCount ?? null,
+                hint: kpiHint,
+              },
               {
                 id: 'revenue',
                 label: 'Total revenue',
-                value: null,
+                value:
+                  principal.permissions.includes('finance.view') &&
+                  verifiedKpis?.netSalesMinor != null
+                    ? formatEgp(verifiedKpis.netSalesMinor)
+                    : null,
                 hint: principal.permissions.includes('finance.view')
-                  ? 'Verified shop-wide total unavailable'
+                  ? kpiHint
                   : 'Requires finance access',
               },
               {
                 id: 'average',
                 label: 'Average order value',
-                value: null,
+                value:
+                  principal.permissions.includes('finance.view') &&
+                  verifiedKpis?.averageOrderMinor != null
+                    ? formatEgp(verifiedKpis.averageOrderMinor)
+                    : null,
                 hint: principal.permissions.includes('finance.view')
-                  ? 'Verified shop-wide average unavailable'
+                  ? verifiedKpis?.denominatorPaidOrderCount === 0
+                    ? 'No paid orders in selected period'
+                    : kpiHint
                   : 'Requires finance access',
               },
-              { id: 'active', label: 'Active orders', value: null },
+              {
+                id: 'active',
+                label: 'Active orders',
+                value: verifiedKpis?.activeOrderCount ?? null,
+                hint: kpiHint,
+              },
             ]}
           />
           <div className="admin-orders-toolbar">
