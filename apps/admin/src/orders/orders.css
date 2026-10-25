@@ -302,3 +302,92 @@
     text-align: end;
   }
 }
+
+/* O3 — the six inspector destinations are in-document anchors, not hidden panels:
+   payment corrections, inventory effects and audit remain accessible at all widths. */
+.admin-order-detail__nav {
+  display: flex;
+  flex-wrap: nowrap;
+  max-width: 100%;
+  gap: 0.25rem;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  border-bottom: 1px solid var(--tux-border-subtle);
+  scrollbar-width: thin;
+}
+
+.admin-order-detail__nav a {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: var(--tux-touch-target);
+  padding: 0.5rem 0.8rem;
+  color: var(--tux-text-secondary);
+  font-size: 0.79rem;
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+
+.admin-order-detail__nav a:hover,
+.admin-order-detail__nav a:focus-visible {
+  color: var(--tux-text-primary);
+  border-bottom-color: var(--tux-accent);
+}
+
+.admin-order-detail__nav a:focus-visible {
+  outline: 2px solid var(--tux-accent);
+  outline-offset: -2px;
+}
+
+.admin-order-detail__facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  gap: 0.5rem;
+}
+
+.admin-order-detail__facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.8rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
+
+.admin-order-detail__facts dt {
+  color: var(--tux-text-secondary);
+  font-size: 0.72rem;
+}
+
+.admin-order-detail__facts dd {
+  margin: 0;
+  color: var(--tux-text-primary);
+  font-size: 0.9rem;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-order-detail [id^='order-detail-'] {
+  scroll-margin-block-start: 0.75rem;
+}
+
+@media (max-width: 620px) {
+  .admin-order-detail__facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-order-detail__nav a {
+    padding-inline: 0.65rem;
+  }
+}
+
+@media print {
+  .admin-order-detail__nav {
+    display: none;
+  }
+}
