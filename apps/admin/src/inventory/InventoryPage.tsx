@@ -45,6 +45,16 @@ function mutationErrorMessage(error: unknown): string | null {
   const code = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
   if (code.includes('inventory_master_unit_locked'))
     return 'This ingredient has a business-wide recipe master binding. Its base unit and tracking mode cannot change.';
+  if (code.includes('stocktake_snapshot_stale'))
+    return 'Stock changed after this count began. Reconcile the late movement, then start a fresh physical count.';
+  if (code.includes('stocktake_requires_off_shift') || code.includes('active_worker_session'))
+    return 'Stocktake is blocked during live trading. End the shift before counting.';
+  if (code.includes('unfinished_orders'))
+    return 'Finalize all stock-affecting orders before starting or posting a physical count.';
+  if (code.includes('destination_inventory_master_mapping_required'))
+    return 'The destination item requires the same authorized recipe master binding, base unit and tracking mode. Configure master bindings before sending.';
+  if (code.includes('transfer_not_cancellable'))
+    return 'This transfer is already received or otherwise final and cannot be cancelled.';
   if (code.includes('insufficient_stock'))
     return 'There is not enough available stock for this action.';
   if (code.includes('conflict'))
