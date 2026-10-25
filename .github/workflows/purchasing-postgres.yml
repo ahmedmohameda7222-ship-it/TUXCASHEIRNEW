@@ -6,6 +6,7 @@ on:
       - fix/purchasing-approved-ui-production-20261025
     paths:
       - 'scripts/test-admin-purchasing-postgres.mjs'
+      - 'e2e/admin-purchasing.spec.ts'
       - 'supabase/migrations/*purchasing*.sql'
       - '.github/workflows/purchasing-postgres.yml'
   pull_request:
@@ -46,3 +47,36 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Test shop-scoped receiving returns retries and weighted cost
         run: node scripts/test-admin-purchasing-postgres.mjs
+
+  purchasing-rendered:
+    name: Purchasing rendered Chromium acceptance and screenshot evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify Admin TypeScript and build
+        run: |
+          npm run typecheck:admin
+          npm run build:admin
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Execute authenticated mock-BFF rendered Purchasing flows
+        run: npx playwright test --config playwright.admin.config.ts e2e/admin-purchasing.spec.ts
+      - name: Preserve real rendered viewport captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: purchasing-admin-rendered-screenshots
+          path: |
+            test-results/
+            playwright-report-admin/
+          if-no-files-found: warn
+          retention-days: 14
