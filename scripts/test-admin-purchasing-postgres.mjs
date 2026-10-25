@@ -713,6 +713,23 @@ if (JSON.parse(replay).idempotentReplay !== true) {
   throw new Error(`purchase receipt replay was not idempotent: ${replay}`);
 }
 
+// Retrying the same command ID with a different request MUST be an explicit conflict.
+for (const caseName of ['quantity', 'cost', 'reference', 'lineId']) {
+  const payload = [{
+    lineId: caseName === 'lineId' ? SECOND_PO_ID : LINE_ID,
+    receivedPurchaseUnitsMicros: caseName === 'quantity' ? 499 : 500,
+    purchaseUnitCostMinor: caseName === 'cost' ? 200001 : 200000,
+  }];
+  const result = JSON.parse(psql(['-At', '-c', `select public.receive_purchase_order_v1(
+     '${EMPLOYEE_ID}', '${SHOP_ID}', '${PO_ID}', 'receive-partial-1',
+     '${caseName === 'reference' ? 'INV-CHANGED' : 'INV-1001'}',
+     '${JSON.stringify(payload)}'::jsonb)::text`],
+  `Conflicting receipt replay (${caseName})`).trim());
+  if (result.ok !== false || result.code !== 'idempotency_conflict') {
+    throw new Error(`receipt replay accepted mismatched ${caseName}: ${JSON.stringify(result)}`);
+  }
+}
+
 const reusedReceive = JSON.parse(
   psql(
     [
@@ -800,6 +817,21 @@ const returnReplay = JSON.parse(
 );
 if (returnReplay.idempotentReplay !== true) {
   throw new Error(`purchase return replay was not idempotent: ${JSON.stringify(returnReplay)}`);
+}
+
+for (const caseName of ['quantity', 'reference', 'lineId']) {
+  const payload = [{
+    lineId: caseName === 'lineId' ? SECOND_PO_ID : LINE_ID,
+    returnedPurchaseUnitsMicros: caseName === 'quantity' ? 249 : 250,
+  }];
+  const result = JSON.parse(psql(['-At', '-c', `select public.return_purchase_order_v1(
+     '${EMPLOYEE_ID}', '${SHOP_ID}', '${PO_ID}', 'return-1',
+     '${caseName === 'reference' ? 'CN-CHANGED' : 'CN-1001'}',
+     '${JSON.stringify(payload)}'::jsonb)::text`],
+  `Conflicting return replay (${caseName})`).trim());
+  if (result.ok !== false || result.code !== 'idempotency_conflict') {
+    throw new Error(`return replay accepted mismatched ${caseName}: ${JSON.stringify(result)}`);
+  }
 }
 
 const reusedReturn = JSON.parse(
