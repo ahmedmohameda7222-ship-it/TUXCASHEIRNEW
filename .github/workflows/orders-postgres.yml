@@ -1,0 +1,101 @@
+name: Orders isolated PostgreSQL acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/api/admin/orders.ts'
+      - 'apps/admin/server/orders/**'
+      - 'apps/admin/src/orders/**'
+      - 'scripts/test-admin-order-approval-postgres.mjs'
+      - 'supabase/migrations/20261025150000_orders_paid_cancel_safety.sql'
+      - '.github/workflows/orders-postgres.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres:
+    name: Orders financial RPC acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Test payment refund, return, approval, and paid cancellation rollback
+        run: node scripts/test-admin-order-approval-postgres.mjs
+
+  admin-rendered:
+    name: Admin Orders rendered acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Typecheck and build Admin
+        run: |
+          npm run typecheck:admin
+          npm run build:admin
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run Admin Orders Playwright acceptance
+        run: npx playwright test --config playwright.admin.config.ts e2e/admin-orders.spec.ts
+      - name: Preserve rendered evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orders-rendered-evidence
+          path: |
+            playwright-report-admin
+            test-results
+          if-no-files-found: warn
+          retention-days: 14
+
+  full-regression:
+    name: Orders full source regression and production builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run complete monorepo unit and integration suite
+        run: npm run test
+      - name: Run monorepo TypeScript verification
+        run: npm run typecheck
+      - name: Build all production workspaces
+        run: npm run build
+      - name: Verify security and deployment contracts
+        run: |
+          npm run test:admin-security
+          npm run test:admin-deployment

@@ -1,20 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
 
-import type {
-  CatalogPublishPreview,
-  CatalogSaveRecurringAvailabilityRuleInput,
-  CatalogScheduledChangeSummary,
-} from '@tux/admin-contracts';
+import type { CatalogPublishPreview, CatalogScheduledChangeSummary } from '@tux/admin-contracts';
 
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { CatalogCopyPanel } from './CatalogCopyPanel';
-import { RecurringAvailabilityEditor } from './RecurringAvailabilityEditor';
-import { ScheduleEditor } from './ScheduleEditor';
+import { PublishReviewChanges } from './PublishReviewChanges';
+import { publishReviewIdentity } from './publishReviewIdentity';
 import { VersionHistory } from './VersionHistory';
 import { CatalogUiError, useCatalogPublishing } from './useCatalog';
-import { useRecurringAvailability } from './useRecurringAvailability';
 import './catalog.css';
 import './publishing.css';
 
@@ -45,9 +40,9 @@ function errorMessage(error: unknown): string {
 
 function scheduleStatusLabel(schedule: CatalogScheduledChangeSummary): string {
   if (schedule.status === 'FAILED' && schedule.terminalFailure) return 'Failed — action required';
-  if (schedule.status === 'FAILED') return 'Retry queued';
-  if (schedule.status === 'CLAIMED') return 'Executing';
-  return schedule.status === 'PENDING' ? 'Pending' : schedule.status;
+  if (schedule.status === 'FAILED') return 'Failed — no automatic retry';
+  if (schedule.status === 'CLAIMED') return 'Claimed (not verified)';
+  return schedule.status === 'PENDING' ? 'Pending — not automatic' : schedule.status;
 }
 
 function PublishSummary({ preview }: { preview: CatalogPublishPreview }) {
@@ -117,13 +112,53 @@ export function PublishReviewPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const publishing = useCatalogPublishing(shopId);
-  const recurring = useRecurringAvailability(shopId);
   const [notice, setNotice] = useState<string | null>(null);
   const [requesterPin, setRequesterPin] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingRestoreVersion, setPendingRestoreVersion] = useState<number | null>(null);
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
+  const [confirmedPreviewIdentity, setConfirmedPreviewIdentity] = useState<string | null>(null);
+  const selectedDraftRef = useRef<string | null>(null);
+  const shopRef = useRef(shopId);
 
+  useEffect(() => {
+    setSelectedDraftId(null);
+    setConfirmedPreviewIdentity(null);
+    setRequesterPin('');
+    setNotice(null);
+    setActionError(null);
+  }, [shopId]);
+
+  const canPublish = principal.permissions.includes('catalog.publish');
+  const canEditCatalog = principal.permissions.includes('catalog.edit');
+  const data = publishing.publishingQuery.data;
+  const draftPreviews = data?.draftPreviews ?? [];
+  // Select the first available draft only on initial load. If an already selected
+  // draft disappears, never silently select a different draft for publication.
+  const preview =
+    selectedDraftId === null
+      ? draftPreviews[0]
+      : draftPreviews.find((candidate) => candidate.draftId === selectedDraftId);
+  const reviewedIdentity =
+    preview && shopId && data?.shopId === shopId ? publishReviewIdentity(shopId, preview) : null;
+  const confirmedPublish =
+    reviewedIdentity !== null &&
+    confirmedPreviewIdentity === reviewedIdentity &&
+    !publishing.publishingQuery.isFetching &&
+    !publishing.publishingQuery.isError;
+
+  selectedDraftRef.current = selectedDraftId ?? preview?.draftId ?? null;
+  shopRef.current = shopId;
+
+  useEffect(() => {
+    if (!data || selectedDraftId !== null || !data.draftPreviews[0]) return;
+    setSelectedDraftId(data.draftPreviews[0].draftId);
+  }, [data, selectedDraftId]);
+
+  useEffect(() => {
+    setConfirmedPreviewIdentity(null);
+    setRequesterPin('');
+  }, [reviewedIdentity]);
   if (!shopId) {
     return (
       <PageScaffold
@@ -134,19 +169,13 @@ export function PublishReviewPage() {
         <div className="admin-callout is-warning">
           <div>
             <strong>Select a shop</strong>
-            <span>Publishing, scheduling, and restores never run against All Shops.</span>
+            <span>Publishing and restores never run against All Shops.</span>
           </div>
         </div>
       </PageScaffold>
     );
   }
 
-  const canPublish = principal.permissions.includes('catalog.publish');
-  const canEditCatalog = principal.permissions.includes('catalog.edit');
-  const data = publishing.publishingQuery.data;
-  const draftPreviews = data?.draftPreviews ?? [];
-  const preview =
-    draftPreviews.find((candidate) => candidate.draftId === selectedDraftId) ?? draftPreviews[0];
   const schedules = (data?.schedules ?? []).filter((schedule) =>
     new Set(['PENDING', 'FAILED', 'CLAIMED']).has(schedule.status),
   );
@@ -161,15 +190,50 @@ export function PublishReviewPage() {
   }
 
   async function publishNow() {
-    if (!preview) return;
+    if (!preview || preview.shopId !== shopId || !confirmedPublish || !reviewedIdentity) return;
+    // Never use a revision read after the operator's explicit confirmation.
+    const selectedAtConfirmation = selectedDraftRef.current;
+    const shopAtConfirmation = shopRef.current;
+    const confirmed = {
+      shopId,
+      draftId: preview.draftId,
+      expectedDraftRevision: preview.draftRevision,
+      expectedVersion: preview.currentPublishVersion,
+      previewIdentity: reviewedIdentity,
+      requesterPin: requesterPin.trim(),
+    };
     await runAction(async () => {
+      // A background refetch alone cannot close the confirmation-to-click race.
+      // Explicitly revalidate the exact reviewed preview immediately before POST.
+      const refreshed = await publishing.publishingQuery.refetch();
+      const current = refreshed.data;
+      const sameDraft = current?.draftPreviews.find(
+        (candidate) => candidate.draftId === confirmed.draftId,
+      );
+      if (
+        refreshed.isError ||
+        !current ||
+        current.shopId !== confirmed.shopId ||
+        current.currentPublishVersion !== confirmed.expectedVersion ||
+        shopRef.current !== shopAtConfirmation ||
+        selectedDraftRef.current !== selectedAtConfirmation ||
+        !sameDraft ||
+        sameDraft.stale ||
+        publishReviewIdentity(confirmed.shopId, sameDraft) !== confirmed.previewIdentity
+      ) {
+        setConfirmedPreviewIdentity(null);
+        setRequesterPin('');
+        setActionError('The reviewed draft changed. Review the updated changes and confirm again.');
+        return;
+      }
       const result = await publishing.publishDraft.mutateAsync({
-        draftId: preview.draftId,
-        expectedDraftRevision: preview.draftRevision,
-        expectedVersion: preview.currentPublishVersion,
-        ...(requesterPin.trim() ? { requesterPin: requesterPin.trim() } : {}),
+        draftId: confirmed.draftId,
+        expectedDraftRevision: confirmed.expectedDraftRevision,
+        expectedVersion: confirmed.expectedVersion,
+        ...(confirmed.requesterPin ? { requesterPin: confirmed.requesterPin } : {}),
       });
       setRequesterPin('');
+      setConfirmedPreviewIdentity(null);
       if ('state' in result && result.state === 'PENDING_APPROVAL') {
         setNotice(
           'Catalog publication requested. A second person must approve before it goes live.',
@@ -179,28 +243,6 @@ export function PublishReviewPage() {
       } else {
         setNotice('Catalog published.');
       }
-    });
-  }
-
-  async function schedulePublish(localScheduledAt: string) {
-    if (!preview) return;
-    await runAction(async () => {
-      await publishing.scheduleDraft.mutateAsync({
-        draftId: preview.draftId,
-        expectedDraftRevision: preview.draftRevision,
-        expectedVersion: preview.currentPublishVersion,
-        localScheduledAt,
-      });
-      setNotice('Publish scheduled.');
-    });
-  }
-
-  async function saveRecurringAvailability(
-    input: Omit<CatalogSaveRecurringAvailabilityRuleInput, 'shopId'>,
-  ) {
-    await runAction(async () => {
-      await recurring.saveRule.mutateAsync(input);
-      setNotice('Recurring availability saved.');
     });
   }
 
@@ -228,7 +270,7 @@ export function PublishReviewPage() {
     <PageScaffold
       eyebrow="Catalog"
       title="Review & publish"
-      description="Review catalog changes, publish now, schedule a Cairo activation time, or restore an earlier release."
+      description="Review catalog changes, publish now through the authorized workflow, or restore an earlier release."
       primaryAction={
         <Link className="admin-secondary-button admin-publish-back-link" href="/catalog/products">
           Back to products
@@ -282,23 +324,29 @@ export function PublishReviewPage() {
             />
           ) : null}
 
-          <RecurringAvailabilityEditor
-            workspace={recurring.recurringQuery.data}
-            isLoading={recurring.recurringQuery.isLoading}
-            isError={recurring.recurringQuery.isError}
-            disabled={!canEditCatalog}
-            isPending={recurring.saveRule.isPending}
-            onSave={saveRecurringAvailability}
-          />
+          <div className="admin-callout is-warning" role="status">
+            <strong>Automatic scheduling is unavailable</strong>
+            <span>
+              Schedule Publish and recurring availability are disabled because there is no verified
+              unattended runner. Existing schedules and saved rules are preserved for review, but
+              they will not execute automatically. Use Publish now or immediate manual availability
+              controls instead.
+            </span>
+          </div>
 
-          {draftPreviews.length > 1 ? (
+          {draftPreviews.length > 1 || (selectedDraftId !== null && !preview) ? (
             <label className="admin-field">
               <span>Changes to review</span>
               <select
                 aria-label="Changes to review"
                 value={preview?.draftId ?? ''}
-                onChange={(event) => setSelectedDraftId(event.target.value)}
+                onChange={(event) => {
+                  setSelectedDraftId(event.target.value);
+                  setConfirmedPreviewIdentity(null);
+                  setRequesterPin('');
+                }}
               >
+                {!preview ? <option value="">Select saved changes to review</option> : null}
                 {draftPreviews.map((candidate, index) => (
                   <option key={candidate.draftId} value={candidate.draftId}>
                     Saved changes {index + 1}
@@ -322,6 +370,7 @@ export function PublishReviewPage() {
               ) : null}
 
               <PublishSummary preview={preview} />
+              {preview.changes ? <PublishReviewChanges changes={preview.changes} /> : null}
 
               <section className="admin-publish-card" aria-labelledby="publish-now-heading">
                 <div className="admin-publish-card__heading">
@@ -348,22 +397,41 @@ export function PublishReviewPage() {
                     onChange={(event) => setRequesterPin(event.currentTarget.value)}
                   />
                 </label>
+                <label className="admin-field">
+                  <span>
+                    <input
+                      type="checkbox"
+                      checked={confirmedPublish}
+                      disabled={
+                        !canPublish ||
+                        preview.stale ||
+                        publishing.publishDraft.isPending ||
+                        publishing.publishingQuery.isFetching
+                      }
+                      onChange={(event) =>
+                        setConfirmedPreviewIdentity(
+                          event.currentTarget.checked ? reviewedIdentity : null,
+                        )
+                      }
+                    />{' '}
+                    I reviewed the changes and confirm publication for this shop.
+                  </span>
+                </label>
                 <button
                   className="admin-primary-button"
                   type="button"
-                  disabled={!canPublish || preview.stale || publishing.publishDraft.isPending}
+                  disabled={
+                    !canPublish ||
+                    !confirmedPublish ||
+                    preview.stale ||
+                    publishing.publishDraft.isPending ||
+                    publishing.publishingQuery.isFetching
+                  }
                   onClick={() => void publishNow()}
                 >
                   {publishing.publishDraft.isPending ? 'Publishing…' : 'Publish now'}
                 </button>
               </section>
-
-              <ScheduleEditor
-                preview={preview}
-                disabled={!canPublish}
-                isPending={publishing.scheduleDraft.isPending}
-                onSchedule={schedulePublish}
-              />
             </>
           ) : (
             <div className="admin-empty-state">
@@ -376,8 +444,8 @@ export function PublishReviewPage() {
             <section className="admin-publish-card" aria-labelledby="scheduled-publishes-heading">
               <div className="admin-publish-card__heading">
                 <div>
-                  <p className="admin-catalog-editor__eyebrow">Upcoming</p>
-                  <h2 id="scheduled-publishes-heading">Scheduled publishes</h2>
+                  <p className="admin-catalog-editor__eyebrow">Preserved history</p>
+                  <h2 id="scheduled-publishes-heading">Existing schedules</h2>
                 </div>
               </div>
               <div className="admin-publish-history">
@@ -391,8 +459,7 @@ export function PublishReviewPage() {
                       <span>Cairo timezone</span>
                       {schedule.status === 'FAILED' ? (
                         <span>
-                          We could not complete this publish. Review the changes and schedule it
-                          again.
+                          This publish was not completed. Review the draft and publish manually.
                         </span>
                       ) : null}
                     </div>

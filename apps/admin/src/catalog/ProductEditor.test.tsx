@@ -172,7 +172,7 @@ describe('ProductEditor', () => {
     expect(html).toContain('Mark sold out');
   });
 
-  it('hides storage implementation details and presents a business image state', () => {
+  it('keeps image assignment in the draft without exposing raw storage keys', () => {
     const html = renderEditor(
       <ProductEditor
         product={fixtureProduct}
@@ -184,7 +184,7 @@ describe('ProductEditor', () => {
     );
 
     expect(html).toContain('Product image');
-    expect(html).toContain('managed outside this screen');
+    expect(html).toContain('Image upload changes remain in Draft until saved and published.');
     expect(html).not.toContain('Image object key');
     expect(html).not.toContain(fixtureProduct.shopId);
     expect(html).not.toContain(fixtureProduct.id);

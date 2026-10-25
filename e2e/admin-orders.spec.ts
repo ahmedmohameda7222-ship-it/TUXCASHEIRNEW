@@ -64,16 +64,23 @@ function detail(input: {
       deliveryZoneLabel: input.source === 'ONLINE' ? 'Maadi' : null,
       finalDeliveryFeeMinor: input.source === 'ONLINE' ? 1500 : 0,
     },
-    payments: [
-      {
-        id: paymentId,
-        methodLabel: 'Cash',
-        logicType: 'CASH',
-        allocatedMinor: 12500,
-        receivedMinor: 12500,
-        changeMinor: 0,
-      },
-    ],
+    payments:
+      input.status === 'ACTIVE'
+        ? []
+        : [
+            {
+              id: paymentId,
+              methodLabel: 'Cash',
+              logicType: 'CASH',
+              allocatedMinor: 12500,
+              receivedMinor: 12500,
+              changeMinor: 0,
+              refundAllowedSnapshot: true,
+              postedRefundMinor: 0,
+              pendingRefundMinor: 0,
+              remainingRefundableMinor: 12500,
+            },
+          ],
     items: [
       {
         id: input.itemId,
@@ -81,6 +88,9 @@ function detail(input: {
         productName: 'TUX Burger',
         quantity: 1,
         unitPriceMinor: 12500,
+        postedReturnQuantity: 0,
+        pendingReturnQuantity: 0,
+        remainingReturnableQuantity: 1,
         itemNote: null,
         modifiers: [],
         comboBeverages: [],
@@ -125,7 +135,7 @@ function summary(order: AdminOrderDetail): AdminOrderSummary {
 
 async function mockOrders(
   page: Page,
-  options: { staleCancellation?: boolean; emptyOrders?: boolean } = {},
+  options: { staleCancellation?: boolean; emptyOrders?: boolean; paidActive?: boolean } = {},
 ) {
   let active = detail({
     id: activeOrderId,
@@ -145,6 +155,7 @@ async function mockOrders(
     phone: '+201000000002',
     itemId: doneItemId,
   });
+  if (options.paidActive) active = { ...active, payments: done.payments };
   const commands: Record<string, unknown>[] = [];
   const searches: URL[] = [];
 
@@ -483,6 +494,19 @@ test('orders search filters real Admin list and exposes status-contextual action
     .toBe(true);
   await expect(page.getByRole('button', { name: /#102/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /#101/ })).toHaveCount(0);
+});
+
+test('paid ACTIVE order blocks Admin cancellation while keeping immutable payments visible', async ({
+  page,
+}) => {
+  const fixture = await mockOrders(page, { paidActive: true });
+  await page.goto('/orders');
+  await page.getByRole('button', { name: /#101/ }).click();
+  await expect(page.getByRole('button', { name: 'Cancel order' })).toHaveCount(0);
+  await expect(
+    page.getByRole('status', { name: 'Paid active order cancellation restriction' }),
+  ).toBeVisible();
+  expect(fixture.commands).toHaveLength(0);
 });
 
 for (const viewport of premiumVisualViewports([{ name: 'desktop', width: 1440, height: 900 }])) {

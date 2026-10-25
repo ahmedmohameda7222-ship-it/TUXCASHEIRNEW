@@ -1,0 +1,245 @@
+name: Orders serial three-stream disposable integration
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/orders-three-stream-preflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Integration candidate includes the actual Catalog squash on main plus the
+# unchanged Orders/Inventory PR source heads. Test this checked-out tree directly.
+env:
+  EXPECTED_MAIN_SHA: b1456a4ade26f0d06b19d2657a6b77bbad7a6622
+  ORDERS_SOURCE_SHA: 5b14103f2c72846beb31151fbe6afb6b1379ebc9
+  INVENTORY_SOURCE_SHA: 3452c42be50cfeeea908d17864ef7075dd69631d
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+jobs:
+  source:
+    name: Three-stream full source regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify pinned combined Orders and Inventory checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This PR is already a real Git merge of Orders and Inventory, based
+          # on the Catalog squash in main. Do NOT merge stale Catalog tips.
+          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/ci-release-main
+          test "$(git rev-parse refs/remotes/origin/ci-release-main)" = "$EXPECTED_MAIN_SHA"
+          for sha in "$EXPECTED_MAIN_SHA" "$ORDERS_SOURCE_SHA" "$INVENTORY_SOURCE_SHA"; do
+            git cat-file -e "$sha^{commit}"
+            git merge-base --is-ancestor "$sha" HEAD
+          done
+          test -z "$(git status --porcelain)"
+          echo "catalog_main=$EXPECTED_MAIN_SHA"
+          echo "orders=$ORDERS_SOURCE_SHA"
+          echo "inventory=$INVENTORY_SOURCE_SHA"
+          echo "tested_combined_head=$(git rev-parse HEAD)"
+          {
+            echo "### Exact-head combined Orders + Inventory release candidate"
+            echo "- Catalog squash main: `$EXPECTED_MAIN_SHA`"
+            echo "- Orders source: `$ORDERS_SOURCE_SHA`"
+            echo "- Inventory source: `$INVENTORY_SOURCE_SHA`"
+            echo "- Exact integrated SHA: `$(git rev-parse HEAD)`"
+            echo "- Tests use the checked-out integration tree; no stale re-merges."
+            echo "- No remote push, production migration, or live deployment."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install immutable lockfile dependencies
+        id: source_install
+        run: npm ci
+      - name: Full format verification
+        if: ${{ always() && steps.source_install.outcome == 'success' }}
+        run: npm run format:check
+      - name: Full ESLint
+        if: ${{ always() && steps.source_install.outcome == 'success' }}
+        run: npm run lint
+      - name: Full monorepo unit and integration tests
+        if: ${{ always() && steps.source_install.outcome == 'success' }}
+        run: npm run test
+      - name: Independent Node CI selector tests
+        if: ${{ always() && steps.source_install.outcome == 'success' }}
+        run: node --test scripts/ci-fast-scope.test.mjs
+      - name: Sync package regression
+        if: ${{ always() && steps.source_install.outcome == 'success' }}
+        run: npm test -w @tux/sync
+      - name: All workspace and API TypeScript checks
+        if: ${{ always() && steps.source_install.outcome == 'success' }}
+        run: npm run typecheck
+      - name: All production workspace builds
+        if: ${{ always() && steps.source_install.outcome == 'success' }}
+        run: npm run build
+      - name: Admin, architecture and security contracts
+        if: ${{ always() && steps.source_install.outcome == 'success' }}
+        run: |
+          npm run test:admin-security
+          npm run test:admin-deployment
+          npm run test:whatsapp-architecture
+          npm run test:whatsapp-security
+
+  database:
+    name: Three-stream PostgreSQL migrations and financial acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify pinned combined Orders and Inventory checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This PR is already a real Git merge of Orders and Inventory, based
+          # on the Catalog squash in main. Do NOT merge stale Catalog tips.
+          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/ci-release-main
+          test "$(git rev-parse refs/remotes/origin/ci-release-main)" = "$EXPECTED_MAIN_SHA"
+          for sha in "$EXPECTED_MAIN_SHA" "$ORDERS_SOURCE_SHA" "$INVENTORY_SOURCE_SHA"; do
+            git cat-file -e "$sha^{commit}"
+            git merge-base --is-ancestor "$sha" HEAD
+          done
+          test -z "$(git status --porcelain)"
+          echo "catalog_main=$EXPECTED_MAIN_SHA"
+          echo "orders=$ORDERS_SOURCE_SHA"
+          echo "inventory=$INVENTORY_SOURCE_SHA"
+          echo "tested_combined_head=$(git rev-parse HEAD)"
+          {
+            echo "### Exact-head combined Orders + Inventory release candidate"
+            echo "- Catalog squash main: `$EXPECTED_MAIN_SHA`"
+            echo "- Orders source: `$ORDERS_SOURCE_SHA`"
+            echo "- Inventory source: `$INVENTORY_SOURCE_SHA`"
+            echo "- Exact integrated SHA: `$(git rev-parse HEAD)`"
+            echo "- Tests use the checked-out integration tree; no stale re-merges."
+            echo "- No remote push, production migration, or live deployment."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked packages
+        run: npm ci
+      - name: Install local PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Assert exact chronological cross-stream migration sequence
+        run: |
+          node --input-type=module -e "
+            import {readdirSync} from 'node:fs';
+            const f = readdirSync('supabase/migrations').sort();
+            const names = [
+              '20261025150000_orders_paid_cancel_safety.sql',
+              '20261025170000_inventory_offshift_quiescence.sql',
+              '20261025171000_inventory_transfer_master_identity.sql',
+              '20261025172000_inventory_transfer_cancel_compensation.sql',
+              '20261025173000_inventory_stocktake_draft_recovery.sql',
+              '20261025174000_inventory_stocktake_ledger_replay_fence.sql',
+              '20261025175000_inventory_reservation_replay_payload_integrity.sql',
+            ];
+            const indices = names.map(n=>f.indexOf(n));
+            if(indices.some(i=>i<0)||indices.some((i,k)=>k>0&&i<=indices[k-1])){
+              throw Error('Invalid Orders/Inventory migration sequence: '+JSON.stringify(indices));
+            }
+            console.log(names.join(' -> '));
+          "
+      - name: Apply complete ordered migration chain and assert schema security in disposable PostgreSQL
+        run: npm run test:migrations
+      - name: Orders cancellation/refund/return/approval/replay PostgreSQL
+        run: node scripts/test-admin-order-approval-postgres.mjs
+      - name: Business Day/Operations PostgreSQL RPC
+        run: node scripts/test-operations-business-day-sync-postgres.mjs
+      - name: Inventory five-migration real PostgreSQL stocktake/transfer/replay acceptance
+        run: node scripts/test-inventory-isolated-postgres.mjs
+
+  browser:
+    name: Three-stream rendered Admin Operations Menu
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify pinned combined Orders and Inventory checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This PR is already a real Git merge of Orders and Inventory, based
+          # on the Catalog squash in main. Do NOT merge stale Catalog tips.
+          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/ci-release-main
+          test "$(git rev-parse refs/remotes/origin/ci-release-main)" = "$EXPECTED_MAIN_SHA"
+          for sha in "$EXPECTED_MAIN_SHA" "$ORDERS_SOURCE_SHA" "$INVENTORY_SOURCE_SHA"; do
+            git cat-file -e "$sha^{commit}"
+            git merge-base --is-ancestor "$sha" HEAD
+          done
+          test -z "$(git status --porcelain)"
+          echo "catalog_main=$EXPECTED_MAIN_SHA"
+          echo "orders=$ORDERS_SOURCE_SHA"
+          echo "inventory=$INVENTORY_SOURCE_SHA"
+          echo "tested_combined_head=$(git rev-parse HEAD)"
+          {
+            echo "### Exact-head combined Orders + Inventory release candidate"
+            echo "- Catalog squash main: `$EXPECTED_MAIN_SHA`"
+            echo "- Orders source: `$ORDERS_SOURCE_SHA`"
+            echo "- Inventory source: `$INVENTORY_SOURCE_SHA`"
+            echo "- Exact integrated SHA: `$(git rev-parse HEAD)`"
+            echo "- Tests use the checked-out integration tree; no stale re-merges."
+            echo "- No remote push, production migration, or live deployment."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked packages
+        id: node_install
+        run: npm ci
+      - name: Install Chromium browser and system libraries
+        id: browser_install
+        run: npx playwright install --with-deps chromium
+      - name: Admin authenticated shell, Catalog, Orders, Inventory, Finance rendered Playwright
+        if: ${{ always() && steps.node_install.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:e2e:admin
+      - name: Operations desktop/tablet/mobile rendered Playwright
+        if: ${{ always() && steps.node_install.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:e2e
+      - name: Menu desktop/mobile rendered Playwright
+        if: ${{ always() && steps.node_install.outcome == 'success' && steps.browser_install.outcome == 'success' }}
+        run: npm run test:e2e:menu
+      - name: Preserve temporary-render evidence on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orders-three-stream-rendered-evidence
+          path: |
+            playwright-report-admin
+            playwright-report
+            playwright-report-menu
+            test-results
+          if-no-files-found: warn
+          retention-days: 14

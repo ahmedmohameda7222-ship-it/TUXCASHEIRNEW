@@ -4,6 +4,8 @@ import type {
   AdminOrderFinancialMutationResult,
   AdminOrderSearchInput,
   AdminOrderSearchResult,
+  AdminOrderBusinessDaysResult,
+  AdminOnlineOrderRequestsResult,
   AdminReasonCodeConfiguration,
   AdminSessionPrincipal,
   CancelAdminOrderInput,
@@ -17,6 +19,19 @@ type OrderActor = { employeeId: string; businessId: string };
 
 export interface OrderStore {
   searchOrders(input: AdminOrderSearchInput & OrderActor): Promise<AdminOrderSearchResult>;
+  listBusinessDays(input: {
+    shopId: string;
+    businessId: string;
+  }): Promise<AdminOrderBusinessDaysResult>;
+  listOnlineOrderRequests(input: {
+    shopId: string;
+    businessId: string;
+    status: 'PENDING' | 'PROCESSING' | 'ACCEPTED' | 'REJECTED' | null;
+    from: string | null;
+    to: string | null;
+    cursor?: string | null;
+    limit?: number;
+  }): Promise<AdminOnlineOrderRequestsResult>;
   listActionReasons(input: {
     shopId: string;
     businessId: string;
@@ -48,6 +63,32 @@ export function createOrderService(store: OrderStore) {
       return store.searchOrders({
         ...input,
         employeeId: principal.employeeId,
+        businessId: principal.businessId,
+      });
+    },
+
+    listBusinessDays(
+      input: { shopId: string },
+      principal: AdminSessionPrincipal,
+    ): Promise<AdminOrderBusinessDaysResult> {
+      requirePermission(principal, 'orders.view', input.shopId);
+      return store.listBusinessDays({ ...input, businessId: principal.businessId });
+    },
+
+    listOnlineOrderRequests(
+      input: {
+        shopId: string;
+        status: 'PENDING' | 'PROCESSING' | 'ACCEPTED' | 'REJECTED' | null;
+        from: string | null;
+        to: string | null;
+        cursor?: string | null;
+        limit?: number;
+      },
+      principal: AdminSessionPrincipal,
+    ): Promise<AdminOnlineOrderRequestsResult> {
+      requirePermission(principal, 'orders.view', input.shopId);
+      return store.listOnlineOrderRequests({
+        ...input,
         businessId: principal.businessId,
       });
     },

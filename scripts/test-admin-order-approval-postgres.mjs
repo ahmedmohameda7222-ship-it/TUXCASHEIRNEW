@@ -66,7 +66,8 @@ const migrations = readdirSync(migrationsDirectory)
   .filter((name) => /^\d+_.+\.sql$/.test(name))
   .sort();
 const targetIndex = migrations.indexOf(migrationName);
-if (targetIndex < 0) throw new Error('Admin order controls migration missing from repository chain.');
+if (targetIndex < 0)
+  throw new Error('Admin order controls migration missing from repository chain.');
 for (const migration of migrations.slice(0, targetIndex + 1)) {
   psql(['-f', resolve(migrationsDirectory, migration)], migration);
 }
@@ -275,7 +276,6 @@ if (
   throw new Error(`held refund snapshot is invalid: ${JSON.stringify(heldRow)}`);
 }
 
-
 const heldRefundReplay = rpc(
   `public.request_admin_order_refund_v1(
     '${REQUESTER_ID}', '${SHOP_ID}', '${ORDER_ID}', '${PAYMENT_ID}',
@@ -355,7 +355,11 @@ const postedRefund = rpc(
   )`,
   'Execute approved refund',
 );
-if (postedRefund.ok !== true || postedRefund.state !== 'POSTED' || postedRefund.replayed !== false) {
+if (
+  postedRefund.ok !== true ||
+  postedRefund.state !== 'POSTED' ||
+  postedRefund.replayed !== false
+) {
   throw new Error(`approved refund did not post: ${JSON.stringify(postedRefund)}`);
 }
 
@@ -381,7 +385,9 @@ if (
   postedRefundReplay.replayed !== true ||
   postedRefundReplay.refundId !== postedRefund.refundId
 ) {
-  throw new Error(`approved refund execution was not idempotent: ${JSON.stringify(postedRefundReplay)}`);
+  throw new Error(
+    `approved refund execution was not idempotent: ${JSON.stringify(postedRefundReplay)}`,
+  );
 }
 
 const completeRefund = rpc(
@@ -447,7 +453,11 @@ const directReturn = rpc(
   )`,
   'Below-threshold return',
 );
-if (directReturn.ok !== true || directReturn.state !== 'POSTED' || directReturn.replayed !== false) {
+if (
+  directReturn.ok !== true ||
+  directReturn.state !== 'POSTED' ||
+  directReturn.replayed !== false
+) {
   throw new Error(`below-threshold return should post directly: ${JSON.stringify(directReturn)}`);
 }
 
@@ -487,7 +497,9 @@ const directReturnConflict = rpc(
   'Return command conflict',
 );
 if (directReturnConflict.ok !== false || directReturnConflict.code !== 'command_id_conflict') {
-  throw new Error(`changed return payload should conflict: ${JSON.stringify(directReturnConflict)}`);
+  throw new Error(
+    `changed return payload should conflict: ${JSON.stringify(directReturnConflict)}`,
+  );
 }
 
 const rejectedReturn = rpc(
@@ -508,7 +520,9 @@ if (
   rejectedReturn.state !== 'PENDING_APPROVAL' ||
   typeof rejectedReturn.approvalRequestId !== 'string'
 ) {
-  throw new Error(`return requiring approval should be held before rejection: ${JSON.stringify(rejectedReturn)}`);
+  throw new Error(
+    `return requiring approval should be held before rejection: ${JSON.stringify(rejectedReturn)}`,
+  );
 }
 
 const rejectedReturnDecision = rpc(
@@ -603,7 +617,9 @@ const returnSelfApproval = rpc(
   'Return self approval attempt',
 );
 if (returnSelfApproval.ok !== false || returnSelfApproval.code !== 'self_approval_forbidden') {
-  throw new Error(`requester bypassed return second-person approval: ${JSON.stringify(returnSelfApproval)}`);
+  throw new Error(
+    `requester bypassed return second-person approval: ${JSON.stringify(returnSelfApproval)}`,
+  );
 }
 
 const approvedReturn = rpc(
@@ -652,7 +668,11 @@ const postedReturn = rpc(
   )`,
   'Execute approved return',
 );
-if (postedReturn.ok !== true || postedReturn.state !== 'POSTED' || postedReturn.replayed !== false) {
+if (
+  postedReturn.ok !== true ||
+  postedReturn.state !== 'POSTED' ||
+  postedReturn.replayed !== false
+) {
   throw new Error(`approved return did not post: ${JSON.stringify(postedReturn)}`);
 }
 
@@ -670,9 +690,7 @@ const returnedItemAmount = Number(
   ).trim(),
 );
 if (returnedItemAmount !== 11000) {
-  throw new Error(
-    `returned item amount omitted immutable modifier charges: ${returnedItemAmount}`,
-  );
+  throw new Error(`returned item amount omitted immutable modifier charges: ${returnedItemAmount}`);
 }
 const postedReturnReplay = rpc(
   `public.execute_approved_admin_order_return_v1(
@@ -695,7 +713,330 @@ if (
   postedReturnReplay.replayed !== true ||
   postedReturnReplay.returnId !== postedReturn.returnId
 ) {
-  throw new Error(`approved return execution was not idempotent: ${JSON.stringify(postedReturnReplay)}`);
+  throw new Error(
+    `approved return execution was not idempotent: ${JSON.stringify(postedReturnReplay)}`,
+  );
 }
 
 console.log('Admin order approval PostgreSQL threshold behavior passed.');
+
+/* Orders P1 regression: unsafe paid Admin cancellation must roll back fully,
+   while the existing unpaid path remains functional and command-replay safe. */
+psql(
+  ['-f', resolve(migrationsDirectory, '20261025150000_orders_paid_cancel_safety.sql')],
+  'Apply isolated paid-Active cancellation guard',
+);
+
+const PAID_ACTIVE_ID = '59000000-0000-4000-8000-000000000092';
+const UNPAID_ACTIVE_ID = '59000000-0000-4000-8000-000000000093';
+const PAID_PAYMENT_ID = '5b000000-0000-4000-8000-000000000092';
+const CANCEL_REASON_ID = '5c000000-0000-4000-8000-000000000092';
+
+psql(
+  [
+    '-c',
+    `update public.business_days
+       set last_allocated_display_order_no = 3 where id = '${DAY_ID}';
+     insert into public.orders(
+       id, shop_id, business_day_id, display_order_no, idempotency_key,
+       source, status, operator_worker_id, operator_name_snapshot,
+       order_type_id, order_type_label_snapshot, order_type_behavior_snapshot,
+       items_subtotal_minor, discount_minor, total_minor, order_note, created_at, updated_at
+     ) values
+       ('${PAID_ACTIVE_ID}', '${SHOP_ID}', '${DAY_ID}', 2, 'paid-active-test',
+        'POS', 'ACTIVE', '${WORKER_ID}', 'Test worker', '${ORDER_TYPE_ID}',
+        'Take Away', 'TAKE_AWAY', 11000, 0, 11000, null, now(), now()),
+       ('${UNPAID_ACTIVE_ID}', '${SHOP_ID}', '${DAY_ID}', 3, 'unpaid-active-test',
+        'POS', 'ACTIVE', '${WORKER_ID}', 'Test worker', '${ORDER_TYPE_ID}',
+        'Take Away', 'TAKE_AWAY', 11000, 0, 11000, null, now(), now());
+     insert into public.payments(
+       id, shop_id, order_id, part_index, payment_method_id,
+       payment_method_label_snapshot, logic_type_snapshot,
+       allocated_minor, received_minor, change_minor, created_at
+     ) values (
+       '${PAID_PAYMENT_ID}', '${SHOP_ID}', '${PAID_ACTIVE_ID}',
+       1, '${PAYMENT_METHOD_ID}', 'Card', 'CARD', 5000, null, null, now()
+     );
+     insert into public.admin_reason_codes(
+       id, business_id, shop_id, reason_key, family, label,
+       active, version, updated_by_employee_id
+     ) values (
+       '${CANCEL_REASON_ID}', '${BUSINESS_ID}', null,
+       'CUSTOMER_CHANGED_MIND', 'CANCELLATION', 'Customer changed mind',
+       true, 1, '${REQUESTER_ID}'
+     );`,
+  ],
+  'Seed paid and unpaid ACTIVE cancellation cases',
+);
+
+// The Admin cancel RPC releases inventory reservations before setting order status.
+// Seed real reservation movements: a guard exception must unwind all preceding writes.
+const RESERVED_ITEM_ID = '60000000-0000-4000-8000-000000000092';
+const PAID_RESERVATION_ID = '61000000-0000-4000-8000-000000000092';
+const UNPAID_RESERVATION_ID = '61000000-0000-4000-8000-000000000093';
+
+psql(
+  [
+    '-c',
+    `insert into public.inventory_items(id,shop_id,name,unit_label,tracking_mode)
+       values ('${RESERVED_ITEM_ID}', '${SHOP_ID}', 'Cancellation rollback ingredient', 'g',
+               'RECIPE_TRACKED');
+     insert into public.inventory_movements(
+       id,shop_id,business_day_id,inventory_item_id,movement_type,
+       quantity_delta_micros,reserved_delta_micros,admin_employee_id,source_kind,
+       idempotency_key,created_at
+     ) values (
+       gen_random_uuid(), '${SHOP_ID}', '${DAY_ID}', '${RESERVED_ITEM_ID}',
+       'ADMIN_ADJUSTMENT', 10000, 0, '${REQUESTER_ID}', 'ADMIN',
+       'cancel-regression-opening-stock',now()
+     );
+     insert into public.inventory_movements(
+       id,shop_id,business_day_id,inventory_item_id,movement_type,
+       quantity_delta_micros,reserved_delta_micros,worker_id,source_kind,
+       idempotency_key,order_id,created_at
+     ) values
+       (gen_random_uuid(), '${SHOP_ID}', '${DAY_ID}', '${RESERVED_ITEM_ID}',
+        'ORDER_RESERVATION',0,1500,'${WORKER_ID}','OPERATIONS',
+        'cancel-regression-paid-reserve','${PAID_ACTIVE_ID}',now()),
+       (gen_random_uuid(), '${SHOP_ID}', '${DAY_ID}', '${RESERVED_ITEM_ID}',
+        'ORDER_RESERVATION',0,1700,'${WORKER_ID}','OPERATIONS',
+        'cancel-regression-unpaid-reserve','${UNPAID_ACTIVE_ID}',now());
+     insert into public.inventory_reservations(
+       id,shop_id,order_id,inventory_item_id,business_day_id,quantity_micros,
+       status,reserve_command_id,last_command_id,created_by_worker_id
+     ) values
+       ('${PAID_RESERVATION_ID}','${SHOP_ID}','${PAID_ACTIVE_ID}','${RESERVED_ITEM_ID}',
+        '${DAY_ID}',1500,'ACTIVE','paid-reserve-1','paid-reserve-1','${WORKER_ID}'),
+       ('${UNPAID_RESERVATION_ID}','${SHOP_ID}','${UNPAID_ACTIVE_ID}','${RESERVED_ITEM_ID}',
+        '${DAY_ID}',1700,'ACTIVE','unpaid-reserve-1','unpaid-reserve-1','${WORKER_ID}');`,
+  ],
+  'Seed actual paid/unpaid inventory reservations for transactional rollback',
+);
+
+const guardMetadata = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select jsonb_build_object(
+         'enabled', exists(select 1 from pg_trigger where tgrelid='public.orders'::regclass
+           and tgname='orders_paid_admin_cancel_guard' and tgenabled='O'),
+         'anonExec', has_function_privilege('anon',
+           'private.reject_paid_active_admin_cancellation_v1()', 'EXECUTE'),
+         'authenticatedExec', has_function_privilege('authenticated',
+           'private.reject_paid_active_admin_cancellation_v1()', 'EXECUTE'),
+         'serviceExec', has_function_privilege('service_role',
+           'private.reject_paid_active_admin_cancellation_v1()', 'EXECUTE')
+       )::text`,
+    ],
+    'Cancellation trigger and principle-of-least-privilege introspection',
+  ).trim(),
+);
+if (!guardMetadata.enabled || guardMetadata.anonExec ||
+    guardMetadata.authenticatedExec || guardMetadata.serviceExec) {
+  throw new Error(`Guard activation / EXECUTE grants invalid: ${JSON.stringify(guardMetadata)}`);
+}
+
+psql(
+  [
+    '-c',
+    `do $check_paid_cancel$
+     declare observed text;
+     begin
+       begin
+         perform public.cancel_admin_order_v1(
+           '${REQUESTER_ID}', '${SHOP_ID}', '${PAID_ACTIVE_ID}',
+           '${CANCEL_REASON_ID}', 0, null,
+           'paid-cancel-should-reject', '${BUSINESS_ID}'
+         );
+         raise exception 'paid ACTIVE cancellation unexpectedly succeeded';
+       exception when others then
+         get stacked diagnostics observed = MESSAGE_TEXT;
+         if observed <> 'TUX_ADMIN_PAID_CANCEL_REQUIRES_SETTLEMENT' then
+           raise;
+         end if;
+       end;
+     end;
+     $check_paid_cancel$;`,
+  ],
+  'Paid ACTIVE Admin cancellation must reject at the database boundary',
+);
+
+const paidState = psql(
+  [
+    '-At',
+    '-c',
+    `select o.status || ':' ||
+       coalesce((select sum(p.allocated_minor) from public.payments p
+         where p.order_id=o.id), 0)::text || ':' ||
+       (select count(*) from public.order_status_events e
+         where e.order_id=o.id and e.event_type='CANCELLED')::text || ':' ||
+       (select count(*) from public.admin_order_command_receipts c
+         where c.order_id=o.id)::text
+       from public.orders o where o.id='${PAID_ACTIVE_ID}'`,
+  ],
+  'Paid cancellation rollback evidence',
+).trim();
+if (paidState !== 'ACTIVE:5000:0:0') {
+  throw new Error(`Paid cancellation changed financial/lifecycle state: ${paidState}`);
+}
+
+const paidReservationAfterReject = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select jsonb_build_object(
+         'status', r.status,
+         'lastCommandId', r.last_command_id,
+         'releaseCount', (select count(*) from public.inventory_movements m
+           where m.order_id='${PAID_ACTIVE_ID}' and m.movement_type='ORDER_RESERVATION_RELEASE'),
+         'reservedMicros', (select sum(m.reserved_delta_micros)
+           from public.inventory_movements m where m.order_id='${PAID_ACTIVE_ID}'),
+         'auditCount', (select count(*) from public.admin_audit_events a
+           where a.entity_id='${PAID_ACTIVE_ID}' and a.action_type='ORDER_CANCELLED')
+       )::text
+       from public.inventory_reservations r where r.id='${PAID_RESERVATION_ID}'`,
+    ],
+    'Paid cancellation must unwind release movement/reservation and audit',
+  ).trim(),
+);
+if (
+  paidReservationAfterReject.status !== 'ACTIVE' ||
+  paidReservationAfterReject.lastCommandId !== 'paid-reserve-1' ||
+  Number(paidReservationAfterReject.releaseCount) !== 0 ||
+  Number(paidReservationAfterReject.reservedMicros) !== 1500 ||
+  Number(paidReservationAfterReject.auditCount) !== 0
+) {
+  throw new Error(`Paid cancellation leaked effects: ${JSON.stringify(paidReservationAfterReject)}`);
+}
+
+// A second payment method on the same ACTIVE order tests mixed allocation,
+// while the first attempt above establishes the partial-payment case.
+psql(
+  [
+    '-c',
+    `insert into public.payment_methods(
+       id,shop_id,display_name,logic_type,requires_reconciliation,active,sort_order
+     ) values (
+       '58000000-0000-4000-8000-000000000092','${SHOP_ID}','Test Cash','CASH',true,true,1
+     );
+     insert into public.payments(
+       id,shop_id,order_id,part_index,payment_method_id,
+       payment_method_label_snapshot,logic_type_snapshot,allocated_minor,
+       received_minor,change_minor,created_at
+     ) values (
+       '5b000000-0000-4000-8000-000000000093','${SHOP_ID}','${PAID_ACTIVE_ID}',2,
+       '58000000-0000-4000-8000-000000000092','Test Cash','CASH',6000,6000,0,now()
+     );`,
+  ],
+  'Mixed Card and Cash allocations',
+);
+psql(
+  [
+    '-c',
+    `do $mixed_paid_guard$
+     declare observed text;
+     begin
+       begin
+         perform public.cancel_admin_order_v1(
+           '${REQUESTER_ID}', '${SHOP_ID}', '${PAID_ACTIVE_ID}',
+           '${CANCEL_REASON_ID}', 0, 'Mixed payment guard',
+           'mixed-cancel-should-reject', '${BUSINESS_ID}'
+         );
+         raise exception 'mixed payment ACTIVE cancellation unexpectedly succeeded';
+       exception when others then
+         get stacked diagnostics observed = MESSAGE_TEXT;
+         if observed <> 'TUX_ADMIN_PAID_CANCEL_REQUIRES_SETTLEMENT' then raise; end if;
+       end;
+     end;
+     $mixed_paid_guard$;`,
+  ],
+  'Mixed payment cancellation rejection',
+);
+const mixedRollback = psql(
+  [
+    '-At',
+    '-c',
+    `select o.status || ':' ||
+       (select sum(p.allocated_minor) from public.payments p where p.order_id=o.id)::text || ':' ||
+       (select count(*) from public.inventory_movements m where m.order_id=o.id
+         and m.movement_type='ORDER_RESERVATION_RELEASE')::text || ':' ||
+       (select count(*) from public.admin_order_command_receipts c where c.order_id=o.id)::text
+       from public.orders o where o.id='${PAID_ACTIVE_ID}'`,
+  ],
+  'Mixed payment rollback evidence',
+).trim();
+if (mixedRollback !== 'ACTIVE:11000:0:0') {
+  throw new Error(`Mixed payment cancellation changed state: ${mixedRollback}`);
+}
+
+// Explicitly prove the trigger is not a general Operations status guard.
+// The direct worker-shaped transition is rolled back inside this isolated transaction.
+psql(
+  [
+    '-c',
+    `begin;
+     update public.orders set status='CANCELLED', cancelled_at=now(),
+       cancellation_reason='Worker test cancellation',
+       cancellation_food_prepared=false, cancellation_stock_restored=false,
+       cancelled_by_worker_id='${WORKER_ID}',
+       cancelled_by_worker_name_snapshot='Order Worker',
+       cancelled_by_admin_employee_id=null
+       where id='${PAID_ACTIVE_ID}' and status='ACTIVE';
+     do $scope_check$
+     begin
+       if not exists(select 1 from public.orders
+         where id='${PAID_ACTIVE_ID}' and status='CANCELLED') then
+         raise exception 'non-Admin lifecycle transition was blocked';
+       end if;
+     end;
+     $scope_check$;
+     rollback;`,
+  ],
+  'Worker-shaped lifecycle transition is outside Admin-only guard',
+);
+
+const unpaidCancel = rpc(
+  `public.cancel_admin_order_v1(
+    '${REQUESTER_ID}', '${SHOP_ID}', '${UNPAID_ACTIVE_ID}',
+    '${CANCEL_REASON_ID}', 0, 'Unpaid cancellation',
+    'unpaid-cancel-1', '${BUSINESS_ID}'
+  )`,
+  'Unpaid ACTIVE cancellation',
+);
+if (unpaidCancel.ok !== true || unpaidCancel.status !== 'CANCELLED' || unpaidCancel.replayed) {
+  throw new Error(`Unpaid cancellation not committed: ${JSON.stringify(unpaidCancel)}`);
+}
+const unpaidReplay = rpc(
+  `public.cancel_admin_order_v1(
+    '${REQUESTER_ID}', '${SHOP_ID}', '${UNPAID_ACTIVE_ID}',
+    '${CANCEL_REASON_ID}', 0, 'Unpaid cancellation',
+    'unpaid-cancel-1', '${BUSINESS_ID}'
+  )`,
+  'Unpaid cancellation idempotent replay',
+);
+if (unpaidReplay.ok !== true || unpaidReplay.replayed !== true) {
+  throw new Error(`Unpaid cancellation replay not idempotent: ${JSON.stringify(unpaidReplay)}`);
+}
+
+const unpaidReleaseState = psql(
+  [
+    '-At',
+    '-c',
+    `select r.status || ':' ||
+       (select count(*) from public.inventory_movements m
+         where m.order_id='${UNPAID_ACTIVE_ID}' and m.movement_type='ORDER_RESERVATION_RELEASE')::text ||
+       ':' || (select coalesce(sum(m.reserved_delta_micros),0) from public.inventory_movements m
+         where m.order_id='${UNPAID_ACTIVE_ID}')::text
+       from public.inventory_reservations r where r.id='${UNPAID_RESERVATION_ID}'`,
+  ],
+  'Unpaid cancellation releases its reserved inventory once',
+).trim();
+if (unpaidReleaseState !== 'RELEASED:1:0') {
+  throw new Error(`Unpaid cancellation did not safely release stock: ${unpaidReleaseState}`);
+}
+
+console.log(
+  'Paid ACTIVE cancellation guard and unpaid rollback/replay PostgreSQL behavior passed.',
+);

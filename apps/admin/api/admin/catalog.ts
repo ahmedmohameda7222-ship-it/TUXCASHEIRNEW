@@ -8,6 +8,7 @@ import {
 } from '../../server/adminAuthService.js';
 import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
 import { executeCatalogPricePublish } from '../../server/catalog/catalogPricePublishRoute.js';
+import { handleCatalogImageRequest } from '../../server/catalog/catalogImageRoute.js';
 import { resumeCatalogDraft } from '../../server/catalog/catalogDraftResume.js';
 import {
   CatalogServiceError,
@@ -242,6 +243,16 @@ export default async function handler(
     return;
   }
 
+  // Reuse the existing Catalog serverless function for binary image requests.
+  // Its delegated handler enforces its own session, CSRF, tenant and upload limits.
+  if (
+    new URL(request.url ?? '/', 'http://admin.local').searchParams.get('__adminResource') ===
+    'catalog-image'
+  ) {
+    await handleCatalogImageRequest(request, response);
+    return;
+  }
+
   try {
     const env = getAdminServerEnv();
     const client = new AdminSupabaseClient(env);
@@ -422,15 +433,15 @@ export default async function handler(
         });
         return;
       case 'availability.recurring.save':
-        sendJson(response, 200, {
-          ...(await recurringService.saveRecurringAvailabilityRule(command, principal)),
-        });
+        // Preserve existing rules; do not accept unexecutable unattended transitions.
+        sendJson(response, 409, { ok: false, code: 'scheduler_unavailable' });
         return;
       case 'version.restore':
         sendJson(response, 200, { ...(await service.restoreCatalogVersion(command, principal)) });
         return;
       case 'draft.schedule':
-        sendJson(response, 200, { ...(await service.scheduleCatalogDraft(command, principal)) });
+        // The Vercel Free deployment has no verified unattended scheduler.
+        sendJson(response, 409, { ok: false, code: 'scheduler_unavailable' });
         return;
       case 'schedule.cancel':
         sendJson(response, 200, {

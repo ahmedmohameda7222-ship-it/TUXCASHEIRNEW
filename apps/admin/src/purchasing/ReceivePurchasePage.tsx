@@ -2,18 +2,8 @@ import { useMemo, useState } from 'react';
 
 import type { AdminPurchaseOrder } from '@tux/admin-contracts';
 import { AdminDialog } from '../components/overlay/AdminDialog';
-
-function micros(value: string): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
-  return Math.round(parsed * 1_000_000);
-}
-
-function minor(value: string): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) return 0;
-  return Math.round(parsed * 100);
-}
+import { formatPurchaseMicros } from './purchaseOrderDraft';
+import { parseReceiptLines, parseReturnLines } from './receivePurchaseValidation';
 
 export function ReceivePurchasePage({
   order,
@@ -52,6 +42,7 @@ export function ReceivePurchasePage({
   const [reference, setReference] = useState('');
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [costs, setCosts] = useState<Record<string, string>>({});
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   return (
     <AdminDialog
@@ -72,31 +63,46 @@ export function ReceivePurchasePage({
         onSubmit={(event) => {
           event.preventDefault();
           if (mode === 'receive') {
-            const lines = eligible
-              .map((line) => ({
-                lineId: line.id,
-                receivedPurchaseUnitsMicros: micros(quantities[line.id] ?? ''),
-                purchaseUnitCostMinor: minor(costs[line.id] ?? ''),
-              }))
-              .filter((line) => line.receivedPurchaseUnitsMicros > 0);
-            if (lines.length > 0) onReceive({ supplierReference: reference.trim() || null, lines });
+            const result = parseReceiptLines(eligible, quantities, costs);
+            if (!result.ok) {
+              setValidationError(result.error);
+              return;
+            }
+            setValidationError(null);
+            onReceive({ supplierReference: reference.trim() || null, lines: result.lines });
             return;
           }
-          const lines = eligible
-            .map((line) => ({
-              lineId: line.id,
-              returnedPurchaseUnitsMicros: micros(quantities[line.id] ?? ''),
-            }))
-            .filter((line) => line.returnedPurchaseUnitsMicros > 0);
-          if (lines.length > 0) onReturn({ supplierReference: reference.trim() || null, lines });
+          const result = parseReturnLines(eligible, quantities);
+          if (!result.ok) {
+            setValidationError(result.error);
+            return;
+          }
+          setValidationError(null);
+          onReturn({ supplierReference: reference.trim() || null, lines: result.lines });
         }}
       >
         <label>
           {mode === 'receive' ? 'Supplier reference' : 'Return reference'}
           <input value={reference} onChange={(event) => setReference(event.currentTarget.value)} />
         </label>
+        {validationError ? <p role="alert">{validationError}</p> : null}
+        {mode === 'receive' ? (
+          <p className="admin-inventory-muted">
+            A positive cost is required for every received line. Free goods must be handled through
+            an explicitly authorized process.
+          </p>
+        ) : null}
         {eligible.map((line) => (
           <div className="admin-form-grid" key={line.id}>
+            <p className="admin-inventory-muted">
+              Remaining:{' '}
+              {formatPurchaseMicros(
+                mode === 'receive'
+                  ? line.orderedPurchaseUnitsMicros - line.receivedPurchaseUnitsMicros
+                  : line.receivedPurchaseUnitsMicros - line.returnedPurchaseUnitsMicros,
+              )}{' '}
+              {line.purchaseUnitLabel}
+            </p>
             <label>
               {mode === 'receive'
                 ? `Receive ${line.itemName} (${line.purchaseUnitLabel})`

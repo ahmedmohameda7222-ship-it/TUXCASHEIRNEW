@@ -1,5 +1,6 @@
 import type { CatalogCategorySummary, CatalogJsonObject } from '@tux/admin-contracts';
 import { useState, type FormEvent } from 'react';
+import { useUnsavedShopDraft } from '../shops/ShopScopeProvider';
 import { formatEgpMinor, parseEgpToMinor } from './ProductEditor';
 import type { CatalogDefinitionCollection } from './catalogDefinitionsDraft';
 
@@ -71,6 +72,7 @@ export function CatalogDefinitionsEditor({
 }) {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useUnsavedShopDraft(editor !== null);
   const orderedCategories = [...categories].sort(
     (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
   );

@@ -63,6 +63,10 @@
       "dest": "/api/admin/orders?__adminResource=whatsapp"
     },
     {
+      "src": "/api/admin/catalog-image",
+      "dest": "/api/admin/catalog?__adminResource=catalog-image"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }

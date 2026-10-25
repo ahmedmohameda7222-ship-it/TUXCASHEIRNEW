@@ -22,6 +22,42 @@ function money(minor: number): string {
   return `${(minor / 100).toFixed(2)} EGP`;
 }
 
+type ReturnSelectableItem = Pick<
+  AdminOrderDetail['items'][number],
+  'id' | 'remainingReturnableQuantity'
+>;
+
+/** Reject the complete form if any selected line is invalid; never submit a silent subset. */
+export function buildReturnItemSelection(
+  items: readonly ReturnSelectableItem[],
+  quantities: Readonly<Record<string, string>>,
+): {
+  items: { orderItemId: string; quantity: number }[];
+  hasInvalidQuantity: boolean;
+} {
+  const selected: { orderItemId: string; quantity: number }[] = [];
+  let hasInvalidQuantity = false;
+  for (const item of items) {
+    const raw = (quantities[item.id] ?? '0').trim();
+    if (raw === '' || raw === '0') continue;
+    const quantity = Number(raw);
+    if (
+      !/^\d+$/.test(raw) ||
+      !Number.isSafeInteger(quantity) ||
+      quantity <= 0 ||
+      quantity > (item.remainingReturnableQuantity ?? 0)
+    ) {
+      hasInvalidQuantity = true;
+      continue;
+    }
+    selected.push({ orderItemId: item.id, quantity });
+  }
+  return {
+    items: hasInvalidQuantity ? [] : selected,
+    hasInvalidQuantity,
+  };
+}
+
 export function RefundReturnPage({
   mode,
   order,
@@ -42,8 +78,18 @@ export function RefundReturnPage({
   onReturn(input: ReturnDraft): void | Promise<void>;
 }) {
   const [reasonCodeId, setReasonCodeId] = useState(reasons[0]?.id ?? '');
-  const [paymentId, setPaymentId] = useState(order.payments[0]?.id ?? '');
-  const [amountMinor, setAmountMinor] = useState(String(order.payments[0]?.allocatedMinor ?? ''));
+  const refundablePayments = useMemo(
+    () =>
+      order.payments.filter(
+        (payment) =>
+          payment.refundAllowedSnapshot === true && (payment.remainingRefundableMinor ?? 0) > 0,
+      ),
+    [order.payments],
+  );
+  const [paymentId, setPaymentId] = useState(refundablePayments[0]?.id ?? '');
+  const [amountMinor, setAmountMinor] = useState(
+    String(refundablePayments[0]?.remainingRefundableMinor ?? ''),
+  );
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('');
   const [returnQuantities, setReturnQuantities] = useState<Record<string, string>>({});
@@ -54,39 +100,48 @@ export function RefundReturnPage({
   }, [reasonCodeId, reasons]);
 
   useEffect(() => {
-    if (order.payments.some((payment) => payment.id === paymentId)) return;
-    const payment = order.payments[0];
-    setPaymentId(payment?.id ?? '');
-    setAmountMinor(String(payment?.allocatedMinor ?? ''));
-  }, [order.payments, paymentId]);
+    const selected = refundablePayments.find((payment) => payment.id === paymentId);
+    if (!selected) {
+      const next = refundablePayments[0];
+      setPaymentId(next?.id ?? '');
+      setAmountMinor(String(next?.remainingRefundableMinor ?? ''));
+      return;
+    }
+    const maximum = selected.remainingRefundableMinor ?? 0;
+    setAmountMinor((current) => {
+      const amount = Number(current);
+      return String(
+        Number.isSafeInteger(amount) && amount > 0 && amount <= maximum ? amount : maximum,
+      );
+    });
+  }, [refundablePayments, paymentId]);
 
-  const returnItems = useMemo(
-    () =>
-      order.items
-        .map((item) => ({
-          orderItemId: item.id,
-          quantity: Number(returnQuantities[item.id] ?? '0'),
-          maximum: item.quantity,
-        }))
-        .filter(
-          (item) =>
-            Number.isSafeInteger(item.quantity) &&
-            item.quantity > 0 &&
-            item.quantity <= item.maximum,
-        )
-        .map(({ orderItemId, quantity }) => ({ orderItemId, quantity })),
+  const returnSelection = useMemo(
+    () => buildReturnItemSelection(order.items, returnQuantities),
     [order.items, returnQuantities],
   );
+  const returnItems = returnSelection.items;
+  const returnEstimatedGrossMinor = returnItems.reduce((total, line) => {
+    const item = order.items.find((candidate) => candidate.id === line.orderItemId);
+    if (!item) return total;
+    const extrasMinor = item.modifiers.reduce(
+      (sum, modifier) => sum + modifier.quantity * modifier.unitPriceMinor,
+      0,
+    );
+    return total + (item.unitPriceMinor + extrasMinor) * line.quantity;
+  }, 0);
 
   async function submitRefund(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parsedAmount = Number(amountMinor);
+    const payment = refundablePayments.find((candidate) => candidate.id === paymentId);
     if (
-      !paymentId ||
+      !payment ||
       !reasonCodeId ||
       !pin ||
       !Number.isSafeInteger(parsedAmount) ||
-      parsedAmount <= 0
+      parsedAmount <= 0 ||
+      parsedAmount > (payment.remainingRefundableMinor ?? 0)
     )
       return;
     await onRefund({
@@ -101,7 +156,8 @@ export function RefundReturnPage({
 
   async function submitReturn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!reasonCodeId || !pin || returnItems.length === 0) return;
+    if (!reasonCodeId || !pin || returnSelection.hasInvalidQuantity || returnItems.length === 0)
+      return;
     await onReturn({ items: returnItems, reasonCodeId, note: note.trim() || null, pin });
     setPin('');
   }
@@ -114,7 +170,7 @@ export function RefundReturnPage({
       description={
         mode === 'refund'
           ? 'Choose the payment and amount to refund, then confirm with your Admin PIN.'
-          : 'Choose the items to return, then confirm with your Admin PIN.'
+          : 'This return records item valuation only; it does not refund or restock. Confirm with your Admin PIN. Financial settlement and inventory disposal/restock require separate authorized actions.'
       }
       onOpenChange={(open) => {
         if (!open && !refunding && !returning) onCancel();
@@ -167,27 +223,44 @@ export function RefundReturnPage({
               disabled={refunding || returning}
               onChange={(event) => {
                 setPaymentId(event.target.value);
-                const payment = order.payments.find(
+                const payment = refundablePayments.find(
                   (candidate) => candidate.id === event.target.value,
                 );
-                if (payment) setAmountMinor(String(payment.allocatedMinor));
+                if (payment) setAmountMinor(String(payment.remainingRefundableMinor));
               }}
             >
-              {order.payments.map((payment) => (
+              {refundablePayments.map((payment) => (
                 <option key={payment.id} value={payment.id}>
-                  {payment.methodLabel} · {money(payment.allocatedMinor)}
+                  {payment.methodLabel} · available {money(payment.remainingRefundableMinor ?? 0)}
                 </option>
               ))}
             </select>
           </label>
+          {(() => {
+            const selected = refundablePayments.find((payment) => payment.id === paymentId);
+            return selected ? (
+              <p>
+                Original allocation: {money(selected.allocatedMinor)} · Posted refunds:{' '}
+                {money(selected.postedRefundMinor ?? 0)} · Pending approval:{' '}
+                {money(selected.pendingRefundMinor ?? 0)} · Available to refund:{' '}
+                {money(selected.remainingRefundableMinor ?? 0)}
+              </p>
+            ) : (
+              <p role="status">No eligible refundable payment balance remains.</p>
+            );
+          })()}
           <label className="admin-field">
             <span>Refund amount (EGP)</span>
             <input
               type="number"
               min={0.01}
+              max={
+                (refundablePayments.find((payment) => payment.id === paymentId)
+                  ?.remainingRefundableMinor ?? 0) / 100
+              }
               step={0.01}
               value={Number(amountMinor) / 100 || ''}
-              disabled={refunding || returning}
+              disabled={refunding || returning || !paymentId}
               onChange={(event) =>
                 setAmountMinor(String(Math.round(Number(event.target.value) * 100)))
               }
@@ -196,7 +269,18 @@ export function RefundReturnPage({
           <button
             className="admin-primary-button"
             type="submit"
-            disabled={refunding || returning || !reasonCodeId || !paymentId || !pin}
+            disabled={
+              refunding ||
+              returning ||
+              !reasonCodeId ||
+              !paymentId ||
+              !pin ||
+              !Number.isSafeInteger(Number(amountMinor)) ||
+              Number(amountMinor) <= 0 ||
+              Number(amountMinor) >
+                (refundablePayments.find((payment) => payment.id === paymentId)
+                  ?.remainingRefundableMinor ?? 0)
+            }
           >
             {refunding ? 'Refunding…' : 'Submit refund'}
           </button>
@@ -211,26 +295,46 @@ export function RefundReturnPage({
           {order.items.map((item) => (
             <label className="admin-field" key={item.id}>
               <span>
-                {item.productName} · max {item.quantity}
+                {item.productName} · purchased {item.quantity} · already returned{' '}
+                {item.postedReturnQuantity ?? 0} · pending {item.pendingReturnQuantity ?? 0} ·
+                remaining {item.remainingReturnableQuantity ?? 0}
               </span>
               <input
                 aria-label={`Return quantity for ${item.productName}`}
                 type="number"
                 min={0}
-                max={item.quantity}
+                max={item.remainingReturnableQuantity ?? 0}
                 step={1}
                 value={returnQuantities[item.id] ?? '0'}
-                disabled={refunding || returning}
+                disabled={refunding || returning || (item.remainingReturnableQuantity ?? 0) <= 0}
                 onChange={(event) =>
                   setReturnQuantities((current) => ({ ...current, [item.id]: event.target.value }))
                 }
               />
             </label>
           ))}
+          <p>
+            Estimated gross return item valuation: {money(returnEstimatedGrossMinor)}. Calculated
+            from purchase-time base and modifier snapshots before order-level discounts, tax,
+            delivery fees or service charges. This is not a refund or stock movement.
+          </p>
+          {returnSelection.hasInvalidQuantity ? (
+            <p role="alert">
+              A selected return quantity is invalid or exceeds the remaining quantity. Correct every
+              item before submitting.
+            </p>
+          ) : null}
           <button
             className="admin-primary-button"
             type="submit"
-            disabled={refunding || returning || !reasonCodeId || !pin || returnItems.length === 0}
+            disabled={
+              refunding ||
+              returning ||
+              !reasonCodeId ||
+              !pin ||
+              returnSelection.hasInvalidQuantity ||
+              returnItems.length === 0
+            }
           >
             {returning ? 'Returning…' : 'Return selected items'}
           </button>

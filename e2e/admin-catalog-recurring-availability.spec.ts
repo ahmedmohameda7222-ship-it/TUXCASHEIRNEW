@@ -141,63 +141,39 @@ async function mockRecurringAvailability(page: Page) {
   return { commands };
 }
 
-test('recurring availability creates an overnight Cairo rule through the trusted BFF', async ({
+test('recurring availability cannot create unattended rules while the runner is unverified', async ({
   page,
 }) => {
   const fixture = await mockRecurringAvailability(page);
   await page.goto('/catalog/products/publishing');
 
-  await expect(page.getByRole('heading', { name: 'Recurring availability' })).toBeVisible();
-  await expect(page.getByText('Africa/Cairo', { exact: true })).toBeVisible();
-
-  await page.getByLabel('Product').selectOption(masterProductId);
-  await page.getByRole('checkbox', { name: 'Friday' }).check();
-  await page.getByLabel('Start time').fill('22:00');
-  await page.getByLabel('End time').fill('02:00');
-  await expect(page.getByText('Ends next day')).toBeVisible();
-  await page.getByRole('button', { name: 'Save recurring rule' }).click();
-
-  await expect(page.getByText('Recurring availability saved.')).toBeVisible();
-  expect(fixture.commands.at(-1)).toEqual({
-    type: 'availability.recurring.save',
-    shopId,
-    ruleId: null,
-    masterProductId,
-    daysOfWeek: [5],
-    startLocal: '22:00',
-    endLocal: '02:00',
-    available: true,
-    active: true,
-    expectedVersion: null,
-  });
+  await expect(page.getByText('Automatic scheduling is unavailable')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Recurring availability' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Save recurring rule' })).toHaveCount(0);
+  expect(fixture.commands).toEqual([]);
 });
 
-test('recurring availability deactivates an existing rule with version fencing', async ({
+test('saved recurring rules do not expose an unsafe deactivation or activation action', async ({
   page,
 }) => {
   const fixture = await mockRecurringAvailability(page);
   await page.goto('/catalog/products/publishing');
 
-  await page.getByRole('button', { name: 'Deactivate recurring rule for Classic Smash' }).click();
-  await expect(page.getByText('Recurring availability saved.')).toBeVisible();
-  expect(fixture.commands.at(-1)).toMatchObject({
-    type: 'availability.recurring.save',
-    shopId,
-    ruleId,
-    masterProductId,
-    active: false,
-    expectedVersion: 1,
-  });
+  await expect(page.getByText('Automatic scheduling is unavailable')).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Deactivate recurring rule for Classic Smash' }),
+  ).toHaveCount(0);
+  expect(fixture.commands).toEqual([]);
 });
 
-test('recurring availability editor remains usable on phone', async ({ page }) => {
+test('recurring scheduling warning remains usable on phone', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await mockRecurringAvailability(page);
+  const fixture = await mockRecurringAvailability(page);
   await page.goto('/catalog/products/publishing');
 
-  await expect(page.getByRole('heading', { name: 'Recurring availability' })).toBeVisible();
-  await expect(page.getByLabel('Product')).toBeVisible();
-  await expect(page.getByLabel('Start time')).toBeVisible();
-  await expect(page.getByLabel('End time')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Save recurring rule' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review & publish' })).toBeVisible();
+  await expect(page.getByText('Automatic scheduling is unavailable')).toBeVisible();
+  await expect(page.getByLabel('Start time')).toHaveCount(0);
+  await expect(page.getByLabel('End time')).toHaveCount(0);
+  expect(fixture.commands).toEqual([]);
 });

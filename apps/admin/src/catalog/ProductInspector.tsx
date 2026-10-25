@@ -17,7 +17,10 @@ export function ProductInspector({
   onClose,
   onRequestAdvanced,
   onSaveDraft,
+  onReviewPublish,
   onSetAvailability,
+  onUploadImage,
+  imageRequiresSaveFirst = false,
 }: {
   product: CatalogProductDetail;
   categories?: readonly CatalogCategorySummary[];
@@ -29,7 +32,10 @@ export function ProductInspector({
   onClose(): void;
   onRequestAdvanced(): void | Promise<void>;
   onSaveDraft(draft: ProductEditorDraft): void | Promise<void>;
+  onReviewPublish?(): void;
   onSetAvailability(soldOut: boolean): void | Promise<void>;
+  onUploadImage?(file: File): Promise<{ imageKey: string; publicUrl: string }>;
+  imageRequiresSaveFirst?: boolean;
 }) {
   return (
     <section className="admin-catalog-inspector" data-catalog-inspector>
@@ -60,7 +66,10 @@ export function ProductInspector({
         advancedBundle={advancedBundle}
         onRequestAdvanced={onRequestAdvanced}
         onSaveDraft={onSaveDraft}
+        onReviewPublish={onReviewPublish}
         onSetAvailability={onSetAvailability}
+        onUploadImage={onUploadImage}
+        imageRequiresSaveFirst={imageRequiresSaveFirst}
       />
     </section>
   );

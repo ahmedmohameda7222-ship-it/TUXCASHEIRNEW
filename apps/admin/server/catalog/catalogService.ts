@@ -28,6 +28,7 @@ import type {
   CatalogWorkspace,
 } from '@tux/admin-contracts';
 
+import { buildCatalogPublishDiffs } from './catalogPublishDiff.js';
 import { requirePermission } from '../authorization.js';
 import type { AdminSupabaseClient } from '../supabaseAdmin.js';
 
@@ -558,6 +559,12 @@ function buildPublishPreview(
     stale: hasBlockingPublishSinceBase(basePublishVersion, currentPublishVersion, versions),
     changedProductIds,
     priceChangedProductIds,
+    changes: buildCatalogPublishDiffs(
+      row.shop_id,
+      liveProducts,
+      row.working_bundle_json,
+      publishedBundle,
+    ),
     changedRelationCounts: buildRelationChangeCounts(row.working_bundle_json, publishedBundle),
   };
 }

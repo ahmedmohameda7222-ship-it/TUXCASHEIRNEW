@@ -17,10 +17,7 @@ const operationsConfig = JSON.parse(fs.readFileSync(operationsVercelPath, 'utf8'
 const adminDeploymentDoc = fs.readFileSync(adminDeploymentDocPath, 'utf8');
 const operationsDeploymentDoc = fs.readFileSync(operationsDeploymentDocPath, 'utf8');
 const adminExecutionLedger = fs.readFileSync(adminExecutionLedgerPath, 'utf8');
-const adminFoundationWorkflow = fs.readFileSync(
-  '.github/workflows/admin-foundation-tdd.yml',
-  'utf8',
-);
+const permanentCiWorkflow = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
 const apiTsconfig = JSON.parse(fs.readFileSync('tsconfig.api.json', 'utf8'));
 
 function assertEqual(actual, expected, message) {
@@ -413,17 +410,17 @@ if (
   throw new Error('Admin execution ledger still contains the obsolete Vercel migration gate');
 }
 
-for (const requiredWorkflowPath of [
-  "      - 'vercel.json'",
-  "      - 'apps/menu/vercel.json'",
-  "      - 'apps/operations/**'",
-  "      - 'api/**'",
-]) {
-  if (!adminFoundationWorkflow.includes(requiredWorkflowPath)) {
-    throw new Error(
-      `Admin Foundation deployment contract must trigger when ${requiredWorkflowPath.trim()} changes`,
-    );
-  }
+// The retired Admin Foundation workflow must not be an executable dependency.
+// Fast CI now runs on every PR to main, with changed-file-aware checks; it is
+// intentionally NOT limited to a list of deployment paths in the trigger.
+const permanentTriggers = permanentCiWorkflow.split('\npermissions:')[0] ?? '';
+if (
+  !permanentTriggers.includes('pull_request:') ||
+  !permanentTriggers.includes('branches: [main, integration/tux-operations-v2]') ||
+  /^ {4}paths:/m.test(permanentTriggers) ||
+  !permanentCiWorkflow.includes('node scripts/ci-fast-scope.mjs')
+) {
+  throw new Error('Permanent CI must run for all main-targeted PRs and select affected checks.');
 }
 
 console.log('Admin/Menu/Operations Vercel isolation contracts passed.');

@@ -3,7 +3,10 @@ import type {
   AdminOrderDetail,
   AdminOrderFinancialMutationResult,
   AdminOrderSearchResult,
+  AdminOrderBusinessDaysResult,
+  AdminOrderSummary,
   AdminOrderStatus,
+  AdminOnlineOrderRequestsResult,
   AdminReasonCodeConfiguration,
 } from '@tux/admin-contracts';
 import { z } from 'zod';
@@ -14,7 +17,7 @@ import {
   requireSessionCsrf,
   type AdminSessionContext,
 } from '../../server/adminAuthService.js';
-import { AdminAuthorizationError } from '../../server/authorization.js';
+import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
 import { getAdminServerEnv } from '../../server/env.js';
 import {
   firstHeader,
@@ -25,12 +28,45 @@ import {
   type AdminResponse,
 } from '../../server/http.js';
 import { createOrderService, type OrderStore } from '../../server/orders/orderService.js';
+import { ORDER_EXPORT_MAX_ROWS, renderOrdersCsv } from '../../server/orders/orderCsvExport.js';
+import {
+  effectiveFinancialState,
+  projectPaymentRefundBalances,
+  projectReturnQuantities,
+} from '../../server/orders/orderFinancialProjection.js';
+import { cairoCalendarDayRange } from '../../server/orders/cairoCalendarDay.js';
 import { readAdminSessionToken } from '../../server/session.js';
+import { AdminRecentReauthError, requireRecentReauth } from '../../server/reauth.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
 
 const uuidSchema = z.string().uuid();
 const commandIdSchema = z.string().trim().min(1).max(160);
 const noteSchema = z.string().trim().max(500).nullable();
+
+export const adminReturnLineItemsSchema = z
+  .array(
+    z
+      .object({
+        orderItemId: uuidSchema,
+        quantity: z.number().int().safe().positive(),
+      })
+      .strict(),
+  )
+  .min(1)
+  .max(500)
+  .superRefine((items, context) => {
+    const seen = new Set<string>();
+    for (const [index, item] of items.entries()) {
+      if (seen.has(item.orderItemId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, 'orderItemId'],
+          message: 'duplicate_return_item',
+        });
+      }
+      seen.add(item.orderItemId);
+    }
+  });
 
 const commandSchema = z.discriminatedUnion('type', [
   z
@@ -61,23 +97,60 @@ const commandSchema = z.discriminatedUnion('type', [
       type: z.literal('order.return'),
       shopId: uuidSchema,
       orderId: uuidSchema,
-      items: z
-        .array(
-          z
-            .object({
-              orderItemId: uuidSchema,
-              quantity: z.number().int().safe().positive(),
-            })
-            .strict(),
-        )
-        .min(1)
-        .max(500),
+      items: adminReturnLineItemsSchema,
       reasonCodeId: uuidSchema,
       note: noteSchema,
       commandId: commandIdSchema,
     })
     .strict(),
 ]);
+
+type BusinessDayRow = {
+  id: string;
+  shop_id: string;
+  status: string;
+  started_at: string;
+  ended_at: string | null;
+};
+
+type DeliveryStateRow = {
+  order_id: string;
+  state: string;
+  rider_id: string | null;
+};
+
+type DeliveryEventRow = {
+  id: string;
+  from_state: string | null;
+  to_state: string;
+  employee_id: string | null;
+  rider_id: string | null;
+  note: string | null;
+  created_at: string;
+};
+
+type DeliveryRiderRow = {
+  id: string;
+  display_name: string;
+};
+
+type OnlineRequestRow = {
+  id: string;
+  shop_id: string;
+  status: 'PENDING' | 'PROCESSING' | 'ACCEPTED' | 'REJECTED';
+  customer_name: string;
+  normalized_phone: string | null;
+  fulfillment_preference: string;
+  payment_preference: string;
+  trusted_items: unknown;
+  items_subtotal_minor: number | string;
+  created_at: string;
+  resolved_at: string | null;
+  accepted_order_id: string | null;
+  rejection_reason: string | null;
+  source_fingerprint: string | null;
+  catalog_revision: string;
+};
 
 type OrderRow = {
   id: string;
@@ -87,6 +160,12 @@ type OrderRow = {
   source: 'POS' | 'ONLINE';
   display_order_no: number | string;
   created_at: string;
+  business_day_id: string;
+  operator_name_snapshot: string | null;
+  items_subtotal_minor: number | string;
+  discount_minor: number | string;
+  service_charge_minor: number | string;
+  tax_minor: number | string;
   total_minor: number | string;
   customer_contact_id: string | null;
   customer_name_snapshot: string | null;
@@ -105,6 +184,7 @@ type PaymentRow = {
   allocated_minor: number | string;
   received_minor: number | string | null;
   change_minor: number | string | null;
+  refund_allowed_snapshot: boolean;
 };
 
 type ItemRow = {
@@ -175,6 +255,8 @@ type AuditRow = {
 type RefundRow = {
   id: string;
   amount_minor: number | string;
+  payment_id: string;
+  created_by_employee_id: string;
   reason_code_id: string;
   reason_code_key: string;
   reason_label_snapshot: string;
@@ -188,6 +270,7 @@ type RefundRow = {
 
 type ReturnRow = {
   id: string;
+  created_by_employee_id: string;
   reason_code_id: string;
   reason_code_key: string;
   reason_label_snapshot: string;
@@ -201,7 +284,19 @@ type ReturnRow = {
 
 type ReturnItemRow = {
   return_id: string;
+  order_item_id: string;
+  quantity: number | string;
   amount_minor: number | string;
+};
+
+type ApprovalRow = {
+  id: string;
+  status: 'PENDING' | 'APPROVED' | 'EXECUTING' | 'EXECUTED' | 'REJECTED' | 'FAILED';
+  requester_employee_id: string;
+  approver_employee_id: string | null;
+  decided_at: string | null;
+  executed_at: string | null;
+  decision_reason: string | null;
 };
 
 type ReasonCodeRow = {
@@ -285,6 +380,79 @@ async function assertBusinessShop(
 
 export function createOrderStore(client: AdminSupabaseClient): OrderStore {
   return {
+    async listBusinessDays(input): Promise<AdminOrderBusinessDaysResult> {
+      await assertBusinessShop(client, input.businessId, input.shopId);
+      const rows = await client.select<BusinessDayRow[]>(
+        'business_days',
+        new URLSearchParams({
+          select: 'id,shop_id,status,started_at,ended_at',
+          shop_id: `eq.${input.shopId}`,
+          order: 'started_at.desc,id.desc',
+          limit: '100',
+        }),
+      );
+      return {
+        shopId: input.shopId,
+        days: rows.map((row) => ({
+          id: row.id,
+          shopId: row.shop_id,
+          status: row.status,
+          startedAt: row.started_at,
+          endedAt: row.ended_at,
+        })),
+      };
+    },
+
+    async listOnlineOrderRequests(input): Promise<AdminOnlineOrderRequestsResult> {
+      await assertBusinessShop(client, input.businessId, input.shopId);
+      const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
+      const cursor = decodeCursor(input.cursor ?? null);
+      if (input.cursor && !cursor) throw new Error('invalid_online_request_cursor');
+      const query = new URLSearchParams({
+        select:
+          'id,shop_id,status,customer_name,normalized_phone,fulfillment_preference,payment_preference,trusted_items,items_subtotal_minor,created_at,resolved_at,accepted_order_id,rejection_reason,source_fingerprint,catalog_revision',
+        shop_id: `eq.${input.shopId}`,
+        // Stable keyset pagination uses the immutable submission timestamp.
+        // REJECTED date filtering below still uses resolved_at.
+        order: 'created_at.desc,id.desc',
+        limit: String(limit + 1),
+      });
+      if (input.status) query.set('status', `eq.${input.status}`);
+      const dateColumn = input.status === 'REJECTED' ? 'resolved_at' : 'created_at';
+      if (input.from) query.append(dateColumn, `gte.${input.from}`);
+      if (input.to) query.append(dateColumn, `lte.${input.to}`);
+      if (cursor) {
+        query.set(
+          'or',
+          `(created_at.lt.${cursor[0]},and(created_at.eq.${cursor[0]},id.lt.${cursor[1]}))`,
+        );
+      }
+      const rows = await client.select<OnlineRequestRow[]>('online_order_requests', query);
+      const visible = rows.slice(0, limit);
+      const last = rows.length > limit ? (visible.at(-1) ?? null) : null;
+      return {
+        shopId: input.shopId,
+        nextCursor: last ? encodeCursor(last) : null,
+        rows: visible.map((row) => ({
+          id: row.id,
+          shopId: row.shop_id,
+          status: row.status,
+          customerName: row.customer_name,
+          normalizedPhone: row.normalized_phone,
+          fulfillmentPreference: row.fulfillment_preference,
+          paymentPreference: row.payment_preference,
+          trustedItems: row.trusted_items,
+          itemsSubtotalMinor: safeInteger(row.items_subtotal_minor),
+          createdAt: row.created_at,
+          resolvedAt: row.resolved_at,
+          acceptedOrderId: row.accepted_order_id,
+          rejectionReason: row.rejection_reason,
+          sourceFingerprint: row.source_fingerprint,
+          catalogRevision: row.catalog_revision,
+        })),
+      };
+    },
+
     async listActionReasons(input): Promise<readonly AdminReasonCodeConfiguration[]> {
       await assertBusinessShop(client, input.businessId, input.shopId);
       const rows = await client.select<ReasonCodeRow[]>(
@@ -314,7 +482,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
       const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
       const query = new URLSearchParams({
         select:
-          'id,shop_id,status,operational_revision,source,display_order_no,created_at,total_minor,customer_contact_id,customer_name_snapshot,normalized_phone_snapshot,order_type_label_snapshot,order_type_behavior_snapshot,address_snapshot,delivery_zone_label_snapshot,final_delivery_fee_minor',
+          'id,shop_id,status,operational_revision,source,display_order_no,created_at,business_day_id,operator_name_snapshot,items_subtotal_minor,discount_minor,service_charge_minor,tax_minor,total_minor,customer_contact_id,customer_name_snapshot,normalized_phone_snapshot,order_type_label_snapshot,order_type_behavior_snapshot,address_snapshot,delivery_zone_label_snapshot,final_delivery_fee_minor',
         shop_id: `eq.${input.shopId}`,
         order: 'created_at.desc,id.desc',
         limit: String(limit + 1),
@@ -323,31 +491,35 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
         query.set('status', `in.(${input.statuses.join(',')})`);
       }
       if (input.source) query.set('source', `eq.${input.source}`);
+      if (input.businessDayId) query.set('business_day_id', `eq.${input.businessDayId}`);
       if (input.from) query.set('created_at', `gte.${input.from}`);
       if (input.to) query.append('created_at', `lte.${input.to}`);
 
       const cursor = decodeCursor(input.cursor ?? null);
       if (input.cursor && !cursor) throw new Error('invalid_order_cursor');
-      if (cursor) {
-        query.set(
-          'or',
-          `(created_at.lt.${cursor[0]},and(created_at.eq.${cursor[0]},id.lt.${cursor[1]}))`,
-        );
-      }
+      const cursorFilter = cursor
+        ? `(created_at.lt.${cursor[0]},and(created_at.eq.${cursor[0]},id.lt.${cursor[1]}))`
+        : null;
 
-      const term = normalizedSearchTerm(input.query ?? null);
-      if (term) {
-        if (/^\d+$/.test(term)) {
-          query.append(
-            'or',
-            `(display_order_no.eq.${term},normalized_phone_snapshot.ilike.*${term}*)`,
-          );
-        } else {
-          query.append(
-            'or',
-            `(customer_name_snapshot.ilike.*${term}*,normalized_phone_snapshot.ilike.*${term}*,operator_name_snapshot.ilike.*${term}*)`,
-          );
-        }
+      // Each PostgREST "or" parameter addresses the same top-level predicate.
+      // Combining a cursor and a search requires a single explicit AND logic tree.
+      const term = normalizedSearchTerm(input.query ?? null).replace(/^#(?=\d+$)/, '');
+      // UUIDs are globally unique order references, not free-text search terms.
+      const exactOrderId = uuidSchema.safeParse(term).success ? term : null;
+      if (exactOrderId) query.set('id', `eq.${exactOrderId}`);
+      const searchFilter =
+        exactOrderId || !term
+          ? null
+          : /^\d+$/.test(term)
+            ? `(display_order_no.eq.${term},normalized_phone_snapshot.ilike.*${term}*)`
+            : `(customer_name_snapshot.ilike.*${term}*,normalized_phone_snapshot.ilike.*${term}*,operator_name_snapshot.ilike.*${term}*)`;
+
+      if (cursorFilter && searchFilter) {
+        query.set('and', `(or${cursorFilter},or${searchFilter})`);
+      } else if (cursorFilter) {
+        query.set('or', cursorFilter);
+      } else if (searchFilter) {
+        query.set('or', searchFilter);
       }
 
       const rows = await client.select<OrderRow[]>('orders', query);
@@ -364,6 +536,12 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           displayOrderNo: safeInteger(row.display_order_no),
           displayOrderLabel: `#${safeInteger(row.display_order_no)}`,
           createdAt: row.created_at,
+          businessDayId: row.business_day_id,
+          operatorName: row.operator_name_snapshot,
+          itemsSubtotalMinor: safeInteger(row.items_subtotal_minor),
+          discountMinor: safeInteger(row.discount_minor),
+          serviceChargeMinor: safeInteger(row.service_charge_minor),
+          taxMinor: safeInteger(row.tax_minor),
           totalMinor: safeInteger(row.total_minor),
           customerName: row.customer_name_snapshot,
           normalizedPhone: row.normalized_phone_snapshot,
@@ -379,7 +557,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
         'orders',
         new URLSearchParams({
           select:
-            'id,shop_id,status,operational_revision,source,display_order_no,created_at,total_minor,customer_contact_id,customer_name_snapshot,normalized_phone_snapshot,order_type_label_snapshot,order_type_behavior_snapshot,address_snapshot,delivery_zone_label_snapshot,final_delivery_fee_minor',
+            'id,shop_id,status,operational_revision,source,display_order_no,created_at,business_day_id,operator_name_snapshot,items_subtotal_minor,discount_minor,service_charge_minor,tax_minor,total_minor,customer_contact_id,customer_name_snapshot,normalized_phone_snapshot,order_type_label_snapshot,order_type_behavior_snapshot,address_snapshot,delivery_zone_label_snapshot,final_delivery_fee_minor',
           id: `eq.${input.orderId}`,
           shop_id: `eq.${input.shopId}`,
           limit: '1',
@@ -394,7 +572,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
             'payments',
             new URLSearchParams({
               select:
-                'id,payment_method_label_snapshot,logic_type_snapshot,allocated_minor,received_minor,change_minor',
+                'id,payment_method_label_snapshot,logic_type_snapshot,allocated_minor,received_minor,change_minor,refund_allowed_snapshot',
               order_id: `eq.${input.orderId}`,
               shop_id: `eq.${input.shopId}`,
               order: 'part_index.asc',
@@ -445,7 +623,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
             'admin_order_refunds',
             new URLSearchParams({
               select:
-                'id,amount_minor,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,note,state,approval_request_id,created_at',
+                'id,payment_id,amount_minor,created_by_employee_id,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,note,state,approval_request_id,created_at',
               business_id: `eq.${input.businessId}`,
               shop_id: `eq.${input.shopId}`,
               order_id: `eq.${input.orderId}`,
@@ -456,7 +634,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
             'admin_order_returns',
             new URLSearchParams({
               select:
-                'id,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,note,state,approval_request_id,created_at',
+                'id,created_by_employee_id,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,note,state,approval_request_id,created_at',
               business_id: `eq.${input.businessId}`,
               shop_id: `eq.${input.shopId}`,
               order_id: `eq.${input.orderId}`,
@@ -464,6 +642,45 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
             }),
           ),
         ]);
+
+      const isDelivery = order.order_type_behavior_snapshot === 'DELIVERY';
+      const [deliveryStates, deliveryEvents] = isDelivery
+        ? await Promise.all([
+            client.select<DeliveryStateRow[]>(
+              'delivery_order_states',
+              new URLSearchParams({
+                select: 'order_id,state,rider_id',
+                business_id: `eq.${input.businessId}`,
+                shop_id: `eq.${input.shopId}`,
+                order_id: `eq.${input.orderId}`,
+                limit: '1',
+              }),
+            ),
+            client.select<DeliveryEventRow[]>(
+              'delivery_order_state_events',
+              new URLSearchParams({
+                select: 'id,from_state,to_state,employee_id,rider_id,note,created_at',
+                business_id: `eq.${input.businessId}`,
+                shop_id: `eq.${input.shopId}`,
+                order_id: `eq.${input.orderId}`,
+                order: 'created_at.asc,id.asc',
+              }),
+            ),
+          ])
+        : [[], []];
+      const deliveryRiderId = deliveryStates[0]?.rider_id ?? null;
+      const riderRows = deliveryRiderId
+        ? await client.select<DeliveryRiderRow[]>(
+            'delivery_riders',
+            new URLSearchParams({
+              select: 'id,display_name',
+              business_id: `eq.${input.businessId}`,
+              shop_id: `eq.${input.shopId}`,
+              id: `eq.${deliveryRiderId}`,
+              limit: '1',
+            }),
+          )
+        : [];
 
       const itemIds = items.map((item) => item.id);
       const inventoryItemIds = [
@@ -526,17 +743,76 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           : await client.select<ReturnItemRow[]>(
               'admin_order_return_items',
               new URLSearchParams({
-                select: 'return_id,amount_minor',
+                select: 'return_id,order_item_id,quantity,amount_minor',
                 return_id: `in.(${returnIds.join(',')})`,
                 order: 'created_at.asc,id.asc',
               }),
             );
 
+      const approvalIds = [
+        ...new Set(
+          [...refundRows, ...returnRows]
+            .map((row) => row.approval_request_id)
+            .filter((id): id is string => id !== null),
+        ),
+      ];
+      const approvalRows =
+        approvalIds.length === 0
+          ? []
+          : await client.select<ApprovalRow[]>(
+              'admin_approval_requests',
+              new URLSearchParams({
+                select:
+                  'id,status,requester_employee_id,approver_employee_id,decided_at,executed_at,decision_reason',
+                id: `in.(${approvalIds.join(',')})`,
+                business_id: `eq.${input.businessId}`,
+                shop_id: `eq.${input.shopId}`,
+              }),
+            );
+      const approvalsById = new Map(approvalRows.map((approval) => [approval.id, approval]));
+      const approvalFor = (id: string | null) => (id === null ? undefined : approvalsById.get(id));
+      const effectiveState = (row: RefundRow | ReturnRow) =>
+        effectiveFinancialState(row.state, approvalFor(row.approval_request_id)?.status ?? null);
+      const paymentBalances = projectPaymentRefundBalances(
+        payments.map((payment) => ({
+          id: payment.id,
+          allocatedMinor: safeInteger(payment.allocated_minor),
+          refundAllowedSnapshot: payment.refund_allowed_snapshot,
+        })),
+        refundRows.map((refund) => ({
+          paymentId: refund.payment_id,
+          amountMinor: safeInteger(refund.amount_minor),
+          state: effectiveState(refund),
+        })),
+      );
+      const returnQuantities = projectReturnQuantities(
+        items.map((item) => ({ id: item.id, quantity: safeInteger(item.quantity) })),
+        returnItemRows.flatMap((line) => {
+          const parent = returnRows.find((itemReturn) => itemReturn.id === line.return_id);
+          return parent
+            ? [
+                {
+                  orderItemId: line.order_item_id,
+                  quantity: safeInteger(line.quantity),
+                  state: effectiveState(parent),
+                },
+              ]
+            : [];
+        }),
+      );
+
       const financialEvents = [
         ...refundRows.map((refund) => ({
           id: refund.id,
           kind: 'REFUND' as const,
-          state: refund.state,
+          state: effectiveState(refund),
+          paymentId: refund.payment_id,
+          requestedByEmployeeId: refund.created_by_employee_id,
+          approvedByEmployeeId:
+            approvalFor(refund.approval_request_id)?.approver_employee_id ?? null,
+          decidedAt: approvalFor(refund.approval_request_id)?.decided_at ?? null,
+          executedAt: approvalFor(refund.approval_request_id)?.executed_at ?? null,
+          decisionReason: approvalFor(refund.approval_request_id)?.decision_reason ?? null,
           amountMinor: safeInteger(refund.amount_minor),
           approvalRequestId: refund.approval_request_id,
           reason: {
@@ -552,11 +828,27 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
         ...returnRows.map((orderReturn) => ({
           id: orderReturn.id,
           kind: 'RETURN' as const,
-          state: orderReturn.state,
+          state: effectiveState(orderReturn),
+          requestedByEmployeeId: orderReturn.created_by_employee_id,
+          approvedByEmployeeId:
+            approvalFor(orderReturn.approval_request_id)?.approver_employee_id ?? null,
+          decidedAt: approvalFor(orderReturn.approval_request_id)?.decided_at ?? null,
+          executedAt: approvalFor(orderReturn.approval_request_id)?.executed_at ?? null,
+          decisionReason: approvalFor(orderReturn.approval_request_id)?.decision_reason ?? null,
           amountMinor: returnItemRows
             .filter((item) => item.return_id === orderReturn.id)
             .reduce((total, item) => total + safeInteger(item.amount_minor), 0),
           approvalRequestId: orderReturn.approval_request_id,
+          returnItems: returnItemRows
+            .filter((line) => line.return_id === orderReturn.id)
+            .map((line) => ({
+              orderItemId: line.order_item_id,
+              productName:
+                items.find((item) => item.id === line.order_item_id)?.product_name_snapshot ??
+                'Historical item',
+              quantity: safeInteger(line.quantity),
+              valuationMinor: safeInteger(line.amount_minor),
+            })),
           reason: {
             id: orderReturn.reason_code_id,
             key: orderReturn.reason_code_key,
@@ -578,6 +870,12 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
         displayOrderNo: safeInteger(order.display_order_no),
         displayOrderLabel: `#${safeInteger(order.display_order_no)}`,
         createdAt: order.created_at,
+        businessDayId: order.business_day_id,
+        operatorName: order.operator_name_snapshot,
+        itemsSubtotalMinor: safeInteger(order.items_subtotal_minor),
+        discountMinor: safeInteger(order.discount_minor),
+        serviceChargeMinor: safeInteger(order.service_charge_minor),
+        taxMinor: safeInteger(order.tax_minor),
         totalMinor: safeInteger(order.total_minor),
         customer:
           order.customer_contact_id ||
@@ -596,6 +894,21 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           deliveryZoneLabel: order.delivery_zone_label_snapshot,
           finalDeliveryFeeMinor: safeInteger(order.final_delivery_fee_minor),
         },
+        delivery: isDelivery
+          ? {
+              state: deliveryStates[0]?.state ?? null,
+              riderName: riderRows[0]?.display_name ?? null,
+              timeline: deliveryEvents.map((event) => ({
+                id: event.id,
+                fromState: event.from_state,
+                toState: event.to_state,
+                employeeId: event.employee_id,
+                riderId: event.rider_id,
+                note: event.note,
+                createdAt: event.created_at,
+              })),
+            }
+          : null,
         payments: payments.map((payment) => ({
           id: payment.id,
           methodLabel: payment.payment_method_label_snapshot,
@@ -604,6 +917,8 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           receivedMinor:
             payment.received_minor === null ? null : safeInteger(payment.received_minor),
           changeMinor: payment.change_minor === null ? null : safeInteger(payment.change_minor),
+          refundAllowedSnapshot: payment.refund_allowed_snapshot,
+          ...paymentBalances.get(payment.id),
         })),
         items: items.map((item) => ({
           id: item.id,
@@ -612,6 +927,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           quantity: safeInteger(item.quantity),
           unitPriceMinor: safeInteger(item.unit_price_minor),
           itemNote: item.item_note,
+          ...returnQuantities.get(item.id),
           modifiers: modifiers
             .filter((modifier) => modifier.order_item_id === item.id)
             .map((modifier) => ({
@@ -716,6 +1032,13 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
   };
 }
 
+export function requireOrdersWriteReauthentication(
+  reauthenticatedAt: string | null,
+  now = new Date(),
+): void {
+  requireRecentReauth({ reauthenticated_at: reauthenticatedAt }, 300, now);
+}
+
 async function loadContext(
   request: AdminRequest,
   client: AdminSupabaseClient,
@@ -726,6 +1049,7 @@ async function loadContext(
   const context = await loadAdminSession(token, client);
   if (csrfRequired) {
     requireSessionCsrf(context, firstHeader(request.headers['x-tux-admin-csrf']).trim());
+    requireOrdersWriteReauthentication(context.session.reauthenticated_at);
   }
   return context;
 }
@@ -758,6 +1082,15 @@ function sendMutationResult(
   sendJson(response, 400, result);
 }
 
+export function classifyPaidOrderCancellationDatabaseError(
+  responseBody: string,
+): { status: 409; error: 'paid_active_cancellation_requires_settlement' } | null {
+  if (responseBody.includes('TUX_ADMIN_PAID_CANCEL_REQUIRES_SETTLEMENT')) {
+    return { status: 409, error: 'paid_active_cancellation_requires_settlement' };
+  }
+  return null;
+}
+
 export function classifyOrderRefundDatabaseError(
   responseBody: string,
 ): { status: 409; error: 'payment_refund_not_allowed' } | null {
@@ -767,8 +1100,21 @@ export function classifyOrderRefundDatabaseError(
   return null;
 }
 
+export function classifyOrderReadInputError(
+  error: unknown,
+): { status: 400; error: 'invalid_order_cursor' | 'invalid_orders_date_filter' } | null {
+  if (!(error instanceof Error)) return null;
+  if (error.message === 'invalid_order_cursor') {
+    return { status: 400, error: 'invalid_order_cursor' };
+  }
+  if (error.message === 'invalid_orders_date_filter') {
+    return { status: 400, error: 'invalid_orders_date_filter' };
+  }
+  return null;
+}
+
 function handleFailure(response: AdminResponse, error: unknown): void {
-  if (error instanceof AdminAuthError) {
+  if (error instanceof AdminAuthError || error instanceof AdminRecentReauthError) {
     sendJson(response, error.status, { error: error.code });
     return;
   }
@@ -780,7 +1126,21 @@ function handleFailure(response: AdminResponse, error: unknown): void {
     sendJson(response, 400, { error: 'invalid_orders_request' });
     return;
   }
+  const invalidReadInput = classifyOrderReadInputError(error);
+  if (invalidReadInput) {
+    sendJson(response, invalidReadInput.status, { error: invalidReadInput.error });
+    return;
+  }
   if (error instanceof AdminSupabaseError) {
+    const cancellationSafetyFailure = classifyPaidOrderCancellationDatabaseError(
+      error.responseBody,
+    );
+    if (cancellationSafetyFailure) {
+      sendJson(response, cancellationSafetyFailure.status, {
+        error: cancellationSafetyFailure.error,
+      });
+      return;
+    }
     const refundPolicyFailure = classifyOrderRefundDatabaseError(error.responseBody);
     if (refundPolicyFailure) {
       sendJson(response, refundPolicyFailure.status, { error: refundPolicyFailure.error });
@@ -897,6 +1257,102 @@ export default async function handler(
       const url = new URL(request.url ?? '/', 'http://admin.local');
       const shopId = uuidSchema.parse(url.searchParams.get('shopId'));
       const context = await loadContext(request, client, false);
+      if (url.searchParams.get('view') === 'business-days') {
+        sendJson(response, 200, await service.listBusinessDays({ shopId }, context.principal));
+        return;
+      }
+      if (url.searchParams.get('view') === 'export') {
+        requirePermission(context.principal, 'reports.view', shopId);
+        const requestedStatuses = url.searchParams
+          .getAll('status')
+          .filter((value): value is AdminOrderStatus =>
+            ['ACTIVE', 'DONE', 'CANCELLED', 'RETURNED'].includes(value),
+          );
+        const rawSource = url.searchParams.get('source');
+        const source = rawSource === 'POS' || rawSource === 'ONLINE' ? rawSource : null;
+        let cursor: string | null = null;
+        const rows: AdminOrderSummary[] = [];
+        do {
+          const page = await service.searchOrders(
+            {
+              shopId,
+              query: url.searchParams.get('q'),
+              statuses: requestedStatuses,
+              source,
+              businessDayId: url.searchParams.get('businessDayId')
+                ? uuidSchema.parse(url.searchParams.get('businessDayId'))
+                : null,
+              from: url.searchParams.get('from'),
+              to: url.searchParams.get('to'),
+              cursor,
+              limit: Math.min(100, ORDER_EXPORT_MAX_ROWS - rows.length),
+            },
+            context.principal,
+          );
+          rows.push(...page.rows);
+          cursor = page.nextCursor;
+        } while (cursor && rows.length < ORDER_EXPORT_MAX_ROWS);
+
+        response.statusCode = 200;
+        response.setHeader('content-type', 'text/csv; charset=utf-8');
+        response.setHeader('content-disposition', 'attachment; filename="tux-orders.csv"');
+        response.setHeader('cache-control', 'no-store');
+        response.setHeader('x-content-type-options', 'nosniff');
+        response.setHeader('x-tux-export-truncated', cursor ? 'true' : 'false');
+        response.end(renderOrdersCsv(rows));
+        return;
+      }
+      if (url.searchParams.get('view') === 'online-requests') {
+        const rawStatus = url.searchParams.get('status');
+        const status =
+          rawStatus === 'PENDING' ||
+          rawStatus === 'PROCESSING' ||
+          rawStatus === 'ACCEPTED' ||
+          rawStatus === 'REJECTED'
+            ? rawStatus
+            : null;
+        const day = url.searchParams.get('date');
+        const dateRange = day ? cairoCalendarDayRange(day) : null;
+        if (day && !dateRange) {
+          sendJson(response, 400, { error: 'invalid_orders_date_filter' });
+          return;
+        }
+        const from = dateRange?.from ?? url.searchParams.get('from');
+        const to = dateRange?.to ?? url.searchParams.get('to');
+        const cursor = url.searchParams.get('cursor');
+        if (cursor && !decodeCursor(cursor)) {
+          sendJson(response, 400, { error: 'invalid_online_request_cursor' });
+          return;
+        }
+        const rawLimit = Number(url.searchParams.get('limit') ?? '50');
+        const limit = Number.isSafeInteger(rawLimit) ? rawLimit : 50;
+        const parseOptionalInstant = (value: string | null): string | null => {
+          if (!value) return null;
+          if (
+            !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value) ||
+            !Number.isFinite(Date.parse(value))
+          ) {
+            throw new Error('invalid_orders_date_filter');
+          }
+          return value;
+        };
+        sendJson(
+          response,
+          200,
+          await service.listOnlineOrderRequests(
+            {
+              shopId,
+              status,
+              from: parseOptionalInstant(from),
+              to: parseOptionalInstant(to),
+              cursor,
+              limit,
+            },
+            context.principal,
+          ),
+        );
+        return;
+      }
       if (url.searchParams.get('view') === 'action-reasons') {
         sendJson(response, 200, {
           reasons: await service.listActionReasons({ shopId }, context.principal),
@@ -932,6 +1388,9 @@ export default async function handler(
           query: url.searchParams.get('q'),
           statuses,
           source,
+          businessDayId: url.searchParams.get('businessDayId')
+            ? uuidSchema.parse(url.searchParams.get('businessDayId'))
+            : null,
           from: url.searchParams.get('from'),
           to: url.searchParams.get('to'),
           cursor: url.searchParams.get('cursor'),
