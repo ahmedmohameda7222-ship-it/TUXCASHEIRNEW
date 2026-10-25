@@ -212,3 +212,10 @@ begin
   );
 end;
 $function$
+
+
+-- Preserve and explicitly reassert the original trusted BFF-only execution boundary.
+revoke all on function public.send_stock_transfer_v1(uuid, uuid, uuid, jsonb, text)
+  from public, anon, authenticated;
+grant execute on function public.send_stock_transfer_v1(uuid, uuid, uuid, jsonb, text)
+  to service_role;
