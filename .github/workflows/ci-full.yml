@@ -59,6 +59,8 @@ jobs:
         run: npm run format:check
       - name: Lint
         run: npm run lint
+      - name: Fast CI selector Node regression
+        run: node --test scripts/ci-fast-scope.test.mjs
       - name: Unit and integration tests
         run: npm run test
       - name: Sync workspace domain source regression
