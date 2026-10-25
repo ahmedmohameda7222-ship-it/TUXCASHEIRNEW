@@ -1,4 +1,5 @@
 import type { AdminOrderDetail } from '@tux/admin-contracts';
+import { Link } from 'wouter';
 
 function money(minor: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -25,6 +26,7 @@ export function OrderDetailPage({
   order,
   canCancel,
   canRefund,
+  canReviewApprovals,
   cancelling,
   refunding,
   returning,
@@ -35,6 +37,7 @@ export function OrderDetailPage({
   order: AdminOrderDetail;
   canCancel: boolean;
   canRefund: boolean;
+  canReviewApprovals: boolean;
   cancelling: boolean;
   refunding: boolean;
   returning: boolean;
@@ -311,7 +314,14 @@ export function OrderDetailPage({
                     <small>Decision reason: {event.decisionReason}</small>
                   ) : null}
                   {event.approvalRequestId ? (
-                    <small>Approval reference: {event.approvalRequestId}</small>
+                    <>
+                      <small>Approval reference: {event.approvalRequestId}</small>
+                      {canReviewApprovals ? (
+                        <Link href={`/approvals/${event.approvalRequestId}`}>
+                          Review approval
+                        </Link>
+                      ) : null}
+                    </>
                   ) : null}
                   <small>
                     {event.kind === 'RETURN'
