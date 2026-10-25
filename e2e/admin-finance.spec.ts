@@ -517,7 +517,7 @@ test('approved Finance navigation has three primary sections and reconciliation 
 }) => {
   const commands = await mockFinance(page, 'CLOSED');
   await page.goto('/finance/reconciliation');
-  await expect(page.getByRole('heading', { name: 'Reconciliation' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Reconciliation', exact: true })).toBeVisible();
   const primary = page.getByRole('navigation', { name: 'Finance sections' });
   await expect(primary.getByRole('link')).toHaveCount(3);
   await expect(primary.getByRole('link', { name: 'Money' })).toBeVisible();
