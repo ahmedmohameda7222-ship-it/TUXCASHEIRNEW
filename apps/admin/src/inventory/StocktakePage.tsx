@@ -1,19 +1,14 @@
 import type { AdminInventoryItem, AdminStocktakeSnapshot } from '@tux/admin-contracts';
 import { useMemo, useState } from 'react';
 
+import { parseStocktakeMicros } from './stocktakeQuantity';
+
 function formatQuantity(micros: number, unitLabel: string): string {
   return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(
     micros / 1_000_000,
   )} ${unitLabel}`;
 }
 
-function toMicros(value: string): number | null {
-  if (value.trim() === '') return null;
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric < 0) return null;
-  const micros = Math.round(numeric * 1_000_000);
-  return Number.isSafeInteger(micros) && micros >= 0 ? micros : null;
-}
 
 export function StocktakePage({
   items,
@@ -35,7 +30,7 @@ export function StocktakePage({
   const parsed = snapshot.lines.map((line) => ({
     line,
     item: itemById.get(line.inventoryItemId),
-    actualMicros: toMicros(actualByItem[line.inventoryItemId] ?? ''),
+    actualMicros: parseStocktakeMicros(actualByItem[line.inventoryItemId] ?? ''),
   }));
   const valid = parsed.every((entry) => entry.item && entry.actualMicros !== null);
   const counted = parsed.filter((entry) => entry.actualMicros !== null).length;
