@@ -430,7 +430,6 @@ export function OrderDetailPage({
                     }).format(new Date(event.createdAt))}{' '}
                     (Cairo)
                   </small>
-                  <small>Revision {event.operationalRevision}</small>
                   {event.workerName ? <small>Worker: {event.workerName}</small> : null}
                   {event.adminEmployeeId ? (
                     <small>Admin actor: {event.adminEmployeeId}</small>
