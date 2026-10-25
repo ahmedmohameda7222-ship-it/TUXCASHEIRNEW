@@ -1,4 +1,4 @@
-export const INDEXED_DB_VERSION = 10;
+export const INDEXED_DB_VERSION = 11;
 
 export const INDEXED_DB_STORES = [
   'shops',
@@ -365,7 +365,11 @@ const MIGRATIONS: readonly IndexedDbMigration[] = [
           0,
         );
         const recoveryStream = events
-          .filter((event) => recoverableDayIds.has(String(event['businessDayId'])))
+          .filter(
+            (event) =>
+              event['deliveredAt'] === null &&
+              recoverableDayIds.has(String(event['businessDayId'])),
+          )
           .sort((left, right) => {
             const byPrecedence = precedence(left['eventType']) - precedence(right['eventType']);
             if (byPrecedence !== 0) return byPrecedence;
@@ -394,6 +398,44 @@ const MIGRATIONS: readonly IndexedDbMigration[] = [
             },
           });
         }
+      });
+    },
+  },
+  {
+    version: 11,
+    name: 'retry_already_closed_day_convergence',
+    apply(_database, transaction) {
+      const outbox = transaction.objectStore('outboxEvents');
+      const cursorRequest = outbox.openCursor();
+      cursorRequest.addEventListener('success', () => {
+        const cursor = cursorRequest.result;
+        if (cursor === null) return;
+        const event = cursor.value as Record<string, unknown>;
+        const evidence = event['recoveryEvidence'];
+        const migratedByLegacyReplay =
+          typeof evidence === 'object' &&
+          evidence !== null &&
+          !Array.isArray(evidence) &&
+          (evidence as Record<string, unknown>)['migration'] === 10;
+        if (
+          migratedByLegacyReplay &&
+          event['eventType'] === 'BUSINESS_DAY_CLOSED' &&
+          event['deliveredAt'] === null &&
+          typeof event['quarantinedAt'] === 'string' &&
+          event['lastError'] ===
+            'Canonical Business Day identity is incompatible with this event. Preserve the local queue and inspect the original day and shop before an explicit, audited recovery.'
+        ) {
+          cursor.update({
+            ...event,
+            attemptCount: 0,
+            nextAttemptAt: null,
+            lastError: null,
+            quarantinedAt: null,
+            permanentFailureReason: null,
+            blockedByEventId: null,
+          });
+        }
+        cursor.continue();
       });
     },
   },

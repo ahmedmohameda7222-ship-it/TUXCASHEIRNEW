@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { buildRemoteMaterializationPlanV1 } from '@tux/remote-materializer';
+import { closedDayConvergenceCandidate } from './closedDayConvergence.ts';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -119,6 +120,41 @@ Deno.serve(async (request) => {
 
   if (error) {
     const message = error.message ?? '';
+    const closedDay = closedDayConvergenceCandidate(message, envelope, plan);
+    if (closedDay !== null) {
+      const { data: canonicalDay, error: canonicalDayError } = await serviceClient
+        .from('business_days')
+        .select('id, shop_id, status, started_at')
+        .eq('id', closedDay.businessDayId)
+        .eq('shop_id', closedDay.shopId)
+        .maybeSingle();
+      const sameStart =
+        canonicalDay !== null &&
+        Date.parse(canonicalDay.started_at) === Date.parse(closedDay.startedAt);
+      if (canonicalDayError === null && canonicalDay?.status === 'CLOSED' && sameStart) {
+        const { error: receiptError } = await serviceClient
+          .from('operations_sync_event_receipts')
+          .insert({
+            event_id: closedDay.eventId,
+            shop_id: closedDay.shopId,
+            idempotency_key: closedDay.idempotencyKey,
+            event_type: closedDay.eventType,
+            payload_version: closedDay.payloadVersion,
+            payload_sha256: payloadSha256,
+            envelope_json: envelope,
+          });
+        if (receiptError === null) {
+          await serviceClient
+            .from('devices')
+            .update({ last_seen_at: new Date().toISOString() })
+            .eq('id', deviceId)
+            .eq('shop_id', closedDay.shopId)
+            .eq('auth_user_id', userData.user.id);
+          return jsonResponse(200, { status: 'CONVERGED' });
+        }
+        console.error('operations-sync closed-day convergence receipt failed', receiptError);
+      }
+    }
     // A mismatched OPEN identity is a blocked dependency, not a transient generic 500.
     // Keep the immutable local event in the outbox so the origin can deliver End Day first.
     const openConflict = message.match(/TUX_BUSINESS_DAY_OPEN_CONFLICT:([0-9a-f-]{36})/i);

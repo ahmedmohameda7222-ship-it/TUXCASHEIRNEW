@@ -124,8 +124,8 @@ afterEach(async () => {
 
 describe('IndexedDB migration registry', () => {
   it('declares a contiguous production migration chain', () => {
-    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    expect(INDEXED_DB_VERSION).toBe(10);
+    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    expect(INDEXED_DB_VERSION).toBe(11);
   });
 
   it('retries legacy quarantined order lifecycle events once on v10 while preserving evidence', async () => {
@@ -176,6 +176,112 @@ describe('IndexedDB migration registry', () => {
       });
     } finally {
       v10.close();
+    }
+  });
+
+  it('does not resurrect already delivered events while recovering a legacy day stream', async () => {
+    const name = `tux-indexeddb-v10-preserve-delivered-${crypto.randomUUID()}`;
+    const v9 = await openAtVersion(name, 9);
+    const write = v9.transaction('outboxEvents', 'readwrite');
+    const dayId = '20000000-0000-4000-8000-000000000001';
+    const deliveredId = '60000000-0000-4000-8000-000000000012';
+    const failedId = '60000000-0000-4000-8000-000000000013';
+    const base = {
+      shopId: '10000000-0000-4000-8000-000000000001',
+      businessDayId: dayId,
+      aggregateId: dayId,
+      aggregateRevision: 1,
+      payloadVersion: 1,
+      payload: {},
+      createdAt: '2026-10-24T13:00:00.000Z',
+      attemptCount: 0,
+      nextAttemptAt: null,
+      blockedByEventId: null,
+    };
+    write.objectStore('outboxEvents').put({
+      ...base,
+      id: deliveredId,
+      aggregateType: 'BUSINESS_DAY',
+      eventType: 'BUSINESS_DAY_CLOSED',
+      idempotencyKey: 'delivered-close',
+      lastError: null,
+      deliveredAt: '2026-10-24T13:02:00.000Z',
+      quarantinedAt: null,
+      permanentFailureReason: null,
+    });
+    write.objectStore('outboxEvents').put({
+      ...base,
+      id: failedId,
+      aggregateType: 'ORDER',
+      eventType: 'ORDER_MARKED_DONE',
+      idempotencyKey: 'failed-lifecycle',
+      lastError: 'Remote outbox endpoint rejected event with HTTP 400.',
+      deliveredAt: null,
+      quarantinedAt: '2026-10-24T13:01:00.000Z',
+      permanentFailureReason: 'Remote outbox endpoint rejected event with HTTP 400.',
+    });
+    await transactionDone(write);
+    v9.close();
+
+    const v10 = await openAtVersion(name, 10);
+    try {
+      const delivered = await requestResult(
+        v10.transaction('outboxEvents', 'readonly').objectStore('outboxEvents').get(deliveredId),
+      );
+      expect(delivered).toMatchObject({
+        deliveredAt: '2026-10-24T13:02:00.000Z',
+        createdAt: '2026-10-24T13:00:00.000Z',
+      });
+      expect(delivered).not.toHaveProperty('recoveryEvidence');
+    } finally {
+      v10.close();
+    }
+  });
+
+  it('retries v10 already-closed convergence failures once on v11', async () => {
+    const name = `tux-indexeddb-v11-close-convergence-${crypto.randomUUID()}`;
+    const v10 = await openAtVersion(name, 10);
+    const write = v10.transaction('outboxEvents', 'readwrite');
+    const id = '60000000-0000-4000-8000-000000000014';
+    write.objectStore('outboxEvents').put({
+      id,
+      shopId: '10000000-0000-4000-8000-000000000001',
+      businessDayId: '20000000-0000-4000-8000-000000000001',
+      aggregateType: 'BUSINESS_DAY',
+      aggregateId: '20000000-0000-4000-8000-000000000001',
+      aggregateRevision: 1,
+      eventType: 'BUSINESS_DAY_CLOSED',
+      payloadVersion: 1,
+      payload: {},
+      idempotencyKey: 'close-convergence-v11',
+      createdAt: '2026-10-24T13:00:00.000Z',
+      attemptCount: 1,
+      nextAttemptAt: null,
+      lastError:
+        'Canonical Business Day identity is incompatible with this event. Preserve the local queue and inspect the original day and shop before an explicit, audited recovery.',
+      deliveredAt: null,
+      quarantinedAt: '2026-10-24T13:01:00.000Z',
+      permanentFailureReason: 'conflict',
+      blockedByEventId: null,
+      recoveryEvidence: { migration: 10 },
+    });
+    await transactionDone(write);
+    v10.close();
+
+    const v11 = await openAtVersion(name, 11);
+    try {
+      await expect(
+        requestResult(
+          v11.transaction('outboxEvents', 'readonly').objectStore('outboxEvents').get(id),
+        ),
+      ).resolves.toMatchObject({
+        attemptCount: 0,
+        lastError: null,
+        quarantinedAt: null,
+        permanentFailureReason: null,
+      });
+    } finally {
+      v11.close();
     }
   });
 
