@@ -14,15 +14,21 @@ describe('accurate expected Purchase Order value', () => {
 
   it('does not invent a total for empty, invalid, or nonrepresentable lines', () => {
     expect(expectedOrderValueMinor([])).toBeNull();
-    expect(expectedOrderValueMinor([
-      { orderedPurchaseUnitsMicros: 1_000_000, expectedPurchaseUnitCostMinor: 1.25 },
-    ])).toBeNull();
+    expect(
+      expectedOrderValueMinor([
+        { orderedPurchaseUnitsMicros: 1_000_000, expectedPurchaseUnitCostMinor: 1.25 },
+      ]),
+    ).toBeNull();
     expect(formatExpectedOrderValue(null)).toBe('Unavailable');
   });
 
   it('preserves deliberately free supplier items without inventing nonzero costs', () => {
-    expect(formatExpectedOrderValue(expectedOrderValueMinor([
-      { orderedPurchaseUnitsMicros: 500_000, expectedPurchaseUnitCostMinor: 0 },
-    ]))).toBe('0.00 EGP');
+    expect(
+      formatExpectedOrderValue(
+        expectedOrderValueMinor([
+          { orderedPurchaseUnitsMicros: 500_000, expectedPurchaseUnitCostMinor: 0 },
+        ]),
+      ),
+    ).toBe('0.00 EGP');
   });
 });
