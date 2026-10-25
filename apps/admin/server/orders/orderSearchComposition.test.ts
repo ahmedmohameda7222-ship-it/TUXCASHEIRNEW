@@ -53,4 +53,14 @@ describe('Orders cursor/search query composition', () => {
     const query = calls.find(([table]) => table === 'orders')?.[1];
     expect(query?.get('and')).toContain('display_order_no.eq.42');
   });
+  it('matches an exact immutable order UUID without searching customer names', async () => {
+    const { store, select } = setup();
+    const orderId = '44444444-4444-4444-8444-444444444444';
+    await store.searchOrders({ businessId, shopId, employeeId, query: orderId });
+    const calls = select.mock.calls as unknown as Array<[string, URLSearchParams]>;
+    const query = calls.find(([table]) => table === 'orders')?.[1];
+    expect(query?.get('id')).toBe(`eq.${orderId}`);
+    expect(query?.getAll('or')).toEqual([]);
+  });
+
 });
