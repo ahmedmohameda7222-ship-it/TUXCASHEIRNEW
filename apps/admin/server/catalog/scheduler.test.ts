@@ -325,5 +325,4 @@ describe('catalog scheduler', () => {
       p_result: { ok: true, publishVersion: 49 },
     });
   });
-
 });
