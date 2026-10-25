@@ -187,7 +187,7 @@ export function OrdersPage() {
           date={/^\d{4}-\d{2}-\d{2}$/.test(onlineDate) ? onlineDate : ''}
         />
       ) : (
-        <>
+        <div className="admin-orders-canonical-view">
           <AdminMetricStrip
             label="Orders key metrics"
             metrics={[
@@ -539,7 +539,7 @@ export function OrdersPage() {
               />
             }
           />
-        </>
+        </div>
       )}
     </PageScaffold>
   );
