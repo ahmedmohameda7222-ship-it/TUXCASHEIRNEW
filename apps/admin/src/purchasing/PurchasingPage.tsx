@@ -1,4 +1,5 @@
 import './purchasing.css';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
 
@@ -13,6 +14,7 @@ import { PurchaseOrdersPage } from './PurchaseOrdersPage';
 import { ReceivePurchasePage } from './ReceivePurchasePage';
 import { SuppliersPage } from './SuppliersPage';
 import { usePurchasing } from './usePurchasing';
+import { purchaseHistoryKey, usePurchaseHistory } from './usePurchaseHistory';
 
 type ActionMode = 'receive' | 'return' | null;
 type PurchasingSection = 'orders' | 'suppliers';
@@ -46,6 +48,8 @@ export function PurchasingPage() {
   const [location, navigate] = useLocation();
   const selectedId = detailIdFromPath(location, '/purchasing');
   const purchasing = usePurchasing(shopId);
+  const history = usePurchaseHistory(shopId, selectedId);
+  const queryClient = useQueryClient();
   const workspace = purchasing.workspace.data;
   const mutationError = latestMutationError([
     purchasing.createSupplier,
@@ -66,6 +70,15 @@ export function PurchasingPage() {
     () => workspace?.purchaseOrders.find((order) => order.id === selectedId) ?? null,
     [selectedId, workspace?.purchaseOrders],
   );
+
+  function closeActionAndRefreshHistory() {
+    if (shopId && selectedId) {
+      void queryClient.invalidateQueries({
+        queryKey: purchaseHistoryKey(shopId, selectedId),
+      });
+    }
+    setAction(null);
+  }
 
   if (!shopId) {
     return (
@@ -197,6 +210,10 @@ export function PurchasingPage() {
             <>
               <PurchaseOrderPage
                 order={selected}
+                history={history.data?.purchaseOrderId === selected.id ? history.data : null}
+                historyPending={history.isLoading}
+                historyError={history.isError}
+                onRetryHistory={() => void history.refetch()}
                 canManage={canManage}
                 canReceive={canReceive}
                 cancelling={purchasing.cancelPurchaseOrder.isPending}
@@ -252,13 +269,13 @@ export function PurchasingPage() {
                   onReceive={(input) =>
                     purchasing.receivePurchase.mutate(
                       { purchaseOrderId: selected.id, ...input },
-                      { onSuccess: () => setAction(null) },
+                      { onSuccess: closeActionAndRefreshHistory },
                     )
                   }
                   onReturn={(input) =>
                     purchasing.returnPurchase.mutate(
                       { purchaseOrderId: selected.id, ...input },
-                      { onSuccess: () => setAction(null) },
+                      { onSuccess: closeActionAndRefreshHistory },
                     )
                   }
                 />
