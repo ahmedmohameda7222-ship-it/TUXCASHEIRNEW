@@ -10,6 +10,7 @@ import { useShopScope } from '../shops/ShopScopeProvider';
 import { AdjustStockSheet } from './AdjustStockSheet';
 import { InventoryItemPage } from './InventoryItemPage';
 import { InventoryDefinitionEditor } from './InventoryDefinitionEditor';
+import { inventoryCsv } from './inventoryCsv';
 import { InventoryMasterBindingPanel } from './InventoryMasterBindingPanel';
 import {
   inventoryCounts,
@@ -268,6 +269,24 @@ export function InventoryPage() {
       description="Review stock levels, manage counts, adjustments, waste and transfers."
       primaryAction={
         <div className="admin-inventory-page-actions">
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={() => {
+              const csv = inventoryCsv(items);
+              const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `inventory-${shopId}.csv`;
+              document.body.appendChild(link);
+              link.click();
+              link.remove();
+              window.setTimeout(() => URL.revokeObjectURL(url), 0);
+            }}
+          >
+            Export CSV
+          </button>
           {canManageDefinitions ? (
             <button
               className="admin-primary-button"
