@@ -836,10 +836,30 @@ async function loadInventoryApprovalRules(
   });
 }
 
+type StocktakeEligibility = { allowed: boolean; code: string };
+
+async function loadStocktakeEligibility(
+  client: AdminSupabaseClient,
+  context: AdminSessionContext,
+  shopId: string,
+): Promise<StocktakeEligibility> {
+  requirePermission(context.principal, 'inventory.stocktake', shopId);
+  // If this trusted RPC has not been migrated, the request fails CLOSED;
+  // legacy database stocktake paths must never be used as a fallback.
+  return client.rpc<StocktakeEligibility>('read_admin_stocktake_quiescence_v1', {
+    p_employee_id: context.principal.employeeId,
+    p_shop_id: shopId,
+  });
+}
+
 function commandFailureStatus(result: AdminInventoryCommandResult): number {
   if (result.ok) return 200;
   if (
     result.code === 'insufficient_stock' ||
+    result.code === 'active_worker_session' ||
+    result.code === 'unfinished_orders' ||
+    result.code === 'stocktake_requires_off_shift' ||
+    result.code === 'stocktake_snapshot_stale' ||
     result.code === 'stale_version' ||
     result.code === 'inventory_semantic_change_forbidden' ||
     result.code.includes('conflict')
@@ -969,16 +989,19 @@ async function executeCommand(
         p_emergency_negative_override: command.emergencyNegativeOverride,
       });
     }
-    case 'stocktake.begin':
-      requirePermission(context.principal, 'inventory.stocktake', command.shopId);
+    case 'stocktake.begin': {
+      const eligibility = await loadStocktakeEligibility(client, context, command.shopId);
+      if (!eligibility.allowed) return { ok: false, code: eligibility.code };
       return client.rpc<AdminInventoryCommandResult>('begin_stocktake_v1', {
         p_employee_id: context.principal.employeeId,
         p_shop_id: command.shopId,
         p_inventory_item_ids: command.inventoryItemIds,
         p_command_id: command.commandId,
       });
-    case 'stocktake.post':
-      requirePermission(context.principal, 'inventory.stocktake', command.shopId);
+    }
+    case 'stocktake.post': {
+      const eligibility = await loadStocktakeEligibility(client, context, command.shopId);
+      if (!eligibility.allowed) return { ok: false, code: eligibility.code };
       return client.rpc<AdminInventoryCommandResult>('post_stocktake_v1', {
         p_employee_id: context.principal.employeeId,
         p_shop_id: command.shopId,
@@ -989,6 +1012,7 @@ async function executeCommand(
         })),
         p_command_id: command.commandId,
       });
+    }
     case 'replenishment.update':
       requirePermission(context.principal, 'purchasing.manage', command.shopId);
       await updateReplenishmentPolicy(client, {
@@ -1058,6 +1082,14 @@ function handleFailure(response: AdminResponse, error: unknown, request: AdminRe
       sendJson(response, 403, { error: 'permission_forbidden' });
       return;
     }
+    if (error.responseBody.includes('stocktake_requires_off_shift')) {
+      sendJson(response, 409, { error: 'stocktake_requires_off_shift' });
+      return;
+    }
+    if (error.responseBody.includes('stocktake_snapshot_stale')) {
+      sendJson(response, 409, { error: 'stocktake_snapshot_stale' });
+      return;
+    }
     if (error.responseBody.includes('catalog_inventory_master_unit_locked')) {
       sendJson(response, 409, { error: 'inventory_master_unit_locked' });
       return;
@@ -1096,6 +1128,10 @@ export default async function handler(
       const inventoryItemId = url.searchParams.get('inventoryItemId');
       const context = await loadContext(request, client, false);
       const view = url.searchParams.get('view');
+      if (view === 'stocktake-eligibility') {
+        sendJson(response, 200, await loadStocktakeEligibility(client, context, shopId));
+        return;
+      }
       if (view === 'master-bindings') {
         requireInventoryMasterAuthority(context, shopId);
         const result = await client.rpc<Readonly<Record<string, unknown>>>(
