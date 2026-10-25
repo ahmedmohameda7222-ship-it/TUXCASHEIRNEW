@@ -44,10 +44,7 @@ export function FinanceSectionNav({
             >
               Settlements
             </Link>
-            <Link
-              href="/finance/end-day"
-              aria-current={active === 'end-day' ? 'page' : undefined}
-            >
+            <Link href="/finance/end-day" aria-current={active === 'end-day' ? 'page' : undefined}>
               Financial End Day
             </Link>
           </nav>
