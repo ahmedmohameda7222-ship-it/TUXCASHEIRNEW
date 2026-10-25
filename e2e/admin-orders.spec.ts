@@ -140,6 +140,7 @@ async function mockOrders(
     emptyOrders?: boolean;
     paidActive?: boolean;
     financeVisible?: boolean;
+    paginate?: boolean;
   } = {},
 ) {
   let active = detail({
@@ -297,7 +298,17 @@ async function mockOrders(
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ shopId, rows, nextCursor: null }),
+        body: JSON.stringify({
+          shopId,
+          rows: options.paginate
+            ? rows.slice(url.searchParams.get('cursor') === 'orders-next-2' ? 1 : 0,
+                url.searchParams.get('cursor') === 'orders-next-2' ? 2 : 1)
+            : rows,
+          nextCursor:
+            options.paginate && !url.searchParams.get('cursor') && rows.length > 1
+              ? 'orders-next-2'
+              : null,
+        }),
       });
       return;
     }
@@ -931,4 +942,26 @@ test('O2 zero paid orders have null AOV rather than fabricated zero', async ({ p
   const strip = page.locator('dl[aria-label="Orders key metrics"]');
   await expect(strip).toContainText('No paid orders in selected period');
   await expect(strip).toContainText('Unavailable');
+});
+
+test('O1 nextCursor reveals additional server rows without changing the full-shop KPI', async ({
+  page,
+}) => {
+  const fixture = await mockOrders(page, { paginate: true, financeVisible: true });
+  await page.goto('/orders');
+  const list = page.getByRole('region', { name: 'Orders' });
+  await expect(list.getByRole('button', { name: /#101/ })).toBeVisible();
+  await expect(list.getByRole('button', { name: /#102/ })).toHaveCount(0);
+  await expect(page.locator('dl[aria-label="Orders key metrics"]')).toContainText('65');
+  await page.getByRole('button', { name: 'Load more' }).click();
+  await expect(list.getByRole('button', { name: /#102/ })).toBeVisible();
+  await expect(list.getByRole('button', { name: /#101/ })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Load more' })).toHaveCount(0);
+  await expect
+    .poll(() =>
+      fixture.searches.some((url) => url.searchParams.get('cursor') === 'orders-next-2'),
+    )
+    .toBe(true);
+  await expect(page.locator('dl[aria-label="Orders key metrics"]')).toContainText('65');
+  expect(fixture.kpiRequests).toHaveLength(1);
 });
