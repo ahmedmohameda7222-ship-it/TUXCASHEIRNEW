@@ -12,7 +12,11 @@ import {
   parsePurchaseMoneyMinor,
   validatePurchaseOrderLines,
 } from './purchaseOrderDraft';
-import { expectedOrderValueMinor, formatExpectedOrderValue, purchaseOrderDisplayReference } from './purchaseOrderValue';
+import {
+  expectedOrderValueMinor,
+  formatExpectedOrderValue,
+  purchaseOrderDisplayReference,
+} from './purchaseOrderValue';
 
 function statusLabel(status: AdminPurchaseOrder['status']): string {
   return status
