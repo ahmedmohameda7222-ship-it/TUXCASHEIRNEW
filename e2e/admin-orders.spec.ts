@@ -301,8 +301,10 @@ async function mockOrders(
         body: JSON.stringify({
           shopId,
           rows: options.paginate
-            ? rows.slice(url.searchParams.get('cursor') === 'orders-next-2' ? 1 : 0,
-                url.searchParams.get('cursor') === 'orders-next-2' ? 2 : 1)
+            ? rows.slice(
+                url.searchParams.get('cursor') === 'orders-next-2' ? 1 : 0,
+                url.searchParams.get('cursor') === 'orders-next-2' ? 2 : 1,
+              )
             : rows,
           nextCursor:
             options.paginate && !url.searchParams.get('cursor') && rows.length > 1
@@ -958,9 +960,7 @@ test('O1 nextCursor reveals additional server rows without changing the full-sho
   await expect(list.getByRole('button', { name: /#101/ })).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Load more' })).toHaveCount(0);
   await expect
-    .poll(() =>
-      fixture.searches.some((url) => url.searchParams.get('cursor') === 'orders-next-2'),
-    )
+    .poll(() => fixture.searches.some((url) => url.searchParams.get('cursor') === 'orders-next-2'))
     .toBe(true);
   await expect(page.locator('dl[aria-label="Orders key metrics"]')).toContainText('65');
   expect(fixture.kpiRequests).toHaveLength(1);
