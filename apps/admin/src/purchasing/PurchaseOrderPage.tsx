@@ -92,7 +92,7 @@ export function PurchaseOrderPage({
             className={activeTab === tab ? 'is-active' : ''}
             onClick={() => setActiveTab(tab)}
           >
-            {tab[0].toUpperCase() + tab.slice(1)}
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
       </div>
