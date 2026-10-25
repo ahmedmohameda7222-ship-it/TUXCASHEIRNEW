@@ -1184,14 +1184,11 @@ export default async function handler(
       const view = url.searchParams.get('view');
       if (view === 'stocktake-sessions') {
         requirePermission(context.principal, 'inventory.stocktake', shopId);
-        sendJson(
-          response,
-          200,
-          { ...(await client.rpc<AdminStocktakeSessions>('read_admin_stocktake_sessions_v1', {
-            p_employee_id: context.principal.employeeId,
-            p_shop_id: shopId,
-          })) },
+        const sessions = await client.rpc<AdminStocktakeSessions>(
+          'read_admin_stocktake_sessions_v1',
+          { p_employee_id: context.principal.employeeId, p_shop_id: shopId },
         );
+        sendJson(response, 200, { ...sessions });
         return;
       }
       if (view === 'stocktake-eligibility') {
