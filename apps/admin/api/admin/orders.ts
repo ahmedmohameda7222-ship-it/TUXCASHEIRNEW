@@ -4,6 +4,7 @@ import type {
   AdminOrderFinancialMutationResult,
   AdminOrderSearchResult,
   AdminOrderStatus,
+  AdminOnlineOrderRequestsResult,
   AdminReasonCodeConfiguration,
 } from '@tux/admin-contracts';
 import { z } from 'zod';
@@ -79,6 +80,24 @@ const commandSchema = z.discriminatedUnion('type', [
     })
     .strict(),
 ]);
+
+type OnlineRequestRow = {
+  id: string;
+  shop_id: string;
+  status: 'PENDING' | 'PROCESSING' | 'ACCEPTED' | 'REJECTED';
+  customer_name: string;
+  normalized_phone: string | null;
+  fulfillment_preference: string;
+  payment_preference: string;
+  trusted_items: unknown;
+  items_subtotal_minor: number | string;
+  created_at: string;
+  resolved_at: string | null;
+  accepted_order_id: string | null;
+  rejection_reason: string | null;
+  source_fingerprint: string | null;
+  catalog_revision: string;
+};
 
 type OrderRow = {
   id: string;
@@ -308,6 +327,44 @@ async function assertBusinessShop(
 
 export function createOrderStore(client: AdminSupabaseClient): OrderStore {
   return {
+    async listOnlineOrderRequests(input): Promise<AdminOnlineOrderRequestsResult> {
+      await assertBusinessShop(client, input.businessId, input.shopId);
+      const query = new URLSearchParams({
+        select:
+          'id,shop_id,status,customer_name,normalized_phone,fulfillment_preference,payment_preference,trusted_items,items_subtotal_minor,created_at,resolved_at,accepted_order_id,rejection_reason,source_fingerprint,catalog_revision',
+        shop_id: `eq.${input.shopId}`,
+        order: input.status === 'REJECTED'
+          ? 'resolved_at.desc.nullslast,id.desc'
+          : 'created_at.desc,id.desc',
+        limit: '100',
+      });
+      if (input.status) query.set('status', `eq.${input.status}`);
+      const dateColumn = input.status === 'REJECTED' ? 'resolved_at' : 'created_at';
+      if (input.from) query.append(dateColumn, `gte.${input.from}`);
+      if (input.to) query.append(dateColumn, `lte.${input.to}`);
+      const rows = await client.select<OnlineRequestRow[]>('online_order_requests', query);
+      return {
+        shopId: input.shopId,
+        rows: rows.map((row) => ({
+          id: row.id,
+          shopId: row.shop_id,
+          status: row.status,
+          customerName: row.customer_name,
+          normalizedPhone: row.normalized_phone,
+          fulfillmentPreference: row.fulfillment_preference,
+          paymentPreference: row.payment_preference,
+          trustedItems: row.trusted_items,
+          itemsSubtotalMinor: safeInteger(row.items_subtotal_minor),
+          createdAt: row.created_at,
+          resolvedAt: row.resolved_at,
+          acceptedOrderId: row.accepted_order_id,
+          rejectionReason: row.rejection_reason,
+          sourceFingerprint: row.source_fingerprint,
+          catalogRevision: row.catalog_revision,
+        })),
+      };
+    },
+
     async listActionReasons(input): Promise<readonly AdminReasonCodeConfiguration[]> {
       await assertBusinessShop(client, input.businessId, input.shopId);
       const rows = await client.select<ReasonCodeRow[]>(
@@ -1007,6 +1064,31 @@ export default async function handler(
       const url = new URL(request.url ?? '/', 'http://admin.local');
       const shopId = uuidSchema.parse(url.searchParams.get('shopId'));
       const context = await loadContext(request, client, false);
+      if (url.searchParams.get('view') === 'online-requests') {
+        const rawStatus = url.searchParams.get('status');
+        const status =
+          rawStatus === 'PENDING' || rawStatus === 'PROCESSING' ||
+          rawStatus === 'ACCEPTED' || rawStatus === 'REJECTED'
+            ? rawStatus
+            : null;
+        const from = url.searchParams.get('from');
+        const to = url.searchParams.get('to');
+        const parseOptionalInstant = (value: string | null): string | null => {
+          if (!value) return null;
+          if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value) ||
+              !Number.isFinite(Date.parse(value))) {
+            throw new Error('invalid_orders_date_filter');
+          }
+          return value;
+        };
+        sendJson(response, 200, await service.listOnlineOrderRequests({
+          shopId,
+          status,
+          from: parseOptionalInstant(from),
+          to: parseOptionalInstant(to),
+        }, context.principal));
+        return;
+      }
       if (url.searchParams.get('view') === 'action-reasons') {
         sendJson(response, 200, {
           reasons: await service.listActionReasons({ shopId }, context.principal),
