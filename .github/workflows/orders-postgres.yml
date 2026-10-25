@@ -7,7 +7,9 @@ on:
       - 'apps/admin/server/orders/**'
       - 'apps/admin/src/orders/**'
       - 'scripts/test-admin-order-approval-postgres.mjs'
+      - 'scripts/test-admin-orders-kpis-postgres.mjs'
       - 'supabase/migrations/20261025150000_orders_paid_cancel_safety.sql'
+      - 'supabase/migrations/20261026000000_orders_authoritative_kpis.sql'
       - '.github/workflows/orders-postgres.yml'
   workflow_dispatch:
 
@@ -41,6 +43,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Test payment refund, return, approval, and paid cancellation rollback
         run: node scripts/test-admin-order-approval-postgres.mjs
+      - name: Test shop-wide Orders O2 ledger, authorization and zero denominator
+        run: node scripts/test-admin-orders-kpis-postgres.mjs
 
   admin-rendered:
     name: Admin Orders rendered acceptance
