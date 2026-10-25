@@ -1,0 +1,48 @@
+name: Orders isolated rendered verification (temporary)
+
+on:
+  push:
+    branches:
+      - fix/orders-production-remediation-20261025
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orders-rendered-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  admin-rendered:
+    name: Admin Orders rendered QA
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Typecheck Admin
+        run: npm run typecheck:admin
+      - name: Build Admin
+        run: npm run build:admin
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run existing Admin rendered E2E
+        run: npm run test:e2e:admin
+      - name: Preserve screenshots and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orders-admin-rendered-e2e
+          path: |
+            playwright-report-admin
+            test-results
+          if-no-files-found: warn
+          retention-days: 14
