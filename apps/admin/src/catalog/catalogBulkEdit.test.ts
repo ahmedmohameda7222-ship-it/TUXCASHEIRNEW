@@ -44,28 +44,49 @@ const bundle: CatalogJsonObject = {
 
 describe('atomic Catalog bulk draft staging', () => {
   it('previews fixed and percentage prices using integer minor units', () => {
-    const fixed = previewCatalogBulkEdit([a, b], shopA, ['a', 'b'], {
-      kind: 'price.fixed',
-      priceMinor: 1500,
-    }, categories);
+    const fixed = previewCatalogBulkEdit(
+      [a, b],
+      shopA,
+      ['a', 'b'],
+      {
+        kind: 'price.fixed',
+        priceMinor: 1500,
+      },
+      categories,
+    );
     expect(fixed.map((row) => [row.before.priceMinor, row.after.priceMinor])).toEqual([
       [1001, 1500],
       [2000, 1500],
     ]);
-    const percent = previewCatalogBulkEdit([a, b], shopA, ['a', 'b'], {
-      kind: 'price.percentage',
-      percentage: 10,
-    }, categories);
+    const percent = previewCatalogBulkEdit(
+      [a, b],
+      shopA,
+      ['a', 'b'],
+      {
+        kind: 'price.percentage',
+        percentage: 10,
+      },
+      categories,
+    );
     expect(percent.map((row) => row.after.priceMinor)).toEqual([1101, 2200]);
   });
 
   it('stages all selected products as one complete bundle replacement', () => {
-    const staged = stageCatalogBulkEditBundle(bundle, shopA, ['a', 'b'], {
-      kind: 'archive',
-      archived: true,
-    }, categories);
+    const staged = stageCatalogBulkEditBundle(
+      bundle,
+      shopA,
+      ['a', 'b'],
+      {
+        kind: 'archive',
+        archived: true,
+      },
+      categories,
+    );
     const items = (staged.bundleJson.snapshot as CatalogJsonObject).products as CatalogJsonObject[];
-    expect(items.filter((item) => item.active === false).map((item) => item.id)).toEqual(['a', 'b']);
+    expect(items.filter((item) => item.active === false).map((item) => item.id)).toEqual([
+      'a',
+      'b',
+    ]);
     expect(items.find((item) => item.id === 'foreign')?.active).toBe(true);
     expect(staged.changedPaths).toContain('products');
   });
@@ -78,23 +99,47 @@ describe('atomic Catalog bulk draft staging', () => {
     expect(() => stageCatalogBulkEditBundle(bundle, shopA, ['a', 'a'], patch, categories)).toThrow(
       CatalogBulkEditError,
     );
-    expect(() => stageCatalogBulkEditBundle(bundle, shopA, ['a', 'missing'], patch, categories)).toThrow(
-      CatalogBulkEditError,
-    );
     expect(() =>
-      stageCatalogBulkEditBundle(bundle, shopA, ['a'], { kind: 'price.fixed', priceMinor: -1 }, categories),
+      stageCatalogBulkEditBundle(bundle, shopA, ['a', 'missing'], patch, categories),
     ).toThrow(CatalogBulkEditError);
     expect(() =>
-      stageCatalogBulkEditBundle(bundle, shopA, ['a'], { kind: 'category.assign', categoryId: categoryB }, categories),
+      stageCatalogBulkEditBundle(
+        bundle,
+        shopA,
+        ['a'],
+        { kind: 'price.fixed', priceMinor: -1 },
+        categories,
+      ),
+    ).toThrow(CatalogBulkEditError);
+    expect(() =>
+      stageCatalogBulkEditBundle(
+        bundle,
+        shopA,
+        ['a'],
+        { kind: 'category.assign', categoryId: categoryB },
+        categories,
+      ),
     ).toThrow(CatalogBulkEditError);
   });
 
   it('rejects invalid percentage and overflowing adjustment before any mutation', () => {
     expect(() =>
-      previewCatalogBulkEdit([a], shopA, ['a'], { kind: 'price.percentage', percentage: -120 }, categories),
+      previewCatalogBulkEdit(
+        [a],
+        shopA,
+        ['a'],
+        { kind: 'price.percentage', percentage: -120 },
+        categories,
+      ),
     ).toThrow(CatalogBulkEditError);
     expect(() =>
-      previewCatalogBulkEdit([a], shopA, ['a'], { kind: 'price.adjust', deltaMinor: -1002 }, categories),
+      previewCatalogBulkEdit(
+        [a],
+        shopA,
+        ['a'],
+        { kind: 'price.adjust', deltaMinor: -1002 },
+        categories,
+      ),
     ).toThrow(CatalogBulkEditError);
   });
 });
