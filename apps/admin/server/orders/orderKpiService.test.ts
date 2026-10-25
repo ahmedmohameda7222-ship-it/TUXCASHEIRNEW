@@ -32,7 +32,14 @@ describe('Orders authoritative KPI service', () => {
       principal(['orders.view', 'finance.view']),
       { rpc },
     );
-    expect(kpis).toMatchObject(response);
+    expect(kpis).toMatchObject({
+      shopId,
+      orderCount: 65,
+      activeOrderCount: 7,
+      netSalesMinor: 471550,
+      averageOrderMinor: 7918,
+      denominatorPaidOrderCount: 58,
+    });
     expect(rpc).toHaveBeenCalledExactlyOnceWith('admin_orders_kpis_v1', {
       p_actor_employee_id: employeeId,
       p_shop_id: shopId,
@@ -75,7 +82,7 @@ describe('Orders authoritative KPI service', () => {
       ['not-a-date', null],
       ['2026-10-27T00:00:00.000Z', '2026-10-26T00:00:00.000Z'],
       ['2026-01-01T00:00:00.000Z', '2027-02-01T00:00:00.000Z'],
-    ]) {
+    ] as const) {
       await expect(
         queryOrdersKpis({ shopId, from, to }, principal(['orders.view']), { rpc }),
       ).rejects.toThrow('invalid_orders_kpi_range');
