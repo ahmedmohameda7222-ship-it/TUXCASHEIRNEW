@@ -844,3 +844,25 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
     }
   }
 }
+
+test('approved desktop order directory exposes named data columns without fake selection actions', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1536, height: 960 });
+  await mockOrders(page);
+  await page.goto('/orders');
+  const header = page.locator('.admin-orders-list__columns');
+  await expect(header).toBeVisible();
+  for (const label of ['Order', 'Customer', 'Type', 'Source', 'Amount', 'Status', 'Date & time']) {
+    await expect(header).toContainText(label);
+  }
+  const first = page.locator('.admin-order-row').first();
+  await expect(first.locator('.admin-order-row__number')).toContainText('#101');
+  await expect(first.locator('.admin-order-row__customer')).toContainText('Ahmed');
+  await expect(first.locator('.admin-order-row__source')).toContainText('In-store');
+  await expect(first.locator('.admin-order-row__status')).toContainText('Active');
+  await expect(page.getByRole('button', { name: 'Bulk cancel' })).toHaveCount(0);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+  ).toBe(true);
+});
