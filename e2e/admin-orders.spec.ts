@@ -1015,6 +1015,12 @@ test('approved Orders 1536×1024 reference composition remains fully navigable',
   await page.getByRole('button', { name: /#101/ }).click();
   await expect(page.getByRole('navigation', { name: 'Order detail sections' })).toBeVisible();
   await expect(page.locator('.admin-master-detail__list')).toBeVisible();
+  const kpiBox = await page.locator('dl[aria-label="Orders key metrics"]').boundingBox();
+  const inspectorBox = await page.locator('.admin-master-detail__detail').boundingBox();
+  expect(kpiBox).not.toBeNull();
+  expect(inspectorBox).not.toBeNull();
+  expect(kpiBox!.x + kpiBox!.width).toBeLessThanOrEqual(inspectorBox!.x);
+  expect(Math.abs(kpiBox!.y - inspectorBox!.y)).toBeLessThanOrEqual(20);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
