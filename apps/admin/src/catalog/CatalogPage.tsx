@@ -245,7 +245,9 @@ export function CatalogPage() {
               onClick={() => {
                 setModeError(null);
                 if (!bulkOpen && hasUnsavedDrafts()) {
-                  setModeError('Save or discard unfinished editor changes before opening Bulk Edit.');
+                  setModeError(
+                    'Save or discard unfinished editor changes before opening Bulk Edit.',
+                  );
                   return;
                 }
                 if (!bulkOpen) {
