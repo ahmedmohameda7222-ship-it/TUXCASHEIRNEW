@@ -6,6 +6,7 @@ import type {
   AdminInventoryReasonCode,
   AdminInventoryTransfer,
   AdminInventoryWorkspace,
+  AdminStocktakeSessions,
 } from '@tux/admin-contracts';
 import { z } from 'zod';
 
@@ -217,6 +218,34 @@ const commandSchema = z.discriminatedUnion('type', [
     .strict(),
   z
     .object({
+      type: z.literal('stocktake.save'),
+      shopId: uuidSchema,
+      stocktakeId: uuidSchema,
+      expectedRevision: microsSchema.nonnegative(),
+      lines: z
+        .array(
+          z
+            .object({
+              inventoryItemId: uuidSchema,
+              actualCountMicros: microsSchema.nonnegative().nullable(),
+            })
+            .strict(),
+        )
+        .min(1)
+        .max(500),
+      commandId: commandIdSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('stocktake.cancel'),
+      shopId: uuidSchema,
+      stocktakeId: uuidSchema,
+      commandId: commandIdSchema,
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal('stocktake.post'),
       shopId: uuidSchema,
       stocktakeId: uuidSchema,
@@ -269,7 +298,7 @@ const commandSchema = z.discriminatedUnion('type', [
     .strict(),
   z
     .object({
-      type: z.literal('transfer.receive'),
+      type: z.enum(['transfer.receive', 'transfer.cancel']),
       shopId: uuidSchema,
       transferId: uuidSchema,
       commandId: commandIdSchema,
@@ -448,6 +477,33 @@ export async function loadInventoryItemRows(
           'id,shop_id,name,unit_label,tracking_mode,active,definition_version,low_stock_threshold_micros',
         shop_id: `eq.${shopId}`,
         order: 'name.asc,id.asc',
+        limit: String(INVENTORY_ITEM_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
+    offset += page.length;
+  }
+}
+
+/** Follow every authorized conversion page: PostgREST can cap a requested limit
+ * to 1,000 rows, even when the query asks for more. Stable ID tiebreaker
+ * prevents dropping equal-name conversions across page boundaries. */
+export async function loadInventoryUnitConversionRows(
+  client: AdminSupabaseClient,
+  shopId: string,
+): Promise<UnitConversionRow[]> {
+  const rows: UnitConversionRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.select<UnitConversionRow[]>(
+      'inventory_unit_conversions',
+      new URLSearchParams({
+        select:
+          'id,inventory_item_id,purchase_unit_label,base_micros_per_purchase_unit,active,definition_version',
+        shop_id: `eq.${shopId}`,
+        order: 'inventory_item_id.asc,purchase_unit_label.asc,id.asc',
         limit: String(INVENTORY_ITEM_PAGE_SIZE),
         offset: String(offset),
       }),
@@ -660,16 +716,7 @@ export async function loadInventoryWorkspace(
         order: 'name.asc,id.asc',
       }),
     ),
-    client.select<UnitConversionRow[]>(
-      'inventory_unit_conversions',
-      new URLSearchParams({
-        select:
-          'id,inventory_item_id,purchase_unit_label,base_micros_per_purchase_unit,active,definition_version',
-        shop_id: `eq.${shopId}`,
-        order: 'inventory_item_id.asc,purchase_unit_label.asc',
-        limit: String(INVENTORY_ITEM_PAGE_SIZE),
-      }),
-    ),
+    loadInventoryUnitConversionRows(client, shopId),
   ]);
 
   const transferIds = transferRows.map((row) => row.id);
@@ -836,10 +883,30 @@ async function loadInventoryApprovalRules(
   });
 }
 
+type StocktakeEligibility = { allowed: boolean; code: string };
+
+async function loadStocktakeEligibility(
+  client: AdminSupabaseClient,
+  context: AdminSessionContext,
+  shopId: string,
+): Promise<StocktakeEligibility> {
+  requirePermission(context.principal, 'inventory.stocktake', shopId);
+  // If this trusted RPC has not been migrated, the request fails CLOSED;
+  // legacy database stocktake paths must never be used as a fallback.
+  return client.rpc<StocktakeEligibility>('read_admin_stocktake_quiescence_v1', {
+    p_employee_id: context.principal.employeeId,
+    p_shop_id: shopId,
+  });
+}
+
 function commandFailureStatus(result: AdminInventoryCommandResult): number {
   if (result.ok) return 200;
   if (
     result.code === 'insufficient_stock' ||
+    result.code === 'active_worker_session' ||
+    result.code === 'unfinished_orders' ||
+    result.code === 'stocktake_requires_off_shift' ||
+    result.code === 'stocktake_snapshot_stale' ||
     result.code === 'stale_version' ||
     result.code === 'inventory_semantic_change_forbidden' ||
     result.code.includes('conflict')
@@ -969,16 +1036,19 @@ async function executeCommand(
         p_emergency_negative_override: command.emergencyNegativeOverride,
       });
     }
-    case 'stocktake.begin':
-      requirePermission(context.principal, 'inventory.stocktake', command.shopId);
+    case 'stocktake.begin': {
+      const eligibility = await loadStocktakeEligibility(client, context, command.shopId);
+      if (!eligibility.allowed) return { ok: false, code: eligibility.code };
       return client.rpc<AdminInventoryCommandResult>('begin_stocktake_v1', {
         p_employee_id: context.principal.employeeId,
         p_shop_id: command.shopId,
         p_inventory_item_ids: command.inventoryItemIds,
         p_command_id: command.commandId,
       });
-    case 'stocktake.post':
-      requirePermission(context.principal, 'inventory.stocktake', command.shopId);
+    }
+    case 'stocktake.post': {
+      const eligibility = await loadStocktakeEligibility(client, context, command.shopId);
+      if (!eligibility.allowed) return { ok: false, code: eligibility.code };
       return client.rpc<AdminInventoryCommandResult>('post_stocktake_v1', {
         p_employee_id: context.principal.employeeId,
         p_shop_id: command.shopId,
@@ -987,6 +1057,25 @@ async function executeCommand(
           inventoryItemId: line.inventoryItemId,
           actualCountMicros: line.actualCountMicros,
         })),
+        p_command_id: command.commandId,
+      });
+    }
+    case 'stocktake.save':
+      requirePermission(context.principal, 'inventory.stocktake', command.shopId);
+      return client.rpc<AdminInventoryCommandResult>('save_admin_stocktake_draft_v1', {
+        p_employee_id: context.principal.employeeId,
+        p_shop_id: command.shopId,
+        p_stocktake_id: command.stocktakeId,
+        p_expected_revision: command.expectedRevision,
+        p_lines: command.lines,
+        p_command_id: command.commandId,
+      });
+    case 'stocktake.cancel':
+      requirePermission(context.principal, 'inventory.stocktake', command.shopId);
+      return client.rpc<AdminInventoryCommandResult>('cancel_admin_stocktake_draft_v1', {
+        p_employee_id: context.principal.employeeId,
+        p_shop_id: command.shopId,
+        p_stocktake_id: command.stocktakeId,
         p_command_id: command.commandId,
       });
     case 'replenishment.update':
@@ -1024,6 +1113,13 @@ async function executeCommand(
         p_transfer_id: command.transferId,
         p_command_id: command.commandId,
       });
+    case 'transfer.cancel':
+      requirePermission(context.principal, 'inventory.transfer', command.shopId);
+      return client.rpc<AdminInventoryCommandResult>('cancel_stock_transfer_v1', {
+        p_employee_id: context.principal.employeeId,
+        p_transfer_id: command.transferId,
+        p_command_id: command.commandId,
+      });
   }
 }
 
@@ -1056,6 +1152,14 @@ function handleFailure(response: AdminResponse, error: unknown, request: AdminRe
       error.responseBody.includes('inventory_master_owner_required')
     ) {
       sendJson(response, 403, { error: 'permission_forbidden' });
+      return;
+    }
+    if (error.responseBody.includes('stocktake_requires_off_shift')) {
+      sendJson(response, 409, { error: 'stocktake_requires_off_shift' });
+      return;
+    }
+    if (error.responseBody.includes('stocktake_snapshot_stale')) {
+      sendJson(response, 409, { error: 'stocktake_snapshot_stale' });
       return;
     }
     if (error.responseBody.includes('catalog_inventory_master_unit_locked')) {
@@ -1096,6 +1200,19 @@ export default async function handler(
       const inventoryItemId = url.searchParams.get('inventoryItemId');
       const context = await loadContext(request, client, false);
       const view = url.searchParams.get('view');
+      if (view === 'stocktake-sessions') {
+        requirePermission(context.principal, 'inventory.stocktake', shopId);
+        const sessions = await client.rpc<AdminStocktakeSessions>(
+          'read_admin_stocktake_sessions_v1',
+          { p_employee_id: context.principal.employeeId, p_shop_id: shopId },
+        );
+        sendJson(response, 200, { ...sessions });
+        return;
+      }
+      if (view === 'stocktake-eligibility') {
+        sendJson(response, 200, await loadStocktakeEligibility(client, context, shopId));
+        return;
+      }
       if (view === 'master-bindings') {
         requireInventoryMasterAuthority(context, shopId);
         const result = await client.rpc<Readonly<Record<string, unknown>>>(

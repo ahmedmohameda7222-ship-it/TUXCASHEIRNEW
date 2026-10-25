@@ -1,3 +1,40 @@
+export type AdminOnlineOrderRequest = {
+  id: string;
+  shopId: string;
+  status: 'PENDING' | 'PROCESSING' | 'ACCEPTED' | 'REJECTED';
+  customerName: string;
+  normalizedPhone: string | null;
+  fulfillmentPreference: string;
+  paymentPreference: string;
+  trustedItems: unknown;
+  itemsSubtotalMinor: number;
+  createdAt: string;
+  resolvedAt: string | null;
+  acceptedOrderId: string | null;
+  rejectionReason: string | null;
+  sourceFingerprint: string | null;
+  catalogRevision: string;
+};
+
+export type AdminOnlineOrderRequestsResult = {
+  shopId: string;
+  rows: readonly AdminOnlineOrderRequest[];
+  nextCursor: string | null;
+};
+
+export type AdminOrderBusinessDay = {
+  id: string;
+  shopId: string;
+  startedAt: string;
+  endedAt: string | null;
+  status: string;
+};
+
+export type AdminOrderBusinessDaysResult = {
+  shopId: string;
+  days: readonly AdminOrderBusinessDay[];
+};
+
 export const ADMIN_ORDER_STATUSES = ['ACTIVE', 'DONE', 'CANCELLED', 'RETURNED'] as const;
 export type AdminOrderStatus = (typeof ADMIN_ORDER_STATUSES)[number];
 
@@ -8,6 +45,7 @@ export type AdminOrderSearchInput = {
   query?: string | null;
   statuses?: readonly AdminOrderStatus[];
   source?: AdminOrderSource | null;
+  businessDayId?: string | null;
   from?: string | null;
   to?: string | null;
   cursor?: string | null;
@@ -23,6 +61,12 @@ export type AdminOrderSummary = {
   displayOrderNo: number;
   displayOrderLabel: string | null;
   createdAt: string;
+  businessDayId?: string | null;
+  operatorName?: string | null;
+  itemsSubtotalMinor?: number;
+  discountMinor?: number;
+  serviceChargeMinor?: number;
+  taxMinor?: number;
   totalMinor: number;
   customerName: string | null;
   normalizedPhone: string | null;
@@ -50,6 +94,10 @@ export type AdminOrderPayment = {
   allocatedMinor: number;
   receivedMinor: number | null;
   changeMinor: number | null;
+  refundAllowedSnapshot?: boolean;
+  postedRefundMinor?: number;
+  pendingRefundMinor?: number;
+  remainingRefundableMinor?: number;
 };
 
 export type AdminOrderItemModifier = {
@@ -68,6 +116,9 @@ export type AdminOrderItem = {
   itemNote: string | null;
   modifiers: readonly AdminOrderItemModifier[];
   comboBeverages: readonly { productId: string; label: string }[];
+  postedReturnQuantity?: number;
+  pendingReturnQuantity?: number;
+  remainingReturnableQuantity?: number;
 };
 
 export type AdminOrderStatusEvent = {
@@ -86,9 +137,21 @@ export type AdminOrderStatusEvent = {
 export type AdminOrderFinancialEvent = {
   id: string;
   kind: 'REFUND' | 'RETURN';
-  state: 'PENDING_APPROVAL' | 'POSTED' | 'REJECTED' | 'FAILED';
+  state: 'PENDING_APPROVAL' | 'APPROVED' | 'EXECUTING' | 'POSTED' | 'REJECTED' | 'FAILED';
   amountMinor: number;
   approvalRequestId: string | null;
+  paymentId?: string | null;
+  requestedByEmployeeId?: string | null;
+  approvedByEmployeeId?: string | null;
+  decidedAt?: string | null;
+  executedAt?: string | null;
+  decisionReason?: string | null;
+  returnItems?: readonly {
+    orderItemId: string;
+    productName: string;
+    quantity: number;
+    valuationMinor: number;
+  }[];
   reason: AdminOrderReasonSnapshot;
   note?: string | null;
   createdAt: string;
@@ -103,6 +166,12 @@ export type AdminOrderDetail = {
   displayOrderNo: number;
   displayOrderLabel: string | null;
   createdAt: string;
+  businessDayId?: string | null;
+  operatorName?: string | null;
+  itemsSubtotalMinor?: number;
+  discountMinor?: number;
+  serviceChargeMinor?: number;
+  taxMinor?: number;
   totalMinor: number;
   customer: {
     contactId: string | null;
@@ -115,6 +184,19 @@ export type AdminOrderDetail = {
     address: string | null;
     deliveryZoneLabel: string | null;
     finalDeliveryFeeMinor: number;
+  } | null;
+  delivery?: {
+    state: string | null;
+    riderName: string | null;
+    timeline: readonly {
+      id: string;
+      fromState: string | null;
+      toState: string;
+      employeeId: string | null;
+      riderId: string | null;
+      note: string | null;
+      createdAt: string;
+    }[];
   } | null;
   payments: readonly AdminOrderPayment[];
   items: readonly AdminOrderItem[];

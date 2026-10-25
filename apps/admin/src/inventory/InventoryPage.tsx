@@ -1,4 +1,4 @@
-import type { AdminStocktakeSnapshot } from '@tux/admin-contracts';
+import type { AdminStocktakeDraftSession, AdminStocktakeSnapshot } from '@tux/admin-contracts';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 
@@ -10,7 +10,16 @@ import { useShopScope } from '../shops/ShopScopeProvider';
 import { AdjustStockSheet } from './AdjustStockSheet';
 import { InventoryItemPage } from './InventoryItemPage';
 import { InventoryDefinitionEditor } from './InventoryDefinitionEditor';
+import { inventoryCsv } from './inventoryCsv';
 import { InventoryMasterBindingPanel } from './InventoryMasterBindingPanel';
+import {
+  inventoryCounts,
+  inventoryDisplayRows,
+  inventoryStatus,
+  trackingModeLabel,
+  type InventoryFilter,
+  type InventorySort,
+} from './inventoryPresentation';
 import { RecordWasteSheet } from './RecordWasteSheet';
 import { ReorderSuggestionsPage } from './ReorderSuggestionsPage';
 import { StocktakePage } from './StocktakePage';
@@ -18,14 +27,6 @@ import { TransferPage } from './TransferPage';
 import { useInventory } from './useInventory';
 import { VarianceReport } from './VarianceReport';
 import './inventory.css';
-
-function trackingModeLabel(mode: string): string {
-  return mode === 'BATCH_TRACKED'
-    ? 'Batch tracked'
-    : mode === 'SERIAL_TRACKED'
-      ? 'Serial tracked'
-      : 'Standard stock';
-}
 
 const STOCKTAKE_BATCH_SIZE = 500;
 
@@ -45,6 +46,16 @@ function mutationErrorMessage(error: unknown): string | null {
   const code = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
   if (code.includes('inventory_master_unit_locked'))
     return 'This ingredient has a business-wide recipe master binding. Its base unit and tracking mode cannot change.';
+  if (code.includes('stocktake_snapshot_stale'))
+    return 'Stock changed after this count began. Reconcile the late movement, then start a fresh physical count.';
+  if (code.includes('stocktake_requires_off_shift') || code.includes('active_worker_session'))
+    return 'Stocktake is blocked during live trading. End the shift before counting.';
+  if (code.includes('unfinished_orders'))
+    return 'Finalize all stock-affecting orders before starting or posting a physical count.';
+  if (code.includes('destination_inventory_master_mapping_required'))
+    return 'The destination item requires the same authorized recipe master binding, base unit and tracking mode. Configure master bindings before sending.';
+  if (code.includes('transfer_not_cancellable'))
+    return 'This transfer is already received or otherwise final and cannot be cancelled.';
   if (code.includes('insufficient_stock'))
     return 'There is not enough available stock for this action.';
   if (code.includes('conflict'))
@@ -57,6 +68,7 @@ function mutationErrorMessage(error: unknown): string | null {
 type WorkspaceMode =
   | 'detail'
   | 'stocktake-select'
+  | 'stocktake-history'
   | 'stocktake'
   | 'transfer'
   | 'reorder'
@@ -103,7 +115,16 @@ export function InventoryPage() {
   const [adjustmentApprovalPending, setAdjustmentApprovalPending] = useState(false);
   const [definitionItemId, setDefinitionItemId] = useState<string | null>(null);
   const [definitionOpen, setDefinitionOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<InventoryFilter>('all');
+  const [sort, setSort] = useState<InventorySort>('name');
+  const [page, setPage] = useState(1);
   const [stocktakeSnapshot, setStocktakeSnapshot] = useState<AdminStocktakeSnapshot | null>(null);
+  const [stocktakeRevision, setStocktakeRevision] = useState(0);
+  const [stocktakeStale, setStocktakeStale] = useState(false);
+  const [stocktakeSavedValues, setStocktakeSavedValues] = useState<Record<string, number | null>>(
+    {},
+  );
 
   const workspace = inventory.workspaceQuery.data;
   const mutationError = latestMutationError([
@@ -111,6 +132,8 @@ export function InventoryPage() {
     inventory.recordWaste,
     inventory.beginStocktake,
     inventory.postStocktake,
+    inventory.saveStocktakeDraft,
+    inventory.cancelStocktakeDraft,
     inventory.updateReplenishment,
     inventory.sendTransfer,
     inventory.receiveTransfer,
@@ -118,6 +141,25 @@ export function InventoryPage() {
   ]);
   const mutationErrorText = mutationErrorMessage(mutationError);
   const items = workspace?.items ?? [];
+  const counts = useMemo(() => inventoryCounts(items), [items]);
+  const display = useMemo(
+    () => inventoryDisplayRows(items, search, statusFilter, sort, page),
+    [items, search, statusFilter, sort, page],
+  );
+  useEffect(() => {
+    setSearch('');
+    setStatusFilter('all');
+    setSort('name');
+    setPage(1);
+    setItemAction(null);
+    setAdjustmentApprovalPending(false);
+    setDefinitionOpen(false);
+    setStocktakeSnapshot(null);
+    setStocktakeRevision(0);
+    setStocktakeStale(false);
+    setStocktakeSavedValues({});
+    setMode('detail');
+  }, [shopId]);
   const stocktakeItems = useMemo(() => items.filter((item) => item.active), [items]);
 
   const selectedItem = useMemo(() => {
@@ -144,12 +186,37 @@ export function InventoryPage() {
       {
         onSuccess: (snapshot) => {
           setStocktakeSnapshot(snapshot);
+          setStocktakeRevision(0);
+          setStocktakeStale(false);
+          setStocktakeSavedValues({});
           setMode('stocktake');
           setItemAction(null);
           navigate('/inventory');
         },
       },
     );
+  };
+
+  const resumeStocktake = (session: AdminStocktakeDraftSession) => {
+    if (!shopId || session.shopId !== shopId || session.status !== 'DRAFT') return;
+    setStocktakeSnapshot({
+      stocktakeId: session.stocktakeId,
+      lines: session.lines.map((line) => ({
+        inventoryItemId: line.inventoryItemId,
+        snapshotOnHandMicros: line.snapshotOnHandMicros,
+        snapshotReservedMicros: line.snapshotReservedMicros,
+        unitCostMinor: line.unitCostMinor,
+      })),
+    });
+    setStocktakeRevision(session.draftRevision);
+    setStocktakeStale(session.stale);
+    setStocktakeSavedValues(
+      Object.fromEntries(
+        session.lines.map((line) => [line.inventoryItemId, line.actualCountMicros]),
+      ),
+    );
+    setMode('stocktake');
+    navigate('/inventory');
   };
 
   if (!shopId) {
@@ -164,6 +231,17 @@ export function InventoryPage() {
 
   const canAdjust = principal.permissions.includes('inventory.adjust');
   const canStocktake = principal.permissions.includes('inventory.stocktake');
+  const stocktakeAllowed = inventory.stocktakeEligibilityQuery.data?.allowed === true;
+  const eligibilityCode = inventory.stocktakeEligibilityQuery.data?.code;
+  const stocktakeReason = inventory.stocktakeEligibilityQuery.isError
+    ? 'Safety verification is unavailable. Stock count is blocked until the trusted server can confirm the shift has ended.'
+    : eligibilityCode === 'active_worker_session'
+      ? 'A worker session is active. Physical stock counting is available only after the last trading shift ends.'
+      : eligibilityCode === 'unfinished_orders'
+        ? 'Unfinished orders are still present. Finalize active stock-affecting orders before counting.'
+        : !stocktakeAllowed
+          ? 'Checking shift and order eligibility; stock count is unavailable until confirmed.'
+          : null;
   const canTransfer = principal.permissions.includes('inventory.transfer');
   const canManageReplenishment = principal.permissions.includes('purchasing.manage');
   const canManageDefinitions = principal.permissions.includes('purchasing.manage');
@@ -224,9 +302,27 @@ export function InventoryPage() {
     <PageScaffold
       eyebrow="Inventory control"
       title="Inventory"
-      description="Review availability, stock counts, waste and transfers for this shop."
+      description="Review stock levels, manage counts, adjustments, waste and transfers."
       primaryAction={
         <div className="admin-inventory-page-actions">
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={() => {
+              const csv = inventoryCsv(items);
+              const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `inventory-${shopId}.csv`;
+              document.body.appendChild(link);
+              link.click();
+              link.remove();
+              window.setTimeout(() => URL.revokeObjectURL(url), 0);
+            }}
+          >
+            Export CSV
+          </button>
           {canManageDefinitions ? (
             <button
               className="admin-primary-button"
@@ -245,7 +341,11 @@ export function InventoryPage() {
             <button
               className="admin-primary-button"
               type="button"
-              disabled={inventory.beginStocktake.isPending || stocktakeItems.length === 0}
+              disabled={
+                inventory.beginStocktake.isPending ||
+                stocktakeItems.length === 0 ||
+                !stocktakeAllowed
+              }
               onClick={() => {
                 if (stocktakeItems.length > STOCKTAKE_BATCH_SIZE) {
                   openWorkflow('stocktake-select');
@@ -282,6 +382,15 @@ export function InventoryPage() {
               >
                 Variance &amp; margins
               </button>
+              {canStocktake ? (
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  onClick={() => openWorkflow('stocktake-history')}
+                >
+                  Stock count history
+                </button>
+              ) : null}
               {canManageMasterBindings ? (
                 <button
                   className="admin-secondary-button"
@@ -305,6 +414,11 @@ export function InventoryPage() {
         </div>
       }
     >
+      {canStocktake && stocktakeReason ? (
+        <p role="status" className="admin-inventory-note">
+          {stocktakeReason}
+        </p>
+      ) : null}
       {adjustmentApprovalPending ? (
         <p className="admin-inventory-note" role="status">
           Stock adjustment submitted for approval. No inventory movement is posted until approval
@@ -316,6 +430,24 @@ export function InventoryPage() {
           {mutationErrorText}
         </p>
       ) : null}
+      <section className="admin-inventory-summary" aria-label="Inventory summary">
+        <div>
+          <span>Total items</span>
+          <strong>{counts.total}</strong>
+        </div>
+        <div>
+          <span>Thresholds not set</span>
+          <strong>{counts.unconfigured}</strong>
+        </div>
+        <div>
+          <span>Low stock</span>
+          <strong>{counts.lowStock}</strong>
+        </div>
+        <div>
+          <span>Out of stock</span>
+          <strong>{counts.outOfStock}</strong>
+        </div>
+      </section>
       {definitionOpen && canManageDefinitions ? (
         <InventoryDefinitionEditor
           item={items.find((item) => item.id === definitionItemId) ?? null}
@@ -332,6 +464,80 @@ export function InventoryPage() {
             })
           }
         />
+      ) : mode === 'stocktake-history' && canStocktake ? (
+        <section className="admin-inventory-workflow" aria-labelledby="stocktake-history-title">
+          <div className="admin-inventory-workflow__header">
+            <div>
+              <p className="admin-page__eyebrow">After-shift physical counts</p>
+              <h2 id="stocktake-history-title">Stock count history</h2>
+            </div>
+            <button
+              className="admin-secondary-button"
+              type="button"
+              onClick={() => setMode('detail')}
+            >
+              Back to inventory
+            </button>
+          </div>
+          {inventory.stocktakeSessionsQuery.isError ? (
+            <p role="alert">Could not verify persisted count history. No changes were made.</p>
+          ) : inventory.stocktakeSessionsQuery.isLoading ? (
+            <p role="status">Loading authoritative count history…</p>
+          ) : inventory.stocktakeSessionsQuery.data?.sessions.length ? (
+            <div className="admin-inventory-transfer-list">
+              {inventory.stocktakeSessionsQuery.data.sessions.map((session) => (
+                <article className="admin-inventory-transfer-row" key={session.stocktakeId}>
+                  <div>
+                    <strong>
+                      {session.status} · {session.lines.length} items
+                    </strong>
+                    <small>Started {new Date(session.startedAt).toLocaleString('en-GB')}</small>
+                    {session.stale ? (
+                      <span role="status">Stale snapshot — reconcile before a new count</span>
+                    ) : null}
+                    {session.postedAt ? (
+                      <small>Posted {new Date(session.postedAt).toLocaleString('en-GB')}</small>
+                    ) : null}
+                    {session.cancelledAt ? (
+                      <small>
+                        Cancelled {new Date(session.cancelledAt).toLocaleString('en-GB')}
+                      </small>
+                    ) : null}
+                  </div>
+                  {session.status === 'DRAFT' ? (
+                    <div className="admin-inventory-page-actions">
+                      <button
+                        className="admin-secondary-button"
+                        type="button"
+                        onClick={() => resumeStocktake(session)}
+                      >
+                        Resume draft
+                      </button>
+                      <button
+                        className="admin-secondary-button"
+                        type="button"
+                        disabled={inventory.cancelStocktakeDraft.isPending}
+                        onClick={() => {
+                          if (
+                            !window.confirm(
+                              'Cancel this saved physical count without altering inventory?',
+                            )
+                          )
+                            return;
+                          inventory.cancelStocktakeDraft.mutate(session.stocktakeId);
+                        }}
+                      >
+                        Cancel draft
+                      </button>
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="admin-inventory-muted">No recorded stock counts for this shop.</p>
+          )}
+        </section>
       ) : mode === 'stocktake-select' ? (
         <section
           className="admin-inventory-workflow"
@@ -363,7 +569,7 @@ export function InventoryPage() {
                   className="admin-inventory-row"
                   type="button"
                   key={first?.id ?? index}
-                  disabled={inventory.beginStocktake.isPending}
+                  disabled={inventory.beginStocktake.isPending || !stocktakeAllowed}
                   onClick={() => beginStocktakeBatch(batch)}
                 >
                   <span>
@@ -403,14 +609,44 @@ export function InventoryPage() {
         />
       ) : mode === 'stocktake' && stocktakeSnapshot ? (
         <StocktakePage
+          key={stocktakeSnapshot.stocktakeId}
           items={items}
           snapshot={stocktakeSnapshot}
-          pending={inventory.postStocktake.isPending}
+          initialActualByItem={stocktakeSavedValues}
+          stale={stocktakeStale}
+          saving={inventory.saveStocktakeDraft.isPending}
+          pending={inventory.postStocktake.isPending || !stocktakeAllowed}
           onBack={() => {
             setStocktakeSnapshot(null);
             setMode('detail');
           }}
-          onSubmit={(lines) =>
+          onSaveDraft={(lines, onSaved) => {
+            if (!stocktakeAllowed || stocktakeStale) return;
+            inventory.saveStocktakeDraft.mutate(
+              {
+                stocktakeId: stocktakeSnapshot.stocktakeId,
+                expectedRevision: stocktakeRevision,
+                lines,
+              },
+              {
+                onSuccess: (result) => {
+                  if (result.ok && result.draftRevision !== undefined)
+                    setStocktakeRevision(result.draftRevision);
+                  onSaved();
+                },
+              },
+            );
+          }}
+          onCancelDraft={() =>
+            inventory.cancelStocktakeDraft.mutate(stocktakeSnapshot.stocktakeId, {
+              onSuccess: () => {
+                setStocktakeSnapshot(null);
+                setMode('detail');
+              },
+            })
+          }
+          onSubmit={(lines) => {
+            if (!stocktakeAllowed || stocktakeStale) return;
             inventory.postStocktake.mutate(
               { stocktakeId: stocktakeSnapshot.stocktakeId, lines },
               {
@@ -419,8 +655,8 @@ export function InventoryPage() {
                   setMode('detail');
                 },
               },
-            )
-          }
+            );
+          }}
         />
       ) : mode === 'transfer' ? (
         <TransferPage
@@ -433,56 +669,166 @@ export function InventoryPage() {
           transfers={workspace.transfers}
           sending={inventory.sendTransfer.isPending}
           receiving={inventory.receiveTransfer.isPending}
+          cancelling={inventory.cancelTransfer.isPending}
           onBack={() => setMode('detail')}
           onSend={(input) => inventory.sendTransfer.mutate(input)}
           onReceive={(transferId) => inventory.receiveTransfer.mutate(transferId)}
+          onCancelTransfer={(transferId) => inventory.cancelTransfer.mutate(transferId)}
         />
       ) : (
         <ResponsiveMasterDetail
+          className="admin-inventory-master-detail"
           listLabel="Inventory items"
           detailLabel="Inventory item detail"
           detailActive={selectedItemId !== null}
           backHref="/inventory"
           list={
             <div className="admin-inventory-list">
-              <div className="admin-inventory-list__header">
-                <strong>{items.length} items</strong>
-                <span>Available = On Hand − Reserved</span>
+              <div className="admin-inventory-filter-pills" aria-label="Inventory stock filters">
+                {(
+                  [
+                    ['all', 'All items', counts.total],
+                    ['in', 'In stock', counts.inStock],
+                    ['low', 'Low stock', counts.lowStock],
+                    ['out', 'Out of stock', counts.outOfStock],
+                  ] as const
+                ).map(([value, label, count]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={statusFilter === value ? 'is-selected' : ''}
+                    aria-pressed={statusFilter === value}
+                    onClick={() => {
+                      setStatusFilter(value);
+                      setPage(1);
+                    }}
+                  >
+                    {label} <span>{count}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="admin-inventory-list-controls">
+                <label className="admin-inventory-search">
+                  <span className="sr-only">Search inventory items</span>
+                  <input
+                    type="search"
+                    value={search}
+                    placeholder="Search inventory items…"
+                    onChange={(event) => {
+                      setSearch(event.currentTarget.value);
+                      setPage(1);
+                    }}
+                  />
+                </label>
+                <label>
+                  <span className="sr-only">Sort inventory</span>
+                  <select
+                    value={sort}
+                    onChange={(event) => {
+                      setSort(event.currentTarget.value as InventorySort);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="name">Name (A–Z)</option>
+                    <option value="available-desc">Available (high to low)</option>
+                    <option value="priority">Stock priority</option>
+                  </select>
+                </label>
+              </div>
+              <div className="admin-inventory-table-header" aria-hidden="true">
+                <span>Item</span>
+                <span>Base unit</span>
+                <span>On hand</span>
+                <span>Reserved</span>
+                <span>Available</span>
+                <span>Status</span>
               </div>
               {items.length === 0 ? (
                 <EmptyState
                   title="No inventory items"
                   description="Inventory configuration for this shop is empty."
                 />
+              ) : display.total === 0 ? (
+                <EmptyState
+                  title="No matching items"
+                  description="Try changing the search or stock status filter."
+                />
               ) : (
-                items.map((item) => (
-                  <button
-                    className={
-                      item.id === selectedItemId
-                        ? 'admin-inventory-row is-selected'
-                        : 'admin-inventory-row'
-                    }
-                    aria-current={item.id === selectedItemId ? 'true' : undefined}
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      navigate(detailPath('/inventory', item.id));
-                      setItemAction(null);
-                    }}
-                  >
-                    <span>
-                      <strong>{item.name}</strong>
-                      <small>{trackingModeLabel(item.trackingMode)}</small>
-                    </span>
-                    <span>
-                      {new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(
-                        item.availableMicros / 1_000_000,
-                      )}{' '}
-                      {item.unitLabel}
-                    </span>
-                  </button>
-                ))
+                display.rows.map((item) => {
+                  const status = inventoryStatus(item);
+                  const statusText =
+                    status === 'OUT_OF_STOCK'
+                      ? 'Out of stock'
+                      : status === 'LOW_STOCK'
+                        ? 'Low stock'
+                        : status === 'ARCHIVED'
+                          ? 'Archived'
+                          : status === 'UNCONFIGURED'
+                            ? 'Threshold not set'
+                            : 'In stock';
+                  const formatted = (micros: number) =>
+                    new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(
+                      micros / 1_000_000,
+                    );
+                  return (
+                    <button
+                      className={
+                        item.id === selectedItemId
+                          ? 'admin-inventory-row is-selected'
+                          : 'admin-inventory-row'
+                      }
+                      aria-current={item.id === selectedItemId ? 'true' : undefined}
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        navigate(detailPath('/inventory', item.id));
+                        setItemAction(null);
+                      }}
+                    >
+                      <span>
+                        <strong>{item.name}</strong>
+                        <small>{trackingModeLabel(item.trackingMode)}</small>
+                      </span>
+                      <span>{item.unitLabel}</span>
+                      <span>{formatted(item.onHandMicros)}</span>
+                      <span>{formatted(item.reservedMicros)}</span>
+                      <span>{formatted(item.availableMicros)}</span>
+                      <span
+                        className={`admin-inventory-status admin-inventory-status--${status.toLowerCase()}`}
+                      >
+                        {statusText}
+                      </span>
+                    </button>
+                  );
+                })
               )}
+              <div className="admin-inventory-pagination">
+                <span>
+                  Showing {display.total === 0 ? 0 : (display.page - 1) * 25 + 1}–
+                  {Math.min(display.page * 25, display.total)} of {display.total} items
+                </span>
+                <div>
+                  <button
+                    type="button"
+                    aria-label="Previous inventory page"
+                    disabled={display.page <= 1}
+                    onClick={() => setPage(display.page - 1)}
+                  >
+                    ‹
+                  </button>
+                  <span>
+                    Page {display.page} of {display.totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Next inventory page"
+                    disabled={display.page >= display.totalPages}
+                    onClick={() => setPage(display.page + 1)}
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
             </div>
           }
           detail={
@@ -497,6 +843,7 @@ export function InventoryPage() {
               <>
                 <InventoryItemPage
                   item={selectedItem}
+                  shopName={workspace.shops?.find((shop) => shop.id === shopId)?.name}
                   actions={
                     canManageDefinitions || (canAdjust && selectedItem.active) ? (
                       <>

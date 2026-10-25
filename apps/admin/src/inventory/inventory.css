@@ -332,3 +332,355 @@
 .admin-inventory-empty-state strong {
   color: var(--tux-text-primary);
 }
+
+/* Approved light Inventory content; deliberately scoped away from AdminShell. */
+.admin-inventory-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-block: 0.15rem 1rem;
+}
+.admin-inventory-summary > div {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+  background: #fff;
+  border: 1px solid #e8e9e6;
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+}
+.admin-inventory-summary span {
+  color: #727d78;
+  font-size: 0.75rem;
+}
+.admin-inventory-summary strong {
+  color: #1c2422;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.4rem;
+}
+.admin-inventory-filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.8rem 0.8rem 0.5rem;
+}
+.admin-inventory-filter-pills button {
+  min-height: 32px;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid #e8e9e6;
+  border-radius: 20px;
+  background: #fff;
+  color: #52615a;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.admin-inventory-filter-pills button.is-selected {
+  background: #1c2422;
+  border-color: #1c2422;
+  color: #fff;
+}
+.admin-inventory-filter-pills button span {
+  opacity: 0.8;
+}
+.admin-inventory-filter-pills button:focus-visible,
+.admin-inventory-row:focus-visible,
+.admin-inventory-pagination button:focus-visible {
+  outline: 2px solid #0f6a4a;
+  outline-offset: -2px;
+}
+.admin-inventory-list-controls {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0 0.8rem 0.8rem;
+}
+.admin-inventory-list-controls label {
+  min-width: 0;
+}
+.admin-inventory-search {
+  flex: 1;
+}
+.admin-inventory-list-controls input,
+.admin-inventory-list-controls select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #e8e9e6;
+  border-radius: 9px;
+  padding: 0.5rem 0.75rem;
+  color: #1c2422;
+  background: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+}
+.admin-inventory-master-detail.admin-master-detail {
+  gap: 15px;
+}
+.admin-inventory-master-detail .admin-master-detail__list,
+.admin-inventory-master-detail .admin-master-detail__detail {
+  min-width: 0;
+}
+.admin-inventory-table-header,
+.admin-inventory-master-detail .admin-inventory-row {
+  display: grid;
+  grid-template-columns:
+    minmax(125px, 2fr) minmax(55px, 0.65fr) repeat(3, minmax(58px, 0.7fr))
+    minmax(88px, 0.95fr);
+  gap: 0.45rem;
+  align-items: center;
+  padding-inline: 0.8rem;
+  text-align: start;
+}
+.admin-inventory-table-header {
+  padding-block: 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 650;
+  color: #727d78;
+  background: #f7f8f6;
+  border-top: 1px solid #e8e9e6;
+  border-bottom: 1px solid #e8e9e6;
+}
+.admin-inventory-master-detail .admin-inventory-row {
+  min-height: 49px;
+  padding-block: 0.45rem;
+  border-left: 3px solid transparent;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+.admin-inventory-master-detail .admin-inventory-row > span:first-child {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.admin-inventory-master-detail .admin-inventory-row strong {
+  overflow-wrap: anywhere;
+}
+.admin-inventory-master-detail .admin-inventory-row small {
+  font-size: 0.67rem;
+}
+.admin-inventory-master-detail .admin-inventory-row > span:nth-child(n + 3):nth-child(-n + 5),
+.admin-inventory-table-header > span:nth-child(n + 3):nth-child(-n + 5) {
+  text-align: right;
+}
+.admin-inventory-master-detail .admin-inventory-row.is-selected {
+  border-left-color: #0f6a4a;
+  background: #eef8f1;
+}
+.admin-inventory-status {
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+.admin-inventory-status--low_stock {
+  color: #ac6d21;
+}
+.admin-inventory-status--out_of_stock {
+  color: #c4433b;
+}
+.admin-inventory-status--in_stock {
+  color: #0f6a4a;
+}
+.admin-inventory-status--unconfigured,
+.admin-inventory-status--archived {
+  color: #727d78;
+}
+.admin-inventory-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.65rem 0.8rem;
+  color: #727d78;
+  font-size: 0.75rem;
+  border-top: 1px solid #e8e9e6;
+}
+.admin-inventory-pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.admin-inventory-pagination button {
+  min-width: 34px;
+  min-height: 34px;
+  border: 1px solid #e8e9e6;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
+.admin-inventory-pagination button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@media (min-width: 1151px) {
+  .admin-inventory-master-detail.admin-master-detail {
+    grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+  }
+}
+@media (max-width: 1150px) {
+  .admin-inventory-master-detail.admin-master-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-inventory-master-detail .admin-master-detail__detail {
+    display: none;
+  }
+  /* The shared shell hides Back at >=48rem; Inventory changes to a
+     single-pane inspector all the way through 1150px, so restore Back. */
+  .admin-inventory-master-detail .admin-master-detail__back {
+    display: inline-flex;
+  }
+  .admin-inventory-master-detail[data-detail-active='true'] .admin-master-detail__list {
+    display: none;
+  }
+  .admin-inventory-master-detail[data-detail-active='true'] .admin-master-detail__detail {
+    display: block;
+  }
+}
+@media (max-width: 690px) {
+  .admin-inventory-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-inventory-table-header {
+    display: none;
+  }
+  .admin-inventory-master-detail .admin-inventory-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 64px;
+    gap: 0.2rem 0.6rem;
+    text-align: start;
+  }
+  .admin-inventory-master-detail .admin-inventory-row > span:nth-child(2),
+  .admin-inventory-master-detail .admin-inventory-row > span:nth-child(3),
+  .admin-inventory-master-detail .admin-inventory-row > span:nth-child(4) {
+    display: none;
+  }
+  .admin-inventory-master-detail .admin-inventory-row > span:nth-child(5) {
+    grid-row: 1;
+    grid-column: 2;
+    font-weight: 700;
+  }
+  .admin-inventory-master-detail .admin-inventory-row > span:nth-child(6) {
+    grid-row: 2;
+    grid-column: 2;
+    text-align: end;
+  }
+  .admin-inventory-list-controls {
+    flex-wrap: wrap;
+  }
+  .admin-inventory-list-controls label {
+    flex: 1 1 100%;
+  }
+  .admin-inventory-filter-pills {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .admin-inventory-filter-pills button {
+    flex-shrink: 0;
+  }
+  .admin-inventory-pagination {
+    font-size: 0.7rem;
+  }
+}
+
+.admin-inventory-inspector-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+  font-size: 0.78rem;
+  color: #727d78;
+  margin-top: 0.5rem;
+}
+.admin-inventory-item-active,
+.admin-inventory-item-inactive {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 5px;
+  font-size: 0.7rem;
+  font-weight: 650;
+  padding: 0.18rem 0.4rem;
+}
+.admin-inventory-item-active {
+  color: #0f6a4a;
+  background: #eef8f1;
+}
+.admin-inventory-item-inactive {
+  color: #69746e;
+  background: #f2f3f1;
+}
+.admin-inventory-inspector-tabs {
+  display: flex;
+  gap: 1rem;
+  border-bottom: 1px solid #e8e9e6;
+  overflow-x: auto;
+}
+.admin-inventory-inspector-tabs button {
+  appearance: none;
+  flex-shrink: 0;
+  min-height: 40px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.5rem 0.15rem;
+  background: transparent;
+  color: #727d78;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.admin-inventory-inspector-tabs button.is-selected {
+  color: #0f6a4a;
+  border-color: #0f6a4a;
+  font-weight: 700;
+}
+.admin-inventory-inspector-tabs button:focus-visible {
+  outline: 2px solid #0f6a4a;
+  outline-offset: -2px;
+}
+.admin-inventory-inspector-panel {
+  display: grid;
+  gap: 1rem;
+}
+.admin-inventory-stock-threshold {
+  border: 1px solid #e8e9e6;
+  border-radius: 9px;
+  background: #f9faf8;
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+}
+.admin-inventory-stock-threshold > span {
+  color: #727d78;
+  font-size: 0.75rem;
+}
+.admin-inventory-stock-threshold dl {
+  margin: 0.5rem 0 0;
+}
+.admin-inventory-stock-threshold dt,
+.admin-inventory-definition-overview dt {
+  color: #727d78;
+  font-size: 0.75rem;
+}
+.admin-inventory-stock-threshold dd {
+  margin: 0.2rem 0;
+  font-weight: 700;
+}
+.admin-inventory-definition-overview {
+  display: grid;
+  margin: 0;
+}
+.admin-inventory-definition-overview > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #ebede9;
+  font-size: 0.8rem;
+}
+.admin-inventory-definition-overview > div:last-child {
+  border-bottom: none;
+}
+.admin-inventory-definition-overview dd {
+  text-align: right;
+  margin: 0;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
