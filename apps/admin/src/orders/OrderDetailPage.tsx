@@ -37,7 +37,7 @@ export function OrderDetailPage({
   order: AdminOrderDetail;
   canCancel: boolean;
   canRefund: boolean;
-  canReviewApprovals: boolean;
+  canReviewApprovals?: boolean;
   cancelling: boolean;
   refunding: boolean;
   returning: boolean;
