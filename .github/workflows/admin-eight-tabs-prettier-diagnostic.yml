@@ -1,0 +1,47 @@
+name: Temporary Admin eight-tab format diagnostic
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/admin-eight-tabs-prettier-diagnostic.yml'
+      - 'apps/admin/src/orders/**'
+      - 'apps/admin/src/reports/**'
+      - 'e2e/admin-orders.spec.ts'
+      - 'e2e/premiumVisualEvidence.ts'
+
+permissions:
+  contents: read
+
+jobs:
+  formatter-diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Produce read-only formatter patch for review
+        run: |
+          set -euo pipefail
+          files=(
+            apps/admin/src/orders/orders.css
+            apps/admin/src/reports/ReportFilters.tsx
+            apps/admin/src/reports/ReportsPage.tsx
+            apps/admin/src/reports/reportAreaTransition.ts
+            apps/admin/src/reports/reportDateRange.ts
+            apps/admin/src/reports/reportScope.test.ts
+            apps/admin/src/reports/reportScope.ts
+            e2e/admin-orders.spec.ts
+            e2e/premiumVisualEvidence.ts
+          )
+          npx prettier --write "${files[@]}"
+          git diff --no-ext-diff --unified=3 -- "${files[@]}"
+          echo 'FORMAT_DIAGNOSTIC_COMPLETE'
