@@ -13,7 +13,8 @@ import type {
 } from '@tux/admin-contracts';
 
 import { useAdminSession } from '../auth/useAdminSession';
-import { AdminApiError, adminFetch } from '../lib/adminApi';
+import { adminFetch } from '../lib/adminApi';
+import { shouldReleaseOrdersCommandIdAfterFailure } from './orderCommandRetryPolicy';
 import { createRetainedCommandIds, isPendingApprovalResult } from '../lib/retainedCommandIds';
 
 // Cross-app changes must reach an open Admin order workspace without user refresh.
@@ -185,7 +186,9 @@ export function useOrders(
       }
       return result;
     } catch (error) {
-      if (error instanceof AdminApiError) commandIds.complete(scope, retainedIntent);
+      if (shouldReleaseOrdersCommandIdAfterFailure(error)) {
+        commandIds.complete(scope, retainedIntent);
+      }
       throw error;
     }
   }
