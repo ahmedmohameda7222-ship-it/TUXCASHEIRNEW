@@ -42,7 +42,9 @@ export function OrderDetailPage({
   onRefund(): void;
   onReturn(): void;
 }) {
-  const canCancelActive = order.status === 'ACTIVE' && canCancel;
+  const recordedPaymentMinor = order.payments.reduce((sum, payment) => sum + payment.allocatedMinor, 0);
+  const hasRecordedPayment = recordedPaymentMinor > 0;
+  const canCancelActive = order.status === 'ACTIVE' && canCancel && !hasRecordedPayment;
   const canRefundOrReturn = ['DONE', 'RETURNED'].includes(order.status) && canRefund;
 
   return (
@@ -223,6 +225,14 @@ export function OrderDetailPage({
           </details>
         ) : null}
       </section>
+
+      {order.status === 'ACTIVE' && hasRecordedPayment ? (
+        <section className="admin-order-detail__card" role="status" aria-label="Paid active order cancellation restriction">
+          <h3>Paid active order</h3>
+          <p>Recorded payments: {money(recordedPaymentMinor)}. Admin cancellation is blocked until an authorized financial settlement policy is available.</p>
+          <p>Keep the order active or complete the existing Operations lifecycle and use the authorized refund workflow when eligible. Nonrefundable payment methods require an explicit finance resolution. A ledger adjustment does not confirm an external refund.</p>
+        </section>
+      ) : null}
 
       {canCancelActive || canRefundOrReturn ? (
         <section
