@@ -67,7 +67,7 @@ export function projectPaymentRefundBalances(
       remainingRefundableMinor: payment.refundAllowedSnapshot
         ? Math.max(0, payment.allocatedMinor - postedRefundMinor - pendingRefundMinor)
         : 0,
-    }];
+    }] as const;
   }));
 }
 
