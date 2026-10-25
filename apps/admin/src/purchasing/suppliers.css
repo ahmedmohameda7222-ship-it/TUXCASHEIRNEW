@@ -64,3 +64,38 @@
     flex: 1 1 100%;
   }
 }
+
+/* Approved procurement directory: compact list instead of standalone tall cards. */
+.admin-purchasing-supplier-filters { display: grid; grid-template-columns: minmax(0,2fr) minmax(9rem,1fr) auto; gap: 10px; align-items: end; margin-bottom: 8px; }
+.admin-purchasing-supplier-filters .admin-field { min-width: 0; }
+.admin-purchasing-supplier-filters input, .admin-purchasing-supplier-filters select { width: 100%; height: 42px; min-width: 0; }
+.admin-supplier-directory { border: 1px solid #e2e9e5; background: #fff; border-radius: 12px; overflow: hidden; }
+.admin-supplier-directory__heading { display: grid; grid-template-columns: minmax(0,1.35fr) repeat(3,minmax(0,1fr)) minmax(0,1.6fr); gap: 10px; padding: 11px 12px; font-size: 12px; font-weight: 600; color: #607465; background: #fafcfb; }
+.admin-supplier-directory .admin-supplier-card { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(0,3.2fr) minmax(0,1.6fr); gap: 10px; align-items: center; padding: 12px; border-top: 1px solid #e8edea; box-shadow: none; border-radius: 0; min-width: 0; }
+.admin-supplier-directory .admin-supplier-card.is-selected { background: #eef7f1; box-shadow: inset 3px 0 #128350; }
+.admin-supplier-directory .admin-supplier-card__identity { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 4px; min-width: 0; }
+.admin-supplier-select { display: inline-block; max-width: 100%; border: none; background: transparent; padding: 0; font: inherit; font-weight: 700; color: #203026; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.admin-supplier-select:hover { text-decoration: underline; }
+.admin-supplier-select:focus-visible { outline: 2px solid #138350; outline-offset: 3px; }
+.admin-supplier-directory .admin-supplier-card__facts { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+.admin-supplier-directory .admin-supplier-card__facts dt { display: none; }
+.admin-supplier-directory .admin-supplier-card__facts dd { font-size: 12px; }
+.admin-supplier-directory .admin-supplier-card__actions { display: flex; justify-content: flex-end; align-items: center; gap: 4px; border: 0; padding: 0; }
+.admin-supplier-directory .admin-supplier-card__actions button { min-height: 34px; font-size: 11px; padding: 5px 8px; }
+.admin-purchasing-supplier-inspector { margin-top: 12px; padding: 14px; background: #fff; border: 1px solid #e2e9e5; border-radius: 12px; }
+.admin-purchasing-supplier-inspector dl { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,9rem),1fr)); gap: 12px; }
+.admin-purchasing-supplier-inspector dt { font-size: 12px; color: #69796e; }
+.admin-purchasing-supplier-inspector dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+@media (max-width: 850px) {
+  .admin-purchasing-supplier-filters { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+  .admin-purchasing-supplier-filters .admin-purchasing-reset { justify-self: start; }
+  .admin-supplier-directory__heading { display: none; }
+  .admin-supplier-directory .admin-supplier-card { grid-template-columns: minmax(0,1fr); gap: 10px; }
+  .admin-supplier-directory .admin-supplier-card__facts dt { display: block; }
+  .admin-supplier-directory .admin-supplier-card__actions { justify-content: flex-start; }
+}
+@media (max-width: 390px) {
+  .admin-purchasing-supplier-filters { grid-template-columns: minmax(0,1fr); }
+  .admin-supplier-directory .admin-supplier-card__facts { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+  .admin-supplier-directory .admin-supplier-card__actions button { flex: 1 1 auto; }
+}
