@@ -974,6 +974,10 @@ for (const width of [1100, 720] as const) {
     await mockOrders(page);
     await page.goto('/orders');
     await page.getByRole('button', { name: /#101/ }).click();
+    if (width === 1100) {
+      await expect(page.locator('.admin-master-detail__list')).toBeHidden();
+      await expect(page.getByRole('link', { name: /back to orders/i })).toBeVisible();
+    }
     const inspector = page.getByRole('navigation', { name: 'Order detail sections' });
     await expect(inspector.getByRole('link')).toHaveCount(6);
     await inspector.getByRole('link', { name: 'History' }).click();
