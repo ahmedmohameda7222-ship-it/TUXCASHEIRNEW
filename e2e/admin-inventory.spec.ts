@@ -67,13 +67,19 @@ async function mockInventory(
       expect(url.searchParams.get('shopId')).toBe(shopId);
       const view = url.searchParams.get('view');
       if (view === 'stocktake-eligibility') {
-        await route.fulfill({ status: 200, contentType: 'application/json',
-          body: JSON.stringify({ allowed: true, code: 'off_shift_allowed' }) });
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ allowed: true, code: 'off_shift_allowed' }),
+        });
         return;
       }
       if (view === 'stocktake-sessions') {
-        await route.fulfill({ status: 200, contentType: 'application/json',
-          body: JSON.stringify({ ok: true, sessions: [] }) });
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true, sessions: [] }),
+        });
         return;
       }
       const requestedInventoryItemId = url.searchParams.get('inventoryItemId');
