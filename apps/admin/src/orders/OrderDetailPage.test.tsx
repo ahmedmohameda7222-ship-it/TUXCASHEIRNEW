@@ -112,6 +112,23 @@ function render(order: AdminOrderDetail): string {
 }
 
 describe('OrderDetailPage', () => {
+  it('uses immutable modifier snapshots in the complete line total for multiple items', () => {
+    const html = render({
+      ...fixture,
+      items: [{
+        ...fixture.items[0]!,
+        quantity: 2,
+        unitPriceMinor: 11000,
+        modifiers: [{ id: null, label: 'Extra cheese', quantity: 2, unitPriceMinor: 500 }],
+      }],
+    });
+    expect(html).toContain('Base unit');
+    expect(html).toContain('Modifier extras');
+    expect(html).toContain('EGP 120.00');
+    expect(html).toContain('EGP 240.00');
+    expect(html).toContain('Line total before discounts');
+  });
+
   it('offers cancel for active orders and separate refund and return actions for completed orders', () => {
     expect(render({ ...fixture, status: 'ACTIVE' })).toContain('Cancel order');
     const done = render({ ...fixture, status: 'DONE' });
