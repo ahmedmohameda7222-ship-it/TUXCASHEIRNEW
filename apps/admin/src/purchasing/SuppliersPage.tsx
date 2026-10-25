@@ -114,7 +114,7 @@ export function SuppliersPage({
         <span>{visibleSuppliers.length} matching suppliers from {suppliers.length} loaded records</span>
       </div>
       <div className="admin-supplier-directory" role="list">
-        <div className="admin-supplier-directory__heading" aria-hidden="true"><span>Supplier</span><span>Contact</span><span>Phone</span><span>Email</span><span>Status</span></div>
+        <div className="admin-supplier-directory__heading" aria-hidden="true"><span>Supplier</span><span>Contact</span><span>Phone</span><span>Email</span><span>Actions</span></div>
         {visibleSuppliers.map((supplier) => (
           <article className={selectedSupplierId === supplier.id ? "admin-supplier-card is-selected" : "admin-supplier-card"} role="listitem" key={supplier.id}>
             <header className="admin-supplier-card__identity">
