@@ -460,9 +460,9 @@ test('new employee sheet persists actual hire date and notes through the trusted
   await sheet.getByLabel('Hire date').fill('2026-10-01');
   await sheet.getByLabel('Internal notes').fill('Cross-trained at counter');
   await sheet.getByRole('button', { name: 'Add employee' }).click();
-  await expect.poll(() => commands.some((command) => command['type'] === 'employee.create')).toBe(
-    true,
-  );
+  await expect
+    .poll(() => commands.some((command) => command['type'] === 'employee.create'))
+    .toBe(true);
   expect(commands.find((command) => command['type'] === 'employee.create')).toMatchObject({
     shopId,
     displayName: 'Amira QA',
