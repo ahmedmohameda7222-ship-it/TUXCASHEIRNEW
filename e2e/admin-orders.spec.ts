@@ -1005,3 +1005,55 @@ test('approved Orders 1536×1024 reference composition remains fully navigable',
   ).toBe(true);
   await capturePremiumScreenshot(page, 'orders-reference');
 });
+
+test('O1 date filters transmit Cairo-converted UTC instants to both Orders and full-shop KPIs', async ({
+  page,
+}) => {
+  const fixture = await mockOrders(page, { financeVisible: true });
+  await page.goto('/orders');
+  await page.getByText('Search and filters', { exact: true }).click();
+  const from = page.getByLabel('From date/time (Cairo)');
+  const to = page.getByLabel('To date/time (Cairo)');
+  await from.fill('2026-10-01T08:30');
+  await to.fill('2026-10-01T10:30');
+  await expect
+    .poll(() =>
+      fixture.searches.some(
+        (url) =>
+          url.searchParams.get('from') === '2026-10-01T05:30:00.000Z' &&
+          url.searchParams.get('to') === '2026-10-01T07:30:00.000Z',
+      ),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      fixture.kpiRequests.some(
+        (url) =>
+          url.searchParams.get('from') === '2026-10-01T05:30:00.000Z' &&
+          url.searchParams.get('to') === '2026-10-01T07:30:00.000Z',
+      ),
+    )
+    .toBe(true);
+  await page.getByRole('button', { name: 'Clear date filters' }).click();
+  await expect(from).toHaveValue('');
+  await expect(to).toHaveValue('');
+  await expect.poll(() => fixture.searches.at(-1)?.searchParams.has('from')).toBe(false);
+});
+
+test('O1 reversed Cairo range never submits an invalid list or money-aggregation query', async ({
+  page,
+}) => {
+  const fixture = await mockOrders(page, { financeVisible: true });
+  await page.goto('/orders');
+  await expect(page.locator('dl[aria-label="Orders key metrics"]')).toContainText('65');
+  await page.getByText('Search and filters', { exact: true }).click();
+  await page.getByLabel('To date/time (Cairo)').fill('2026-10-01T08:30');
+  await page.getByLabel('From date/time (Cairo)').fill('2026-10-02T10:30');
+  await expect(page.getByRole('alert')).toContainText('Start date/time must be before end date/time');
+  const oldSearches = fixture.searches.length;
+  const oldKpis = fixture.kpiRequests.length;
+  await page.waitForTimeout(100);
+  expect(fixture.searches).toHaveLength(oldSearches);
+  expect(fixture.kpiRequests).toHaveLength(oldKpis);
+  await expect(page.getByRole('link', { name: /Export up to/ })).toHaveCount(0);
+});
