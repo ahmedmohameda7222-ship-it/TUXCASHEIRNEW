@@ -184,6 +184,17 @@ export function InventoryPage() {
 
   const canAdjust = principal.permissions.includes('inventory.adjust');
   const canStocktake = principal.permissions.includes('inventory.stocktake');
+  const stocktakeAllowed = inventory.stocktakeEligibilityQuery.data?.allowed === true;
+  const eligibilityCode = inventory.stocktakeEligibilityQuery.data?.code;
+  const stocktakeReason = inventory.stocktakeEligibilityQuery.isError
+    ? 'Safety verification is unavailable. Stock count is blocked until the trusted server can confirm the shift has ended.'
+    : eligibilityCode === 'active_worker_session'
+      ? 'A worker session is active. Physical stock counting is available only after the last trading shift ends.'
+      : eligibilityCode === 'unfinished_orders'
+        ? 'Unfinished orders are still present. Finalize active stock-affecting orders before counting.'
+        : !stocktakeAllowed
+          ? 'Checking shift and order eligibility; stock count is unavailable until confirmed.'
+          : null;
   const canTransfer = principal.permissions.includes('inventory.transfer');
   const canManageReplenishment = principal.permissions.includes('purchasing.manage');
   const canManageDefinitions = principal.permissions.includes('purchasing.manage');
@@ -265,7 +276,7 @@ export function InventoryPage() {
             <button
               className="admin-primary-button"
               type="button"
-              disabled={inventory.beginStocktake.isPending || stocktakeItems.length === 0}
+              disabled={inventory.beginStocktake.isPending || stocktakeItems.length === 0 || !stocktakeAllowed}
               onClick={() => {
                 if (stocktakeItems.length > STOCKTAKE_BATCH_SIZE) {
                   openWorkflow('stocktake-select');
@@ -325,6 +336,9 @@ export function InventoryPage() {
         </div>
       }
     >
+      {canStocktake && stocktakeReason ? (
+        <p role="status" className="admin-inventory-note">{stocktakeReason}</p>
+      ) : null}
       {adjustmentApprovalPending ? (
         <p className="admin-inventory-note" role="status">
           Stock adjustment submitted for approval. No inventory movement is posted until approval
@@ -401,7 +415,7 @@ export function InventoryPage() {
                   className="admin-inventory-row"
                   type="button"
                   key={first?.id ?? index}
-                  disabled={inventory.beginStocktake.isPending}
+                  disabled={inventory.beginStocktake.isPending || !stocktakeAllowed}
                   onClick={() => beginStocktakeBatch(batch)}
                 >
                   <span>
@@ -443,12 +457,13 @@ export function InventoryPage() {
         <StocktakePage
           items={items}
           snapshot={stocktakeSnapshot}
-          pending={inventory.postStocktake.isPending}
+          pending={inventory.postStocktake.isPending || !stocktakeAllowed}
           onBack={() => {
             setStocktakeSnapshot(null);
             setMode('detail');
           }}
-          onSubmit={(lines) =>
+          onSubmit={(lines) => {
+            if (!stocktakeAllowed) return;
             inventory.postStocktake.mutate(
               { stocktakeId: stocktakeSnapshot.stocktakeId, lines },
               {
@@ -457,8 +472,8 @@ export function InventoryPage() {
                   setMode('detail');
                 },
               },
-            )
-          }
+            );
+          }}
         />
       ) : mode === 'transfer' ? (
         <TransferPage
