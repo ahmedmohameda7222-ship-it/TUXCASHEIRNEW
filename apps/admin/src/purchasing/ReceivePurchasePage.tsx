@@ -87,11 +87,22 @@ export function ReceivePurchasePage({
         </label>
         {validationError ? <p role="alert">{validationError}</p> : null}
         {mode === 'receive' ? (
-          <p className="admin-inventory-muted">A positive cost is required for every received line. Free goods must be handled through an explicitly authorized process.</p>
+          <p className="admin-inventory-muted">
+            A positive cost is required for every received line. Free goods must be handled through
+            an explicitly authorized process.
+          </p>
         ) : null}
         {eligible.map((line) => (
           <div className="admin-form-grid" key={line.id}>
-            <p className="admin-inventory-muted">Remaining: {formatPurchaseMicros(mode === 'receive' ? line.orderedPurchaseUnitsMicros - line.receivedPurchaseUnitsMicros : line.receivedPurchaseUnitsMicros - line.returnedPurchaseUnitsMicros)} {line.purchaseUnitLabel}</p>
+            <p className="admin-inventory-muted">
+              Remaining:{' '}
+              {formatPurchaseMicros(
+                mode === 'receive'
+                  ? line.orderedPurchaseUnitsMicros - line.receivedPurchaseUnitsMicros
+                  : line.receivedPurchaseUnitsMicros - line.returnedPurchaseUnitsMicros,
+              )}{' '}
+              {line.purchaseUnitLabel}
+            </p>
             <label>
               {mode === 'receive'
                 ? `Receive ${line.itemName} (${line.purchaseUnitLabel})`
