@@ -88,6 +88,34 @@ export function PurchaseOrdersPage({
   const [lines, setLines] = useState<DraftLine[]>(() => [newLine(1, inventoryItems)]);
   const [formError, setFormError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const visibleOrders = useMemo(() => {
+    const normalized = search.trim().toLocaleLowerCase();
+    return purchaseOrders
+      .filter((order) => {
+        if (statusFilter && order.status !== statusFilter) return false;
+        if (supplierFilter && order.supplierId !== supplierFilter) return false;
+        if (!normalized) return true;
+        return [order.reference, order.id, order.supplierName]
+          .filter((value): value is string => Boolean(value))
+          .some((value) => value.toLocaleLowerCase().includes(normalized));
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
+  }, [purchaseOrders, search, statusFilter, supplierFilter]);
+  const pageCount = Math.max(1, Math.ceil(visibleOrders.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const paginatedOrders = visibleOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  function resetFilters() {
+    setSearch('');
+    setStatusFilter('');
+    setSupplierFilter('');
+    setPage(1);
+  }
+
 
   const selectedSupplierId = activeSuppliers.some((supplier) => supplier.id === supplierId)
     ? supplierId
@@ -140,25 +168,86 @@ export function PurchaseOrdersPage({
           </button>
         ) : null}
       </div>
-      <div className="admin-record-list">
-        {purchaseOrders.map((order) => (
-          <button
-            className={
-              selectedId === order.id
-                ? 'admin-record-row admin-record-row--button is-selected'
-                : 'admin-record-row admin-record-row--button'
-            }
-            type="button"
-            key={order.id}
-            onClick={() => onSelect(order.id)}
-          >
-            <span>
-              <strong>{order.reference ?? `Purchase order · ${order.supplierName}`}</strong>
-              <small>{order.supplierName}</small>
-            </span>
-            <span>{statusLabel(order.status)}</span>
-          </button>
-        ))}
+      <div className="admin-purchasing-directory">
+        <div className="admin-purchasing-filters">
+          <label className="admin-purchasing-search">
+            <span className="sr-only">Search purchase orders</span>
+            <input
+              aria-label="Search purchase orders"
+              type="search"
+              placeholder="PO number or supplier"
+              value={search}
+              onChange={(event) => { setSearch(event.currentTarget.value); setPage(1); }}
+            />
+          </label>
+          <label>
+            <span className="sr-only">Filter by status</span>
+            <select
+              aria-label="Filter by status"
+              value={statusFilter}
+              onChange={(event) => { setStatusFilter(event.currentTarget.value); setPage(1); }}
+            >
+              <option value="">All statuses</option>
+              {(['DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CANCELLED'] as const).map((status) => (
+                <option key={status} value={status}>{statusLabel(status)}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span className="sr-only">Filter by supplier</span>
+            <select
+              aria-label="Filter by supplier"
+              value={supplierFilter}
+              onChange={(event) => { setSupplierFilter(event.currentTarget.value); setPage(1); }}
+            >
+              <option value="">All suppliers</option>
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="admin-purchasing-filter-summary">
+          <span>{visibleOrders.length} matching purchase orders from {purchaseOrders.length} loaded records</span>
+          <button type="button" className="admin-purchasing-reset" onClick={resetFilters}>Reset filters</button>
+        </div>
+        <div className="admin-purchasing-list-heading" aria-hidden="true">
+          <span>PO reference</span><span>Supplier</span><span>Expected delivery</span><span>Status</span>
+        </div>
+        <div className="admin-purchasing-list" aria-label="Purchase orders">
+          {paginatedOrders.map((order) => (
+            <button
+              className={selectedId === order.id
+                ? 'admin-purchasing-list-row is-selected'
+                : 'admin-purchasing-list-row'}
+              aria-current={selectedId === order.id ? 'true' : undefined}
+              type="button"
+              key={order.id}
+              onClick={() => onSelect(order.id)}
+            >
+              <span className="admin-purchasing-row-reference">
+                <strong>{order.reference?.trim() || `PO-${order.id.slice(0, 8).toUpperCase()}`}</strong>
+                <small>{order.createdAt.slice(0, 10)}</small>
+              </span>
+              <span className="admin-purchasing-row-supplier">{order.supplierName}</span>
+              <span className="admin-purchasing-row-date">{order.expectedDeliveryDate ?? 'Not set'}</span>
+              <span><span className={`admin-purchasing-status is-${order.status.toLowerCase().replaceAll('_', '-')}`}>{statusLabel(order.status)}</span></span>
+            </button>
+          ))}
+          {visibleOrders.length === 0 ? (
+            <p className="admin-purchasing-empty">
+              {purchaseOrders.length === 0 ? 'No purchase orders yet' : 'No purchase orders match these filters.'}
+            </p>
+          ) : null}
+        </div>
+        <div className="admin-purchasing-pager">
+          <span>Showing {visibleOrders.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, visibleOrders.length)} of {visibleOrders.length} loaded matches</span>
+          <div>
+            <button type="button" aria-label="Previous purchase order page" className="admin-secondary-button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Previous</button>
+            <span aria-live="polite">Page {currentPage} of {pageCount}</span>
+            <button type="button" aria-label="Next purchase order page" className="admin-secondary-button" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>Next</button>
+          </div>
+        </div>
       </div>
       {canManage ? (
         <AdminDialog
