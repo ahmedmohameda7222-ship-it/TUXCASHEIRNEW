@@ -699,3 +699,121 @@ if (
 }
 
 console.log('Admin order approval PostgreSQL threshold behavior passed.');
+
+/* Orders P1 regression: unsafe paid Admin cancellation must roll back fully,
+   while the existing unpaid path remains functional and command-replay safe. */
+psql(
+  ['-f', resolve(migrationsDirectory, '20261025150000_orders_paid_cancel_safety.sql')],
+  'Apply isolated paid-Active cancellation guard',
+);
+
+const PAID_ACTIVE_ID = '59000000-0000-4000-8000-000000000092';
+const UNPAID_ACTIVE_ID = '59000000-0000-4000-8000-000000000093';
+const PAID_PAYMENT_ID = '5b000000-0000-4000-8000-000000000092';
+const CANCEL_REASON_ID = '5c000000-0000-4000-8000-000000000092';
+
+psql(
+  [
+    '-c',
+    `update public.business_days
+       set last_allocated_display_order_no = 3 where id = '${DAY_ID}';
+     insert into public.orders(
+       id, shop_id, business_day_id, display_order_no, idempotency_key,
+       source, status, operator_worker_id, operator_name_snapshot,
+       order_type_id, order_type_label_snapshot, order_type_behavior_snapshot,
+       items_subtotal_minor, discount_minor, total_minor, order_note, created_at, updated_at
+     ) values
+       ('${PAID_ACTIVE_ID}', '${SHOP_ID}', '${DAY_ID}', 2, 'paid-active-test',
+        'POS', 'ACTIVE', '${WORKER_ID}', 'Test worker', '${ORDER_TYPE_ID}',
+        'Take Away', 'TAKE_AWAY', 11000, 0, 11000, null, now(), now()),
+       ('${UNPAID_ACTIVE_ID}', '${SHOP_ID}', '${DAY_ID}', 3, 'unpaid-active-test',
+        'POS', 'ACTIVE', '${WORKER_ID}', 'Test worker', '${ORDER_TYPE_ID}',
+        'Take Away', 'TAKE_AWAY', 11000, 0, 11000, null, now(), now());
+     insert into public.payments(
+       id, shop_id, order_id, part_index, payment_method_id,
+       payment_method_label_snapshot, logic_type_snapshot,
+       allocated_minor, received_minor, change_minor, created_at
+     ) values (
+       '${PAID_PAYMENT_ID}', '${SHOP_ID}', '${PAID_ACTIVE_ID}',
+       1, '${PAYMENT_METHOD_ID}', 'Card', 'CARD', 5000, null, null, now()
+     );
+     insert into public.admin_reason_codes(
+       id, business_id, shop_id, reason_key, family, label,
+       active, version, updated_by_employee_id
+     ) values (
+       '${CANCEL_REASON_ID}', '${BUSINESS_ID}', null,
+       'CUSTOMER_CHANGED_MIND', 'CANCELLATION', 'Customer changed mind',
+       true, 1, '${REQUESTER_ID}'
+     );`,
+  ],
+  'Seed paid and unpaid ACTIVE cancellation cases',
+);
+
+psql(
+  [
+    '-c',
+    `do $check_paid_cancel$
+     declare observed text;
+     begin
+       begin
+         perform public.cancel_admin_order_v1(
+           '${REQUESTER_ID}', '${SHOP_ID}', '${PAID_ACTIVE_ID}',
+           '${CANCEL_REASON_ID}', 0, null,
+           'paid-cancel-should-reject', '${BUSINESS_ID}'
+         );
+         raise exception 'paid ACTIVE cancellation unexpectedly succeeded';
+       exception when others then
+         get stacked diagnostics observed = MESSAGE_TEXT;
+         if observed <> 'TUX_ADMIN_PAID_CANCEL_REQUIRES_SETTLEMENT' then
+           raise;
+         end if;
+       end;
+     end;
+     $check_paid_cancel$;`,
+  ],
+  'Paid ACTIVE Admin cancellation must reject at the database boundary',
+);
+
+const paidState = psql(
+  [
+    '-At',
+    '-c',
+    `select o.status || ':' ||
+       coalesce((select sum(p.allocated_minor) from public.payments p
+         where p.order_id=o.id), 0)::text || ':' ||
+       (select count(*) from public.order_status_events e
+         where e.order_id=o.id and e.event_type='CANCELLED')::text || ':' ||
+       (select count(*) from public.admin_order_command_receipts c
+         where c.order_id=o.id)::text
+       from public.orders o where o.id='${PAID_ACTIVE_ID}'`,
+  ],
+  'Paid cancellation rollback evidence',
+).trim();
+if (paidState !== 'ACTIVE:5000:0:0') {
+  throw new Error(`Paid cancellation changed financial/lifecycle state: ${paidState}`);
+}
+
+const unpaidCancel = rpc(
+  `public.cancel_admin_order_v1(
+    '${REQUESTER_ID}', '${SHOP_ID}', '${UNPAID_ACTIVE_ID}',
+    '${CANCEL_REASON_ID}', 0, 'Unpaid cancellation',
+    'unpaid-cancel-1', '${BUSINESS_ID}'
+  )`,
+  'Unpaid ACTIVE cancellation',
+);
+if (unpaidCancel.ok !== true || unpaidCancel.status !== 'CANCELLED' || unpaidCancel.replayed) {
+  throw new Error(`Unpaid cancellation not committed: ${JSON.stringify(unpaidCancel)}`);
+}
+const unpaidReplay = rpc(
+  `public.cancel_admin_order_v1(
+    '${REQUESTER_ID}', '${SHOP_ID}', '${UNPAID_ACTIVE_ID}',
+    '${CANCEL_REASON_ID}', 0, 'Unpaid cancellation',
+    'unpaid-cancel-1', '${BUSINESS_ID}'
+  )`,
+  'Unpaid cancellation idempotent replay',
+);
+if (unpaidReplay.ok !== true || unpaidReplay.replayed !== true) {
+  throw new Error(`Unpaid cancellation replay not idempotent: ${JSON.stringify(unpaidReplay)}`);
+}
+
+console.log('Paid ACTIVE cancellation guard and unpaid rollback/replay PostgreSQL behavior passed.');
