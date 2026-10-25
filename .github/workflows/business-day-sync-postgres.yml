@@ -111,3 +111,52 @@ jobs:
         run: npm run typecheck
       - name: All production builds
         run: npm run build
+
+  inventory-rendered-preview:
+    name: Inventory authenticated rendered browser regression
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 159 }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Build local-only serial integration preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'TUX Inventory CI Preview'
+          git config user.email 'inventory-ci@localhost.invalid'
+          git fetch --no-tags origin refs/pull/157/head:refs/remotes/origin/preview-catalog-157
+          git fetch --no-tags origin refs/pull/158/head:refs/remotes/origin/preview-orders-158
+          echo "Catalog: $(git rev-parse refs/remotes/origin/preview-catalog-157)"
+          echo "Orders: $(git rev-parse refs/remotes/origin/preview-orders-158)"
+          git merge --no-ff --no-edit refs/remotes/origin/preview-catalog-157
+          git merge --no-ff --no-edit refs/remotes/origin/preview-orders-158
+          echo "Throwaway local preview SHA: $(git rev-parse HEAD)"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build Admin for browser regression
+        run: |
+          npm run typecheck:admin
+          npm run build:admin
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Rendered Inventory interaction, viewport, and state regression
+        run: npx playwright test e2e/admin-inventory.spec.ts --config playwright.admin.config.ts
+      - name: Upload reproducible browser failure artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: inventory-three-stream-rendered-preview
+          path: |
+            playwright-report-admin
+            test-results
+          if-no-files-found: warn
+          retention-days: 14
