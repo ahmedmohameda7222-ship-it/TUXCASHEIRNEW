@@ -27,6 +27,8 @@ async function routeRemoteRuntime(
   capture: {
     orderRow: Readonly<Record<string, unknown>> | null;
     orderPosts: number;
+    orderEventIds: string[];
+    orderIds: string[];
     auxiliaryUnavailablePaths: string[];
   },
 ): Promise<void> {
@@ -147,6 +149,8 @@ async function routeRemoteRuntime(
     if (orderMutation !== undefined) {
       capture.orderPosts += 1;
       capture.orderRow = orderMutation.row;
+      capture.orderEventIds.push(String(envelope.eventId));
+      capture.orderIds.push(String(orderMutation.row['id']));
       expect(request.headers()['x-tux-event-id']).toBe(envelope.eventId);
       expect(request.headers()['x-tux-idempotency-key']).toBe(envelope.idempotencyKey);
     }
@@ -181,8 +185,16 @@ test('Chromium delivers a locally created Order and exposes its canonical Admin 
   const capture: {
     orderRow: Readonly<Record<string, unknown>> | null;
     orderPosts: number;
+    orderEventIds: string[];
+    orderIds: string[];
     auxiliaryUnavailablePaths: string[];
-  } = { orderRow: null, orderPosts: 0, auxiliaryUnavailablePaths: [] };
+  } = {
+    orderRow: null,
+    orderPosts: 0,
+    orderEventIds: [],
+    orderIds: [],
+    auxiliaryUnavailablePaths: [],
+  };
   const consoleErrors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
@@ -205,7 +217,7 @@ test('Chromium delivers a locally created Order and exposes its canonical Admin 
   await page.getByRole('button', { name: 'Place Order', exact: true }).click();
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
 
-  await expect.poll(() => capture.orderPosts, { timeout: 20_000 }).toBe(1);
+  await expect.poll(() => capture.orderPosts, { timeout: 20_000 }).toBeGreaterThan(0);
   await expect(page.locator('[data-state="SYNCED"]')).toBeVisible();
   const pendingCount = await page.evaluate(
     () =>
@@ -229,6 +241,10 @@ test('Chromium delivers a locally created Order and exposes its canonical Admin 
       }),
   );
   expect(pendingCount).toBe(0);
+  // At-least-once delivery may replay the same immutable ORDER_PLACED envelope.
+  // It must not manufacture another event or a second canonical Order identity.
+  expect(new Set(capture.orderEventIds).size).toBe(1);
+  expect(new Set(capture.orderIds).size).toBe(1);
 
   const select = async (table: string) => {
     if (table === 'business_shops') return [{ shop_id: SHOP }];
