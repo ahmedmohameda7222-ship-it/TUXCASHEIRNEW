@@ -147,7 +147,9 @@ export function ReportFilters({
         Report
         <select
           value={value.area}
-          onChange={(event) => onChange(chooseReportArea(value, event.target.value as AdminReportArea))}
+          onChange={(event) =>
+            onChange(chooseReportArea(value, event.target.value as AdminReportArea))
+          }
         >
           {REPORT_TOPICS.map((topic) => (
             <optgroup label={topic.label} key={topic.label}>
