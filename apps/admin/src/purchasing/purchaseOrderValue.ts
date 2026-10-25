@@ -29,3 +29,22 @@ export function formatExpectedOrderValue(minor: number | null): string {
   const pennies = BigInt(minor);
   return `${pennies / 100n}.${String(pennies % 100n).padStart(2, '0')} EGP`;
 }
+
+/**
+ * A stable, human-oriented identifier when a PO has no supplier reference.
+ * The opaque checksum avoids exposing a raw UUID fragment in primary UI.
+ * The persisted PO identity and routing remain the full canonical UUID.
+ */
+export function purchaseOrderDisplayReference(
+  order: Pick<AdminPurchaseOrder, 'id' | 'reference'>,
+): string {
+  const reference = order.reference?.trim();
+  if (reference) return reference;
+
+  let checksum = 0xcbf29ce484222325n;
+  for (const character of order.id) {
+    checksum ^= BigInt(character.charCodeAt(0));
+    checksum = (checksum * 0x100000001b3n) & 0xffffffffffffffffn;
+  }
+  return `PO-${checksum.toString(36).toUpperCase().padStart(13, '0')}`;
+}
