@@ -318,7 +318,7 @@ jobs:
           EDGE_SECURITY_RESULT: ${{ needs.edge-security.result }}
           WINDOWS_RESULT: ${{ needs.windows-package.result }}
           MENU_RESULT: ${{ needs.menu.result }}
-          BRANCH_PIN_RESULT: ${{ needs.branch-pin.result }}
+          BRANCH_LOGIN_RESULT: ${{ needs.branch-pin.result }}
           ARCHITECTURE_RESULT: ${{ needs.architecture.result }}
         run: |
           test "$QUALITY_RESULT" = "success"
@@ -326,5 +326,5 @@ jobs:
           test "$EDGE_SECURITY_RESULT" = "success"
           test "$WINDOWS_RESULT" = "success"
           test "$MENU_RESULT" = "success"
-          test "$BRANCH_PIN_RESULT" = "success"
+          test "$BRANCH_LOGIN_RESULT" = "success"
           test "$ARCHITECTURE_RESULT" = "success"

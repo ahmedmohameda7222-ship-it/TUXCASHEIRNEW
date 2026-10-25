@@ -1,8 +1,4 @@
-import {
-  AdminAuthError,
-  loadAdminSession,
-  requireSessionCsrf,
-} from '../adminAuthService.js';
+import { AdminAuthError, loadAdminSession, requireSessionCsrf } from '../adminAuthService.js';
 import { AdminAuthorizationError, requirePermission } from '../authorization.js';
 import {
   CatalogImageUploadError,
