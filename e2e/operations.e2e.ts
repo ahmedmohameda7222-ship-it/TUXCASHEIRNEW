@@ -2039,6 +2039,31 @@ test('requested compact product card controls do not overlap on 375px mobile', a
   await expect(page.locator('.product-customizer')).toBeVisible();
 });
 
+test('Extra drawer keeps Add to order visible when its content is taller than the viewport', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await page.setViewportSize({ width: 1440, height: 480 });
+  await enterActiveOrdersForCategoryTests(page);
+
+  const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+  await card.getByRole('button', { name: 'Extra', exact: true }).click();
+
+  const customizer = page.getByRole('dialog', { name: 'Single Smashed Patty' });
+  const footer = customizer.locator('.drawer-footer');
+  await expect(customizer).toBeVisible();
+  await expect(customizer.getByRole('button', { name: 'Add to order' })).toBeVisible();
+
+  const [customizerBox, footerBox] = await Promise.all([
+    customizer.boundingBox(),
+    footer.boundingBox(),
+  ]);
+  expect(customizerBox).not.toBeNull();
+  expect(footerBox).not.toBeNull();
+  expect(customizerBox!.y + customizerBox!.height).toBeLessThanOrEqual(480);
+  expect(footerBox!.y + footerBox!.height).toBeLessThanOrEqual(480);
+});
+
 test('approved cards put 14px price top right and Extra bottom left on every product', async ({
   page,
 }) => {

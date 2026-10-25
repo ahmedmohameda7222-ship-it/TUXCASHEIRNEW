@@ -816,7 +816,9 @@
 
 .orders-overlay {
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
   justify-items: end;
+  overflow: hidden;
   background: rgb(0 0 0 / 0.4);
 }
 
