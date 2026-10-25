@@ -19,15 +19,15 @@ export function CatalogFirstRunGuide({
 }) {
   if (productCount > 0) return null;
   return (
-    <section className="admin-publish-card" aria-labelledby="catalog-first-run-heading">
-      <div className="admin-publish-card__heading">
+    <section className="admin-callout" aria-labelledby="catalog-first-run-heading">
+      <div className="admin-catalog-editor__section-heading">
         <div>
           <p className="admin-catalog-editor__eyebrow">Shop setup</p>
           <h2 id="catalog-first-run-heading">Set up this shop</h2>
         </div>
         <span className="admin-status-pill">No products yet</span>
       </div>
-      <p className="admin-publish-card__copy">
+      <p className="admin-field__help">
         This shop currently has no products. Changes stay in a draft until reviewed and published.
         Existing shops and their published catalogs are not modified by this setup.
       </p>
