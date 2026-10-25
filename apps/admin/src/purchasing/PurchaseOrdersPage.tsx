@@ -12,6 +12,7 @@ import {
   parsePurchaseMoneyMinor,
   validatePurchaseOrderLines,
 } from './purchaseOrderDraft';
+import { expectedOrderValueMinor, formatExpectedOrderValue } from './purchaseOrderValue';
 
 function statusLabel(status: AdminPurchaseOrder['status']): string {
   return status
@@ -234,6 +235,7 @@ export function PurchaseOrdersPage({
           <span>PO reference</span>
           <span>Supplier</span>
           <span>Expected delivery</span>
+          <span>Expected value</span>
           <span>Status</span>
         </div>
         <div className="admin-purchasing-list" aria-label="Purchase orders">
@@ -258,6 +260,9 @@ export function PurchaseOrdersPage({
               <span className="admin-purchasing-row-supplier">{order.supplierName}</span>
               <span className="admin-purchasing-row-date">
                 {order.expectedDeliveryDate ?? 'Not set'}
+              </span>
+              <span className="admin-purchasing-row-value">
+                {formatExpectedOrderValue(expectedOrderValueMinor(order.lines))}
               </span>
               <span>
                 <span
