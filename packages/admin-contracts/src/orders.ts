@@ -171,6 +171,19 @@ export type AdminOrderDetail = {
     deliveryZoneLabel: string | null;
     finalDeliveryFeeMinor: number;
   } | null;
+  delivery?: {
+    state: string | null;
+    riderName: string | null;
+    timeline: readonly {
+      id: string;
+      fromState: string | null;
+      toState: string;
+      employeeId: string | null;
+      riderId: string | null;
+      note: string | null;
+      createdAt: string;
+    }[];
+  } | null;
   payments: readonly AdminOrderPayment[];
   items: readonly AdminOrderItem[];
   statusHistory: readonly AdminOrderStatusEvent[];
