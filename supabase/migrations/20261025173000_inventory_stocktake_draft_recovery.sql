@@ -168,11 +168,23 @@ begin
     exception when others then
       return jsonb_build_object('ok',false,'code','invalid_stocktake_line');
     end;
-    update public.stocktake_lines set actual_count_micros = v_actual
-    where stocktake_id = p_stocktake_id and inventory_item_id = v_item_id;
-    if not found then
+    if not exists (
+      select 1 from public.stocktake_lines
+      where stocktake_id = p_stocktake_id and inventory_item_id = v_item_id
+    ) then
       return jsonb_build_object('ok',false,'code','stocktake_line_set_mismatch');
     end if;
+  end loop;
+
+  -- Do not mutate a single line until ALL submitted lines have been checked.
+  -- A rejected multi-line payload must never leave a partially saved draft.
+  for v_line in select value from jsonb_array_elements(p_lines)
+    order by value ->> 'inventoryItemId'
+  loop
+    update public.stocktake_lines
+    set actual_count_micros = (v_line ->> 'actualCountMicros')::bigint
+    where stocktake_id = p_stocktake_id
+      and inventory_item_id = (v_line ->> 'inventoryItemId')::uuid;
   end loop;
 
   update public.stocktakes
