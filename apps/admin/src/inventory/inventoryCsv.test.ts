@@ -29,9 +29,9 @@ describe('genuine shop-scoped Inventory CSV export', () => {
       { ...item, id: 'id2', name: '  +cmd|' },
       { ...item, id: 'id3', name: '@SUM(1,1)' },
     ]);
-    expect(csv).toContain("'=HYPERLINK');
-    expect(csv).toContain("'  +cmd|');
-    expect(csv).toContain("'@SUM');
+    expect(csv).toContain("'=HYPERLINK");
+    expect(csv).toContain("'  +cmd|");
+    expect(csv).toContain("'@SUM");
   });
 
   it('exports only the current authorized items provided by the server', () => {
