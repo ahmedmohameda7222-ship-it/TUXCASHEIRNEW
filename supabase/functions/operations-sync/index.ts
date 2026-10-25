@@ -100,6 +100,7 @@ Deno.serve(async (request) => {
     // This call runs the canonical V1 deep parser before any remote mutation is planned.
     plan = buildRemoteMaterializationPlanV1(envelope);
   } catch (cause) {
+    console.error('operations-sync envelope validation failed', cause);
     return jsonResponse(400, {
       error: 'invalid_operations_sync_envelope',
       message: cause instanceof Error ? cause.message : 'Operations sync validation failed.',
@@ -229,6 +230,10 @@ Deno.serve(async (request) => {
       message.includes('TUX_INVENTORY_CANCEL_RESTOCK_MISMATCH') ||
       message.includes('TUX_ORDER_TRANSITION_PRECONDITION_MISMATCH')
     ) {
+      console.error('operations-sync rejected materialization plan', {
+        code: error.code,
+        message,
+      });
       return jsonResponse(400, { error: 'invalid_materialization_plan' });
     }
     console.error('operations-sync RPC failed', error);

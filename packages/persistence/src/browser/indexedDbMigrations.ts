@@ -1,4 +1,4 @@
-export const INDEXED_DB_VERSION = 12;
+export const INDEXED_DB_VERSION = 13;
 
 export const INDEXED_DB_STORES = [
   'shops',
@@ -474,6 +474,49 @@ const MIGRATIONS: readonly IndexedDbMigration[] = [
               ...(evidence as Record<string, unknown>),
               retiredAt,
               retirementReason: 'PREPRODUCTION_V10_RECOVERY_RETIRED',
+            },
+          });
+        }
+        cursor.continue();
+      });
+    },
+  },
+  {
+    version: 13,
+    name: 'retry_order_placement_after_configuration_snapshot_recovery',
+    apply(_database, transaction) {
+      const outbox = transaction.objectStore('outboxEvents');
+      const cursorRequest = outbox.openCursor();
+      cursorRequest.addEventListener('success', () => {
+        const cursor = cursorRequest.result;
+        if (cursor === null) return;
+        const event = cursor.value as Record<string, unknown>;
+        const evidence = event['recoveryEvidence'];
+        const evidenceRecord =
+          typeof evidence === 'object' && evidence !== null && !Array.isArray(evidence)
+            ? (evidence as Record<string, unknown>)
+            : null;
+        if (
+          event['eventType'] === 'ORDER_PLACED' &&
+          event['deliveredAt'] === null &&
+          typeof event['quarantinedAt'] === 'string' &&
+          event['lastError'] === 'Remote outbox endpoint rejected event with HTTP 400.' &&
+          evidenceRecord?.['migration'] !== 10 &&
+          evidenceRecord?.['migration'] !== 13
+        ) {
+          cursor.update({
+            ...event,
+            attemptCount: 0,
+            nextAttemptAt: null,
+            lastError: null,
+            quarantinedAt: null,
+            permanentFailureReason: null,
+            blockedByEventId: null,
+            recoveryEvidence: {
+              ...(evidenceRecord ?? {}),
+              migration: 13,
+              quarantinedAt: event['quarantinedAt'],
+              reason: event['lastError'],
             },
           });
         }
