@@ -51,6 +51,19 @@ export function useInventory(shopId: string | undefined, inventoryItemId: string
     },
   });
 
+  const stocktakeEligibilityQuery = useQuery({
+    queryKey: shopId ? [...inventoryQueryKey(shopId), 'stocktake-eligibility'] : ['admin', 'inventory', 'no-stocktake-eligibility'],
+    enabled: Boolean(shopId),
+    queryFn: async () => {
+      if (!shopId) throw new InventoryUiError('concrete_shop_required');
+      return adminFetch<{ allowed: boolean; code: string }>(
+        `/api/admin/inventory?shopId=${encodeURIComponent(shopId)}&view=stocktake-eligibility`,
+      );
+    },
+    staleTime: 5_000,
+    refetchInterval: 15_000,
+  });
+
   const itemHistoryQuery = useQuery({
     queryKey:
       shopId && inventoryItemId
@@ -246,6 +259,7 @@ export function useInventory(shopId: string | undefined, inventoryItemId: string
   return {
     workspaceQuery,
     itemHistoryQuery,
+    stocktakeEligibilityQuery,
     manageDefinition,
     adjustStock,
     recordWaste,
