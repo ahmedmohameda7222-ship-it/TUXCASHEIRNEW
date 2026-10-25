@@ -52,8 +52,12 @@ describe('report shop scope transitions', () => {
 
   it('never allows unauthorized stored report selections into a request', () => {
     expect(
-      scopeReportFilters({ ...filters, shopIds: ['shop-a', 'foreign-shop'] },
-        { kind: 'all-shops' }, ['shop-a'], false).shopIds,
+      scopeReportFilters(
+        { ...filters, shopIds: ['shop-a', 'foreign-shop'] },
+        { kind: 'all-shops' },
+        ['shop-a'],
+        false,
+      ).shopIds,
     ).toEqual(['shop-a']);
     expect(
       scopeReportFilters(filters, { kind: 'shop', shopId: 'foreign-shop' }, ['shop-a'], true)
