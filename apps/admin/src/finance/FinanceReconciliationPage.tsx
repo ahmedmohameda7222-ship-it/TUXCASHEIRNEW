@@ -179,10 +179,7 @@ export function FinanceReconciliationPage() {
         />
       ) : null}
       {authorizedReport ? <FinanceReconciliationFacts facts={authorizedReport} /> : null}
-      {activeDay &&
-      !authorizedReport &&
-      !reportQuery.dayQuery.isLoading &&
-      !reportQuery.dayQuery.isError ? (
+      {activeDay && !authorizedReport && !reportQuery.dayQuery.isLoading && !reportQuery.dayQuery.isError ? (
         <EmptyState
           title="No verified reconciliation facts"
           description="The selected Business Day has no authorized financial report available."
