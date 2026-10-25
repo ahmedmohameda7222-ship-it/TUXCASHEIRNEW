@@ -858,6 +858,9 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+    // Full-page screenshots of sticky shell/navigation must start at the real
+    // page origin; clicking a lower list row can otherwise displace topbars.
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     await capturePremiumScreenshot(page, 'orders');
   });
 }
