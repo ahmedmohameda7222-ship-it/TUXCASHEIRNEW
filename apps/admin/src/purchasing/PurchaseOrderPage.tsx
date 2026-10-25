@@ -6,6 +6,7 @@ import type {
 } from '@tux/admin-contracts';
 import { DraftPurchaseOrderLinesEditor } from './DraftPurchaseOrderLinesEditor';
 import { formatPurchaseMicros } from './purchaseOrderDraft';
+import { expectedOrderValueMinor, formatExpectedOrderValue } from './purchaseOrderValue';
 import { useEffect, useState } from 'react';
 
 function statusLabel(status: AdminPurchaseOrder['status']): string {
@@ -128,6 +129,10 @@ export function PurchaseOrderPage({
             <div>
               <dt>Supplier</dt>
               <dd>{order.supplierName}</dd>
+            </div>
+            <div>
+              <dt>Expected order value</dt>
+              <dd>{formatExpectedOrderValue(expectedOrderValueMinor(order.lines))}</dd>
             </div>
             <div>
               <dt>Line items</dt>
