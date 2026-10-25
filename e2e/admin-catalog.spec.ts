@@ -117,6 +117,24 @@ async function mockCatalog(
 
   await page.route('**/api/admin/catalog**', async (route: Route) => {
     const request = route.request();
+    if (
+      request.method() === 'GET' &&
+      new URL(request.url()).searchParams.get('view') === 'publishing'
+    ) {
+      const requestedShop = new URL(request.url()).searchParams.get('shopId') ?? shopId;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          shopId: requestedShop,
+          currentPublishVersion: publishVersion,
+          versions: [],
+          draftPreviews: [],
+          schedules: [],
+        }),
+      });
+      return;
+    }
     if (request.method() === 'GET') {
       await route.fulfill({
         status: 200,
@@ -449,17 +467,11 @@ test('version history link and browser Back preserve dirty edits until explicitl
   await name.fill('Keep through browser navigation');
   await page.getByRole('button', { name: 'More' }).click();
   await page.getByRole('button', { name: 'Open version history' }).click();
-  let dialog = page.getByRole('dialog', { name: 'Discard unsaved product edits?' });
+  const dialog = page.getByRole('dialog', { name: 'Discard unsaved product edits?' });
   await dialog.getByRole('button', { name: 'Stay and keep editing' }).click();
   await expect(name).toHaveValue('Keep through browser navigation');
-  let confirmedBack = false;
-  page.once('dialog', async (confirmation) => {
-    expect(confirmation.type()).toBe('confirm');
-    expect(confirmation.message()).toContain('Discard unsaved product edits');
-    confirmedBack = true;
-    await confirmation.dismiss();
-  });
   await page.goBack();
-  expect(confirmedBack).toBe(true);
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Stay and keep editing' }).click();
   await expect(name).toHaveValue('Keep through browser navigation');
 });

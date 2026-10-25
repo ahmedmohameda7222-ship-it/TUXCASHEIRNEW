@@ -81,16 +81,31 @@ export function CatalogPage() {
   const routeRef = useRef(location);
   const ignorePopstate = useRef(false);
   const approvedNavigation = useRef<string | null>(null);
+  // Wouter may publish a Back/Forward location before this component's
+  // popstate listener. Keep the dirty editor mounted until it can offer a
+  // deliberate Stay / Discard choice rather than rendering the new route.
+  const unapprovedRouteChange =
+    hasUnsavedDrafts() &&
+    location !== routeRef.current &&
+    approvedNavigation.current !== location;
+  const effectiveLocation = unapprovedRouteChange ? routeRef.current : location;
   const scopedUnsavedProduct = unsavedProduct?.shopId === shopId ? unsavedProduct : null;
   const selectedProductId =
-    scopedUnsavedProduct?.id ?? detailIdFromPath(location, '/catalog/products');
+    scopedUnsavedProduct?.id ?? detailIdFromPath(effectiveLocation, '/catalog/products');
   const mobileEditing = selectedProductId !== null;
 
-  routeRef.current = location;
+  if (!unapprovedRouteChange) routeRef.current = location;
 
   useEffect(() => {
     if (approvedNavigation.current === location) approvedNavigation.current = null;
   }, [location]);
+
+  useEffect(() => {
+    if (!unapprovedRouteChange) return;
+    const destination = location;
+    window.history.replaceState(window.history.state, '', routeRef.current);
+    setPendingNavigation(destination);
+  }, [location, unapprovedRouteChange]);
 
   useEffect(() => {
     function interceptLink(event: MouseEvent) {
@@ -125,9 +140,18 @@ export function CatalogPage() {
         return;
       }
       if (!hasUnsavedDrafts() || window.location.pathname === routeRef.current) return;
-      // Back/Forward can notify the router before this page's own listener.
-      // Use a synchronous native confirmation so there is no render/unmount
-      // gap in which the editor's local form can disappear.
+      // For paths rendered by this Catalog page, keep the editor mounted and
+      // show the explicit in-app Stay / Discard modal.
+      if (requested.startsWith('/catalog/products')) {
+        event.stopImmediatePropagation();
+        window.history.pushState(window.history.state, '', routeRef.current);
+        ignorePopstate.current = true;
+        window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
+        setPendingNavigation(requested);
+        return;
+      }
+      // Exiting Catalog entirely can unmount this route before React renders
+      // the modal; use a synchronous browser confirmation for browser history.
       if (window.confirm('Discard unsaved product edits and leave Catalog?')) return;
       event.stopImmediatePropagation();
       window.history.pushState(window.history.state, '', routeRef.current);
