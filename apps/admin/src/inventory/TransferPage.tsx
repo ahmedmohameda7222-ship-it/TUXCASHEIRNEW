@@ -303,9 +303,7 @@ export function TransferPage({
                 className="admin-primary-button"
                 type="button"
                 disabled={
-                  sending ||
-                  selectedDestinationShopId.length === 0 ||
-                  draftLines.length === 0
+                  sending || selectedDestinationShopId.length === 0 || draftLines.length === 0
                 }
                 onClick={() => setReviewing(true)}
               >
