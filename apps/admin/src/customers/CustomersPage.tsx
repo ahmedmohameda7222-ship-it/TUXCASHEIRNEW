@@ -178,22 +178,22 @@ export function CustomersPage() {
       return requireSuccessfulCrmMutation(
         await adminFetch<{ ok: boolean; code?: string }>(
           '/api/admin/customers?surface=crm',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            type: 'loyalty.program.upsert',
-            shopId,
-            enabled: programDraft.enabled,
-            earnPointsPer100Minor: Number(programDraft.earnPointsPer100Minor),
-            redemptionMinorPerPoint: Math.round(Number(programDraft.pointValueEgp) * 100),
-            minimumRedemptionPoints: Number(programDraft.minimumRedemptionPoints),
-            pointExpiryDays: programDraft.pointExpiryDays.trim()
-              ? Number(programDraft.pointExpiryDays)
-              : null,
-            shopIds: existing?.shopIds ?? [shopId],
-            expectedVersion: existing?.version ?? null,
-          }),
-        },
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              type: 'loyalty.program.upsert',
+              shopId,
+              enabled: programDraft.enabled,
+              earnPointsPer100Minor: Number(programDraft.earnPointsPer100Minor),
+              redemptionMinorPerPoint: Math.round(Number(programDraft.pointValueEgp) * 100),
+              minimumRedemptionPoints: Number(programDraft.minimumRedemptionPoints),
+              pointExpiryDays: programDraft.pointExpiryDays.trim()
+                ? Number(programDraft.pointExpiryDays)
+                : null,
+              shopIds: existing?.shopIds ?? [shopId],
+              expectedVersion: existing?.version ?? null,
+            }),
+          },
           csrfToken(session),
         ),
       );
