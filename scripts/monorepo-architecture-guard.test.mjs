@@ -30,7 +30,7 @@ const validRoot = {
   'apps/operations/package.json': JSON.stringify({ name: '@tux/operations' }),
   'apps/menu/src/a.ts': "import '@tux/domain';\n",
   'supabase/migrations/001.sql': '-- canonical',
-  '.github/workflows/ci.yml': [
+  '.github/workflows/ci-full.yml': [
     'npm run typecheck:menu',
     'npm run build:menu',
     'npm run test:e2e:menu',
@@ -81,12 +81,31 @@ test('rejects wrong Menu identity and missing permanent CI coverage', async () =
   const root = await fixture({
     ...validRoot,
     'apps/menu/package.json': JSON.stringify({ name: 'tux-burger-website' }),
-    '.github/workflows/ci.yml': 'npm run build\n',
+    '.github/workflows/ci-full.yml': 'npm run build\n',
   });
   try {
     const violations = await collectArchitectureViolations(root);
     assert.equal(violations.some((value) => value.includes('@tux/menu')), true);
     assert.equal(violations.some((value) => value.includes('CI coverage')), true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('does not treat fast-CI commands as evidence of full regression coverage', async () => {
+  const root = await fixture({
+    ...validRoot,
+    '.github/workflows/ci.yml': [
+      'npm run typecheck:menu',
+      'npm run build:menu',
+      'npm run test:e2e:menu',
+      'npm run test:monorepo-architecture',
+    ].join('\\n'),
+    '.github/workflows/ci-full.yml': 'npm run build',
+  });
+  try {
+    const violations = await collectArchitectureViolations(root);
+    assert.equal(violations.filter((item) => item.startsWith('CI coverage missing:')).length, 4);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

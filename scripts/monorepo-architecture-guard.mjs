@@ -85,7 +85,8 @@ export async function collectArchitectureViolations(root) {
     if (!rootPackage.scripts?.[script]) violations.push(`root script missing: ${script}`);
   }
 
-  const ci = await readFile(path.join(root, '.github/workflows/ci.yml'), 'utf8');
+  // Fast CI is intentionally scope-filtered; permanent cross-app E2E gates live in full CI.
+  const ci = await readFile(path.join(root, '.github/workflows/ci-full.yml'), 'utf8');
   for (const command of [
     'npm run typecheck:menu',
     'npm run build:menu',
