@@ -122,6 +122,27 @@ describe('atomic Catalog bulk draft staging', () => {
     ).toThrow(CatalogBulkEditError);
   });
 
+  it('prevents prices and sort orders that the Catalog UI or Postgres cannot represent', () => {
+    expect(() =>
+      previewCatalogBulkEdit(
+        [a],
+        shopA,
+        ['a'],
+        { kind: 'price.fixed', priceMinor: 2_147_483_648 },
+        categories,
+      ),
+    ).toThrow(CatalogBulkEditError);
+    expect(() =>
+      previewCatalogBulkEdit(
+        [{ ...a, sortOrder: 2_147_483_647 }],
+        shopA,
+        ['a'],
+        { kind: 'sortOrder.adjust', delta: 1 },
+        categories,
+      ),
+    ).toThrow(CatalogBulkEditError);
+  });
+
   it('rejects invalid percentage and overflowing adjustment before any mutation', () => {
     expect(() =>
       previewCatalogBulkEdit(
