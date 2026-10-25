@@ -1,20 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'wouter';
 
-import type {
-  CatalogPublishPreview,
-  CatalogSaveRecurringAvailabilityRuleInput,
-  CatalogScheduledChangeSummary,
-} from '@tux/admin-contracts';
+import type { CatalogPublishPreview, CatalogScheduledChangeSummary } from '@tux/admin-contracts';
 
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { CatalogCopyPanel } from './CatalogCopyPanel';
-import { RecurringAvailabilityEditor } from './RecurringAvailabilityEditor';
-import { ScheduleEditor } from './ScheduleEditor';
 import { VersionHistory } from './VersionHistory';
 import { CatalogUiError, useCatalogPublishing } from './useCatalog';
-import { useRecurringAvailability } from './useRecurringAvailability';
 import './catalog.css';
 import './publishing.css';
 
@@ -45,9 +38,9 @@ function errorMessage(error: unknown): string {
 
 function scheduleStatusLabel(schedule: CatalogScheduledChangeSummary): string {
   if (schedule.status === 'FAILED' && schedule.terminalFailure) return 'Failed — action required';
-  if (schedule.status === 'FAILED') return 'Retry queued';
-  if (schedule.status === 'CLAIMED') return 'Executing';
-  return schedule.status === 'PENDING' ? 'Pending' : schedule.status;
+  if (schedule.status === 'FAILED') return 'Failed — no automatic retry';
+  if (schedule.status === 'CLAIMED') return 'Claimed (not verified)';
+  return schedule.status === 'PENDING' ? 'Pending — not automatic' : schedule.status;
 }
 
 function PublishSummary({ preview }: { preview: CatalogPublishPreview }) {
@@ -117,7 +110,6 @@ export function PublishReviewPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const publishing = useCatalogPublishing(shopId);
-  const recurring = useRecurringAvailability(shopId);
   const [notice, setNotice] = useState<string | null>(null);
   const [requesterPin, setRequesterPin] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
@@ -182,28 +174,6 @@ export function PublishReviewPage() {
     });
   }
 
-  async function schedulePublish(localScheduledAt: string) {
-    if (!preview) return;
-    await runAction(async () => {
-      await publishing.scheduleDraft.mutateAsync({
-        draftId: preview.draftId,
-        expectedDraftRevision: preview.draftRevision,
-        expectedVersion: preview.currentPublishVersion,
-        localScheduledAt,
-      });
-      setNotice('Publish scheduled.');
-    });
-  }
-
-  async function saveRecurringAvailability(
-    input: Omit<CatalogSaveRecurringAvailabilityRuleInput, 'shopId'>,
-  ) {
-    await runAction(async () => {
-      await recurring.saveRule.mutateAsync(input);
-      setNotice('Recurring availability saved.');
-    });
-  }
-
   async function restoreVersion(sourcePublishVersion: number) {
     if (!data) return;
     setPendingRestoreVersion(sourcePublishVersion);
@@ -228,7 +198,7 @@ export function PublishReviewPage() {
     <PageScaffold
       eyebrow="Catalog"
       title="Review & publish"
-      description="Review catalog changes, publish now, schedule a Cairo activation time, or restore an earlier release."
+      description="Review catalog changes, publish now through the authorized workflow, or restore an earlier release."
       primaryAction={
         <Link className="admin-secondary-button admin-publish-back-link" href="/catalog/products">
           Back to products
@@ -282,14 +252,15 @@ export function PublishReviewPage() {
             />
           ) : null}
 
-          <RecurringAvailabilityEditor
-            workspace={recurring.recurringQuery.data}
-            isLoading={recurring.recurringQuery.isLoading}
-            isError={recurring.recurringQuery.isError}
-            disabled={!canEditCatalog}
-            isPending={recurring.saveRule.isPending}
-            onSave={saveRecurringAvailability}
-          />
+          <div className="admin-callout is-warning" role="status">
+            <strong>Automatic scheduling is unavailable</strong>
+            <span>
+              Schedule Publish and recurring availability are disabled because there is no verified
+              unattended runner. Existing schedules and saved rules are preserved for review, but
+              they will not execute automatically. Use Publish now or immediate manual availability
+              controls instead.
+            </span>
+          </div>
 
           {draftPreviews.length > 1 ? (
             <label className="admin-field">
@@ -358,12 +329,6 @@ export function PublishReviewPage() {
                 </button>
               </section>
 
-              <ScheduleEditor
-                preview={preview}
-                disabled={!canPublish}
-                isPending={publishing.scheduleDraft.isPending}
-                onSchedule={schedulePublish}
-              />
             </>
           ) : (
             <div className="admin-empty-state">
@@ -376,8 +341,8 @@ export function PublishReviewPage() {
             <section className="admin-publish-card" aria-labelledby="scheduled-publishes-heading">
               <div className="admin-publish-card__heading">
                 <div>
-                  <p className="admin-catalog-editor__eyebrow">Upcoming</p>
-                  <h2 id="scheduled-publishes-heading">Scheduled publishes</h2>
+                  <p className="admin-catalog-editor__eyebrow">Preserved history</p>
+                  <h2 id="scheduled-publishes-heading">Existing schedules</h2>
                 </div>
               </div>
               <div className="admin-publish-history">
@@ -391,8 +356,7 @@ export function PublishReviewPage() {
                       <span>Cairo timezone</span>
                       {schedule.status === 'FAILED' ? (
                         <span>
-                          We could not complete this publish. Review the changes and schedule it
-                          again.
+                          This publish was not completed. Review the draft and publish manually.
                         </span>
                       ) : null}
                     </div>
