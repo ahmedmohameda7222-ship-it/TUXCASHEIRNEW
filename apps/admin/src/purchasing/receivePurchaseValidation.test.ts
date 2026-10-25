@@ -27,13 +27,21 @@ describe('trusted purchasing receipt form validation', () => {
   it('uses exact purchase-unit micros and minor units for valid partial receipts', () => {
     expect(parseReceiptLines([line], { 'line-1': '1.000001' }, { 'line-1': '25.99' })).toEqual({
       ok: true,
-      lines: [{ lineId: 'line-1', receivedPurchaseUnitsMicros: 1_000_001, purchaseUnitCostMinor: 2599 }],
+      lines: [
+        { lineId: 'line-1', receivedPurchaseUnitsMicros: 1_000_001, purchaseUnitCostMinor: 2599 },
+      ],
     });
   });
 
   it('rejects an invalid line instead of silently submitting another valid line', () => {
     const another = { ...line, id: 'line-2', itemName: 'Bread' };
-    expect(parseReceiptLines([line, another], { 'line-1': '1', 'line-2': 'no' }, { 'line-1': '10', 'line-2': '20' }).ok).toBe(false);
+    expect(
+      parseReceiptLines(
+        [line, another],
+        { 'line-1': '1', 'line-2': 'no' },
+        { 'line-1': '10', 'line-2': '20' },
+      ).ok,
+    ).toBe(false);
   });
 
   it('prevents returns exceeding the unreturned amount and validates precision', () => {
