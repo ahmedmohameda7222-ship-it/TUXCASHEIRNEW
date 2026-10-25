@@ -217,3 +217,56 @@
     flex: 1 1 auto;
   }
 }
+
+
+/* Approved desktop procurement master/inspector layout, local to Suppliers. */
+.admin-purchasing-suppliers-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(18rem, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.admin-purchasing-suppliers-list {
+  min-width: 0;
+}
+.admin-purchasing-suppliers-workspace .admin-supplier-directory__heading {
+  grid-template-columns: minmax(0, 1.35fr) repeat(3, minmax(0, 1fr));
+}
+.admin-purchasing-suppliers-workspace .admin-supplier-directory .admin-supplier-card {
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 3fr);
+}
+.admin-purchasing-suppliers-workspace .admin-purchasing-supplier-inspector {
+  margin-top: 0;
+  min-width: 0;
+}
+.admin-purchasing-suppliers-workspace .admin-purchasing-supplier-inspector .admin-supplier-card__actions {
+  display: flex;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+  border-top: 1px solid #e3eae5;
+}
+.admin-purchasing-suppliers-workspace .admin-purchasing-supplier-inspector .admin-supplier-card__actions button {
+  min-height: 36px;
+  font-size: 12px;
+}
+@media (max-width: 1120px) {
+  .admin-purchasing-suppliers-workspace .admin-supplier-directory__heading {
+    display: none;
+  }
+  .admin-purchasing-suppliers-workspace .admin-supplier-directory .admin-supplier-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-purchasing-suppliers-workspace .admin-supplier-directory .admin-supplier-card__facts dt {
+    display: block;
+  }
+}
+@media (max-width: 980px) {
+  .admin-purchasing-suppliers-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-purchasing-supplier-inspector.is-mobile-collapsed {
+    display: none;
+  }
+}
