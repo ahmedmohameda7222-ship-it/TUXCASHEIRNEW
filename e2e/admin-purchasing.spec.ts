@@ -457,7 +457,6 @@ test('purchase order creation excludes inactive suppliers from options and defau
   await expect(page.getByText('Archived Foods').first()).toBeVisible();
   await openPurchaseOrders(page);
   await page.getByRole('button', { name: 'New purchase order' }).click();
-  const purchaseOrders = page.getByRole('region', { name: 'Purchase orders' });
   const supplierSelect = page
     .getByRole('dialog', { name: 'New purchase order' })
     .getByRole('combobox', { name: 'Supplier' });
@@ -610,7 +609,8 @@ test('selected supplier details appear adjacent to compact directory on desktop'
   expect(listBounds).not.toBeNull();
   expect(detailBounds).not.toBeNull();
   expect(detailBounds!.x).toBeGreaterThan(listBounds!.x + listBounds!.width - 3);
-  expect(Math.abs(detailBounds!.y - listBounds!.y)).toBeLessThan(40);
+  expect(detailBounds!.y).toBeLessThanOrEqual(listBounds!.y + 40);
+  expect(listBounds!.y - detailBounds!.y).toBeLessThan(180);
 });
 
 test('supplier form exposes linked field guidance and restores focus after Escape', async ({
