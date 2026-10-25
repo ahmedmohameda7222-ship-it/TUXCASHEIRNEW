@@ -72,7 +72,9 @@ export function resolveCatalogImagePublicUrl(input: {
     segments[0] !== input.businessId ||
     segments[1] !== input.shopId ||
     !uuidPattern.test(segments[2] ?? '') ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|jpg|webp|avif)$/i.test(segments[3] ?? '')
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|jpg|webp|avif)$/i.test(
+      segments[3] ?? '',
+    )
   ) {
     throw new CatalogImageUploadError('image_scope_invalid');
   }
