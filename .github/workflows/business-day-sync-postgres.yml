@@ -13,7 +13,7 @@ jobs:
   postgres:
     name: Real PostgreSQL RPC
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
     services:
@@ -36,3 +36,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Real RPC regression
         run: node scripts/test-operations-business-day-sync-postgres.mjs
+      - name: Inventory independent PostgreSQL acceptance (PR 159 only)
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 159 }}
+        run: |
+          node --check scripts/test-inventory-isolated-postgres.mjs
+          node scripts/test-inventory-isolated-postgres.mjs
