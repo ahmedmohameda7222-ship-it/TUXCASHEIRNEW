@@ -328,26 +328,25 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
 
       const cursor = decodeCursor(input.cursor ?? null);
       if (input.cursor && !cursor) throw new Error('invalid_order_cursor');
-      if (cursor) {
-        query.set(
-          'or',
-          `(created_at.lt.${cursor[0]},and(created_at.eq.${cursor[0]},id.lt.${cursor[1]}))`,
-        );
-      }
+      const cursorFilter = cursor
+        ? `(created_at.lt.${cursor[0]},and(created_at.eq.${cursor[0]},id.lt.${cursor[1]}))`
+        : null;
 
-      const term = normalizedSearchTerm(input.query ?? null);
-      if (term) {
-        if (/^\d+$/.test(term)) {
-          query.append(
-            'or',
-            `(display_order_no.eq.${term},normalized_phone_snapshot.ilike.*${term}*)`,
-          );
-        } else {
-          query.append(
-            'or',
-            `(customer_name_snapshot.ilike.*${term}*,normalized_phone_snapshot.ilike.*${term}*,operator_name_snapshot.ilike.*${term}*)`,
-          );
-        }
+      // Each PostgREST "or" parameter addresses the same top-level predicate.
+      // Combining a cursor and a search requires a single explicit AND logic tree.
+      const term = normalizedSearchTerm(input.query ?? null).replace(/^#(?=\d+$)/, '');
+      const searchFilter = !term
+        ? null
+        : /^\d+$/.test(term)
+          ? `(display_order_no.eq.${term},normalized_phone_snapshot.ilike.*${term}*)`
+          : `(customer_name_snapshot.ilike.*${term}*,normalized_phone_snapshot.ilike.*${term}*,operator_name_snapshot.ilike.*${term}*)`;
+
+      if (cursorFilter && searchFilter) {
+        query.set('and', `(or${cursorFilter},or${searchFilter})`);
+      } else if (cursorFilter) {
+        query.set('or', cursorFilter);
+      } else if (searchFilter) {
+        query.set('or', searchFilter);
       }
 
       const rows = await client.select<OrderRow[]>('orders', query);
