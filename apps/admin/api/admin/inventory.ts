@@ -487,6 +487,33 @@ export async function loadInventoryItemRows(
   }
 }
 
+/** Follow every authorized conversion page: PostgREST can cap a requested limit
+ * to 1,000 rows, even when the query asks for more. Stable ID tiebreaker
+ * prevents dropping equal-name conversions across page boundaries. */
+export async function loadInventoryUnitConversionRows(
+  client: AdminSupabaseClient,
+  shopId: string,
+): Promise<UnitConversionRow[]> {
+  const rows: UnitConversionRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.select<UnitConversionRow[]>(
+      'inventory_unit_conversions',
+      new URLSearchParams({
+        select:
+          'id,inventory_item_id,purchase_unit_label,base_micros_per_purchase_unit,active,definition_version',
+        shop_id: `eq.${shopId}`,
+        order: 'inventory_item_id.asc,purchase_unit_label.asc,id.asc',
+        limit: String(INVENTORY_ITEM_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
+    offset += page.length;
+  }
+}
+
 async function loadIncomingSentTransfers(
   client: AdminSupabaseClient,
   shopId: string,
@@ -689,16 +716,7 @@ export async function loadInventoryWorkspace(
         order: 'name.asc,id.asc',
       }),
     ),
-    client.select<UnitConversionRow[]>(
-      'inventory_unit_conversions',
-      new URLSearchParams({
-        select:
-          'id,inventory_item_id,purchase_unit_label,base_micros_per_purchase_unit,active,definition_version',
-        shop_id: `eq.${shopId}`,
-        order: 'inventory_item_id.asc,purchase_unit_label.asc',
-        limit: String(INVENTORY_ITEM_PAGE_SIZE),
-      }),
-    ),
+    loadInventoryUnitConversionRows(client, shopId),
   ]);
 
   const transferIds = transferRows.map((row) => row.id);
