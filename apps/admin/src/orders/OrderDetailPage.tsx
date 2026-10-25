@@ -63,27 +63,41 @@ export function OrderDetailPage({
       <section className="admin-order-detail__card" aria-labelledby="admin-order-items-title">
         <h3 id="admin-order-items-title">Items</h3>
         <div className="admin-order-detail__list">
-          {order.items.map((item) => (
-            <article className="admin-order-detail__row" key={item.id}>
-              <div>
-                <strong>
-                  {item.quantity} × {item.productName}
-                </strong>
-                {item.itemNote ? <small>{item.itemNote}</small> : null}
-                {item.modifiers.map((modifier, index) => (
-                  <small key={modifier.id ?? `${item.id}:modifier:${index}`}>
-                    {modifier.quantity} × {modifier.label} · {money(modifier.unitPriceMinor)}
-                  </small>
-                ))}
-                {item.comboBeverages.map((beverage, index) => (
-                  <small key={`${item.id}:beverage:${beverage.productId}:${index}`}>
-                    {beverage.label}
-                  </small>
-                ))}
-              </div>
-              <strong>{money(item.unitPriceMinor * item.quantity)}</strong>
-            </article>
-          ))}
+          {order.items.map((item) => {
+            const modifierUnitMinor = item.modifiers.reduce(
+              (total, modifier) => total + modifier.quantity * modifier.unitPriceMinor,
+              0,
+            );
+            const effectiveUnitMinor = item.unitPriceMinor + modifierUnitMinor;
+            return (
+              <article className="admin-order-detail__row" key={item.id}>
+                <div>
+                  <strong>
+                    {item.quantity} × {item.productName}
+                  </strong>
+                  <small>Base unit · {money(item.unitPriceMinor)}</small>
+                  {item.itemNote ? <small>{item.itemNote}</small> : null}
+                  {item.modifiers.map((modifier, index) => (
+                    <small key={modifier.id ?? `${item.id}:modifier:${index}`}>
+                      {modifier.quantity} × {modifier.label} · {money(modifier.unitPriceMinor)} each
+                    </small>
+                  ))}
+                  {item.comboBeverages.map((beverage, index) => (
+                    <small key={`${item.id}:beverage:${beverage.productId}:${index}`}>
+                      {beverage.label} · included in combo snapshot
+                    </small>
+                  ))}
+                  <small>Modifier extras per unit · {money(modifierUnitMinor)}</small>
+                  <small>Effective unit · {money(effectiveUnitMinor)}</small>
+                  <small>Quantity · {item.quantity}</small>
+                </div>
+                <span>
+                  <strong>{money(effectiveUnitMinor * item.quantity)}</strong>
+                  <small>Line total before discounts</small>
+                </span>
+              </article>
+            );
+          })}
         </div>
       </section>
 
