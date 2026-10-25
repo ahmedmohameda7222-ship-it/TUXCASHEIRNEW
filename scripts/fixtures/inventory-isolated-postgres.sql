@@ -255,3 +255,351 @@ begin
   return jsonb_build_object('ok', true, 'idempotentReplay', false);
 end;
 $function$;
+
+-- Canonical begin_stocktake_v1 production function (captured READ ONLY for isolated acceptance).
+CREATE OR REPLACE FUNCTION public.begin_stocktake_v1(p_employee_id uuid, p_shop_id uuid, p_inventory_item_ids jsonb, p_command_id text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public', 'private'
+AS $function$
+declare
+  v_stocktake_id uuid;
+  v_item jsonb;
+  v_item_id uuid;
+  v_on_hand bigint;
+  v_reserved bigint;
+  v_unit_cost numeric(20, 6);
+  v_lines jsonb;
+begin
+  if p_employee_id is null or p_shop_id is null
+     or p_inventory_item_ids is null
+     or jsonb_typeof(p_inventory_item_ids) <> 'array'
+     or jsonb_array_length(p_inventory_item_ids) = 0
+     or p_command_id is null or btrim(p_command_id) = '' then
+    return jsonb_build_object('ok', false, 'code', 'invalid_stocktake_begin_command');
+  end if;
+
+  perform 1
+  from private.admin_inventory_authority_v1(
+    p_employee_id, p_shop_id, 'inventory.stocktake'
+  );
+
+  perform pg_advisory_xact_lock(
+    hashtextextended(
+      'tux-stocktake-begin-command:' || p_shop_id::text || ':' || p_command_id,
+      0
+    )
+  );
+
+  select s.id into v_stocktake_id
+  from public.stocktakes s
+  where s.shop_id = p_shop_id and s.command_id = p_command_id;
+
+  if v_stocktake_id is not null then
+    select coalesce(
+      jsonb_agg(
+        jsonb_build_object(
+          'inventoryItemId', l.inventory_item_id,
+          'snapshotOnHandMicros', l.snapshot_on_hand_micros,
+          'snapshotReservedMicros', l.snapshot_reserved_micros,
+          'unitCostMinor', l.unit_cost_minor
+        )
+        order by l.inventory_item_id
+      ),
+      '[]'::jsonb
+    ) into v_lines
+    from public.stocktake_lines l
+    where l.stocktake_id = v_stocktake_id;
+
+    return jsonb_build_object(
+      'ok', true,
+      'idempotentReplay', true,
+      'stocktakeId', v_stocktake_id,
+      'lines', v_lines
+    );
+  end if;
+
+  for v_item in
+    select value
+    from jsonb_array_elements(p_inventory_item_ids)
+    order by value #>> '{}'
+  loop
+    begin
+      v_item_id := trim(both '"' from v_item::text)::uuid;
+    exception when others then
+      return jsonb_build_object('ok', false, 'code', 'invalid_stocktake_item');
+    end;
+    perform private.assert_inventory_item_shop_v1(p_shop_id, v_item_id);
+    perform pg_advisory_xact_lock(
+      hashtextextended('tux-inventory:' || p_shop_id::text || ':' || v_item_id::text, 0)
+    );
+  end loop;
+
+  if exists (
+    select 1
+    from jsonb_array_elements(p_inventory_item_ids) submitted(value)
+    group by trim(both '"' from submitted.value::text)::uuid
+    having count(*) > 1
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'duplicate_stocktake_item');
+  end if;
+
+  v_stocktake_id := gen_random_uuid();
+  insert into public.stocktakes(
+    id, shop_id, created_by_employee_id, status, command_id
+  ) values (
+    v_stocktake_id, p_shop_id, p_employee_id, 'DRAFT', p_command_id
+  );
+
+  for v_item in
+    select value
+    from jsonb_array_elements(p_inventory_item_ids)
+    order by value #>> '{}'
+  loop
+    v_item_id := trim(both '"' from v_item::text)::uuid;
+
+    select b.on_hand_micros, b.reserved_micros
+      into v_on_hand, v_reserved
+    from private.inventory_balance_v1(p_shop_id, v_item_id) b;
+
+    select coalesce(c.weighted_unit_cost_minor, 0)
+      into v_unit_cost
+    from public.inventory_cost_state c
+    where c.shop_id = p_shop_id
+      and c.inventory_item_id = v_item_id;
+    v_unit_cost := coalesce(v_unit_cost, 0);
+
+    insert into public.stocktake_lines(
+      stocktake_id,
+      inventory_item_id,
+      snapshot_on_hand_micros,
+      snapshot_reserved_micros,
+      actual_count_micros,
+      variance_micros,
+      unit_cost_minor
+    ) values (
+      v_stocktake_id,
+      v_item_id,
+      v_on_hand,
+      v_reserved,
+      null,
+      null,
+      v_unit_cost
+    );
+  end loop;
+
+  select jsonb_agg(
+    jsonb_build_object(
+      'inventoryItemId', l.inventory_item_id,
+      'snapshotOnHandMicros', l.snapshot_on_hand_micros,
+      'snapshotReservedMicros', l.snapshot_reserved_micros,
+      'unitCostMinor', l.unit_cost_minor
+    )
+    order by l.inventory_item_id
+  ) into v_lines
+  from public.stocktake_lines l
+  where l.stocktake_id = v_stocktake_id;
+
+  return jsonb_build_object(
+    'ok', true,
+    'idempotentReplay', false,
+    'stocktakeId', v_stocktake_id,
+    'lines', coalesce(v_lines, '[]'::jsonb)
+  );
+end;
+$function$;
+
+
+-- Canonical post_stocktake_v1 production function (captured READ ONLY for isolated acceptance).
+CREATE OR REPLACE FUNCTION public.post_stocktake_v1(p_employee_id uuid, p_shop_id uuid, p_stocktake_id uuid, p_lines jsonb, p_command_id text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public', 'private'
+AS $function$
+declare
+  v_stocktake public.stocktakes%rowtype;
+  v_line jsonb;
+  v_item_id uuid;
+  v_actual bigint;
+  v_snapshot_on_hand bigint;
+  v_snapshot_reserved bigint;
+  v_current_on_hand bigint;
+  v_current_reserved bigint;
+  v_delta bigint;
+  v_unit_cost numeric(20, 6);
+  v_posting_expected_by_item jsonb := '{}'::jsonb;
+begin
+  if p_employee_id is null or p_shop_id is null or p_stocktake_id is null
+     or p_lines is null or jsonb_typeof(p_lines) <> 'array'
+     or jsonb_array_length(p_lines) = 0
+     or p_command_id is null or btrim(p_command_id) = '' then
+    return jsonb_build_object('ok', false, 'code', 'invalid_stocktake_post_command');
+  end if;
+
+  perform 1
+  from private.admin_inventory_authority_v1(
+    p_employee_id, p_shop_id, 'inventory.stocktake'
+  );
+
+  select s.* into v_stocktake
+  from public.stocktakes s
+  where s.id = p_stocktake_id and s.shop_id = p_shop_id
+  for update;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'code', 'stocktake_not_found');
+  end if;
+  if v_stocktake.status = 'POSTED' and v_stocktake.post_command_id = p_command_id then
+    return jsonb_build_object(
+      'ok', true, 'idempotentReplay', true, 'stocktakeId', v_stocktake.id
+    );
+  end if;
+  if v_stocktake.status <> 'DRAFT' then
+    return jsonb_build_object('ok', false, 'code', 'stocktake_not_postable');
+  end if;
+
+  if jsonb_array_length(p_lines) <> (
+    select count(*) from public.stocktake_lines l where l.stocktake_id = v_stocktake.id
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'stocktake_line_set_mismatch');
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_array_elements(p_lines) submitted(value)
+    group by submitted.value ->> 'inventoryItemId'
+    having count(*) > 1
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'stocktake_line_set_mismatch');
+  end if;
+
+  begin
+    if exists (
+      (
+        select l.inventory_item_id
+        from public.stocktake_lines l
+        where l.stocktake_id = v_stocktake.id
+        except
+        select (submitted.value ->> 'inventoryItemId')::uuid
+        from jsonb_array_elements(p_lines) submitted(value)
+      )
+    ) or exists (
+      (
+        select (submitted.value ->> 'inventoryItemId')::uuid
+        from jsonb_array_elements(p_lines) submitted(value)
+        except
+        select l.inventory_item_id
+        from public.stocktake_lines l
+        where l.stocktake_id = v_stocktake.id
+      )
+    ) then
+      return jsonb_build_object('ok', false, 'code', 'stocktake_line_set_mismatch');
+    end if;
+  exception when others then
+    return jsonb_build_object('ok', false, 'code', 'invalid_stocktake_line');
+  end;
+
+  for v_line in
+    select value from jsonb_array_elements(p_lines)
+    order by value ->> 'inventoryItemId'
+  loop
+    begin
+      v_item_id := (v_line ->> 'inventoryItemId')::uuid;
+      v_actual := (v_line ->> 'actualCountMicros')::bigint;
+    exception when others then
+      return jsonb_build_object('ok', false, 'code', 'invalid_stocktake_line');
+    end;
+    if v_actual is null or v_actual < 0 then
+      return jsonb_build_object('ok', false, 'code', 'invalid_stocktake_line');
+    end if;
+
+    select
+      l.snapshot_on_hand_micros,
+      l.snapshot_reserved_micros,
+      l.unit_cost_minor
+      into v_snapshot_on_hand, v_snapshot_reserved, v_unit_cost
+    from public.stocktake_lines l
+    where l.stocktake_id = v_stocktake.id
+      and l.inventory_item_id = v_item_id;
+
+    if not found then
+      return jsonb_build_object('ok', false, 'code', 'stocktake_line_set_mismatch');
+    end if;
+
+    perform pg_advisory_xact_lock(
+      hashtextextended('tux-inventory:' || p_shop_id::text || ':' || v_item_id::text, 0)
+    );
+
+    select b.on_hand_micros, b.reserved_micros
+      into v_current_on_hand, v_current_reserved
+    from private.inventory_balance_v1(p_shop_id, v_item_id) b;
+
+    v_posting_expected_by_item :=
+      v_posting_expected_by_item
+      || jsonb_build_object(v_item_id::text, v_current_on_hand);
+    v_delta := v_actual - v_current_on_hand;
+
+    if v_current_on_hand + v_delta - v_current_reserved < 0 then
+      return jsonb_build_object(
+        'ok', false,
+        'code', 'stocktake_below_reserved',
+        'inventoryItemId', v_item_id
+      );
+    end if;
+  end loop;
+
+  for v_line in
+    select value from jsonb_array_elements(p_lines)
+    order by value ->> 'inventoryItemId'
+  loop
+    v_item_id := (v_line ->> 'inventoryItemId')::uuid;
+    v_actual := (v_line ->> 'actualCountMicros')::bigint;
+
+    select
+      l.snapshot_on_hand_micros,
+      l.snapshot_reserved_micros,
+      l.unit_cost_minor
+      into v_snapshot_on_hand, v_snapshot_reserved, v_unit_cost
+    from public.stocktake_lines l
+    where l.stocktake_id = v_stocktake.id
+      and l.inventory_item_id = v_item_id
+    for update;
+
+    v_current_on_hand := (v_posting_expected_by_item ->> v_item_id::text)::bigint;
+    v_delta := v_actual - v_current_on_hand;
+
+    update public.stocktake_lines
+    set posting_expected_on_hand_micros = v_current_on_hand,
+        actual_count_micros = v_actual,
+        variance_micros = v_delta
+    where stocktake_id = v_stocktake.id
+      and inventory_item_id = v_item_id;
+
+    if v_delta <> 0 then
+      insert into public.inventory_movements(
+        id, shop_id, business_day_id, inventory_item_id, movement_type,
+        quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+        compensates_movement_id, idempotency_key, admin_employee_id,
+        source_kind, command_id, unit_cost_minor, created_at
+      ) values (
+        gen_random_uuid(), p_shop_id, null, v_item_id, 'STOCKTAKE_ADJUSTMENT',
+        v_delta, 0, null, null, null,
+        'stocktake:' || p_command_id || ':' || v_item_id::text,
+        p_employee_id, 'ADMIN', p_command_id, v_unit_cost, now()
+      );
+    end if;
+  end loop;
+
+  update public.stocktakes
+  set status = 'POSTED',
+      post_command_id = p_command_id,
+      posted_at = now()
+  where id = v_stocktake.id;
+
+  return jsonb_build_object(
+    'ok', true, 'idempotentReplay', false, 'stocktakeId', v_stocktake.id
+  );
+end;
+$function$;
