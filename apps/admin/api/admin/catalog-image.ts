@@ -32,15 +32,13 @@ async function readUpload(request: AdminRequest): Promise<Uint8Array> {
       throw new CatalogImageUploadError('image_size_invalid');
     return request.body;
   }
-  if (request.body !== undefined)
-    throw new CatalogImageUploadError('image_body_invalid');
+  if (request.body !== undefined) throw new CatalogImageUploadError('image_body_invalid');
   const chunks: Buffer[] = [];
   let length = 0;
   for await (const chunk of request) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     length += buffer.byteLength;
-    if (length > MAX_CATALOG_IMAGE_BYTES)
-      throw new CatalogImageUploadError('image_size_invalid');
+    if (length > MAX_CATALOG_IMAGE_BYTES) throw new CatalogImageUploadError('image_size_invalid');
     chunks.push(buffer);
   }
   return Buffer.concat(chunks, length);
