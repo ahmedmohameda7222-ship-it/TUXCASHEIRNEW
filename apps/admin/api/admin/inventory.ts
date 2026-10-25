@@ -269,7 +269,7 @@ const commandSchema = z.discriminatedUnion('type', [
     .strict(),
   z
     .object({
-      type: z.literal('transfer.receive'),
+      type: z.enum(['transfer.receive', 'transfer.cancel']),
       shopId: uuidSchema,
       transferId: uuidSchema,
       commandId: commandIdSchema,
@@ -1044,6 +1044,13 @@ async function executeCommand(
     case 'transfer.receive':
       requirePermission(context.principal, 'inventory.transfer', command.shopId);
       return client.rpc<AdminInventoryCommandResult>('receive_stock_transfer_v1', {
+        p_employee_id: context.principal.employeeId,
+        p_transfer_id: command.transferId,
+        p_command_id: command.commandId,
+      });
+    case 'transfer.cancel':
+      requirePermission(context.principal, 'inventory.transfer', command.shopId);
+      return client.rpc<AdminInventoryCommandResult>('cancel_stock_transfer_v1', {
         p_employee_id: context.principal.employeeId,
         p_transfer_id: command.transferId,
         p_command_id: command.commandId,
