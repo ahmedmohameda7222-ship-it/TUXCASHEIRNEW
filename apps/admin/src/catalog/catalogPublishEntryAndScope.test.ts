@@ -15,7 +15,7 @@ describe('Catalog shop-scoped publishing entry point', () => {
     expect(catalog).toContain('Publish Now');
   });
 
-  it('does not render another shop\'s unsaved product while scope changes', () => {
+  it("does not render another shop's unsaved product while scope changes", () => {
     expect(catalog).toContain('unsavedProduct?.shopId === shopId');
     expect(catalog).toContain('product.shopId === shopId');
     expect(catalog).toContain('setUnsavedProduct(null)');
