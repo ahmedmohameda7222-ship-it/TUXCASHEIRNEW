@@ -559,7 +559,12 @@ function buildPublishPreview(
     stale: hasBlockingPublishSinceBase(basePublishVersion, currentPublishVersion, versions),
     changedProductIds,
     priceChangedProductIds,
-    changes: buildCatalogPublishDiffs(row.shop_id, liveProducts, row.working_bundle_json, publishedBundle),
+    changes: buildCatalogPublishDiffs(
+      row.shop_id,
+      liveProducts,
+      row.working_bundle_json,
+      publishedBundle,
+    ),
     changedRelationCounts: buildRelationChangeCounts(row.working_bundle_json, publishedBundle),
   };
 }
