@@ -37,7 +37,10 @@ export function FinanceReconciliationFacts({
           Operations physical counts.
         </p>
       )}
-      <section aria-label="Recorded payment method totals" className="tux-finance-reconciliation-section">
+      <section
+        aria-label="Recorded payment method totals"
+        className="tux-finance-reconciliation-section"
+      >
         <h2>Recorded payments by method</h2>
         <div className="tux-finance-reconciliation-grid">
           {Object.entries(facts.paymentBreakdown).map(([method, expectedMinor]) => (
@@ -56,7 +59,10 @@ export function FinanceReconciliationFacts({
           />
         ) : null}
       </section>
-      <section aria-label="Posted cashier reconciliations" className="tux-finance-reconciliation-section">
+      <section
+        aria-label="Posted cashier reconciliations"
+        className="tux-finance-reconciliation-section"
+      >
         <h2>Finance-posted cashier reconciliation</h2>
         <p>
           Cashier reconciliations are Finance records. They do not constitute a method-by-method
@@ -140,7 +146,10 @@ export function FinanceReconciliationPage() {
       {days.length > 0 && activeDay ? (
         <label className="tux-finance-day-picker">
           Business Day
-          <select value={activeDay.id} onChange={(event) => setSelectedDay(event.currentTarget.value)}>
+          <select
+            value={activeDay.id}
+            onChange={(event) => setSelectedDay(event.currentTarget.value)}
+          >
             {days.map((day) => (
               <option key={day.id} value={day.id}>
                 {new Date(day.started_at).toLocaleString('en-EG', {
@@ -170,7 +179,10 @@ export function FinanceReconciliationPage() {
         />
       ) : null}
       {authorizedReport ? <FinanceReconciliationFacts facts={authorizedReport} /> : null}
-      {activeDay && !authorizedReport && !reportQuery.dayQuery.isLoading && !reportQuery.dayQuery.isError ? (
+      {activeDay &&
+      !authorizedReport &&
+      !reportQuery.dayQuery.isLoading &&
+      !reportQuery.dayQuery.isError ? (
         <EmptyState
           title="No verified reconciliation facts"
           description="The selected Business Day has no authorized financial report available."
