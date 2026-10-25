@@ -7,7 +7,7 @@ const catalog = readFileSync(resolve(import.meta.dirname, 'CatalogPage.tsx'), 'u
 
 describe('Catalog shop-scoped publishing entry point', () => {
   it('makes Review & Publish discoverable from the main Catalog screen', () => {
-    expect(catalog).toContain('href="/catalog/products/publishing"');
+    expect(catalog).toContain("requestCatalogNavigation('/catalog/products/publishing')");
     expect(catalog).toContain('Review & Publish');
     expect(catalog).toContain('catalog.compatibleDrafts.length');
     expect(catalog).toContain('currentPublishVersion');
@@ -48,5 +48,9 @@ describe('Catalog shop-scoped publishing entry point', () => {
     );
     expect(catalog).toContain('if (busy || !canSwitchCatalogEditor()) return;');
     expect(catalog).toContain('if (!bulkOpen && !canSwitchCatalogEditor()) return;');
+    expect(catalog).toContain("setPendingNavigation(destination)");
+    expect(catalog).toContain("document.addEventListener('click', interceptLink, true)");
+    expect(catalog).toContain("window.addEventListener('popstate', onPopstate, true)");
+    expect(catalog).toContain("window.addEventListener('beforeunload', onBeforeUnload)");
   });
 });

@@ -17,6 +17,7 @@ export function ProductInspector({
   onClose,
   onRequestAdvanced,
   onSaveDraft,
+  onReviewPublish,
   onSetAvailability,
   onUploadImage,
   imageRequiresSaveFirst = false,
@@ -31,6 +32,7 @@ export function ProductInspector({
   onClose(): void;
   onRequestAdvanced(): void | Promise<void>;
   onSaveDraft(draft: ProductEditorDraft): void | Promise<void>;
+  onReviewPublish?(): void;
   onSetAvailability(soldOut: boolean): void | Promise<void>;
   onUploadImage?(file: File): Promise<{ imageKey: string; publicUrl: string }>;
   imageRequiresSaveFirst?: boolean;
@@ -64,6 +66,7 @@ export function ProductInspector({
         advancedBundle={advancedBundle}
         onRequestAdvanced={onRequestAdvanced}
         onSaveDraft={onSaveDraft}
+        onReviewPublish={onReviewPublish}
         onSetAvailability={onSetAvailability}
         onUploadImage={onUploadImage}
         imageRequiresSaveFirst={imageRequiresSaveFirst}

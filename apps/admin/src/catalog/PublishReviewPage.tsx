@@ -129,23 +129,6 @@ export function PublishReviewPage() {
     setActionError(null);
   }, [shopId]);
 
-  if (!shopId) {
-    return (
-      <PageScaffold
-        eyebrow="Catalog"
-        title="Review & publish"
-        description="Select one shop before reviewing or changing its catalog."
-      >
-        <div className="admin-callout is-warning">
-          <div>
-            <strong>Select a shop</strong>
-            <span>Publishing and restores never run against All Shops.</span>
-          </div>
-        </div>
-      </PageScaffold>
-    );
-  }
-
   const canPublish = principal.permissions.includes('catalog.publish');
   const canEditCatalog = principal.permissions.includes('catalog.edit');
   const data = publishing.publishingQuery.data;
@@ -176,6 +159,23 @@ export function PublishReviewPage() {
     setConfirmedPreviewIdentity(null);
     setRequesterPin('');
   }, [reviewedIdentity]);
+  if (!shopId) {
+    return (
+      <PageScaffold
+        eyebrow="Catalog"
+        title="Review & publish"
+        description="Select one shop before reviewing or changing its catalog."
+      >
+        <div className="admin-callout is-warning">
+          <div>
+            <strong>Select a shop</strong>
+            <span>Publishing and restores never run against All Shops.</span>
+          </div>
+        </div>
+      </PageScaffold>
+    );
+  }
+
   const schedules = (data?.schedules ?? []).filter((schedule) =>
     new Set(['PENDING', 'FAILED', 'CLAIMED']).has(schedule.status),
   );
