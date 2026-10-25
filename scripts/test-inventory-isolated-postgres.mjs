@@ -292,3 +292,67 @@ reject(post(legacyCount,'legacy-post'),'stocktake_snapshot_stale',
 eq(query('select status from public.stocktakes where id='+literal(legacyCount)),'DRAFT',
   'Legacy draft posting rejection leaves no stock movement');
 console.log('Inventory acceptance: pre-migration unfenced draft fails closed.');
+
+
+// Canonical reservation/consumption layer integration: the disposable fixture
+// maps recipe_lines to the same requirements envelope sent by POS / Online.
+// This proves the REAL unchanged PostgreSQL RPCs and append-only ledger, NOT
+// an authenticated published-Catalog-to-Operations event path.
+execute(['-f', resolve('scripts/fixtures/inventory-recipe-order-rpc.sql')],
+  'Load disposable published-recipe snapshot and canonical order inventory RPCs');
+const worker='80000000-0000-4000-8000-000000000001';
+const businessDay='80000000-0000-4000-8000-000000000002';
+const product='80000000-0000-4000-8000-000000000003';
+const posOrder='80000000-0000-4000-8000-000000000004';
+const onlineOrder='80000000-0000-4000-8000-000000000005';
+const insuffOrder='80000000-0000-4000-8000-000000000006';
+const requirements=JSON.parse(query(
+  "select coalesce(jsonb_agg(jsonb_build_object("+
+  "'inventoryItemId',inventory_item_id,'quantityMicros',quantity_micros) "+
+  "order by inventory_item_id),'[]'::jsonb)::text "+
+  "from public.recipe_lines where shop_id="+literal(S)+" and product_id="+literal(product),
+  'Read actual shop-scoped fixture recipe lines'
+));
+eq(requirements.length,2,'Two distinct ingredients in canonical recipe snapshot');
+verify(requirements.some(x=>x.inventoryItemId===A && x.quantityMicros===500000),
+  'Product recipe correctly maps to source-shop tracked beef');
+verify(requirements.some(x=>x.inventoryItemId===WRONG && x.quantityMicros===250000),
+  'Product recipe correctly maps to second source-shop ingredient');
+const initialBeef=balance(S,A),initialOther=balance(S,WRONG);
+for (const [order,channel] of [[posOrder,'pos'],[onlineOrder,'online']]) {
+  const reserveCommand='recipe-reserve-'+channel;
+  const consumeCommand='recipe-consume-'+channel;
+  const reserved=call('reserve_inventory_for_order_v1',S,order,businessDay,worker,
+    requirements,reserveCommand);
+  verify(reserved.ok===true && reserved.idempotentReplay===false,
+    channel+' canonical recipe inventory reservation');
+  verify(call('reserve_inventory_for_order_v1',S,order,businessDay,worker,
+    requirements,reserveCommand).idempotentReplay===true,
+    channel+' reservation retry must not duplicate stock commitment');
+  eq(query('select count(*) from public.inventory_reservations where order_id='+literal(order)+
+    " and status='ACTIVE'"),'2',channel+' has two active ingredient reservations');
+  const consumed=call('consume_inventory_for_order_v1',S,order,worker,consumeCommand);
+  verify(consumed.ok===true && consumed.idempotentReplay===false,
+    channel+' canonical recipe consumption');
+  verify(call('consume_inventory_for_order_v1',S,order,worker,consumeCommand)
+    .idempotentReplay===true,channel+' consumption retry must not double-debit');
+  eq(query('select count(*) from public.inventory_reservations where order_id='+
+    literal(order)+" and status='CONSUMED'"),'2',
+    channel+' has two completed ingredient reservations');
+  eq(query('select count(*) from public.inventory_movements where order_id='+
+    literal(order)+" and movement_type='ORDER_CONSUMPTION'"),
+    '2',channel+' has one append-only movement per recipe ingredient');
+}
+eq(balance(S,A),initialBeef-1000000,'POS + Online exactly consume two beef recipe quantities');
+eq(balance(S,WRONG),initialOther-500000,'POS + Online exactly consume other recipe ingredient');
+eq(query("select reserved_micros from private.inventory_balance_v1("+literal(S)+
+  ","+literal(A)+")"),'0','No stranded beef reservation after both completions');
+eq(query("select reserved_micros from private.inventory_balance_v1("+literal(S)+
+  ","+literal(WRONG)+")"),'0','No stranded second ingredient reservation');
+const tooLarge=call('reserve_inventory_for_order_v1',S,insuffOrder,businessDay,worker,
+  [{inventoryItemId:A,quantityMicros:999999999999}],'recipe-insufficient-stock');
+eq(tooLarge.code,'insufficient_stock','Insufficient stock fails closed');
+eq(query('select count(*) from public.inventory_reservations where order_id='+
+  literal(insuffOrder)),'0','Rejected order creates no reservation');
+console.log('Inventory acceptance: canonical POS/Online-labeled recipe-line requirements, '+
+  'reserves, replays and consumption ledger PASSED; full Catalog/Operations event path unproven.');
