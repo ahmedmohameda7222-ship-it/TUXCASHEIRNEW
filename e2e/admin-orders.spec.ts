@@ -139,7 +139,7 @@ async function mockOrders(
     phone: '+201000000001',
     itemId: activeItemId,
   });
-  const done = detail({
+  let done = detail({
     id: doneOrderId,
     status: 'DONE',
     source: 'ONLINE',
