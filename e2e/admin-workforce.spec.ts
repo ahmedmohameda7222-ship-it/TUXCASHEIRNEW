@@ -416,3 +416,33 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
     }
   }
 }
+
+test('rejected employee creation preserves the Add employee sheet and does not claim success', async ({
+  page,
+}) => {
+  await mockWorkforce(page);
+  await page.route('**/api/admin/staff**', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const draft = route.request().postDataJSON() as { type?: string };
+    if (draft.type !== 'employee.create') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: false, code: 'employee_already_exists' }),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Existing Employee');
+  await sheet.getByRole('button', { name: 'Add employee' }).click();
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByLabel('Name')).toHaveValue('Existing Employee');
+  await expect(page.getByRole('alert')).toContainText('employee already exists');
+});
