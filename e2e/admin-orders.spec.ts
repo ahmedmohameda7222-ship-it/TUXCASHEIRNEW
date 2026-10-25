@@ -999,6 +999,10 @@ test('approved Orders 1536×1024 reference composition remains fully navigable',
   await page.setViewportSize({ width: 1536, height: 1024 });
   await mockOrders(page, { financeVisible: true });
   await page.goto('/orders');
+  const stripPosition = await page.locator('dl[aria-label="Orders key metrics"]').boundingBox();
+  expect(stripPosition?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(300);
+  await expect(page.getByLabel('Current order shop')).toContainText('TUX Maadi');
+  await expect(page.getByRole('button', { name: 'Online requests' })).toBeVisible();
   const kpis = page.getByLabel('Orders key metrics');
   for (const exactLabel of [
     'Total Orders',
