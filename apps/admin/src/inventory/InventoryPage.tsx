@@ -11,6 +11,7 @@ import { AdjustStockSheet } from './AdjustStockSheet';
 import { InventoryItemPage } from './InventoryItemPage';
 import { InventoryDefinitionEditor } from './InventoryDefinitionEditor';
 import { InventoryMasterBindingPanel } from './InventoryMasterBindingPanel';
+import { inventoryCounts, inventoryDisplayRows, inventoryStatus, trackingModeLabel, type InventoryFilter, type InventorySort } from './inventoryPresentation';
 import { RecordWasteSheet } from './RecordWasteSheet';
 import { ReorderSuggestionsPage } from './ReorderSuggestionsPage';
 import { StocktakePage } from './StocktakePage';
@@ -18,14 +19,6 @@ import { TransferPage } from './TransferPage';
 import { useInventory } from './useInventory';
 import { VarianceReport } from './VarianceReport';
 import './inventory.css';
-
-function trackingModeLabel(mode: string): string {
-  return mode === 'BATCH_TRACKED'
-    ? 'Batch tracked'
-    : mode === 'SERIAL_TRACKED'
-      ? 'Serial tracked'
-      : 'Standard stock';
-}
 
 const STOCKTAKE_BATCH_SIZE = 500;
 
@@ -103,6 +96,10 @@ export function InventoryPage() {
   const [adjustmentApprovalPending, setAdjustmentApprovalPending] = useState(false);
   const [definitionItemId, setDefinitionItemId] = useState<string | null>(null);
   const [definitionOpen, setDefinitionOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<InventoryFilter>('all');
+  const [sort, setSort] = useState<InventorySort>('name');
+  const [page, setPage] = useState(1);
   const [stocktakeSnapshot, setStocktakeSnapshot] = useState<AdminStocktakeSnapshot | null>(null);
 
   const workspace = inventory.workspaceQuery.data;
@@ -118,6 +115,19 @@ export function InventoryPage() {
   ]);
   const mutationErrorText = mutationErrorMessage(mutationError);
   const items = workspace?.items ?? [];
+  const counts = useMemo(() => inventoryCounts(items), [items]);
+  const display = useMemo(() => inventoryDisplayRows(items, search, statusFilter, sort, page), [items, search, statusFilter, sort, page]);
+  useEffect(() => {
+    setSearch('');
+    setStatusFilter('all');
+    setSort('name');
+    setPage(1);
+    setItemAction(null);
+    setAdjustmentApprovalPending(false);
+    setDefinitionOpen(false);
+    setStocktakeSnapshot(null);
+    setMode('detail');
+  }, [shopId]);
   const stocktakeItems = useMemo(() => items.filter((item) => item.active), [items]);
 
   const selectedItem = useMemo(() => {
@@ -224,7 +234,7 @@ export function InventoryPage() {
     <PageScaffold
       eyebrow="Inventory control"
       title="Inventory"
-      description="Review availability, stock counts, waste and transfers for this shop."
+      description="Review stock levels, manage counts, adjustments, waste and transfers."
       primaryAction={
         <div className="admin-inventory-page-actions">
           {canManageDefinitions ? (
@@ -316,6 +326,12 @@ export function InventoryPage() {
           {mutationErrorText}
         </p>
       ) : null}
+      <section className="admin-inventory-summary" aria-label="Inventory summary">
+        <div><span>Total items</span><strong>{counts.total}</strong></div>
+        <div><span>Thresholds not set</span><strong>{counts.unconfigured}</strong></div>
+        <div><span>Low stock</span><strong>{counts.lowStock}</strong></div>
+        <div><span>Out of stock</span><strong>{counts.outOfStock}</strong></div>
+      </section>
       {definitionOpen && canManageDefinitions ? (
         <InventoryDefinitionEditor
           item={items.find((item) => item.id === definitionItemId) ?? null}
@@ -445,44 +461,75 @@ export function InventoryPage() {
           backHref="/inventory"
           list={
             <div className="admin-inventory-list">
-              <div className="admin-inventory-list__header">
-                <strong>{items.length} items</strong>
-                <span>Available = On Hand − Reserved</span>
+              <div className="admin-inventory-filter-pills" aria-label="Inventory stock filters">
+                {([
+                  ['all', 'All items', counts.total],
+                  ['in', 'In stock', counts.inStock],
+                  ['low', 'Low stock', counts.lowStock],
+                  ['out', 'Out of stock', counts.outOfStock],
+                ] as const).map(([value, label, count]) => (
+                  <button key={value} type="button"
+                    className={statusFilter === value ? 'is-selected' : ''}
+                    aria-pressed={statusFilter === value}
+                    onClick={() => { setStatusFilter(value); setPage(1); }}>
+                    {label} <span>{count}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="admin-inventory-list-controls">
+                <label className="admin-inventory-search">
+                  <span className="sr-only">Search inventory items</span>
+                  <input type="search" value={search} placeholder="Search inventory items…"
+                    onChange={(event) => { setSearch(event.currentTarget.value); setPage(1); }} />
+                </label>
+                <label>
+                  <span className="sr-only">Sort inventory</span>
+                  <select value={sort} onChange={(event) => { setSort(event.currentTarget.value as InventorySort); setPage(1); }}>
+                    <option value="name">Name (A–Z)</option>
+                    <option value="available-desc">Available (high to low)</option>
+                    <option value="priority">Stock priority</option>
+                  </select>
+                </label>
+              </div>
+              <div className="admin-inventory-table-header" aria-hidden="true">
+                <span>Item</span><span>Base unit</span><span>On hand</span>
+                <span>Reserved</span><span>Available</span><span>Status</span>
               </div>
               {items.length === 0 ? (
-                <EmptyState
-                  title="No inventory items"
-                  description="Inventory configuration for this shop is empty."
-                />
+                <EmptyState title="No inventory items" description="Inventory configuration for this shop is empty." />
+              ) : display.total === 0 ? (
+                <EmptyState title="No matching items" description="Try changing the search or stock status filter." />
               ) : (
-                items.map((item) => (
-                  <button
-                    className={
-                      item.id === selectedItemId
-                        ? 'admin-inventory-row is-selected'
-                        : 'admin-inventory-row'
-                    }
-                    aria-current={item.id === selectedItemId ? 'true' : undefined}
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      navigate(detailPath('/inventory', item.id));
-                      setItemAction(null);
-                    }}
-                  >
-                    <span>
-                      <strong>{item.name}</strong>
-                      <small>{trackingModeLabel(item.trackingMode)}</small>
-                    </span>
-                    <span>
-                      {new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(
-                        item.availableMicros / 1_000_000,
-                      )}{' '}
-                      {item.unitLabel}
-                    </span>
-                  </button>
-                ))
+                display.rows.map((item) => {
+                  const status = inventoryStatus(item);
+                  const statusText = status === 'OUT_OF_STOCK' ? 'Out of stock'
+                    : status === 'LOW_STOCK' ? 'Low stock'
+                    : status === 'ARCHIVED' ? 'Archived'
+                    : status === 'UNCONFIGURED' ? 'Threshold not set' : 'In stock';
+                  const formatted = (micros: number) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(micros / 1_000_000);
+                  return (
+                    <button className={item.id === selectedItemId ? 'admin-inventory-row is-selected' : 'admin-inventory-row'}
+                      aria-current={item.id === selectedItemId ? 'true' : undefined}
+                      key={item.id} type="button"
+                      onClick={() => { navigate(detailPath('/inventory', item.id)); setItemAction(null); }}>
+                      <span><strong>{item.name}</strong><small>{trackingModeLabel(item.trackingMode)}</small></span>
+                      <span>{item.unitLabel}</span>
+                      <span>{formatted(item.onHandMicros)}</span>
+                      <span>{formatted(item.reservedMicros)}</span>
+                      <span>{formatted(item.availableMicros)}</span>
+                      <span className={`admin-inventory-status admin-inventory-status--${status.toLowerCase()}`}>{statusText}</span>
+                    </button>
+                  );
+                })
               )}
+              <div className="admin-inventory-pagination">
+                <span>Showing {display.total === 0 ? 0 : (display.page - 1) * 25 + 1}–{Math.min(display.page * 25, display.total)} of {display.total} items</span>
+                <div>
+                  <button type="button" aria-label="Previous inventory page" disabled={display.page <= 1} onClick={() => setPage(display.page - 1)}>‹</button>
+                  <span>Page {display.page} of {display.totalPages}</span>
+                  <button type="button" aria-label="Next inventory page" disabled={display.page >= display.totalPages} onClick={() => setPage(display.page + 1)}>›</button>
+                </div>
+              </div>
             </div>
           }
           detail={
