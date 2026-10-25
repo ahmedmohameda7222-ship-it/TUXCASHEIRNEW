@@ -23,8 +23,7 @@ function signedMinor(value: string): number {
   if (!/^-?\d+(?:\.\d{1,2})?$/.test(value.trim()))
     throw new Error('Enter an exact EGP amount with at most two decimal places.');
   const minor = Number(value) * 100;
-  if (!Number.isSafeInteger(Math.round(minor)))
-    throw new Error('Price adjustment is too large.');
+  if (!Number.isSafeInteger(Math.round(minor))) throw new Error('Price adjustment is too large.');
   return Math.round(minor);
 }
 
@@ -165,7 +164,11 @@ export function BulkProductEditor({
   }
 
   return (
-    <form className="admin-publish-card" aria-label="Bulk edit products" onSubmit={(event) => void submit(event)}>
+    <form
+      className="admin-publish-card"
+      aria-label="Bulk edit products"
+      onSubmit={(event) => void submit(event)}
+    >
       <div className="admin-publish-card__heading">
         <div>
           <p className="admin-catalog-editor__eyebrow">Shop-scoped draft</p>
@@ -175,8 +178,8 @@ export function BulkProductEditor({
       </div>
       <p className="admin-publish-card__copy">
         Select up to 100 products. The entire batch is validated and saved as one draft revision.
-        Nothing goes live until Review & Publish and any required approval.
-        Live sold-out changes are intentionally separate from draft edits.
+        Nothing goes live until Review & Publish and any required approval. Live sold-out changes
+        are intentionally separate from draft edits.
       </p>
       <div className="admin-catalog-bulk-selection" aria-label="Select products">
         {scopedProducts.map((product) => (
@@ -184,7 +187,12 @@ export function BulkProductEditor({
             <input
               type="checkbox"
               checked={selectedIds.includes(product.id)}
-              disabled={!canEdit || busy || saving || (selectedIds.length >= 100 && !selectedIds.includes(product.id))}
+              disabled={
+                !canEdit ||
+                busy ||
+                saving ||
+                (selectedIds.length >= 100 && !selectedIds.includes(product.id))
+              }
               onChange={(event) => toggleProduct(product.id, event.currentTarget.checked)}
             />
             <span>{product.name}</span>
@@ -203,9 +211,15 @@ export function BulkProductEditor({
               setConfirmed(false);
             }}
           >
-            <option value="price.fixed" disabled={!canPrice}>Set price</option>
-            <option value="price.adjust" disabled={!canPrice}>Adjust price (EGP)</option>
-            <option value="price.percentage" disabled={!canPrice}>Adjust price (%)</option>
+            <option value="price.fixed" disabled={!canPrice}>
+              Set price
+            </option>
+            <option value="price.adjust" disabled={!canPrice}>
+              Adjust price (EGP)
+            </option>
+            <option value="price.percentage" disabled={!canPrice}>
+              Adjust price (%)
+            </option>
             <option value="category.assign">Move to category</option>
             <option value="archive">Archive selected</option>
             <option value="restore">Restore selected</option>
@@ -217,19 +231,31 @@ export function BulkProductEditor({
         {mode === 'category.assign' ? (
           <label className="admin-field">
             <span>Target category</span>
-            <select value={targetCategoryId} disabled={!canEdit || busy || saving} onChange={(event) => {
-              setTargetCategoryId(event.currentTarget.value);
-              setConfirmed(false);
-            }}>
+            <select
+              value={targetCategoryId}
+              disabled={!canEdit || busy || saving}
+              onChange={(event) => {
+                setTargetCategoryId(event.currentTarget.value);
+                setConfirmed(false);
+              }}
+            >
               <option value="">Select a category</option>
               {activeCategories.map((category) => (
-                <option key={category.id} value={category.id}>{category.name}</option>
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
               ))}
             </select>
           </label>
         ) : mode.startsWith('price.') || mode === 'sortOrder.adjust' ? (
           <label className="admin-field">
-            <span>{mode === 'price.percentage' ? 'Percentage' : mode === 'sortOrder.adjust' ? 'Position change' : 'EGP amount'}</span>
+            <span>
+              {mode === 'price.percentage'
+                ? 'Percentage'
+                : mode === 'sortOrder.adjust'
+                  ? 'Position change'
+                  : 'EGP amount'}
+            </span>
             <input
               type="text"
               inputMode={mode === 'sortOrder.adjust' ? 'numeric' : 'decimal'}
@@ -243,7 +269,9 @@ export function BulkProductEditor({
           </label>
         ) : null}
       </div>
-      {result.message ? <p role="status">{result.message}</p> : (
+      {result.message ? (
+        <p role="status">{result.message}</p>
+      ) : (
         <div className="admin-publish-history">
           <strong>Before → After preview</strong>
           {result.preview.map(({ before, after }) => (
@@ -256,14 +284,34 @@ export function BulkProductEditor({
       )}
       <label className="admin-field">
         <span>
-          <input type="checkbox" checked={confirmed} disabled={!canEdit || busy || saving || !result.patch} onChange={(event) => setConfirmed(event.currentTarget.checked)} />
-          {' '}I reviewed all selected products and their proposed changes.
+          <input
+            type="checkbox"
+            checked={confirmed}
+            disabled={!canEdit || busy || saving || !result.patch}
+            onChange={(event) => setConfirmed(event.currentTarget.checked)}
+          />{' '}
+          I reviewed all selected products and their proposed changes.
         </span>
       </label>
-      <button className="admin-primary-button" type="submit" disabled={!canEdit || busy || saving || !confirmed || !result.patch || (mode.startsWith('price.') && !canPrice)}>
+      <button
+        className="admin-primary-button"
+        type="submit"
+        disabled={
+          !canEdit ||
+          busy ||
+          saving ||
+          !confirmed ||
+          !result.patch ||
+          (mode.startsWith('price.') && !canPrice)
+        }
+      >
         {saving ? 'Saving batch…' : 'Save bulk draft'}
       </button>
-      {error ? <div className="admin-callout is-danger" role="alert">{error}</div> : null}
+      {error ? (
+        <div className="admin-callout is-danger" role="alert">
+          {error}
+        </div>
+      ) : null}
     </form>
   );
 }
