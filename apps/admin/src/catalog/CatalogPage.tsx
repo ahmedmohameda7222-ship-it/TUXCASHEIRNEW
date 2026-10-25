@@ -4,6 +4,7 @@ import { Link, useLocation } from 'wouter';
 
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { PageScaffold } from '../components/layout/PageScaffold';
+import { useAdminSession } from '../auth/useAdminSession';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import './catalog.css';
 import { createCatalogProductSlug } from './catalogProductSlug';
@@ -62,6 +63,7 @@ function newProductForShop(
 
 export function CatalogPage() {
   const { principal, scope, hasUnsavedDrafts } = useShopScope();
+  const session = useAdminSession();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const catalog = useCatalog(shopId);
   const [location, navigate] = useLocation();
@@ -455,6 +457,46 @@ export function CatalogPage() {
                   setDraftSaved(true);
                   setUnsavedProduct(null);
                   navigate(detailPath('/catalog/products', draft.product.id), { replace: true });
+                }}
+                onUploadImage={async (file) => {
+                  if (
+                    !shopId ||
+                    selectedProduct.shopId !== shopId ||
+                    session.state.status !== 'authenticated'
+                  ) {
+                    throw new Error('Image upload requires an authenticated shop.');
+                  }
+                  if (
+                    !['image/png', 'image/jpeg', 'image/webp', 'image/avif'].includes(file.type) ||
+                    file.size === 0 ||
+                    file.size > 2 * 1024 * 1024
+                  ) {
+                    throw new Error('Invalid image format or size.');
+                  }
+                  const response = await fetch('/api/admin/catalog-image', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                      'content-type': file.type,
+                      'x-tux-admin-csrf': session.state.session.csrfToken,
+                      'x-tux-catalog-shop-id': shopId,
+                      'x-tux-catalog-product-id': selectedProduct.id,
+                    },
+                    body: file,
+                  });
+                  if (!response.ok) throw new Error('Image upload failed.');
+                  const uploaded: unknown = await response.json();
+                  if (
+                    typeof uploaded !== 'object' ||
+                    uploaded === null ||
+                    !('imageKey' in uploaded) ||
+                    typeof uploaded.imageKey !== 'string' ||
+                    !('publicUrl' in uploaded) ||
+                    typeof uploaded.publicUrl !== 'string'
+                  ) {
+                    throw new Error('Image upload response invalid.');
+                  }
+                  return { imageKey: uploaded.imageKey, publicUrl: uploaded.publicUrl };
                 }}
                 onSetAvailability={async (soldOut) => {
                   await catalog.setAvailability.mutateAsync({
