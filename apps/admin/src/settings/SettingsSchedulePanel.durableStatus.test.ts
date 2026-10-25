@@ -28,7 +28,7 @@ describe('durable SHOP_CONFIG schedule outcomes', () => {
     expect(panel).toContain('Scheduled history unavailable');
     expect(panel).toContain('Retry history');
     expect(panel).toContain('Needs attention');
-    expect(panel).toContain('Choose a new time');
+    expect(panel).toContain('publish the saved settings manually');
     expect(panel).not.toContain('attemptCount');
     expect(panel).not.toContain('nextAttemptAt');
     expect(panel).not.toContain('lastError');
