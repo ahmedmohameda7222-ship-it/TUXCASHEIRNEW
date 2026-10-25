@@ -22,6 +22,7 @@ import { PromotionsPage } from '../promotions/PromotionsPage';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { CustomerDetailPage } from './CustomerDetailPage';
 import { CustomerMergeDialog } from './CustomerMergeDialog';
+import { requireSuccessfulCrmMutation } from './crmMutationGuard';
 import { LoyaltyPanel, type LoyaltyAdjustmentInput } from './LoyaltyPanel';
 import './customers.css';
 
@@ -133,7 +134,7 @@ export function CustomersPage() {
         csrfToken(session),
       );
       commandIds.complete('loyalty.adjust', intent);
-      return result;
+      return requireSuccessfulCrmMutation(result);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'customers', shopId] });
@@ -174,8 +175,9 @@ export function CustomersPage() {
       event.preventDefault();
       if (!shopId) throw new Error('concrete_shop_required');
       const existing = programQuery.data;
-      return adminFetch<{ ok: boolean; code?: string }>(
-        '/api/admin/customers?surface=crm',
+      return requireSuccessfulCrmMutation(
+        await adminFetch<{ ok: boolean; code?: string }>(
+          '/api/admin/customers?surface=crm',
         {
           method: 'POST',
           body: JSON.stringify({
@@ -192,7 +194,8 @@ export function CustomersPage() {
             expectedVersion: existing?.version ?? null,
           }),
         },
-        csrfToken(session),
+          csrfToken(session),
+        ),
       );
     },
     onSuccess: async () => {
