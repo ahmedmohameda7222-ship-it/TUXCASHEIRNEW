@@ -263,12 +263,9 @@ test('Chromium delivers a locally created Order and exposes its canonical Admin 
   ).toEqual([]);
   // Browser console 503s belong exclusively to the deliberately unavailable
   // auxiliary fixture paths above, never the asserted Order Sync endpoint.
-  expect(
-    consoleErrors.filter(
-      (message) =>
-        message !== 'Failed to load resource: the server responded with a status of 503 (Service Unavailable)',
-    ),
-  ).toEqual([]);
+  const expectedAuxiliary503 =
+    'Failed to load resource: the server responded with a status of 503 (Service Unavailable)';
+  expect(consoleErrors.filter((message) => message !== expectedAuxiliary503)).toEqual([]);
 
   await page.screenshot({
     path: testInfo.outputPath('operations-order-delivered-and-synced.png'),
