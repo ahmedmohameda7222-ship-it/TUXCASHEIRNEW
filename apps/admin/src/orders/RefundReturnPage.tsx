@@ -136,7 +136,7 @@ export function RefundReturnPage({
       description={
         mode === 'refund'
           ? 'Choose the payment and amount to refund, then confirm with your Admin PIN.'
-          : 'Choose the items to return, then confirm with your Admin PIN.'
+          : 'This return records item valuation only; it does not refund or restock. Confirm with your Admin PIN. Financial settlement and inventory disposal/restock require separate authorized actions.'
       }
       onOpenChange={(open) => {
         if (!open && !refunding && !returning) onCancel();
