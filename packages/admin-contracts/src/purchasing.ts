@@ -181,3 +181,23 @@ export type PurchasingCommandResult =
       readonly remainingBaseMicros?: number;
       readonly returnableBaseMicros?: number;
     };
+
+
+/** Bounded, persisted receipt/return chronology for a single authorized PO. */
+export type AdminPurchaseOrderHistory = {
+  shopId: string;
+  purchaseOrderId: string;
+  truncated: boolean;
+  events: readonly {
+    id: string;
+    type: 'RECEIPT' | 'RETURN';
+    occurredAt: string;
+    supplierReference: string | null;
+    lines: readonly {
+      purchaseOrderLineId: string;
+      quantityPurchaseUnitsMicros: number;
+      /** Actual supplier cost per purchase unit, in minor currency units (receipts only). */
+      purchaseUnitCostMinor: number | null;
+    }[];
+  }[];
+};
