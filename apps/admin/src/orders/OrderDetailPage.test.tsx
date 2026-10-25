@@ -112,6 +112,45 @@ function render(order: AdminOrderDetail): string {
 }
 
 describe('OrderDetailPage', () => {
+  it('renders immutable financial snapshots and distinct refund / return accounting totals', () => {
+    const html = render({
+      ...fixture,
+      status: 'DONE',
+      businessDayId: '2026-day-1',
+      operatorName: 'Cashier A',
+      itemsSubtotalMinor: 11500,
+      discountMinor: 1000,
+      serviceChargeMinor: 500,
+      taxMinor: 0,
+      financialEvents: [
+        {
+          id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          kind: 'REFUND',
+          state: 'POSTED',
+          amountMinor: 2500,
+          approvalRequestId: null,
+          reason: {
+            id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+            key: 'QUALITY_ISSUE',
+            label: 'Quality issue',
+            family: 'REFUND_RETURN',
+            configurationVersion: 3,
+          },
+          createdAt: '2026-09-21T03:10:00.000Z',
+        },
+      ],
+    });
+    expect(html).toContain('Business day');
+    expect(html).toContain('Cashier A');
+    expect(html).toContain('Items subtotal');
+    expect(html).toContain('Discount');
+    expect(html).toContain('Service charge');
+    expect(html).toContain('Tax');
+    expect(html).toContain('Posted refunds');
+    expect(html).toContain('Net after posted refunds');
+    expect(html).toContain('Outstanding settlement');
+  });
+
   it('uses immutable modifier snapshots in the complete line total for multiple items', () => {
     const html = render({
       ...fixture,
