@@ -132,6 +132,12 @@ export type AdminOrderFinancialEvent = {
   decidedAt?: string | null;
   executedAt?: string | null;
   decisionReason?: string | null;
+  returnItems?: readonly {
+    orderItemId: string;
+    productName: string;
+    quantity: number;
+    valuationMinor: number;
+  }[];
   reason: AdminOrderReasonSnapshot;
   note?: string | null;
   createdAt: string;
