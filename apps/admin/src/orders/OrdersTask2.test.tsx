@@ -212,6 +212,7 @@ describe('Orders Task 2 controls', () => {
     expect(refundHtml).not.toContain('Return selected items');
     expect(returnHtml).toContain('TUX Burger');
     expect(returnHtml).toContain('Return selected items');
+    expect(returnHtml).toContain('does not refund or restock');
     expect(returnHtml).not.toContain('Submit refund');
   });
 });
