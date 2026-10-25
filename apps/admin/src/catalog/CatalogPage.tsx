@@ -85,9 +85,7 @@ export function CatalogPage() {
   // popstate listener. Keep the dirty editor mounted until it can offer a
   // deliberate Stay / Discard choice rather than rendering the new route.
   const unapprovedRouteChange =
-    hasUnsavedDrafts() &&
-    location !== routeRef.current &&
-    approvedNavigation.current !== location;
+    hasUnsavedDrafts() && location !== routeRef.current && approvedNavigation.current !== location;
   const effectiveLocation = unapprovedRouteChange ? routeRef.current : location;
   const scopedUnsavedProduct = unsavedProduct?.shopId === shopId ? unsavedProduct : null;
   const selectedProductId =
