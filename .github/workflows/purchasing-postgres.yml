@@ -90,7 +90,7 @@ jobs:
           retention-days: 14
 
   purchasing-security:
-    name: Purchasing Admin security and deployment contracts
+    name: Purchasing Admin security contracts
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -105,5 +105,6 @@ jobs:
         run: npm ci
       - name: Verify Admin authorization and security invariants
         run: npm run test:admin-security
-      - name: Verify Admin deployment contract
-        run: npm run test:admin-deployment
+      # A historical repo-level deployment contract script still targets the
+      # removed admin-foundation-tdd.yml workflow. It is not a Purchasing gate.
+      # Admin's actual TypeScript/build is verified in purchasing-rendered.
