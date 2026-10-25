@@ -128,5 +128,4 @@ describe('trusted catalog image uploads', () => {
       }),
     ).toThrow(CatalogImageUploadError);
   });
-
 });
