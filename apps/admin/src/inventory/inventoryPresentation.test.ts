@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { inventoryCounts, inventoryDisplayRows, inventoryStatus, trackingModeLabel } from './inventoryPresentation';
+import {
+  inventoryCounts,
+  inventoryDisplayRows,
+  inventoryStatus,
+  trackingModeLabel,
+} from './inventoryPresentation';
 
 const item = (name: string, availableMicros: number, threshold: number | null, active = true) => ({
   id: name,
@@ -28,14 +33,36 @@ describe('Inventory presentation from authorized shop balances', () => {
   });
 
   it('calculates status counts over the full shop scope, excluding archived alerts', () => {
-    const rows = [item('One', 0, 1), item('Two', 1_000_000, 2_000_000), item('Three', 4_000_000, null), item('Old', 0, 1, false)];
-    expect(inventoryCounts(rows)).toEqual({ total: 4, inStock: 0, lowStock: 1, outOfStock: 1, unconfigured: 1, archived: 1 });
+    const rows = [
+      item('One', 0, 1),
+      item('Two', 1_000_000, 2_000_000),
+      item('Three', 4_000_000, null),
+      item('Old', 0, 1, false),
+    ];
+    expect(inventoryCounts(rows)).toEqual({
+      total: 4,
+      inStock: 0,
+      lowStock: 1,
+      outOfStock: 1,
+      unconfigured: 1,
+      archived: 1,
+    });
   });
 
   it('searches, sorts and paginates without mixing stock units or inventing totals', () => {
-    const rows = [item('Banana', 1_000_000, 0), item('Apple', 2_000_000, 0), item('Apricot', 3_000_000, 0)];
-    expect(inventoryDisplayRows(rows, 'ap', 'all', 'name', 1, 1).rows.map(x => x.name)).toEqual(['Apple']);
-    expect(inventoryDisplayRows(rows, 'ap', 'all', 'name', 2, 1).rows.map(x => x.name)).toEqual(['Apricot']);
-    expect(inventoryDisplayRows(rows, '', 'all', 'available-desc', 1, 2).rows.map(x => x.name)).toEqual(['Apricot', 'Apple']);
+    const rows = [
+      item('Banana', 1_000_000, 0),
+      item('Apple', 2_000_000, 0),
+      item('Apricot', 3_000_000, 0),
+    ];
+    expect(inventoryDisplayRows(rows, 'ap', 'all', 'name', 1, 1).rows.map((x) => x.name)).toEqual([
+      'Apple',
+    ]);
+    expect(inventoryDisplayRows(rows, 'ap', 'all', 'name', 2, 1).rows.map((x) => x.name)).toEqual([
+      'Apricot',
+    ]);
+    expect(
+      inventoryDisplayRows(rows, '', 'all', 'available-desc', 1, 2).rows.map((x) => x.name),
+    ).toEqual(['Apricot', 'Apple']);
   });
 });
