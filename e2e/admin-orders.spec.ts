@@ -999,7 +999,15 @@ test('approved Orders 1536×1024 reference composition remains fully navigable',
   await page.setViewportSize({ width: 1536, height: 1024 });
   await mockOrders(page, { financeVisible: true });
   await page.goto('/orders');
-  await expect(page.getByLabel('Orders key metrics')).toContainText('Total orders');
+  const kpis = page.getByLabel('Orders key metrics');
+  for (const exactLabel of [
+    'Total Orders',
+    'Total Revenue',
+    'Average Order Value',
+    'Active Orders',
+  ]) {
+    await expect(kpis.getByText(exactLabel, { exact: true })).toBeVisible();
+  }
   await page.getByRole('button', { name: /#101/ }).click();
   await expect(page.getByRole('navigation', { name: 'Order detail sections' })).toBeVisible();
   await expect(page.locator('.admin-master-detail__list')).toBeVisible();
