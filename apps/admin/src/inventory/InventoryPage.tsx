@@ -643,6 +643,7 @@ export function InventoryPage() {
               <>
                 <InventoryItemPage
                   item={selectedItem}
+                  shopName={workspace.shops?.find((shop) => shop.id === shopId)?.name}
                   actions={
                     canManageDefinitions || (canAdjust && selectedItem.active) ? (
                       <>
