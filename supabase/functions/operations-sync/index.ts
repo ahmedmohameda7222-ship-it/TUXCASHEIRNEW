@@ -168,6 +168,14 @@ Deno.serve(async (request) => {
         canonicalOperationalRevision: Number(stale[2]),
       });
     }
+    if (message.includes('TUX_DEPENDENCY_MISSING:orders.')) {
+      const missingOrder = message.match(/TUX_DEPENDENCY_MISSING:orders\.([0-9a-f-]{36})/i);
+      return jsonResponse(425, {
+        error: 'order_dependency_not_ready',
+        missingOrderId: missingOrder?.[1] ?? null,
+        recovery: 'replay_original_order_placement_first',
+      });
+    }
     if (message.includes('TUX_DEPENDENCY_MISSING')) {
       return jsonResponse(425, { error: 'sync_dependency_not_ready' });
     }

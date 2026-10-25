@@ -4,6 +4,7 @@ import {
   operationsSyncPayloadJson,
   parseEntityId,
   type BusinessDayId,
+  type OrderId,
   type OutboxEvent,
   type OutboxEventId,
   type ShopId,
@@ -17,6 +18,7 @@ import type { OutboxDeliveryError } from './outboxSync';
 const SHOP_ID = parseEntityId<ShopId>('12000000-0000-4000-8000-000000000001');
 const EVENT_ID = parseEntityId<OutboxEventId>('22000000-0000-4000-8000-000000000001');
 const DAY_ID = parseEntityId<BusinessDayId>('32000000-0000-4000-8000-000000000001');
+const ORDER_ID = parseEntityId<OrderId>('52000000-0000-4000-8000-000000000001');
 const WORKER_ID = parseEntityId<WorkerId>('42000000-0000-4000-8000-000000000001');
 const event: OutboxEvent = {
   id: EVENT_ID,
@@ -282,6 +284,28 @@ describe('HttpOutboxTransport', () => {
       status: 425,
     });
     expect(recovered).toEqual([DAY_ID]);
+  });
+
+  it('requests replay of the exact missing order placement before retrying a lifecycle event', async () => {
+    const recovered: string[] = [];
+    const transport = new HttpOutboxTransport({
+      endpoint: 'https://sync.example.test/events',
+      onOrderDependencyMissing: async (_event, orderId) => {
+        recovered.push(orderId);
+      },
+      fetcher: (async () =>
+        new Response(
+          JSON.stringify({ error: 'order_dependency_not_ready', missingOrderId: ORDER_ID }),
+          { status: 425 },
+        )) as typeof fetch,
+    });
+
+    await expect(transport.deliver(event)).rejects.toMatchObject({
+      kind: 'TRANSIENT',
+      status: 425,
+      message: expect.stringContaining(ORDER_ID),
+    });
+    expect(recovered).toEqual([ORDER_ID]);
   });
 
   it('quarantines explicit permanent day identity conflicts with their actionable cause', async () => {

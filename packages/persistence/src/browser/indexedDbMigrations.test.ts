@@ -124,8 +124,59 @@ afterEach(async () => {
 
 describe('IndexedDB migration registry', () => {
   it('declares a contiguous production migration chain', () => {
-    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    expect(INDEXED_DB_VERSION).toBe(9);
+    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(INDEXED_DB_VERSION).toBe(10);
+  });
+
+  it('retries legacy quarantined order lifecycle events once on v10 while preserving evidence', async () => {
+    const name = `tux-indexeddb-v10-order-recovery-${crypto.randomUUID()}`;
+    const v9 = await openAtVersion(name, 9);
+    const write = v9.transaction('outboxEvents', 'readwrite');
+    const id = '60000000-0000-4000-8000-000000000011';
+    write.objectStore('outboxEvents').put({
+      id,
+      shopId: '10000000-0000-4000-8000-000000000001',
+      businessDayId: '20000000-0000-4000-8000-000000000001',
+      aggregateType: 'ORDER',
+      aggregateId: '30000000-0000-4000-8000-000000000001',
+      aggregateRevision: 1,
+      eventType: 'ORDER_MARKED_DONE',
+      payloadVersion: 1,
+      payload: {},
+      idempotencyKey: 'legacy-order-lifecycle-v10-retry',
+      createdAt: '2026-10-24T13:00:00.000Z',
+      attemptCount: 1,
+      nextAttemptAt: null,
+      lastError: 'Remote outbox endpoint rejected event with HTTP 400.',
+      deliveredAt: null,
+      quarantinedAt: '2026-10-24T13:01:00.000Z',
+      permanentFailureReason: 'Remote outbox endpoint rejected event with HTTP 400.',
+      blockedByEventId: null,
+    });
+    await transactionDone(write);
+    v9.close();
+
+    const v10 = await openAtVersion(name, 10);
+    try {
+      await expect(
+        requestResult(
+          v10.transaction('outboxEvents', 'readonly').objectStore('outboxEvents').get(id),
+        ),
+      ).resolves.toMatchObject({
+        attemptCount: 0,
+        nextAttemptAt: null,
+        lastError: null,
+        quarantinedAt: null,
+        permanentFailureReason: null,
+        recoveryEvidence: {
+          quarantinedAt: '2026-10-24T13:01:00.000Z',
+          reason: 'Remote outbox endpoint rejected event with HTTP 400.',
+          migration: 10,
+        },
+      });
+    } finally {
+      v10.close();
+    }
   });
 
   it('retries transient pending events once on v9 without touching quarantine evidence', async () => {

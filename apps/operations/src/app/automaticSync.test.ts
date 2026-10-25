@@ -4,6 +4,11 @@ import type { AutomaticOutboxSchedulerOptions, OutboxSyncSummary } from '@tux/sy
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const harness = vi.hoisted(() => ({
+  outboxTransportOptions: undefined as
+    | {
+        onOrderDependencyMissing?: (event: unknown, orderId: string) => Promise<void>;
+      }
+    | undefined,
   schedulerOptions: undefined as AutomaticOutboxSchedulerOptions | undefined,
   schedulerStarted: vi.fn(),
   schedulerStopped: vi.fn(),
@@ -41,7 +46,7 @@ vi.mock('@tux/sync', () => ({
   },
   HttpOutboxTransport: class HttpOutboxTransport {
     constructor(options: unknown) {
-      void options;
+      harness.outboxTransportOptions = options as typeof harness.outboxTransportOptions;
     }
   },
   OutboxSyncService: class OutboxSyncService {
@@ -115,10 +120,40 @@ const cleanSummary: OutboxSyncSummary = {
 beforeEach(() => {
   vi.clearAllMocks();
   harness.schedulerOptions = undefined;
+  harness.outboxTransportOptions = undefined;
   vi.stubGlobal('window', { location: { origin: 'https://operations.example.test' } });
 });
 
 describe('startBrowserAutomaticSync', () => {
+  it('replays a delivered order placement when the server reports its order dependency missing', async () => {
+    const recoverMissingOrderPlacement = vi.fn(async () => 'RECOVERED' as const);
+    const database = {
+      transaction: async (work: (transaction: unknown) => Promise<unknown>) =>
+        work({
+          outbox: {
+            recoverMissingOrderPlacement,
+            getDeliveryStatus: async () => ({
+              pendingCount: 0,
+              quarantinedCount: 0,
+              nextAttemptAt: null,
+              lastError: null,
+              lastSuccessfulDeliveryAt: null,
+            }),
+          },
+        }),
+    } as unknown as OperationsDatabase;
+    const orderId = '52000000-0000-4000-8000-000000000001';
+
+    startBrowserAutomaticSync({
+      database,
+      now: () => '2026-10-25T06:00:00.000Z' as Instant,
+      shopId: '14000000-0000-4000-8000-000000000001' as never,
+    });
+    await harness.outboxTransportOptions?.onOrderDependencyMissing?.({}, orderId);
+
+    expect(recoverMissingOrderPlacement).toHaveBeenCalledWith(orderId);
+  });
+
   it('recovers a previously reported missing Business Day origin immediately at startup', async () => {
     const shopId = '14000000-0000-4000-8000-000000000001';
     const businessDayId = '7a73d78c-7f7f-4288-aa41-ef7a5b3be0b6';

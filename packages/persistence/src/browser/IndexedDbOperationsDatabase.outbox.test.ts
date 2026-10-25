@@ -4,6 +4,7 @@ import {
   instant,
   parseEntityId,
   type BusinessDayId,
+  type OrderId,
   type OutboxEvent,
   type OutboxEventId,
   type ShopId,
@@ -54,6 +55,64 @@ afterEach(async () => {
 });
 
 describe('IndexedDB Business Day outbox ordering', () => {
+  it('replays the original order placement before a recovered lifecycle mutation', async () => {
+    const name = 'tux-outbox-order-origin-recovery-' + crypto.randomUUID();
+    names.add(name);
+    const db = new IndexedDbOperationsDatabase(name);
+    await db.initialize();
+    try {
+      const orderId = parseEntityId<OrderId>('31000000-0000-4000-8000-000000000001');
+      const origin = {
+        ...outbox(
+          '33000000-0000-4000-8000-000000000101',
+          A,
+          'ORDER_PLACED',
+          '2026-10-10T08:00:00.000Z',
+        ),
+        aggregateType: 'ORDER' as const,
+        aggregateId: orderId,
+        aggregateRevision: 0,
+      };
+      const lifecycle = {
+        ...outbox(
+          '33000000-0000-4000-8000-000000000102',
+          A,
+          'ORDER_MARKED_DONE',
+          '2026-10-10T08:05:00.000Z',
+        ),
+        aggregateType: 'ORDER' as const,
+        aggregateId: orderId,
+        aggregateRevision: 1,
+      };
+      await db.transaction(async (tx) => {
+        await tx.outbox.append(origin);
+        await tx.outbox.markDelivered(origin.id, instant('2026-10-10T08:00:01.000Z'));
+        await tx.outbox.append(lifecycle);
+        await tx.outbox.quarantine(
+          lifecycle.id,
+          instant('2026-10-10T08:05:01.000Z'),
+          'Remote outbox endpoint rejected event with HTTP 400.',
+        );
+      });
+
+      await expect(
+        db.transaction((tx) => tx.outbox.recoverMissingOrderPlacement(orderId)),
+      ).resolves.toBe('RECOVERED');
+      await expect(
+        db.transaction((tx) => tx.outbox.listPending(instant('2026-10-10T09:00:00.000Z'), 50, A)),
+      ).resolves.toEqual([
+        expect.objectContaining({
+          id: origin.id,
+          eventType: 'ORDER_PLACED',
+          deliveredAt: null,
+          lastError: null,
+        }),
+      ]);
+    } finally {
+      await db.close();
+    }
+  });
+
   it('exposes the quarantined event identity in delivery diagnostics without deleting it', async () => {
     const name = 'tux-outbox-quarantine-diagnostics-' + crypto.randomUUID();
     names.add(name);

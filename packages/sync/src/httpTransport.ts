@@ -18,6 +18,7 @@ export interface HttpOutboxTransportOptions {
     event: OutboxEvent,
     businessDayId: string,
   ) => void | Promise<void>;
+  readonly onOrderDependencyMissing?: (event: OutboxEvent, orderId: string) => void | Promise<void>;
   readonly fetcher?: typeof fetch;
   readonly timeoutMs?: number;
 }
@@ -70,6 +71,8 @@ export class HttpOutboxTransport implements OutboxTransport {
     ((event: OutboxEvent, conflict: HttpOutboxConflict) => void | Promise<void>) | null;
   readonly #onDependencyMissing:
     ((event: OutboxEvent, businessDayId: string) => void | Promise<void>) | null;
+  readonly #onOrderDependencyMissing:
+    ((event: OutboxEvent, orderId: string) => void | Promise<void>) | null;
   readonly #fetcher: typeof fetch;
   readonly #timeoutMs: number;
 
@@ -80,6 +83,7 @@ export class HttpOutboxTransport implements OutboxTransport {
     this.#beforeDeliver = options.beforeDeliver ?? null;
     this.#onConflict = options.onConflict ?? null;
     this.#onDependencyMissing = options.onDependencyMissing ?? null;
+    this.#onOrderDependencyMissing = options.onOrderDependencyMissing ?? null;
     this.#fetcher = options.fetcher ?? globalThis.fetch.bind(globalThis);
     this.#timeoutMs = normalizeTimeout(options.timeoutMs);
   }
@@ -158,6 +162,20 @@ export class HttpOutboxTransport implements OutboxTransport {
               if (dayId !== 'unknown') {
                 try {
                   await this.#onDependencyMissing?.(event, dayId);
+                } catch {
+                  // Preserve the transient response; a later retry can recover the origin.
+                }
+              }
+            } else if (body['error'] === 'order_dependency_not_ready') {
+              const orderId =
+                typeof body['missingOrderId'] === 'string' ? body['missingOrderId'] : 'unknown';
+              diagnostic =
+                'Order ' +
+                orderId +
+                ' has not materialized. Replay the original order placement before retrying this lifecycle event.';
+              if (orderId !== 'unknown') {
+                try {
+                  await this.#onOrderDependencyMissing?.(event, orderId);
                 } catch {
                   // Preserve the transient response; a later retry can recover the origin.
                 }
