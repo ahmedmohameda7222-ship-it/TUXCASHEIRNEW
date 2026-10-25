@@ -253,9 +253,7 @@ export function ProductEditor({
     if (
       selectedImageFile.size === 0 ||
       selectedImageFile.size > 2 * 1024 * 1024 ||
-      !['image/png', 'image/jpeg', 'image/webp', 'image/avif'].includes(
-        selectedImageFile.type,
-      )
+      !['image/png', 'image/jpeg', 'image/webp', 'image/avif'].includes(selectedImageFile.type)
     ) {
       setImageError('Choose a PNG, JPEG, WebP, or AVIF image of at most 2 MB.');
       return;
