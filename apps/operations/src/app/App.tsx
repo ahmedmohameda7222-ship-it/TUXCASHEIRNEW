@@ -35,6 +35,7 @@ import {
   type OperationsOrdersBoardClient,
   type OperationsOrdersClient,
 } from './sessionClient';
+import { presentCompletedSessionExit } from './sessionExitPresentation';
 import { connectDesktopSyncStatus } from './syncStatus';
 import { UserIcon } from './icons';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
@@ -953,12 +954,17 @@ export function App({ initialAuthenticatedSession }: AppProps = {}) {
       setError(result.error.message);
       return 'DONE';
     }
-    if (window.tuxDesktop === undefined) {
-      window.location.reload();
-      return 'DONE';
-    }
-    setScreen({ kind: 'SESSION', session: result.value });
+    presentSessionExit(result.value);
     return 'DONE';
+  }
+
+  function presentSessionExit(session: OperationsSessionState): void {
+    presentCompletedSessionExit({
+      browser: window.tuxDesktop === undefined,
+      session,
+      returnToBranchPicker: () => window.location.reload(),
+      showInAppSession: (nextSession) => setScreen({ kind: 'SESSION', session: nextSession }),
+    });
   }
 
   async function refreshAfterEndDay(): Promise<void> {
@@ -970,7 +976,7 @@ export function App({ initialAuthenticatedSession }: AppProps = {}) {
       setError(result.error.message);
       return;
     }
-    setScreen({ kind: 'SESSION', session: result.value });
+    presentSessionExit(result.value);
   }
 
   if (screen.kind === 'LOADING')
