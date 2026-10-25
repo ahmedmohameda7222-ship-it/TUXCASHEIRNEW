@@ -962,6 +962,19 @@ export function classifyOrderRefundDatabaseError(
   return null;
 }
 
+export function classifyOrderReadInputError(
+  error: unknown,
+): { status: 400; error: 'invalid_order_cursor' | 'invalid_orders_date_filter' } | null {
+  if (!(error instanceof Error)) return null;
+  if (error.message === 'invalid_order_cursor') {
+    return { status: 400, error: 'invalid_order_cursor' };
+  }
+  if (error.message === 'invalid_orders_date_filter') {
+    return { status: 400, error: 'invalid_orders_date_filter' };
+  }
+  return null;
+}
+
 function handleFailure(response: AdminResponse, error: unknown): void {
   if (error instanceof AdminAuthError) {
     sendJson(response, error.status, { error: error.code });
@@ -973,6 +986,11 @@ function handleFailure(response: AdminResponse, error: unknown): void {
   }
   if (error instanceof z.ZodError) {
     sendJson(response, 400, { error: 'invalid_orders_request' });
+    return;
+  }
+  const invalidReadInput = classifyOrderReadInputError(error);
+  if (invalidReadInput) {
+    sendJson(response, invalidReadInput.status, { error: invalidReadInput.error });
     return;
   }
   if (error instanceof AdminSupabaseError) {
