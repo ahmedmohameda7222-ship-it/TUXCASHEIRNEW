@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import type {
   AdminOrderCancellationResult,
   AdminOrderDetail,
+  AdminOrderBusinessDaysResult,
   AdminOrderFinancialMutationResult,
   AdminOrderSearchInput,
   AdminOrderSearchResult,
@@ -29,6 +30,7 @@ export type OrderSearchFilters = {
   query: string;
   statuses: readonly AdminOrderStatus[];
   source: AdminOrderSource | null;
+  businessDayId: string | null;
   from: string | null;
   to: string | null;
   limit: number;
@@ -40,6 +42,7 @@ export function buildOrderSearchUrl(input: AdminOrderSearchInput): string {
   if (term) query.set('q', term);
   for (const status of input.statuses ?? []) query.append('status', status);
   if (input.source) query.set('source', input.source);
+  if (input.businessDayId) query.set('businessDayId', input.businessDayId);
   if (input.from) query.set('from', input.from);
   if (input.to) query.set('to', input.to);
   if (input.cursor) query.set('cursor', input.cursor);
@@ -55,6 +58,7 @@ function listKey(shopId: string, filters: OrderSearchFilters) {
     filters.query,
     filters.statuses.join(','),
     filters.source ?? '',
+    filters.businessDayId ?? '',
     filters.from ?? '',
     filters.to ?? '',
     filters.limit,
@@ -101,6 +105,7 @@ export function useOrders(
           query: filters.query,
           statuses: filters.statuses,
           source: filters.source,
+          businessDayId: filters.businessDayId,
           from: filters.from,
           to: filters.to,
           cursor: pageParam,
@@ -109,6 +114,17 @@ export function useOrders(
       );
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  });
+
+  const businessDaysQuery = useQuery({
+    queryKey: shopId ? ['admin', 'orders', shopId, 'business-days'] : ['admin', 'orders', 'no-business-days'],
+    enabled: Boolean(shopId),
+    queryFn: () => {
+      if (!shopId) throw new OrdersUiError('concrete_shop_required');
+      return adminFetch<AdminOrderBusinessDaysResult>(
+        `/api/admin/orders?shopId=${encodeURIComponent(shopId)}&view=business-days`,
+      );
+    },
   });
 
   const detailQuery = useQuery({
@@ -232,6 +248,7 @@ export function useOrders(
 
   return {
     searchQuery,
+    businessDaysQuery,
     detailQuery,
     actionReasonsQuery,
     cancelOrder,
