@@ -16,6 +16,30 @@ function setup() {
 }
 
 describe('Orders cursor/search query composition', () => {
+  it('ANDs the true operational Business Day with source and cursor pagination', async () => {
+    const { store, select } = setup();
+    const cursor = Buffer.from(
+      JSON.stringify(['2026-10-24T14:30:00.000Z', '44444444-4444-4444-8444-444444444444']),
+    ).toString('base64url');
+    const businessDayId = '55555555-5555-4555-8555-555555555555';
+    await store.searchOrders({
+      businessId,
+      shopId,
+      employeeId,
+      businessDayId,
+      statuses: ['DONE'],
+      source: 'ONLINE',
+      cursor,
+    });
+    const calls = select.mock.calls as unknown as Array<[string, URLSearchParams]>;
+    const query = calls.find(([table]) => table === 'orders')?.[1];
+    expect(query?.get('business_day_id')).toBe(`eq.${businessDayId}`);
+    expect(query?.get('source')).toBe('eq.ONLINE');
+    expect(query?.get('status')).toBe('in.(DONE)');
+    expect(query?.get('or')).toContain('created_at.lt.');
+  });
+
+
   it('ANDs cursor boundary with text search rather than duplicating PostgREST or parameters', async () => {
     const { store, select } = setup();
     const cursor = Buffer.from(
