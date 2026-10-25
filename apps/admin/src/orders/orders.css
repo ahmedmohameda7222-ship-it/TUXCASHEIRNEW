@@ -446,3 +446,51 @@
     flex: 0 0 auto;
   }
 }
+
+/* Approved Orders: authenticated context and online-request access remain visible,
+   but must not consume two full-height banners above the KPI strip. */
+.admin-orders-context-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.45rem 1rem;
+  min-width: 0;
+  margin-bottom: 0.4rem;
+}
+
+.admin-orders-context-bar .admin-orders-shop-context {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.55rem;
+  padding: 0.2rem 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.admin-orders-context-bar .admin-orders-shop-context > span:last-child {
+  display: none;
+}
+
+.admin-orders-context-bar nav.admin-orders-shop-context {
+  flex: 0 1 auto;
+}
+
+.admin-orders-context-bar .admin-secondary-button {
+  min-height: 34px;
+  padding: 0.35rem 0.6rem;
+}
+
+@media (max-width: 620px) {
+  .admin-orders-context-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-orders-context-bar nav.admin-orders-shop-context {
+    width: 100%;
+  }
+}
