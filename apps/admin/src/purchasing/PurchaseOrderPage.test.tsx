@@ -43,7 +43,8 @@ describe('purchase order draft metadata editor', () => {
     for (const label of ['Overview', 'Items', 'Receiving', 'Returns', 'History']) {
       expect(html).toContain(label);
     }
-    expect(html).toContain('No receipt or return event history is available');
+    expect(html).toContain('aria-label="Purchase order sections"');
+    expect(html).toContain('aria-selected="true"');
   });
 
 
