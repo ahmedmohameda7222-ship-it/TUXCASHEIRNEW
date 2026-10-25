@@ -59,7 +59,7 @@
     overflow: visible;
   }
 
-  .admin-purchasing-inspector-tabs button {
+  .admin-card .admin-purchasing-inspector-tabs button {
     flex: 0 1 auto;
     min-width: 0;
     padding: 10px 2px;
