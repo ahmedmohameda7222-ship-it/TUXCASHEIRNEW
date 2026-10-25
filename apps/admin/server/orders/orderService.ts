@@ -4,6 +4,7 @@ import type {
   AdminOrderFinancialMutationResult,
   AdminOrderSearchInput,
   AdminOrderSearchResult,
+  AdminOnlineOrderRequestsResult,
   AdminReasonCodeConfiguration,
   AdminSessionPrincipal,
   CancelAdminOrderInput,
@@ -17,6 +18,13 @@ type OrderActor = { employeeId: string; businessId: string };
 
 export interface OrderStore {
   searchOrders(input: AdminOrderSearchInput & OrderActor): Promise<AdminOrderSearchResult>;
+  listOnlineOrderRequests(input: {
+    shopId: string;
+    businessId: string;
+    status: 'PENDING' | 'PROCESSING' | 'ACCEPTED' | 'REJECTED' | null;
+    from: string | null;
+    to: string | null;
+  }): Promise<AdminOnlineOrderRequestsResult>;
   listActionReasons(input: {
     shopId: string;
     businessId: string;
@@ -48,6 +56,22 @@ export function createOrderService(store: OrderStore) {
       return store.searchOrders({
         ...input,
         employeeId: principal.employeeId,
+        businessId: principal.businessId,
+      });
+    },
+
+    listOnlineOrderRequests(
+      input: {
+        shopId: string;
+        status: 'PENDING' | 'PROCESSING' | 'ACCEPTED' | 'REJECTED' | null;
+        from: string | null;
+        to: string | null;
+      },
+      principal: AdminSessionPrincipal,
+    ): Promise<AdminOnlineOrderRequestsResult> {
+      requirePermission(principal, 'orders.view', input.shopId);
+      return store.listOnlineOrderRequests({
+        ...input,
         businessId: principal.businessId,
       });
     },
