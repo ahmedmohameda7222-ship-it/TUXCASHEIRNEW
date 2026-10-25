@@ -727,14 +727,12 @@ for (const width of [360, 1100] as const) {
     await expect(list).toBeHidden();
     const inspector = page.getByLabel('Inventory item detail');
     await expect(inspector).toBeVisible();
-    await expect(
-      inspector.getByRole('link', { name: /back to inventory items/i }),
-    ).toBeVisible();
+    await expect(inspector.getByRole('link', { name: /back to inventory items/i })).toBeVisible();
     await inspector.getByRole('tab', { name: 'Stock & movements' }).click();
     await expect(inspector.getByText('Bulk stock received')).toBeVisible();
     await inspector.getByRole('tab', { name: 'Settings' }).click();
     await expect(
-      inspector.getByRole('tabpanel', { name: 'Settings' }).getByText('Base unit'),
+      inspector.getByRole('tabpanel', { name: 'Settings' }).getByText('Base unit', { exact: true }),
     ).toBeVisible();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
