@@ -613,6 +613,26 @@ test('selected supplier details appear adjacent to compact directory on desktop'
   expect(listBounds!.y - detailBounds!.y).toBeLessThan(180);
 });
 
+test('supplier and new PO sheets anchor to the bottom safe area on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockPurchasing(page);
+  await page.goto('/purchasing');
+  const supplier = await openSupplierDialog(page);
+  const supplierRect = await supplier.boundingBox();
+  expect(supplierRect).not.toBeNull();
+  expect(Math.abs(844 - (supplierRect!.y + supplierRect!.height))).toBeLessThanOrEqual(16);
+  await page.keyboard.press('Escape');
+  await expect(supplier).toBeHidden();
+
+  await openPurchaseOrders(page);
+  await page.getByRole('button', { name: 'New purchase order' }).click();
+  const po = page.getByRole('dialog', { name: 'New purchase order' });
+  const poRect = await po.boundingBox();
+  expect(poRect).not.toBeNull();
+  expect(Math.abs(844 - (poRect!.y + poRect!.height))).toBeLessThanOrEqual(16);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 test('supplier form exposes linked field guidance and restores focus after Escape', async ({
   page,
 }) => {
