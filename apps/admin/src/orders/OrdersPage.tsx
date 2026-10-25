@@ -181,7 +181,7 @@ export function OrdersPage() {
             </select>
           </label>
           <label className="admin-field">
-            <span>From date/time (local)</span>
+            <span>From date/time (Cairo)</span>
             <input
               type="datetime-local"
               value={fromInput}
@@ -189,7 +189,7 @@ export function OrdersPage() {
             />
           </label>
           <label className="admin-field">
-            <span>To date/time (local)</span>
+            <span>To date/time (Cairo)</span>
             <input
               type="datetime-local"
               value={toInput}
