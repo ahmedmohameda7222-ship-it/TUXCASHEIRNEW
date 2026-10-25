@@ -77,6 +77,20 @@ async function mockPurchasing(
   await page.route('**/api/admin/purchasing**', async (route: Route) => {
     const request = route.request();
     if (request.method() === 'GET') {
+      const requestedOrder = new URL(request.url()).searchParams.get('purchaseOrderId');
+      if (requestedOrder) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            shopId,
+            purchaseOrderId: requestedOrder,
+            truncated: false,
+            events: [],
+          }),
+        });
+        return;
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
