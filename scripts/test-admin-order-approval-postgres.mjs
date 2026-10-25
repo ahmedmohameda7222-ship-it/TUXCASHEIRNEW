@@ -894,7 +894,7 @@ const paidReservationAfterReject = JSON.parse(
          'reservedMicros', (select sum(m.reserved_delta_micros)
            from public.inventory_movements m where m.order_id='${PAID_ACTIVE_ID}'),
          'auditCount', (select count(*) from public.admin_audit_events a
-           where a.target_id='${PAID_ACTIVE_ID}')
+           where a.entity_id='${PAID_ACTIVE_ID}' and a.action_type='ORDER_CANCELLED')
        )::text
        from public.inventory_reservations r where r.id='${PAID_RESERVATION_ID}'`,
     ],
