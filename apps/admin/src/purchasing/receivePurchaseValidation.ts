@@ -35,13 +35,23 @@ export function parseReceiptLines(
     const quantity = parsePurchaseDecimalMicros(rawQuantity);
     const remaining = line.orderedPurchaseUnitsMicros - line.receivedPurchaseUnitsMicros;
     if (quantity === null || quantity > remaining) {
-      return { ok: false, error: `${line.itemName}: enter a positive quantity no greater than the remaining purchase units.` };
+      return {
+        ok: false,
+        error: `${line.itemName}: enter a positive quantity no greater than the remaining purchase units.`,
+      };
     }
     const cost = parsePurchaseMoneyMinor(rawCost);
     if (cost === null || cost <= 0) {
-      return { ok: false, error: `${line.itemName}: enter a valid positive purchase-unit cost (EGP).` };
+      return {
+        ok: false,
+        error: `${line.itemName}: enter a valid positive purchase-unit cost (EGP).`,
+      };
     }
-    lines.push({ lineId: line.id, receivedPurchaseUnitsMicros: quantity, purchaseUnitCostMinor: cost });
+    lines.push({
+      lineId: line.id,
+      receivedPurchaseUnitsMicros: quantity,
+      purchaseUnitCostMinor: cost,
+    });
   }
   if (lines.length === 0) return { ok: false, error: 'Enter at least one valid receipt line.' };
   return { ok: true, lines };
@@ -58,7 +68,10 @@ export function parseReturnLines(
     const quantity = parsePurchaseDecimalMicros(raw);
     const returnable = line.receivedPurchaseUnitsMicros - line.returnedPurchaseUnitsMicros;
     if (quantity === null || quantity > returnable) {
-      return { ok: false, error: `${line.itemName}: enter a positive return quantity no greater than unreturned purchase units.` };
+      return {
+        ok: false,
+        error: `${line.itemName}: enter a positive return quantity no greater than unreturned purchase units.`,
+      };
     }
     lines.push({ lineId: line.id, returnedPurchaseUnitsMicros: quantity });
   }
