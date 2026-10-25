@@ -39,6 +39,31 @@ const uuidSchema = z.string().uuid();
 const commandIdSchema = z.string().trim().min(1).max(160);
 const noteSchema = z.string().trim().max(500).nullable();
 
+export const adminReturnLineItemsSchema = z
+  .array(
+    z
+      .object({
+        orderItemId: uuidSchema,
+        quantity: z.number().int().safe().positive(),
+      })
+      .strict(),
+  )
+  .min(1)
+  .max(500)
+  .superRefine((items, context) => {
+    const seen = new Set<string>();
+    for (const [index, item] of items.entries()) {
+      if (seen.has(item.orderItemId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, 'orderItemId'],
+          message: 'duplicate_return_item',
+        });
+      }
+      seen.add(item.orderItemId);
+    }
+  });
+
 const commandSchema = z.discriminatedUnion('type', [
   z
     .object({
@@ -68,17 +93,7 @@ const commandSchema = z.discriminatedUnion('type', [
       type: z.literal('order.return'),
       shopId: uuidSchema,
       orderId: uuidSchema,
-      items: z
-        .array(
-          z
-            .object({
-              orderItemId: uuidSchema,
-              quantity: z.number().int().safe().positive(),
-            })
-            .strict(),
-        )
-        .min(1)
-        .max(500),
+      items: adminReturnLineItemsSchema,
       reasonCodeId: uuidSchema,
       note: noteSchema,
       commandId: commandIdSchema,
