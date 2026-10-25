@@ -46,6 +46,18 @@ begin
     return jsonb_build_object('ok', false, 'code', 'business_day_not_found');
   end if;
 
+  -- Serialize identical retries BEFORE reading reservations. Otherwise the
+  -- second connection can see zero rows while the first transaction remains
+  -- uncommitted, then wait on an ingredient lock and misreport a conflict.
+  -- Distinct command IDs still serialize stock by the existing item locks.
+  perform pg_advisory_xact_lock(
+    hashtextextended(
+      'tux-inventory-reserve-command:' || p_shop_id::text || ':'
+      || p_order_id::text || ':' || p_command_id,
+      0
+    )
+  );
+
   select count(*) into v_existing
   from public.inventory_reservations r
   where r.shop_id = p_shop_id
