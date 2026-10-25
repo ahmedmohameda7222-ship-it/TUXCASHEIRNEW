@@ -196,3 +196,108 @@
     width: 100%;
   }
 }
+
+/* Approved desktop order directory: factual columns without synthetic bulk actions. */
+.admin-orders-list {
+  --admin-orders-grid: minmax(0, 0.72fr) minmax(0, 1.45fr) minmax(0, 0.86fr) minmax(0, 0.73fr) minmax(0, 0.95fr) minmax(0, 0.85fr) minmax(0, 1.22fr);
+}
+
+.admin-orders-list__columns,
+.admin-order-row {
+  display: grid;
+  grid-template-columns: var(--admin-orders-grid);
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.admin-orders-list__columns {
+  padding: 0.65rem 0.7rem;
+  border-bottom: 1px solid var(--tux-border-subtle);
+  color: var(--tux-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.admin-order-row {
+  min-height: 72px;
+  padding: 0.7rem;
+}
+
+.admin-order-row__number,
+.admin-order-row__customer {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-order-row__customer small {
+  color: var(--tux-text-secondary);
+  font-size: 0.7rem;
+}
+
+.admin-order-row__type,
+.admin-order-row__source,
+.admin-order-row__amount,
+.admin-order-row__time {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.76rem;
+}
+
+.admin-order-row__status {
+  width: max-content;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.admin-order-row__time {
+  color: var(--tux-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1279px) {
+  .admin-orders-list__columns {
+    display: none;
+  }
+
+  .admin-order-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'number amount'
+      'customer customer'
+      'type source'
+      'status time';
+    gap: 0.45rem 0.75rem;
+  }
+
+  .admin-order-row__number {
+    grid-area: number;
+  }
+
+  .admin-order-row__customer {
+    grid-area: customer;
+  }
+
+  .admin-order-row__type {
+    grid-area: type;
+  }
+
+  .admin-order-row__source {
+    grid-area: source;
+  }
+
+  .admin-order-row__amount {
+    grid-area: amount;
+    text-align: end;
+  }
+
+  .admin-order-row__status {
+    grid-area: status;
+  }
+
+  .admin-order-row__time {
+    grid-area: time;
+    text-align: end;
+  }
+}
