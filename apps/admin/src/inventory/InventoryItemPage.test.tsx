@@ -21,7 +21,7 @@ describe('InventoryItemPage', () => {
       />,
     );
 
-    expect(html).toContain('On Hand');
+    expect(html).toContain('On hand');
     expect(html).toContain('Reserved');
     expect(html).toContain('Available');
     expect(html).toContain('3.2 kg');
@@ -31,13 +31,26 @@ describe('InventoryItemPage', () => {
 });
 
 const item = {
-  id: 'milk', name: 'Milk', unitLabel: 'L', trackingMode: 'RECIPE_TRACKED', active: true,
-  onHandMicros: 5_000_000, reservedMicros: 1_000_000, availableMicros: 4_000_000,
-  weightedUnitCostMinor: 2100, lowStockThresholdMicros: 2_000_000,
-  history: [{
-    id: 'movement', movementType: 'PURCHASE_RECEIPT', quantityDeltaMicros: 5_000_000,
-    reservedDeltaMicros: 0, reasonLabel: 'Receipt', createdAt: '2026-10-25T10:00:00Z',
-  }],
+  id: 'milk',
+  name: 'Milk',
+  unitLabel: 'L',
+  trackingMode: 'RECIPE_TRACKED',
+  active: true,
+  onHandMicros: 5_000_000,
+  reservedMicros: 1_000_000,
+  availableMicros: 4_000_000,
+  weightedUnitCostMinor: 2100,
+  lowStockThresholdMicros: 2_000_000,
+  history: [
+    {
+      id: 'movement',
+      movementType: 'PURCHASE_RECEIPT',
+      quantityDeltaMicros: 5_000_000,
+      reservedDeltaMicros: 0,
+      reasonLabel: 'Receipt',
+      createdAt: '2026-10-25T10:00:00Z',
+    },
+  ],
 };
 
 describe('authorized Inventory item inspector', () => {
@@ -53,7 +66,9 @@ describe('authorized Inventory item inspector', () => {
     expect(html).toContain('Low-stock threshold');
   });
   it('shows real dated movements and absolute definitions on direct tab', () => {
-    const movements = renderToStaticMarkup(<InventoryItemPage item={item} initialTab="movements" />);
+    const movements = renderToStaticMarkup(
+      <InventoryItemPage item={item} initialTab="movements" />,
+    );
     expect(movements).toContain('2026');
     expect(movements).toContain('Purchase receipt');
     expect(movements).toContain('Receipt');
