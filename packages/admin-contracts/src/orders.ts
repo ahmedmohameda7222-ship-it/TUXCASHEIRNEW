@@ -1,3 +1,26 @@
+export type AdminOnlineOrderRequest = {
+  id: string;
+  shopId: string;
+  status: 'PENDING' | 'PROCESSING' | 'ACCEPTED' | 'REJECTED';
+  customerName: string;
+  normalizedPhone: string | null;
+  fulfillmentPreference: string;
+  paymentPreference: string;
+  trustedItems: unknown;
+  itemsSubtotalMinor: number;
+  createdAt: string;
+  resolvedAt: string | null;
+  acceptedOrderId: string | null;
+  rejectionReason: string | null;
+  sourceFingerprint: string | null;
+  catalogRevision: string;
+};
+
+export type AdminOnlineOrderRequestsResult = {
+  shopId: string;
+  rows: readonly AdminOnlineOrderRequest[];
+};
+
 export const ADMIN_ORDER_STATUSES = ['ACTIVE', 'DONE', 'CANCELLED', 'RETURNED'] as const;
 export type AdminOrderStatus = (typeof ADMIN_ORDER_STATUSES)[number];
 
