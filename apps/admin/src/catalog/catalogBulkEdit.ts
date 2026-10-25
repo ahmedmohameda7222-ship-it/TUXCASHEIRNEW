@@ -19,6 +19,9 @@ export type CatalogBulkPreviewRow = {
   after: CatalogProductDetail;
 };
 
+const MAX_CATALOG_PRICE_MINOR = 2_147_483_647;
+const MAX_SORT_ORDER = 2_147_483_647;
+
 export class CatalogBulkEditError extends Error {
   constructor(message: string) {
     super(message);
@@ -31,7 +34,7 @@ function isRecord(value: unknown): value is CatalogJsonObject {
 }
 
 function safeMinor(value: number): number {
-  if (!Number.isSafeInteger(value) || value < 0)
+  if (!Number.isSafeInteger(value) || value < 0 || value > MAX_CATALOG_PRICE_MINOR)
     throw new CatalogBulkEditError('All selected products must have valid, non-negative prices.');
   return value;
 }
@@ -84,7 +87,7 @@ function patchProduct(
       if (!Number.isSafeInteger(patch.delta))
         throw new CatalogBulkEditError('Sort-order adjustment must be a whole number.');
       const nextOrder = product.sortOrder + patch.delta;
-      if (!Number.isSafeInteger(nextOrder) || nextOrder < 0)
+      if (!Number.isSafeInteger(nextOrder) || nextOrder < 0 || nextOrder > MAX_SORT_ORDER)
         throw new CatalogBulkEditError('Sort order cannot be negative or overflow.');
       return { ...product, sortOrder: nextOrder };
     }
