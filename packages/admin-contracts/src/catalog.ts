@@ -86,6 +86,16 @@ export type CatalogScheduledChangeSummary = {
   lastError: string | null;
 };
 
+export type CatalogPublishEntityChange = {
+  kind: 'product' | 'category' | 'modifier';
+  id: string;
+  status: 'added' | 'modified' | 'removed' | 'unchanged';
+  before: CatalogJsonObject | null;
+  after: CatalogJsonObject | null;
+  changedFields: string[];
+};
+
+/** Additive preview field. Older clients remain compatible without this field. */
 export type CatalogPublishPreview = {
   draftId: string;
   shopId: string;
@@ -93,6 +103,7 @@ export type CatalogPublishPreview = {
   currentPublishVersion: number;
   draftRevision: number;
   stale: boolean;
+  changes?: CatalogPublishEntityChange[];
   changedProductIds: string[];
   priceChangedProductIds: string[];
   changedRelationCounts: {

@@ -209,8 +209,8 @@ describe('IndexedDbWhatsAppStore', () => {
   });
 
   it('retains the WhatsApp v5 migration in the latest schema with deterministic stores and indexes', async () => {
-    expect(INDEXED_DB_VERSION).toBe(10);
-    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(INDEXED_DB_VERSION).toBe(13);
+    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
     const name = databaseName('schema');
     const database = await openAtVersion(name, INDEXED_DB_VERSION);
     try {

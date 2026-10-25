@@ -5,7 +5,10 @@ const gate = readFileSync(new URL('./BrowserBootstrapGate.tsx', import.meta.url)
 const sessionSource = readFileSync(new URL('./sessionClient.ts', import.meta.url), 'utf8');
 const cfg = readFileSync(new URL('../../../../playwright.config.ts', import.meta.url), 'utf8');
 const pkg = readFileSync(new URL('../../../../package.json', import.meta.url), 'utf8');
-const ci = readFileSync(new URL('../../../../.github/workflows/ci.yml', import.meta.url), 'utf8');
+const ci = readFileSync(
+  new URL('../../../../.github/workflows/ci-full.yml', import.meta.url),
+  'utf8',
+);
 
 describe('Operations browser E2E build safety', () => {
   it('restricts the legacy test fixture to localhost builds', () => {

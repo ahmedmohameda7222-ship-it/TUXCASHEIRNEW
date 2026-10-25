@@ -23,6 +23,7 @@ describe('Hobby deployment API entrypoint budget', () => {
       '/api/admin/alerts': '/api/admin/orders?__adminResource=alerts',
       '/api/admin/operations-health': '/api/admin/orders?__adminResource=operations-health',
       '/api/admin/whatsapp': '/api/admin/orders?__adminResource=whatsapp',
+      '/api/admin/catalog-image': '/api/admin/catalog?__adminResource=catalog-image',
     };
     for (const [src, dest] of Object.entries(required)) {
       expect(config.routes).toContainEqual({ src, dest });

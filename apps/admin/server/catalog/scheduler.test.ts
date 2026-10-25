@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createSupabaseCatalogSchedulerExecutors,
   createSupabaseCatalogSchedulerStore,
-  handleCatalogSchedulerRequest,
   runCatalogScheduler,
   type CatalogScheduledChange,
   type CatalogSchedulerRpcClient,
@@ -325,29 +324,5 @@ describe('catalog scheduler', () => {
       p_attempt_count: 2,
       p_result: { ok: true, publishVersion: 49 },
     });
-  });
-
-  it('fails closed when the cron secret is missing or invalid', async () => {
-    const runScheduler = vi.fn().mockResolvedValue({ claimed: 0, applied: 0, failed: 0 });
-
-    await expect(
-      handleCatalogSchedulerRequest({
-        method: 'GET',
-        authorization: 'Bearer configured',
-        cronSecret: undefined,
-        runScheduler,
-      }),
-    ).resolves.toEqual({ statusCode: 503, body: { error: 'cron_secret_not_configured' } });
-
-    await expect(
-      handleCatalogSchedulerRequest({
-        method: 'GET',
-        authorization: 'Bearer wrong',
-        cronSecret: 'configured',
-        runScheduler,
-      }),
-    ).resolves.toEqual({ statusCode: 401, body: { error: 'unauthorized' } });
-
-    expect(runScheduler).not.toHaveBeenCalled();
   });
 });

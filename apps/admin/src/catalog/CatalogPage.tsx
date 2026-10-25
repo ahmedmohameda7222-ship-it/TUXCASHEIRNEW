@@ -1,13 +1,16 @@
 import type { CatalogProductDetail } from '@tux/admin-contracts';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { PageScaffold } from '../components/layout/PageScaffold';
+import { useAdminSession } from '../auth/useAdminSession';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import './catalog.css';
 import { createCatalogProductSlug } from './catalogProductSlug';
+import { BulkProductEditor } from './BulkProductEditor';
 import { CatalogDefinitionsEditor } from './CatalogDefinitionsEditor';
+import { CatalogFirstRunGuide } from './CatalogFirstRunGuide';
 import { ProductInspector } from './ProductInspector';
 import { ProductList, type CatalogStatusFilter } from './ProductList';
 import { CatalogUiError, useCatalog } from './useCatalog';
@@ -60,7 +63,8 @@ function newProductForShop(
 }
 
 export function CatalogPage() {
-  const { principal, scope } = useShopScope();
+  const { principal, scope, hasUnsavedDrafts } = useShopScope();
+  const session = useAdminSession();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const catalog = useCatalog(shopId);
   const [location, navigate] = useLocation();
@@ -70,14 +74,125 @@ export function CatalogPage() {
   const [newProductCategoryId, setNewProductCategoryId] = useState('');
   const [unsavedProduct, setUnsavedProduct] = useState<CatalogProductDetail | null>(null);
   const [definitionsOpen, setDefinitionsOpen] = useState(false);
-  const selectedProductId = unsavedProduct?.id ?? detailIdFromPath(location, '/catalog/products');
+  const [draftSaved, setDraftSaved] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [modeError, setModeError] = useState<string | null>(null);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  const routeRef = useRef(location);
+  const ignorePopstate = useRef(false);
+  const approvedNavigation = useRef<string | null>(null);
+  // Wouter may publish a Back/Forward location before this component's
+  // popstate listener. Keep the dirty editor mounted until it can offer a
+  // deliberate Stay / Discard choice rather than rendering the new route.
+  const unapprovedRouteChange =
+    hasUnsavedDrafts() && location !== routeRef.current && approvedNavigation.current !== location;
+  const effectiveLocation = unapprovedRouteChange ? routeRef.current : location;
+  const scopedUnsavedProduct = unsavedProduct?.shopId === shopId ? unsavedProduct : null;
+  const selectedProductId =
+    scopedUnsavedProduct?.id ?? detailIdFromPath(effectiveLocation, '/catalog/products');
   const mobileEditing = selectedProductId !== null;
+
+  if (!unapprovedRouteChange) routeRef.current = location;
+
+  useEffect(() => {
+    if (approvedNavigation.current === location) approvedNavigation.current = null;
+  }, [location]);
+
+  useEffect(() => {
+    if (!unapprovedRouteChange) return;
+    const destination = location;
+    window.history.replaceState(window.history.state, '', routeRef.current);
+    setPendingNavigation(destination);
+  }, [location, unapprovedRouteChange]);
+
+  useEffect(() => {
+    function interceptLink(event: MouseEvent) {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.shiftKey ||
+        !hasUnsavedDrafts()
+      )
+        return;
+      const node = event.target;
+      if (!(node instanceof Element)) return;
+      const anchor = node.closest('a[href]');
+      if (!anchor || anchor.hasAttribute('download') || anchor.getAttribute('target')) return;
+      const url = new URL(anchor.getAttribute('href') ?? '', window.location.href);
+      if (url.origin !== window.location.origin || url.pathname === routeRef.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setPendingNavigation(url.pathname + url.search + url.hash);
+    }
+    function onPopstate(event: PopStateEvent) {
+      if (ignorePopstate.current) {
+        ignorePopstate.current = false;
+        return;
+      }
+      const requested = window.location.pathname + window.location.search + window.location.hash;
+      if (approvedNavigation.current === requested) {
+        approvedNavigation.current = null;
+        return;
+      }
+      if (!hasUnsavedDrafts() || window.location.pathname === routeRef.current) return;
+      // For paths rendered by this Catalog page, keep the editor mounted and
+      // show the explicit in-app Stay / Discard modal.
+      if (requested.startsWith('/catalog/products')) {
+        event.stopImmediatePropagation();
+        window.history.pushState(window.history.state, '', routeRef.current);
+        ignorePopstate.current = true;
+        window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
+        setPendingNavigation(requested);
+        return;
+      }
+      // Exiting Catalog entirely can unmount this route before React renders
+      // the modal; use a synchronous browser confirmation for browser history.
+      if (window.confirm('Discard unsaved product edits and leave Catalog?')) return;
+      event.stopImmediatePropagation();
+      window.history.pushState(window.history.state, '', routeRef.current);
+      ignorePopstate.current = true;
+      window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
+    }
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      if (!hasUnsavedDrafts()) return;
+      event.preventDefault();
+      event.returnValue = '';
+    }
+    document.addEventListener('click', interceptLink, true);
+    window.addEventListener('popstate', onPopstate, true);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      document.removeEventListener('click', interceptLink, true);
+      window.removeEventListener('popstate', onPopstate, true);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
+  }, [hasUnsavedDrafts]);
+
+  function requestCatalogNavigation(destination: string) {
+    if (hasUnsavedDrafts()) {
+      setPendingNavigation(destination);
+      return;
+    }
+    navigate(destination);
+  }
 
   const canEdit = permission(principal, 'catalog.edit');
   const canPrice = permission(principal, 'catalog.pricing');
-  const categories = catalog.categories;
+  const categories = catalog.categories.filter((category) => category.shopId === shopId);
+  const scopedProducts = catalog.products.filter((product) => product.shopId === shopId);
   const activeCategories = categories.filter((category) => category.active);
   const firstActiveCategory = activeCategories[0];
+
+  useEffect(() => {
+    setUnsavedProduct(null);
+    setDefinitionsOpen(false);
+    setBulkOpen(false);
+    setModeError(null);
+    setDraftSaved(false);
+  }, [shopId]);
 
   useEffect(() => {
     if (activeCategories.some((category) => category.id === newProductCategoryId)) return;
@@ -85,13 +200,13 @@ export function CatalogPage() {
   }, [activeCategories, firstActiveCategory?.id, newProductCategoryId]);
 
   const selectedProduct = useMemo(() => {
-    if (unsavedProduct) return unsavedProduct;
+    if (scopedUnsavedProduct) return scopedUnsavedProduct;
     if (selectedProductId) {
-      const selected = catalog.products.find((product) => product.id === selectedProductId);
+      const selected = scopedProducts.find((product) => product.id === selectedProductId);
       if (selected) return selected;
     }
     return null;
-  }, [catalog.products, selectedProductId, unsavedProduct]);
+  }, [scopedProducts, selectedProductId, scopedUnsavedProduct]);
 
   const actionError = mutationMessage(
     catalog.resumeDraft.error ??
@@ -99,6 +214,7 @@ export function CatalogPage() {
       catalog.prepareDefinitionsDraft.error ??
       catalog.saveProduct.error ??
       catalog.saveDefinitions.error ??
+      catalog.saveBulkProducts.error ??
       catalog.setAvailability.error,
   );
   const busy =
@@ -107,9 +223,22 @@ export function CatalogPage() {
     catalog.prepareDefinitionsDraft.isPending ||
     catalog.saveProduct.isPending ||
     catalog.saveDefinitions.isPending ||
+    catalog.saveBulkProducts.isPending ||
     catalog.setAvailability.isPending;
 
+  function canSwitchCatalogEditor(): boolean {
+    if (hasUnsavedDrafts()) {
+      setModeError(
+        'Save your unfinished edits or close the editor to discard them before switching.',
+      );
+      return false;
+    }
+    setModeError(null);
+    return true;
+  }
+
   function openProduct(productId: string) {
+    if (!canSwitchCatalogEditor()) return;
     setUnsavedProduct(null);
     navigate(detailPath('/catalog/products', productId));
   }
@@ -123,12 +252,16 @@ export function CatalogPage() {
 
   function startNewProduct() {
     if (!shopId || !newProductCategoryId || !canEdit || !canPrice) return;
-    const product = newProductForShop(shopId, newProductCategoryId, catalog.products);
+    if (!canSwitchCatalogEditor()) return;
+    const product = newProductForShop(shopId, newProductCategoryId, scopedProducts);
+    setDraftSaved(false);
     setUnsavedProduct(product);
     navigate(detailPath('/catalog/products', product.id));
   }
 
   function closeEditor() {
+    if (hasUnsavedDrafts() && !window.confirm('Discard your unsaved product edits?')) return;
+    setModeError(null);
     if (unsavedProduct) {
       setUnsavedProduct(null);
     }
@@ -197,10 +330,12 @@ export function CatalogPage() {
               type="button"
               disabled={busy}
               onClick={() => {
+                if (!canSwitchCatalogEditor()) return;
                 if (definitionsOpen) {
                   setDefinitionsOpen(false);
                   return;
                 }
+                setBulkOpen(false);
                 void catalog.prepareDefinitionsDraft
                   .mutateAsync()
                   .then(() => {
@@ -214,6 +349,32 @@ export function CatalogPage() {
               {definitionsOpen ? 'Back to products' : 'Manage categories & extras'}
             </button>
           ) : null}
+          {canEdit ? (
+            <button
+              className="admin-secondary-button"
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                if (!bulkOpen && !canSwitchCatalogEditor()) return;
+                setModeError(null);
+                if (!bulkOpen) {
+                  setDefinitionsOpen(false);
+                  setUnsavedProduct(null);
+                  navigate('/catalog/products');
+                }
+                setBulkOpen(!bulkOpen);
+              }}
+            >
+              {bulkOpen ? 'Close Bulk Edit' : 'Bulk Edit'}
+            </button>
+          ) : null}
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={() => requestCatalogNavigation('/catalog/products/publishing')}
+          >
+            Review & Publish ({catalog.compatibleDrafts.length})
+          </button>
           <label>
             <span>New product category</span>
             <select
@@ -241,6 +402,37 @@ export function CatalogPage() {
         </div>
       }
     >
+      <div className="admin-catalog-draft-banner" role="status">
+        <div>
+          <strong>
+            {principal.shopSummaries?.find((shop) => shop.id === shopId)?.name ?? 'Selected shop'}
+            {' · '}Published version {catalog.workspaceQuery.data.currentPublishVersion}
+          </strong>
+          <span>
+            Save Draft keeps changes private. Review & Publish, then Publish Now after any required
+            approval, to update Operations and the public menu.
+          </span>
+        </div>
+        <span className="admin-status-pill">
+          {catalog.compatibleDrafts.length} pending{' '}
+          {catalog.compatibleDrafts.length === 1 ? 'draft' : 'drafts'}
+        </span>
+      </div>
+
+      {draftSaved ? (
+        <div className="admin-callout" role="status">
+          <strong>Draft saved — not published</strong>
+          <span>Your changes are saved for this shop but are not live.</span>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={() => requestCatalogNavigation('/catalog/products/publishing')}
+          >
+            Review & Publish
+          </button>
+        </div>
+      ) : null}
+
       {!catalog.activeDraft && catalog.compatibleDrafts.length > 0 ? (
         <div className="admin-callout" role="status">
           <strong>Saved draft work is available.</strong>
@@ -287,6 +479,53 @@ export function CatalogPage() {
         </div>
       ) : null}
 
+      {pendingNavigation ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="switch-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="catalog-navigation-confirm-title"
+          >
+            <h2 id="catalog-navigation-confirm-title">Discard unsaved product edits?</h2>
+            <p>
+              These product changes have not been saved. Stay to keep editing, or discard them to
+              leave Catalog.
+            </p>
+            <div className="drawer-footer">
+              <button
+                className="admin-secondary-button"
+                type="button"
+                autoFocus
+                onClick={() => setPendingNavigation(null)}
+              >
+                Stay and keep editing
+              </button>
+              <button
+                className="admin-primary-button"
+                type="button"
+                onClick={() => {
+                  const destination = pendingNavigation;
+                  setPendingNavigation(null);
+                  approvedNavigation.current = destination;
+                  setUnsavedProduct(null);
+                  navigate(destination);
+                }}
+              >
+                Discard changes and navigate
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {modeError ? (
+        <div className="admin-callout is-warning" role="alert">
+          <strong>Unfinished edits</strong>
+          <span>{modeError}</span>
+        </div>
+      ) : null}
+
       {actionError ? (
         <div className="admin-callout is-danger" role="alert">
           <strong>Change not saved.</strong>
@@ -307,8 +546,45 @@ export function CatalogPage() {
         </span>
       </div>
 
-      {definitionsOpen ? (
+      {!bulkOpen && !definitionsOpen && scopedProducts.length === 0 ? (
+        <CatalogFirstRunGuide
+          hasCategories={activeCategories.length > 0}
+          productCount={scopedProducts.length}
+          canEdit={canEdit}
+          canPrice={canPrice}
+          hasCopySources={principal.shopIds.some((id) => id !== shopId)}
+          onManageCategories={() => {
+            if (busy || !canSwitchCatalogEditor()) return;
+            void catalog.prepareDefinitionsDraft
+              .mutateAsync()
+              .then(() => {
+                setUnsavedProduct(null);
+                navigate('/catalog/products');
+                setDefinitionsOpen(true);
+              })
+              .catch(() => undefined);
+          }}
+          onCreateProduct={startNewProduct}
+        />
+      ) : null}
+
+      {bulkOpen ? (
+        <BulkProductEditor
+          key={shopId}
+          shopId={shopId}
+          products={scopedProducts}
+          categories={categories}
+          canEdit={canEdit}
+          canPrice={canPrice}
+          busy={busy}
+          onSave={async (input) => {
+            await catalog.saveBulkProducts.mutateAsync(input);
+            setDraftSaved(true);
+          }}
+        />
+      ) : definitionsOpen ? (
         <CatalogDefinitionsEditor
+          key={shopId}
           shopId={shopId}
           categories={categories}
           modifiers={catalog.modifiers}
@@ -317,13 +593,14 @@ export function CatalogPage() {
           pending={busy}
           onSave={async (input) => {
             await catalog.saveDefinitions.mutateAsync(input);
+            setDraftSaved(true);
           }}
         />
       ) : (
         <div className={mobileEditing ? 'admin-catalog-layout is-editing' : 'admin-catalog-layout'}>
           <div className="admin-catalog-layout__list">
             <ProductList
-              products={catalog.products}
+              products={scopedProducts}
               categories={categories}
               selectedProductId={selectedProduct?.id ?? null}
               search={search}
@@ -340,6 +617,7 @@ export function CatalogPage() {
             {selectedProduct ? (
               <ProductInspector
                 product={selectedProduct}
+                imageRequiresSaveFirst={scopedUnsavedProduct !== null}
                 categories={categories}
                 canEdit={canEdit}
                 canPrice={canPrice}
@@ -350,10 +628,52 @@ export function CatalogPage() {
                 onRequestAdvanced={async () => {
                   await catalog.prepareProductDraft.mutateAsync(selectedProduct);
                 }}
+                onReviewPublish={() => requestCatalogNavigation('/catalog/products/publishing')}
                 onSaveDraft={async (draft) => {
                   await catalog.saveProduct.mutateAsync(draft);
+                  setDraftSaved(true);
                   setUnsavedProduct(null);
                   navigate(detailPath('/catalog/products', draft.product.id), { replace: true });
+                }}
+                onUploadImage={async (file) => {
+                  if (
+                    !shopId ||
+                    selectedProduct.shopId !== shopId ||
+                    session.state.status !== 'authenticated'
+                  ) {
+                    throw new Error('Image upload requires an authenticated shop.');
+                  }
+                  if (
+                    !['image/png', 'image/jpeg', 'image/webp', 'image/avif'].includes(file.type) ||
+                    file.size === 0 ||
+                    file.size > 2 * 1024 * 1024
+                  ) {
+                    throw new Error('Invalid image format or size.');
+                  }
+                  const response = await fetch('/api/admin/catalog-image', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                      'content-type': file.type,
+                      'x-tux-admin-csrf': session.state.session.csrfToken,
+                      'x-tux-catalog-shop-id': shopId,
+                      'x-tux-catalog-product-id': selectedProduct.id,
+                    },
+                    body: file,
+                  });
+                  if (!response.ok) throw new Error('Image upload failed.');
+                  const uploaded: unknown = await response.json();
+                  if (
+                    typeof uploaded !== 'object' ||
+                    uploaded === null ||
+                    !('imageKey' in uploaded) ||
+                    typeof uploaded.imageKey !== 'string' ||
+                    !('publicUrl' in uploaded) ||
+                    typeof uploaded.publicUrl !== 'string'
+                  ) {
+                    throw new Error('Image upload response invalid.');
+                  }
+                  return { imageKey: uploaded.imageKey, publicUrl: uploaded.publicUrl };
                 }}
                 onSetAvailability={async (soldOut) => {
                   await catalog.setAvailability.mutateAsync({

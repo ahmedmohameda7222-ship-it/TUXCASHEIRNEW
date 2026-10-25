@@ -46,20 +46,6 @@ const commandSchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 
-type ScheduleCommand = z.infer<typeof commandSchema>;
-
-type ScheduleResult =
-  | {
-      ok: true;
-      scheduleId: string;
-      status: string;
-      scheduledFor: string;
-      localScheduledAt: string;
-      timezone: 'Africa/Cairo';
-      idempotentReplay?: boolean;
-    }
-  | { ok: false; code: string; currentVersion?: number; scheduleId?: string };
-
 type ScheduleRow = {
   id: string;
   payload_json: unknown;
@@ -77,42 +63,6 @@ const scheduleStatuses = new Set(['PENDING', 'CLAIMED', 'APPLIED', 'FAILED', 'CA
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function parseScheduleResult(value: unknown): ScheduleResult {
-  if (!isRecord(value) || typeof value['ok'] !== 'boolean') {
-    throw new Error('settings_schedule_backend_contract_invalid');
-  }
-  if (value['ok'] === false) {
-    if (typeof value['code'] !== 'string')
-      throw new Error('settings_schedule_backend_contract_invalid');
-    return {
-      ok: false,
-      code: value['code'],
-      ...(Number.isSafeInteger(Number(value['currentVersion']))
-        ? { currentVersion: Number(value['currentVersion']) }
-        : {}),
-      ...(typeof value['scheduleId'] === 'string' ? { scheduleId: value['scheduleId'] } : {}),
-    };
-  }
-  if (
-    typeof value['scheduleId'] !== 'string' ||
-    typeof value['status'] !== 'string' ||
-    typeof value['scheduledFor'] !== 'string' ||
-    typeof value['localScheduledAt'] !== 'string' ||
-    value['timezone'] !== 'Africa/Cairo'
-  ) {
-    throw new Error('settings_schedule_backend_contract_invalid');
-  }
-  return {
-    ok: true,
-    scheduleId: value['scheduleId'],
-    status: value['status'],
-    scheduledFor: value['scheduledFor'],
-    localScheduledAt: value['localScheduledAt'],
-    timezone: 'Africa/Cairo',
-    ...(value['idempotentReplay'] === true ? { idempotentReplay: true } : {}),
-  };
 }
 
 function parseScheduleRow(row: ScheduleRow): AdminShopConfigSchedule {
@@ -191,30 +141,6 @@ async function loadSchedules(
   return rows.map(parseScheduleRow);
 }
 
-async function executeSchedule(
-  client: AdminSupabaseClient,
-  command: ScheduleCommand,
-  context: AdminSessionContext,
-): Promise<ScheduleResult> {
-  requirePermission(context.principal, 'settings.manage', command.shopId);
-  const result =
-    command.type === 'settings.schedule-publish'
-      ? await client.rpc<unknown>('schedule_shop_settings_publish_v1', {
-          p_employee_id: context.employee.id,
-          p_shop_id: command.shopId,
-          p_expected_settings_version: command.expectedSettingsVersion,
-          p_local_scheduled_at: command.localScheduledAt,
-        })
-      : await client.rpc<unknown>('schedule_shop_online_orders_state_v1', {
-          p_employee_id: context.employee.id,
-          p_shop_id: command.shopId,
-          p_online_orders_paused: command.onlineOrdersPaused,
-          p_expected_settings_version: command.expectedSettingsVersion,
-          p_local_scheduled_at: command.localScheduledAt,
-        });
-  return parseScheduleResult(result);
-}
-
 export default async function handler(
   request: AdminRequest,
   response: AdminResponse,
@@ -245,7 +171,9 @@ export default async function handler(
       return;
     }
     const context = await loadContext(request, client, true);
-    sendJson(response, 200, await executeSchedule(client, parsed.data, context));
+    requirePermission(context.principal, 'settings.manage', parsed.data.shopId);
+    // Existing schedule history remains readable. No unattended runner is verified.
+    sendJson(response, 409, { error: 'scheduler_unavailable' });
   } catch (error) {
     if (error instanceof AdminAuthError) {
       sendJson(response, error.status, { error: error.code });

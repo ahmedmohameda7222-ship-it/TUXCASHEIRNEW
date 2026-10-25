@@ -1,5 +1,5 @@
 import type { AdminSettingsWorkspace, AdminShopConfigSchedule } from '@tux/admin-contracts';
-import { createContext, useContext, useState, type FormEvent, type ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 
 export type SettingsScheduleMode = 'PUBLISH_SETTINGS' | 'PAUSE_ONLINE' | 'RESUME_ONLINE';
 
@@ -49,9 +49,9 @@ function scheduleLabel(schedule: AdminShopConfigSchedule): string {
 function scheduleStatus(schedule: AdminShopConfigSchedule): string {
   switch (schedule.status) {
     case 'PENDING':
-      return 'Scheduled';
+      return 'Pending — no automatic runner';
     case 'CLAIMED':
-      return 'Applying';
+      return 'Claimed (not verified)';
     case 'APPLIED':
       return 'Applied';
     case 'CANCELLED':
@@ -69,81 +69,23 @@ export function SettingsSchedulePanel({
   busy?: boolean;
 }) {
   const action = useContext(SettingsScheduleActionContext);
-  const [mode, setMode] = useState<SettingsScheduleMode>('PUBLISH_SETTINGS');
-  const [localScheduledAt, setLocalScheduledAt] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
-  const disabled = busy || action === null || action.busy;
   const schedules = workspace.shopConfigSchedules ?? [];
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (disabled || localScheduledAt === '' || action === null) return;
-
-    setMessage(null);
-    try {
-      const result = await action.schedule({ mode, localScheduledAt });
-      setMessage(
-        `${result.idempotentReplay ? 'Existing schedule confirmed' : 'Scheduled'} for ${result.localScheduledAt} Africa/Cairo.`,
-      );
-    } catch {
-      setMessage('Scheduling failed. Reload and try again.');
-    }
-  }
-
   return (
-    <form
+    <section
       className="admin-settings-card"
       data-settings-schedule-shop={workspace.shop.id}
-      onSubmit={(event) => void submit(event)}
+      aria-busy={busy}
     >
       <div>
         <span>Scheduled configuration</span>
-        <strong>Activate later in Egypt local time</strong>
+        <strong>Automatic scheduling is unavailable</strong>
       </div>
       <p className="admin-field__help">
-        The settings saved when you schedule this change will be used at the selected time.
+        No verified unattended scheduler is configured. New scheduled settings changes, pauses, and
+        resumes are disabled. Existing schedule history is preserved and must not be mistaken for an
+        active automatic transition. Publish settings or change online order availability manually.
       </p>
-      <div className="admin-settings-grid">
-        <label className="admin-field">
-          <span>Change</span>
-          <select
-            value={mode}
-            disabled={disabled}
-            onChange={(event) => setMode(event.currentTarget.value as SettingsScheduleMode)}
-          >
-            <option value="PUBLISH_SETTINGS">Publish saved settings</option>
-            <option value="PAUSE_ONLINE">Pause online orders</option>
-            <option value="RESUME_ONLINE">Resume online orders</option>
-          </select>
-        </label>
-        <label className="admin-field">
-          <span>Egypt local date/time</span>
-          <input
-            type="datetime-local"
-            step={1}
-            required
-            value={localScheduledAt}
-            disabled={disabled}
-            onChange={(event) => setLocalScheduledAt(event.currentTarget.value)}
-          />
-        </label>
-      </div>
-      <button
-        className="admin-primary-button"
-        type="submit"
-        disabled={disabled || localScheduledAt === ''}
-      >
-        {action?.busy ? 'Scheduling…' : 'Schedule change'}
-      </button>
-      <small>
-        Scheduled publishing includes opening, delivery, and online hours. Emergency controls above
-        remain immediate.
-      </small>
-      {message ? (
-        <p className="admin-field__help" aria-live="polite">
-          {message}
-        </p>
-      ) : null}
 
       <div>
         <span>Durable schedule history</span>
@@ -172,12 +114,12 @@ export function SettingsSchedulePanel({
                 {schedule.localScheduledAt} {schedule.timezone}
               </small>
               {schedule.status === 'FAILED' ? (
-                <small>Choose a new time or publish the saved settings manually.</small>
+                <small>Review the failure and publish the saved settings manually.</small>
               ) : null}
             </article>
           ))}
         </div>
       )}
-    </form>
+    </section>
   );
 }

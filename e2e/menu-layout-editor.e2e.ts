@@ -341,7 +341,18 @@ test('dirty shell exits keep or discard the exact editor transaction', async ({
   await page.getByRole('menuitem', { name: 'Sign out' }).click();
   guard = page.getByRole('dialog', { name: 'Discard menu changes?' });
   await guard.getByRole('button', { name: 'Discard changes' }).click();
-  await expect(page.getByText('Business Day active — operator sign-in required')).toBeVisible();
+  // The fixture's last active worker must complete End Day before sign-out.
+  // Discarding menu edits must never bypass that Business Day safety gate.
+  const endDayDialog = page.getByRole('dialog', { name: 'End Day' });
+  await expect(endDayDialog).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Operations' })).toBeVisible();
+  await endDayDialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(endDayDialog).toBeHidden();
+  await expect(page.getByRole('button', { name: /Demo Worker Two/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit menu' })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
 });
 
 test('pickup rollback, save failure, and save-in-flight freeze preserve transaction invariants', async ({

@@ -56,12 +56,6 @@ export type CatalogSchedulerRunResult = {
   failed: number;
 };
 
-export type CatalogSchedulerHttpResult = {
-  statusCode: number;
-  headers?: Readonly<Record<string, string>>;
-  body: Readonly<Record<string, unknown>>;
-};
-
 type UnknownRecord = Readonly<Record<string, unknown>>;
 
 type SchedulerClaimRow = {
@@ -351,33 +345,4 @@ export async function runCatalogScheduler(
   }
 
   return { claimed: claimed.length, applied, failed };
-}
-
-export async function handleCatalogSchedulerRequest(input: {
-  method: string | undefined;
-  authorization: string | undefined;
-  cronSecret: string | undefined;
-  runScheduler: () => Promise<CatalogSchedulerRunResult>;
-}): Promise<CatalogSchedulerHttpResult> {
-  if (input.method !== 'GET') {
-    return {
-      statusCode: 405,
-      headers: { Allow: 'GET' },
-      body: { error: 'method_not_allowed' },
-    };
-  }
-
-  const secret = input.cronSecret?.trim() ?? '';
-  if (secret === '') {
-    return { statusCode: 503, body: { error: 'cron_secret_not_configured' } };
-  }
-  if (input.authorization !== `Bearer ${secret}`) {
-    return { statusCode: 401, body: { error: 'unauthorized' } };
-  }
-
-  try {
-    return { statusCode: 200, body: await input.runScheduler() };
-  } catch {
-    return { statusCode: 503, body: { error: 'catalog_scheduler_unavailable' } };
-  }
 }

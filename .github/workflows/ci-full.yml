@@ -1,7 +1,15 @@
-name: TUX Full Regression (Manual)
+name: TUX Full Regression (Manual + Catalog PR)
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ci-full.yml'
+      - 'apps/admin/src/catalog/**'
+      - 'apps/admin/server/catalog/**'
+      - 'apps/admin/api/admin/catalog*'
+      - 'packages/admin-contracts/src/catalog.ts'
 
 permissions:
   contents: read
@@ -51,6 +59,8 @@ jobs:
         run: npm run format:check
       - name: Lint
         run: npm run lint
+      - name: Fast CI selector Node regression
+        run: node --test scripts/ci-fast-scope.test.mjs
       - name: Unit and integration tests
         run: npm run test
       - name: Sync workspace domain source regression
@@ -208,6 +218,34 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  branch-pin:
+    name: Branch + PIN authenticated Chromium E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Branch login and PIN isolation in real Chromium
+        run: TUX_OPERATIONS_BRANCH_E2E=1 npx playwright test e2e/operations-branch-login.e2e.ts e2e/operations-sync-delivery.e2e.ts --project=desktop-browser-fallback --reporter=line
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: branch-pin-browser-evidence
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
   menu:
     name: menu
     runs-on: ubuntu-latest
@@ -271,6 +309,7 @@ jobs:
       - edge-security
       - windows-package
       - menu
+      - branch-pin
       - architecture
     runs-on: ubuntu-latest
     steps:
@@ -281,6 +320,7 @@ jobs:
           EDGE_SECURITY_RESULT: ${{ needs.edge-security.result }}
           WINDOWS_RESULT: ${{ needs.windows-package.result }}
           MENU_RESULT: ${{ needs.menu.result }}
+          BRANCH_LOGIN_RESULT: ${{ needs.branch-pin.result }}
           ARCHITECTURE_RESULT: ${{ needs.architecture.result }}
         run: |
           test "$QUALITY_RESULT" = "success"
@@ -288,4 +328,5 @@ jobs:
           test "$EDGE_SECURITY_RESULT" = "success"
           test "$WINDOWS_RESULT" = "success"
           test "$MENU_RESULT" = "success"
+          test "$BRANCH_LOGIN_RESULT" = "success"
           test "$ARCHITECTURE_RESULT" = "success"

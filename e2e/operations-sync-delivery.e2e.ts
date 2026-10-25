@@ -6,9 +6,9 @@ import { buildRemoteMaterializationPlanV1 } from '../packages/sync/src/remoteMat
 import {
   SHOP,
   WORKER,
-  enterActiveOrders,
   minimalConfiguration,
   prepareRenderedOrderControls,
+  waitForActiveShell,
 } from './worker-system-color-test-helpers';
 
 const REMOTE_ORIGIN = 'https://tux.localhost:4173';
@@ -24,11 +24,47 @@ function workerPinHash(pin: string): string {
 
 async function routeRemoteRuntime(
   route: Route,
-  capture: { orderRow: Readonly<Record<string, unknown>> | null; orderPosts: number },
+  capture: {
+    orderRow: Readonly<Record<string, unknown>> | null;
+    orderPosts: number;
+    orderEventIds: string[];
+    orderIds: string[];
+    auxiliaryUnavailablePaths: string[];
+  },
 ): Promise<void> {
   const request = route.request();
   const url = new URL(request.url());
 
+  if (url.pathname === '/api/operations-shops') {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ shops: [{ id: SHOP, name: 'TUX E2E Shop' }] }),
+    });
+    return;
+  }
+  if (url.pathname === '/api/device-bootstrap' && request.method() === 'POST') {
+    const body = request.postDataJSON() as { pin?: string; shopId?: string };
+    expect(body.pin).toBe('1234');
+    expect(body.shopId).toBe(SHOP);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        shopId: SHOP,
+        deviceId: DEVICE_ID,
+        shop: { id: SHOP, name: 'TUX E2E Shop', active: true },
+        worker: {
+          id: WORKER,
+          shopId: SHOP,
+          displayName: 'Demo Worker One',
+          pinHash: workerPinHash('1234'),
+          active: true,
+        },
+      }),
+    });
+    return;
+  }
   if (url.pathname === '/api/device-session') {
     await route.fulfill({
       status: 200,
@@ -92,6 +128,20 @@ async function routeRemoteRuntime(
     });
     return;
   }
+  if (url.pathname === '/api/operations-sync' && request.method() === 'GET') {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        shopId: SHOP,
+        openDayId: null,
+        openDay: null,
+        openWorkerCount: 0,
+        localDayStatus: null,
+      }),
+    });
+    return;
+  }
   if (url.pathname === '/api/operations-sync' && request.method() === 'POST') {
     const envelope = request.postDataJSON();
     const plan = buildRemoteMaterializationPlanV1(envelope);
@@ -99,6 +149,8 @@ async function routeRemoteRuntime(
     if (orderMutation !== undefined) {
       capture.orderPosts += 1;
       capture.orderRow = orderMutation.row;
+      capture.orderEventIds.push(String(envelope.eventId));
+      capture.orderIds.push(String(orderMutation.row['id']));
       expect(request.headers()['x-tux-event-id']).toBe(envelope.eventId);
       expect(request.headers()['x-tux-idempotency-key']).toBe(envelope.idempotencyKey);
     }
@@ -110,6 +162,10 @@ async function routeRemoteRuntime(
     return;
   }
   if (url.pathname.startsWith('/api/')) {
+    // These auxiliary services are deliberately outside the isolated Order Sync
+    // fixture. Record every unavailable endpoint so a new critical dependency
+    // cannot silently become an accepted 503 response.
+    capture.auxiliaryUnavailablePaths.push(url.pathname);
     await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
     return;
   }
@@ -122,22 +178,46 @@ test('Chromium delivers a locally created Order and exposes its canonical Admin 
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  test.skip(
+    process.env['TUX_OPERATIONS_BRANCH_E2E'] !== '1',
+    'Requires the authenticated Operations build; legacy fallback intentionally disables remote sync.',
+  );
   const capture: {
     orderRow: Readonly<Record<string, unknown>> | null;
     orderPosts: number;
-  } = { orderRow: null, orderPosts: 0 };
+    orderEventIds: string[];
+    orderIds: string[];
+    auxiliaryUnavailablePaths: string[];
+  } = {
+    orderRow: null,
+    orderPosts: 0,
+    orderEventIds: [],
+    orderIds: [],
+    auxiliaryUnavailablePaths: [],
+  };
   const consoleErrors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
   });
   await page.route(`${REMOTE_ORIGIN}/**`, (route) => routeRemoteRuntime(route, capture));
 
-  await enterActiveOrders(page, REMOTE_ORIGIN);
+  await page.goto(REMOTE_ORIGIN);
+  await page.getByRole('combobox', { name: 'Branch' }).selectOption(SHOP);
+  await page.getByLabel('Enter PIN to Sign In').fill('1234');
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.welcome-action') !== null ||
+      document.querySelector('[aria-label="Operations"]') !== null,
+  );
+  const greeting = page.locator('.welcome-action');
+  if (await greeting.isVisible()) await greeting.click();
+  await waitForActiveShell(page);
   await prepareRenderedOrderControls(page);
   await page.getByRole('button', { name: 'Place Order', exact: true }).click();
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
 
-  await expect.poll(() => capture.orderPosts, { timeout: 20_000 }).toBe(1);
+  await expect.poll(() => capture.orderPosts, { timeout: 20_000 }).toBeGreaterThan(0);
   await expect(page.locator('[data-state="SYNCED"]')).toBeVisible();
   const pendingCount = await page.evaluate(
     () =>
@@ -161,6 +241,10 @@ test('Chromium delivers a locally created Order and exposes its canonical Admin 
       }),
   );
   expect(pendingCount).toBe(0);
+  // At-least-once delivery may replay the same immutable ORDER_PLACED envelope.
+  // It must not manufacture another event or a second canonical Order identity.
+  expect(new Set(capture.orderEventIds).size).toBe(1);
+  expect(new Set(capture.orderIds).size).toBe(1);
 
   const select = async (table: string) => {
     if (table === 'business_shops') return [{ shop_id: SHOP }];
@@ -182,7 +266,22 @@ test('Chromium delivers a locally created Order and exposes its canonical Admin 
     source: 'POS',
     displayOrderLabel: '#1',
   });
-  expect(consoleErrors).toEqual([]);
+  const allowedUnavailable = new Set([
+    '/api/worker-menu-layout',
+    '/api/worker-ui-preferences',
+    '/api/operations-order-rewards',
+    '/api/whatsapp',
+    '/api/operations-session-exit',
+  ]);
+  expect(capture.auxiliaryUnavailablePaths.length).toBeGreaterThan(0);
+  expect(capture.auxiliaryUnavailablePaths.filter((path) => !allowedUnavailable.has(path))).toEqual(
+    [],
+  );
+  // Browser console 503s belong exclusively to the deliberately unavailable
+  // auxiliary fixture paths above, never the asserted Order Sync endpoint.
+  const expectedAuxiliary503 =
+    'Failed to load resource: the server responded with a status of 503 (Service Unavailable)';
+  expect(consoleErrors.filter((message) => message !== expectedAuxiliary503)).toEqual([]);
 
   await page.screenshot({
     path: testInfo.outputPath('operations-order-delivered-and-synced.png'),

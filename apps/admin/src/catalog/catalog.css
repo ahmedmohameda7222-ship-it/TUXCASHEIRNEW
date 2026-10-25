@@ -595,3 +595,33 @@
     grid-column: auto;
   }
 }
+
+.admin-catalog-bulk-selection {
+  display: grid;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+}
+
+.admin-catalog-bulk-selection__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+}
+
+.admin-catalog-bulk-selection__item input {
+  flex: none;
+}
+
+.admin-catalog-bulk-selection__item span {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-catalog-bulk-selection__item small {
+  color: var(--tux-text-secondary);
+}

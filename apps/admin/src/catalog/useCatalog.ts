@@ -20,6 +20,7 @@ import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
 import type { ProductEditorDraft } from './ProductEditor';
 import { applyProductAdvancedDraft } from './catalogAdvancedDraft';
+import { stageCatalogBulkEditBundle, type CatalogBulkPatch } from './catalogBulkEdit';
 import {
   catalogDefinitionsFromBundle,
   reorderCatalogDefinitionsInBundle,
@@ -469,6 +470,86 @@ export function useCatalog(shopId: string | undefined) {
     },
   });
 
+  const saveBulkProducts = useMutation({
+    mutationFn: async (input: {
+      selectedIds: string[];
+      patch: CatalogBulkPatch;
+      expectedBefore: CatalogProductDetail[];
+    }) => {
+      if (!shopId) throw new CatalogUiError('concrete_shop_required');
+      const draft = await loadOrCreateDraftForShop('Bulk product editing');
+      const staged = stageCatalogBulkEditBundle(
+        draft.bundleJson,
+        shopId,
+        input.selectedIds,
+        input.patch,
+        categories,
+      );
+
+      const expectedById = new Map(input.expectedBefore.map((product) => [product.id, product]));
+      const fields: Array<keyof CatalogProductDetail> = [
+        'id',
+        'shopId',
+        'categoryId',
+        'slug',
+        'name',
+        'description',
+        'priceMinor',
+        'imageKey',
+        'family',
+        'bestSeller',
+        'active',
+        'soldOut',
+        'isCombo',
+        'sortOrder',
+      ];
+      if (
+        expectedById.size !== staged.preview.length ||
+        staged.preview.some(({ before }) => {
+          const expected = expectedById.get(before.id);
+          return !expected || fields.some((field) => before[field] !== expected[field]);
+        })
+      ) {
+        throw new CatalogUiError('bulk_preview_stale');
+      }
+
+      const saved = await adminFetch<CatalogDraftSaveResult>(
+        '/api/admin/catalog',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'draft.save',
+            draftId: draft.draftId,
+            shopId,
+            expectedDraftRevision: draft.draftRevision,
+            changes: [
+              {
+                kind: 'bundle.replace',
+                bundleJson: staged.bundleJson,
+                changedPaths: staged.changedPaths,
+              },
+            ],
+          }),
+        },
+        csrfTokenForMutation(session),
+      );
+      if (!saved.ok) throw new CatalogUiError(saved.code);
+      const nextDraft: ActiveCatalogDraft = {
+        draftId: draft.draftId,
+        draftRevision: saved.draftRevision,
+        basePublishVersion: saved.basePublishVersion,
+        bundleJson: staged.bundleJson,
+      };
+      activeDraftRef.current = nextDraft;
+      return nextDraft;
+    },
+    onSuccess(draft) {
+      setActiveDraft(draft);
+      setDraftProducts(productsFromBundle(draft.bundleJson));
+      setDraftInvalidatedByLiveChange(false);
+    },
+  });
+
   const setAvailability = useMutation({
     mutationFn: async ({ productId, soldOut }: { productId: string; soldOut: boolean }) => {
       if (!shopId) throw new CatalogUiError('concrete_shop_required');
@@ -506,6 +587,7 @@ export function useCatalog(shopId: string | undefined) {
     prepareDefinitionsDraft,
     saveProduct,
     saveDefinitions,
+    saveBulkProducts,
     setAvailability,
   };
 }
