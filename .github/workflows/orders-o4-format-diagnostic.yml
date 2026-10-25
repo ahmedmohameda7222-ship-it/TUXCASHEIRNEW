@@ -1,0 +1,29 @@
+name: Temporary Orders O4 formatting diagnostic
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/orders-o4-format-diagnostic.yml']
+permissions:
+  contents: read
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Print exact formatting-only patch
+        run: |
+          npx prettier --write e2e/admin-orders.spec.ts
+          git diff --no-ext-diff --unified=3 -- e2e/admin-orders.spec.ts
+          echo FORMAT_DIAGNOSTIC_COMPLETE
