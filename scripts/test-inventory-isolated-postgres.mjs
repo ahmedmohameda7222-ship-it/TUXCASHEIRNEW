@@ -276,3 +276,19 @@ verify(replayPost.ok && replayPost.idempotentReplay,
 eq(query("select count(*) from public.inventory_movements where command_id='canonical-stocktake-post' and movement_type='STOCKTAKE_ADJUSTMENT'"),
   '1','Exactly one canonical post adjustment');
 console.log('Inventory acceptance: actual begin/post RPC permits same-command variance exactly once.');
+
+
+// A draft started before migration has no immutable ledger baseline. Fail
+// closed rather than falsely certifying it just because no new row is dated
+// after its started_at; the operator must begin a fresh physical count.
+const legacyCount='60000000-0000-4000-8000-000000000005';
+beginCount(legacyCount);
+query('update public.stocktake_lines set snapshot_movement_count=null where stocktake_id='+literal(legacyCount),
+  'Simulate pre-migration count without movement fence');
+const legacySession=call('read_admin_stocktake_sessions_v1',E,S).sessions.find(x=>x.stocktakeId===legacyCount);
+verify(legacySession?.stale===true,'Unfenced legacy draft must be visibly stale');
+reject(post(legacyCount,'legacy-post'),'stocktake_snapshot_stale',
+  'Unfenced legacy draft cannot be posted after migration');
+eq(query('select status from public.stocktakes where id='+literal(legacyCount)),'DRAFT',
+  'Legacy draft posting rejection leaves no stock movement');
+console.log('Inventory acceptance: pre-migration unfenced draft fails closed.');
