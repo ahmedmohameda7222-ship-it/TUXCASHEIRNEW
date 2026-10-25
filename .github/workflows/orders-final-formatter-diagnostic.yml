@@ -1,0 +1,27 @@
+name: Temporary Orders final formatter diagnostic
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/orders-final-formatter-diagnostic.yml']
+permissions:
+  contents: read
+jobs:
+  exact-diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Show reviewed Prettier diff
+        run: |
+          npx prettier --write apps/admin/src/orders/OrderDetailPage.tsx e2e/admin-orders.spec.ts
+          git diff --no-ext-diff --unified=3 -- apps/admin/src/orders/OrderDetailPage.tsx e2e/admin-orders.spec.ts
+          echo ORDERS_FINAL_FORMAT_DIFF_END
