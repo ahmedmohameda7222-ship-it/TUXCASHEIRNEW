@@ -862,7 +862,7 @@ test('approved desktop order directory exposes named data columns without fake s
   await expect(first.locator('.admin-order-row__source')).toContainText('In-store');
   await expect(first.locator('.admin-order-row__status')).toContainText('Active');
   await expect(page.getByRole('button', { name: 'Bulk cancel' })).toHaveCount(0);
-  expect(
-    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-  ).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
 });
