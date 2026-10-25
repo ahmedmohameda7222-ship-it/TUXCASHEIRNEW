@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
 
 import type { CatalogPublishPreview, CatalogScheduledChangeSummary } from '@tux/admin-contracts';
@@ -7,6 +7,7 @@ import { PageScaffold } from '../components/layout/PageScaffold';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { CatalogCopyPanel } from './CatalogCopyPanel';
 import { PublishReviewChanges } from './PublishReviewChanges';
+import { publishReviewIdentity } from './publishReviewIdentity';
 import { VersionHistory } from './VersionHistory';
 import { CatalogUiError, useCatalogPublishing } from './useCatalog';
 import './catalog.css';
@@ -116,11 +117,13 @@ export function PublishReviewPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingRestoreVersion, setPendingRestoreVersion] = useState<number | null>(null);
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
-  const [confirmedPublish, setConfirmedPublish] = useState(false);
+  const [confirmedPreviewIdentity, setConfirmedPreviewIdentity] = useState<string | null>(null);
+  const selectedDraftRef = useRef<string | null>(null);
+  const shopRef = useRef(shopId);
 
   useEffect(() => {
     setSelectedDraftId(null);
-    setConfirmedPublish(false);
+    setConfirmedPreviewIdentity(null);
     setRequesterPin('');
     setNotice(null);
     setActionError(null);
@@ -147,8 +150,32 @@ export function PublishReviewPage() {
   const canEditCatalog = principal.permissions.includes('catalog.edit');
   const data = publishing.publishingQuery.data;
   const draftPreviews = data?.draftPreviews ?? [];
+  // Select the first available draft only on initial load. If an already selected
+  // draft disappears, never silently select a different draft for publication.
   const preview =
-    draftPreviews.find((candidate) => candidate.draftId === selectedDraftId) ?? draftPreviews[0];
+    selectedDraftId === null
+      ? draftPreviews[0]
+      : draftPreviews.find((candidate) => candidate.draftId === selectedDraftId);
+  const reviewedIdentity =
+    preview && data?.shopId === shopId ? publishReviewIdentity(shopId, preview) : null;
+  const confirmedPublish =
+    reviewedIdentity !== null &&
+    confirmedPreviewIdentity === reviewedIdentity &&
+    !publishing.publishingQuery.isFetching &&
+    !publishing.publishingQuery.isError;
+
+  selectedDraftRef.current = selectedDraftId ?? preview?.draftId ?? null;
+  shopRef.current = shopId;
+
+  useEffect(() => {
+    if (!data || selectedDraftId !== null) return;
+    setSelectedDraftId(data.draftPreviews[0]?.draftId ?? '');
+  }, [data, selectedDraftId]);
+
+  useEffect(() => {
+    setConfirmedPreviewIdentity(null);
+    setRequesterPin('');
+  }, [reviewedIdentity]);
   const schedules = (data?.schedules ?? []).filter((schedule) =>
     new Set(['PENDING', 'FAILED', 'CLAIMED']).has(schedule.status),
   );
@@ -163,16 +190,50 @@ export function PublishReviewPage() {
   }
 
   async function publishNow() {
-    if (!preview || preview.shopId !== shopId || !confirmedPublish) return;
+    if (!preview || preview.shopId !== shopId || !confirmedPublish || !reviewedIdentity) return;
+    // Never use a revision read after the operator's explicit confirmation.
+    const selectedAtConfirmation = selectedDraftRef.current;
+    const shopAtConfirmation = shopRef.current;
+    const confirmed = {
+      shopId,
+      draftId: preview.draftId,
+      expectedDraftRevision: preview.draftRevision,
+      expectedVersion: preview.currentPublishVersion,
+      previewIdentity: reviewedIdentity,
+      requesterPin: requesterPin.trim(),
+    };
     await runAction(async () => {
+      // A background refetch alone cannot close the confirmation-to-click race.
+      // Explicitly revalidate the exact reviewed preview immediately before POST.
+      const refreshed = await publishing.publishingQuery.refetch();
+      const current = refreshed.data;
+      const sameDraft = current?.draftPreviews.find(
+        (candidate) => candidate.draftId === confirmed.draftId,
+      );
+      if (
+        refreshed.isError ||
+        !current ||
+        current.shopId !== confirmed.shopId ||
+        current.currentPublishVersion !== confirmed.expectedVersion ||
+        shopRef.current !== shopAtConfirmation ||
+        selectedDraftRef.current !== selectedAtConfirmation ||
+        !sameDraft ||
+        sameDraft.stale ||
+        publishReviewIdentity(confirmed.shopId, sameDraft) !== confirmed.previewIdentity
+      ) {
+        setConfirmedPreviewIdentity(null);
+        setRequesterPin('');
+        setActionError('The reviewed draft changed. Review the updated changes and confirm again.');
+        return;
+      }
       const result = await publishing.publishDraft.mutateAsync({
-        draftId: preview.draftId,
-        expectedDraftRevision: preview.draftRevision,
-        expectedVersion: preview.currentPublishVersion,
-        ...(requesterPin.trim() ? { requesterPin: requesterPin.trim() } : {}),
+        draftId: confirmed.draftId,
+        expectedDraftRevision: confirmed.expectedDraftRevision,
+        expectedVersion: confirmed.expectedVersion,
+        ...(confirmed.requesterPin ? { requesterPin: confirmed.requesterPin } : {}),
       });
       setRequesterPin('');
-      setConfirmedPublish(false);
+      setConfirmedPreviewIdentity(null);
       if ('state' in result && result.state === 'PENDING_APPROVAL') {
         setNotice(
           'Catalog publication requested. A second person must approve before it goes live.',
@@ -273,7 +334,7 @@ export function PublishReviewPage() {
             </span>
           </div>
 
-          {draftPreviews.length > 1 ? (
+          {draftPreviews.length > 1 || (selectedDraftId !== null && !preview) ? (
             <label className="admin-field">
               <span>Changes to review</span>
               <select
@@ -281,9 +342,11 @@ export function PublishReviewPage() {
                 value={preview?.draftId ?? ''}
                 onChange={(event) => {
                   setSelectedDraftId(event.target.value);
-                  setConfirmedPublish(false);
+                  setConfirmedPreviewIdentity(null);
+                  setRequesterPin('');
                 }}
               >
+                {!preview ? <option value="">Select saved changes to review</option> : null}
                 {draftPreviews.map((candidate, index) => (
                   <option key={candidate.draftId} value={candidate.draftId}>
                     Saved changes {index + 1}
@@ -339,8 +402,17 @@ export function PublishReviewPage() {
                     <input
                       type="checkbox"
                       checked={confirmedPublish}
-                      disabled={!canPublish || preview.stale || publishing.publishDraft.isPending}
-                      onChange={(event) => setConfirmedPublish(event.currentTarget.checked)}
+                      disabled={
+                        !canPublish ||
+                        preview.stale ||
+                        publishing.publishDraft.isPending ||
+                        publishing.publishingQuery.isFetching
+                      }
+                      onChange={(event) =>
+                        setConfirmedPreviewIdentity(
+                          event.currentTarget.checked ? reviewedIdentity : null,
+                        )
+                      }
                     />{' '}
                     I reviewed the changes and confirm publication for this shop.
                   </span>
@@ -352,7 +424,8 @@ export function PublishReviewPage() {
                     !canPublish ||
                     !confirmedPublish ||
                     preview.stale ||
-                    publishing.publishDraft.isPending
+                    publishing.publishDraft.isPending ||
+                    publishing.publishingQuery.isFetching
                   }
                   onClick={() => void publishNow()}
                 >

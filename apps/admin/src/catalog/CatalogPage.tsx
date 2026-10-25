@@ -1,6 +1,6 @@
 import type { CatalogProductDetail } from '@tux/admin-contracts';
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'wouter';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'wouter';
 
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { PageScaffold } from '../components/layout/PageScaffold';
@@ -77,10 +77,74 @@ export function CatalogPage() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [modeError, setModeError] = useState<string | null>(null);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  const routeRef = useRef(location);
+  const ignorePopstate = useRef(false);
   const scopedUnsavedProduct = unsavedProduct?.shopId === shopId ? unsavedProduct : null;
   const selectedProductId =
     scopedUnsavedProduct?.id ?? detailIdFromPath(location, '/catalog/products');
   const mobileEditing = selectedProductId !== null;
+
+  routeRef.current = location;
+
+  useEffect(() => {
+    function interceptLink(event: MouseEvent) {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.shiftKey ||
+        !hasUnsavedDrafts()
+      ) return;
+      const node = event.target;
+      if (!(node instanceof Element)) return;
+      const anchor = node.closest('a[href]');
+      if (!anchor || anchor.hasAttribute('download') || anchor.getAttribute('target')) return;
+      const url = new URL(anchor.href, window.location.href);
+      if (url.origin !== window.location.origin || url.pathname === routeRef.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setPendingNavigation(url.pathname + url.search + url.hash);
+    }
+    function onPopstate(event: PopStateEvent) {
+      if (ignorePopstate.current) {
+        ignorePopstate.current = false;
+        return;
+      }
+      if (!hasUnsavedDrafts() || window.location.pathname === routeRef.current) return;
+      const requested = window.location.pathname + window.location.search + window.location.hash;
+      event.stopImmediatePropagation();
+      // popstate cannot be cancelled; restore the current editor URL before
+      // allowing React's router to discard the editor's local form values.
+      window.history.pushState(window.history.state, '', routeRef.current);
+      ignorePopstate.current = true;
+      window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
+      setPendingNavigation(requested);
+    }
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      if (!hasUnsavedDrafts()) return;
+      event.preventDefault();
+      event.returnValue = '';
+    }
+    document.addEventListener('click', interceptLink, true);
+    window.addEventListener('popstate', onPopstate, true);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      document.removeEventListener('click', interceptLink, true);
+      window.removeEventListener('popstate', onPopstate, true);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
+  }, [hasUnsavedDrafts]);
+
+  function requestCatalogNavigation(destination: string) {
+    if (hasUnsavedDrafts()) {
+      setPendingNavigation(destination);
+      return;
+    }
+    navigate(destination);
+  }
 
   const canEdit = permission(principal, 'catalog.edit');
   const canPrice = permission(principal, 'catalog.pricing');
@@ -271,9 +335,13 @@ export function CatalogPage() {
               {bulkOpen ? 'Close Bulk Edit' : 'Bulk Edit'}
             </button>
           ) : null}
-          <Link className="admin-secondary-button" href="/catalog/products/publishing">
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={() => requestCatalogNavigation('/catalog/products/publishing')}
+          >
             Review & Publish ({catalog.compatibleDrafts.length})
-          </Link>
+          </button>
           <label>
             <span>New product category</span>
             <select
@@ -322,9 +390,13 @@ export function CatalogPage() {
         <div className="admin-callout" role="status">
           <strong>Draft saved — not published</strong>
           <span>Your changes are saved for this shop but are not live.</span>
-          <Link className="admin-secondary-button" href="/catalog/products/publishing">
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={() => requestCatalogNavigation('/catalog/products/publishing')}
+          >
             Review & Publish
-          </Link>
+          </button>
         </div>
       ) : null}
 
@@ -371,6 +443,42 @@ export function CatalogPage() {
             The previous unscheduled editing session was cleared. Persisted compatible work remains
             available for explicit resume.
           </span>
+        </div>
+      ) : null}
+
+      {pendingNavigation ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="switch-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="catalog-navigation-confirm-title"
+          >
+            <h2 id="catalog-navigation-confirm-title">Discard unsaved product edits?</h2>
+            <p>These product changes have not been saved. Stay to keep editing, or discard them to leave Catalog.</p>
+            <div className="drawer-footer">
+              <button
+                className="admin-secondary-button"
+                type="button"
+                autoFocus
+                onClick={() => setPendingNavigation(null)}
+              >
+                Stay and keep editing
+              </button>
+              <button
+                className="admin-primary-button"
+                type="button"
+                onClick={() => {
+                  const destination = pendingNavigation;
+                  setPendingNavigation(null);
+                  setUnsavedProduct(null);
+                  navigate(destination);
+                }}
+              >
+                Discard changes and navigate
+              </button>
+            </div>
+          </section>
         </div>
       ) : null}
 
@@ -483,6 +591,7 @@ export function CatalogPage() {
                 onRequestAdvanced={async () => {
                   await catalog.prepareProductDraft.mutateAsync(selectedProduct);
                 }}
+                onReviewPublish={() => requestCatalogNavigation('/catalog/products/publishing')}
                 onSaveDraft={async (draft) => {
                   await catalog.saveProduct.mutateAsync(draft);
                   setDraftSaved(true);

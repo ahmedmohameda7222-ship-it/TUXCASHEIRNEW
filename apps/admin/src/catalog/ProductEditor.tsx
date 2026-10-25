@@ -4,7 +4,6 @@ import type {
   CatalogProductDetail,
 } from '@tux/admin-contracts';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link } from 'wouter';
 import { useUnsavedShopDraft } from '../shops/ShopScopeProvider';
 
 import {
@@ -32,6 +31,7 @@ export type ProductEditorProps = {
   busy?: boolean;
   onRequestAdvanced?(): void | Promise<void>;
   onSaveDraft(draft: ProductEditorDraft): void | Promise<void>;
+  onReviewPublish?(): void;
   onSetAvailability(soldOut: boolean): void | Promise<void>;
   onUploadImage?: ((file: File) => Promise<{ imageKey: string; publicUrl: string }>) | undefined;
   imageRequiresSaveFirst?: boolean;
@@ -87,6 +87,7 @@ export function ProductEditor({
   busy = false,
   onRequestAdvanced,
   onSaveDraft,
+  onReviewPublish,
   onSetAvailability,
   onUploadImage,
   imageRequiresSaveFirst = false,
@@ -708,12 +709,13 @@ export function ProductEditor({
             <p className="admin-field__help">
               Published releases stay in history. Restoring creates a new release.
             </p>
-            <Link
+            <button
               className="admin-secondary-button admin-catalog-history-link"
-              href="/catalog/products/publishing"
+              type="button"
+              onClick={onReviewPublish}
             >
               Open version history
-            </Link>
+            </button>
           </section>
         </div>
       ) : null}
