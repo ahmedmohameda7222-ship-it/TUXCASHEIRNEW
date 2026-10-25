@@ -51,9 +51,12 @@ export function useInventory(shopId: string | undefined, inventoryItemId: string
     },
   });
 
+  const stocktakePermission = session.state.status === 'authenticated' &&
+    session.state.session.principal.permissions.includes('inventory.stocktake');
+
   const stocktakeEligibilityQuery = useQuery({
     queryKey: shopId ? [...inventoryQueryKey(shopId), 'stocktake-eligibility'] : ['admin', 'inventory', 'no-stocktake-eligibility'],
-    enabled: Boolean(shopId),
+    enabled: Boolean(shopId) && stocktakePermission,
     queryFn: async () => {
       if (!shopId) throw new InventoryUiError('concrete_shop_required');
       return adminFetch<{ allowed: boolean; code: string }>(
