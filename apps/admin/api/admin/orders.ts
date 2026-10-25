@@ -25,6 +25,7 @@ import {
   type AdminResponse,
 } from '../../server/http.js';
 import { createOrderService, type OrderStore } from '../../server/orders/orderService.js';
+import { effectiveFinancialState, projectPaymentRefundBalances, projectReturnQuantities } from '../../server/orders/orderFinancialProjection.js';
 import { readAdminSessionToken } from '../../server/session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
 
@@ -105,6 +106,7 @@ type PaymentRow = {
   allocated_minor: number | string;
   received_minor: number | string | null;
   change_minor: number | string | null;
+  refund_allowed_snapshot: boolean;
 };
 
 type ItemRow = {
@@ -175,6 +177,8 @@ type AuditRow = {
 type RefundRow = {
   id: string;
   amount_minor: number | string;
+  payment_id: string;
+  created_by_employee_id: string;
   reason_code_id: string;
   reason_code_key: string;
   reason_label_snapshot: string;
@@ -188,6 +192,7 @@ type RefundRow = {
 
 type ReturnRow = {
   id: string;
+  created_by_employee_id: string;
   reason_code_id: string;
   reason_code_key: string;
   reason_label_snapshot: string;
@@ -201,7 +206,19 @@ type ReturnRow = {
 
 type ReturnItemRow = {
   return_id: string;
+  order_item_id: string;
+  quantity: number | string;
   amount_minor: number | string;
+};
+
+type ApprovalRow = {
+  id: string;
+  status: 'PENDING' | 'APPROVED' | 'EXECUTING' | 'EXECUTED' | 'REJECTED' | 'FAILED';
+  requester_employee_id: string;
+  approver_employee_id: string | null;
+  decided_at: string | null;
+  executed_at: string | null;
+  decision_reason: string | null;
 };
 
 type ReasonCodeRow = {
@@ -393,7 +410,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
             'payments',
             new URLSearchParams({
               select:
-                'id,payment_method_label_snapshot,logic_type_snapshot,allocated_minor,received_minor,change_minor',
+                'id,payment_method_label_snapshot,logic_type_snapshot,allocated_minor,received_minor,change_minor,refund_allowed_snapshot',
               order_id: `eq.${input.orderId}`,
               shop_id: `eq.${input.shopId}`,
               order: 'part_index.asc',
@@ -444,7 +461,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
             'admin_order_refunds',
             new URLSearchParams({
               select:
-                'id,amount_minor,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,note,state,approval_request_id,created_at',
+                'id,payment_id,amount_minor,created_by_employee_id,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,note,state,approval_request_id,created_at',
               business_id: `eq.${input.businessId}`,
               shop_id: `eq.${input.shopId}`,
               order_id: `eq.${input.orderId}`,
@@ -455,7 +472,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
             'admin_order_returns',
             new URLSearchParams({
               select:
-                'id,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,note,state,approval_request_id,created_at',
+                'id,created_by_employee_id,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,note,state,approval_request_id,created_at',
               business_id: `eq.${input.businessId}`,
               shop_id: `eq.${input.shopId}`,
               order_id: `eq.${input.orderId}`,
@@ -525,7 +542,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           : await client.select<ReturnItemRow[]>(
               'admin_order_return_items',
               new URLSearchParams({
-                select: 'return_id,amount_minor',
+                select: 'return_id,order_item_id,quantity,amount_minor',
                 return_id: `in.(${returnIds.join(',')})`,
                 order: 'created_at.asc,id.asc',
               }),
