@@ -83,6 +83,13 @@ export function OrderDetailPage({
         <strong className="admin-order-detail__total">{money(order.totalMinor)}</strong>
       </header>
 
+      <div className="admin-order-detail__print-action">
+        <button className="admin-secondary-button" type="button" onClick={() => window.print()}>
+          Print order summary
+        </button>
+        <small>This prints the immutable Admin order summary, not a new numbered fiscal receipt.</small>
+      </div>
+
       <section className="admin-order-detail__card" aria-label="Order identity">
         <h3>Order identity</h3>
         <p>Business day: {order.businessDayId ?? 'Not available'}</p>
