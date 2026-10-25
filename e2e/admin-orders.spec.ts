@@ -989,3 +989,19 @@ for (const width of [1100, 720] as const) {
     await capturePremiumScreenshot(page, 'orders-inspector');
   });
 }
+
+test('approved Orders 1536×1024 reference composition remains fully navigable', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1536, height: 1024 });
+  await mockOrders(page);
+  await page.goto('/orders');
+  await expect(page.getByLabel('Orders key metrics')).toContainText('Total orders');
+  await page.getByRole('button', { name: /#101/ }).click();
+  await expect(page.getByRole('navigation', { name: 'Order detail sections' })).toBeVisible();
+  await expect(page.locator('.admin-master-detail__list')).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+  ).toBe(true);
+  await capturePremiumScreenshot(page, 'orders-reference');
+});
