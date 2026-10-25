@@ -254,3 +254,25 @@ eq(call('save_admin_stocktake_draft_v1',E,S,backdatedCount,0,
 reject(post(backdatedCount,'backdated-post'),'stocktake_snapshot_stale',
   'Backdated late replay must prohibit physical count posting even with same expected snapshot');
 console.log('Inventory acceptance: server-side ledger fence catches backdated late replay.');
+
+
+// The ledger fence must NOT block an authorized stocktake adjustment created
+// by the SAME post command inside the original canonical transactional RPC.
+const realBegin=call('begin_stocktake_v1',E,S,[A],'canonical-stocktake-begin');
+verify(realBegin.ok && realBegin.stocktakeId && realBegin.lines.length === 1,
+  'Canonical begin_stocktake_v1 returns real snapshot');
+const beforeCanonicalPost=balance(S,A);
+const canonicalPostLines=[{inventoryItemId:A,actualCountMicros:beforeCanonicalPost-1000000}];
+const realPost=call('post_stocktake_v1',E,S,realBegin.stocktakeId,
+  canonicalPostLines,'canonical-stocktake-post');
+verify(realPost.ok === true && !realPost.idempotentReplay,
+  'Original post_stocktake_v1 can post a legitimate variance under ledger fence');
+eq(balance(S,A),beforeCanonicalPost-1000000,
+  'Canonical post writes exactly one physical stock variance into real ledger');
+const replayPost=call('post_stocktake_v1',E,S,realBegin.stocktakeId,
+  canonicalPostLines,'canonical-stocktake-post');
+verify(replayPost.ok && replayPost.idempotentReplay,
+  'Canonical post retry must be idempotent, not duplicate the adjustment');
+eq(query("select count(*) from public.inventory_movements where command_id='canonical-stocktake-post' and movement_type='STOCKTAKE_ADJUSTMENT'"),
+  '1','Exactly one canonical post adjustment');
+console.log('Inventory acceptance: actual begin/post RPC permits same-command variance exactly once.');
