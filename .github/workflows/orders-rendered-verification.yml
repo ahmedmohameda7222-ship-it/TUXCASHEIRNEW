@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - fix/orders-production-remediation-20261025
+    paths:
+      - '.github/workflows/orders-rendered-verification.yml'
   workflow_dispatch:
 
 permissions:
@@ -11,7 +13,7 @@ permissions:
 
 concurrency:
   group: orders-rendered-verification-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   admin-rendered:
