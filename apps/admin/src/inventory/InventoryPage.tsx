@@ -486,9 +486,11 @@ export function InventoryPage() {
           transfers={workspace.transfers}
           sending={inventory.sendTransfer.isPending}
           receiving={inventory.receiveTransfer.isPending}
+          cancelling={inventory.cancelTransfer.isPending}
           onBack={() => setMode('detail')}
           onSend={(input) => inventory.sendTransfer.mutate(input)}
           onReceive={(transferId) => inventory.receiveTransfer.mutate(transferId)}
+          onCancelTransfer={(transferId) => inventory.cancelTransfer.mutate(transferId)}
         />
       ) : (
         <ResponsiveMasterDetail
