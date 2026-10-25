@@ -9,7 +9,6 @@ function formatQuantity(micros: number, unitLabel: string): string {
   )} ${unitLabel}`;
 }
 
-
 export function StocktakePage({
   items,
   snapshot,
