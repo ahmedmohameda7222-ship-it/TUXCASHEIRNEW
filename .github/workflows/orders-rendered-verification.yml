@@ -17,7 +17,7 @@ permissions:
 
 concurrency:
   group: orders-rendered-verification-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   admin-rendered:
