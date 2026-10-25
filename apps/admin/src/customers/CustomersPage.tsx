@@ -385,6 +385,16 @@ export function CustomersPage() {
                       aria-label="Current saved loyalty settings"
                     >
                       <h3>Current saved settings</h3>
+                      <button
+                        className="admin-secondary-button"
+                        type="button"
+                        onClick={() => void programQuery.refetch()}
+                        disabled={programQuery.isFetching}
+                      >
+                        {programQuery.isFetching
+                          ? 'Refreshing saved settings…'
+                          : 'Refresh saved loyalty settings'}
+                      </button>
                       {programQuery.isLoading ? (
                         <p role="status">Loading current loyalty settings…</p>
                       ) : null}
