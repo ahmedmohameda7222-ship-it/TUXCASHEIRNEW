@@ -123,7 +123,10 @@ export function ExpensesPage() {
         ) : undefined
       }
     >
-      <FinanceSectionNav active="expenses" />
+      <FinanceSectionNav
+        active="expenses"
+        canReconcile={principal.permissions.includes('finance.reconcile')}
+      />
       <nav className="tux-finance-expense-tasks" aria-label="Expense workspaces">
         <a href="#expense-recurring">
           <strong>Due &amp; recurring</strong>
