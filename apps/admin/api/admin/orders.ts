@@ -27,6 +27,7 @@ import {
 } from '../../server/http.js';
 import { createOrderService, type OrderStore } from '../../server/orders/orderService.js';
 import { effectiveFinancialState, projectPaymentRefundBalances, projectReturnQuantities } from '../../server/orders/orderFinancialProjection.js';
+import { cairoCalendarDayRange } from '../../server/orders/cairoCalendarDay.js';
 import { readAdminSessionToken } from '../../server/session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
 
@@ -1071,8 +1072,14 @@ export default async function handler(
           rawStatus === 'ACCEPTED' || rawStatus === 'REJECTED'
             ? rawStatus
             : null;
-        const from = url.searchParams.get('from');
-        const to = url.searchParams.get('to');
+        const day = url.searchParams.get('date');
+        const dateRange = day ? cairoCalendarDayRange(day) : null;
+        if (day && !dateRange) {
+          sendJson(response, 400, { error: 'invalid_orders_date_filter' });
+          return;
+        }
+        const from = dateRange?.from ?? url.searchParams.get('from');
+        const to = dateRange?.to ?? url.searchParams.get('to');
         const parseOptionalInstant = (value: string | null): string | null => {
           if (!value) return null;
           if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value) ||
