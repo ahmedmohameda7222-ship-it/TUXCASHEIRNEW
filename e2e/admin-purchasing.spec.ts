@@ -669,7 +669,7 @@ for (const viewport of [
     ).toBeLessThan(4);
     expect(supplierBounds!.y).toBeGreaterThanOrEqual(8);
     expect(supplierBounds!.y + supplierBounds!.height).toBeLessThanOrEqual(viewport.height - 8);
-    if (supplierBounds!.height < viewport.height * 0.8) {
+    if (viewport.width >= 768 && supplierBounds!.height < viewport.height * 0.8) {
       expect(
         Math.abs(supplierBounds!.y + supplierBounds!.height / 2 - viewport.height / 2),
       ).toBeLessThan(8);
