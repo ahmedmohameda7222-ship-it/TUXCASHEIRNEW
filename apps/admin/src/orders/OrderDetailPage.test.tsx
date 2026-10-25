@@ -116,7 +116,7 @@ function render(order: AdminOrderDetail, canViewDelivery = false): string {
 describe('OrderDetailPage', () => {
   it('provides six accessible inspector landmarks without concealing financial or inventory chronology', () => {
     const html = render({ ...fixture, status: 'DONE' });
-    const navigation = html.match(/<nav[^>]*aria-label="Order detail sections"[^>]*>(.*?)<\\/nav>/s)?.[1];
+    const navigation = html.match(/<nav[^>]*aria-label="Order detail sections"[^>]*>(.*?)<\/nav>/s)?.[1];
     expect(navigation).toBeDefined();
     const anchors = [
       ['Overview', '#order-detail-overview'],
@@ -136,7 +136,6 @@ describe('OrderDetailPage', () => {
     expect(html).toContain('Administrative history');
     expect(html).not.toContain('New order</button>');
   });
-
 
   it('shows scoped delivery status, assigned rider and immutable transition timestamps', () => {
     const html = render(
