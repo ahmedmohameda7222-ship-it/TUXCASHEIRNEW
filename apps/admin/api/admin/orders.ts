@@ -1103,12 +1103,15 @@ export function classifyOrderRefundDatabaseError(
 
 export function classifyOrderReadInputError(
   error: unknown,
-): { status: 400; error: 'invalid_order_cursor' | 'invalid_orders_date_filter' } | null {
+): { status: 400 | 403 | 502; error: string } | null {
   if (!(error instanceof Error)) return null;
   if (error.message === 'invalid_order_cursor') {
     return { status: 400, error: 'invalid_order_cursor' };
   }
-  if (error.message === 'invalid_orders_kpi_range' || error.message === 'orders_kpi_range_invalid') {
+  if (
+    error.message === 'invalid_orders_kpi_range' ||
+    error.message === 'orders_kpi_range_invalid'
+  ) {
     return { status: 400, error: 'invalid_orders_kpi_range' };
   }
   if (error.message === 'permission_forbidden') {
