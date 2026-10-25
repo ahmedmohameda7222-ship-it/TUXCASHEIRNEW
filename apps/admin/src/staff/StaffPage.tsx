@@ -53,6 +53,8 @@ export function StaffPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newEmployeeName, setNewEmployeeName] = useState('');
   const [newEmployeePhone, setNewEmployeePhone] = useState('');
+  const [newEmployeeHireDate, setNewEmployeeHireDate] = useState('');
+  const [newEmployeeNotes, setNewEmployeeNotes] = useState('');
   const staff = useStaff(shopId, selectedId);
   const shopChoices = useMemo(
     () => staff.workspaceQuery.data?.shops ?? [],
@@ -94,14 +96,16 @@ export function StaffPage() {
         shopId,
         displayName,
         phone: newEmployeePhone.trim() || null,
-        hireDate: null,
-        notes: null,
+        hireDate: newEmployeeHireDate || null,
+        notes: newEmployeeNotes.trim() || null,
         role: 'STAFF',
       },
       {
         onSuccess: (result) => {
           setNewEmployeeName('');
           setNewEmployeePhone('');
+          setNewEmployeeHireDate('');
+          setNewEmployeeNotes('');
           setCreateOpen(false);
           if (result.ok && result.employeeId) navigate(detailPath('/staff', result.employeeId));
         },
@@ -280,6 +284,22 @@ export function StaffPage() {
               <input
                 value={newEmployeePhone}
                 onChange={(event) => setNewEmployeePhone(event.target.value)}
+              />
+            </label>
+            <label className="admin-field">
+              <span>Hire date</span>
+              <input
+                type="date"
+                value={newEmployeeHireDate}
+                onChange={(event) => setNewEmployeeHireDate(event.currentTarget.value)}
+              />
+            </label>
+            <label className="admin-field">
+              <span>Internal notes</span>
+              <textarea
+                maxLength={2000}
+                value={newEmployeeNotes}
+                onChange={(event) => setNewEmployeeNotes(event.currentTarget.value)}
               />
             </label>
             <div className="admin-inline-actions">
