@@ -7,6 +7,7 @@ import { AdminAuthorizationError, requirePermission } from '../../server/authori
 import {
   CatalogImageUploadError,
   MAX_CATALOG_IMAGE_BYTES,
+  resolveCatalogImagePublicUrl,
   uploadCatalogProductImage,
 } from '../../server/catalog/catalogImageUpload.js';
 import { getAdminServerEnv } from '../../server/env.js';
@@ -48,18 +49,37 @@ export default async function handler(
   request: AdminRequest,
   response: AdminResponse,
 ): Promise<void> {
-  if (request.method !== 'POST') {
-    response.setHeader('allow', 'POST');
+  if (request.method !== 'GET' && request.method !== 'POST') {
+    response.setHeader('allow', 'GET, POST');
     sendJson(response, 405, { error: 'method_not_allowed' });
     return;
   }
-  if (!requireSameOrigin(request, response)) return;
+  if (request.method === 'POST' && !requireSameOrigin(request, response)) return;
   try {
     const token = readAdminSessionToken(firstHeader(request.headers.cookie));
     if (!token) throw new AdminAuthError('session_required', 401);
     const env = getAdminServerEnv();
     const client = new AdminSupabaseClient(env);
     const context = await loadAdminSession(token, client);
+    if (request.method === 'GET') {
+      const url = new URL(request.url ?? '/', 'http://admin.local');
+      const shopId = url.searchParams.get('shopId') ?? '';
+      if (!uuidPattern.test(shopId)) {
+        sendJson(response, 400, { error: 'image_scope_invalid' });
+        return;
+      }
+      requirePermission(context.principal, 'catalog.view', shopId);
+      const imageKey = url.searchParams.get('imageKey') ?? '';
+      const publicUrl = resolveCatalogImagePublicUrl({
+        businessId: context.principal.businessId,
+        shopId,
+        imageKey,
+        supabaseUrl: env.supabaseUrl,
+      });
+      sendJson(response, 200, { publicUrl });
+      return;
+    }
+
     requireSessionCsrf(context, firstHeader(request.headers['x-tux-admin-csrf']).trim());
 
     const shopId = firstHeader(request.headers['x-tux-catalog-shop-id']).trim();
