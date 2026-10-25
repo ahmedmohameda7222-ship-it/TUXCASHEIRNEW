@@ -89,7 +89,9 @@ export function OrderDetailPage({
         <button className="admin-secondary-button" type="button" onClick={() => window.print()}>
           Print order summary
         </button>
-        <small>This prints the immutable Admin order summary, not a new numbered fiscal receipt.</small>
+        <small>
+          This prints the immutable Admin order summary, not a new numbered fiscal receipt.
+        </small>
       </div>
 
       <section className="admin-order-detail__card" aria-label="Order identity">
@@ -236,23 +238,35 @@ export function OrderDetailPage({
       {order.fulfillment?.behavior === 'DELIVERY' ? (
         <section className="admin-order-detail__card" aria-label="Delivery tracking">
           <h3>Delivery tracking</h3>
-          <p>Current delivery state: {order.delivery?.state ? friendly(order.delivery.state) : 'Not recorded'}</p>
+          <p>
+            Current delivery state:{' '}
+            {order.delivery?.state ? friendly(order.delivery.state) : 'Not recorded'}
+          </p>
           <p>Assigned rider: {order.delivery?.riderName ?? 'Not assigned'}</p>
           {order.delivery?.timeline.length ? (
             <ol className="admin-order-detail__list">
               {order.delivery.timeline.map((event) => (
                 <li key={event.id}>
-                  <strong>{event.fromState ? friendly(event.fromState) : 'New'} → {friendly(event.toState)}</strong>
-                  <small> · {new Intl.DateTimeFormat('en-EG', {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                    timeZone: 'Africa/Cairo',
-                  }).format(new Date(event.createdAt))}</small>
+                  <strong>
+                    {event.fromState ? friendly(event.fromState) : 'New'} →{' '}
+                    {friendly(event.toState)}
+                  </strong>
+                  <small>
+                    {' '}
+                    ·{' '}
+                    {new Intl.DateTimeFormat('en-EG', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                      timeZone: 'Africa/Cairo',
+                    }).format(new Date(event.createdAt))}
+                  </small>
                   {event.note ? <small> · {event.note}</small> : null}
                 </li>
               ))}
             </ol>
-          ) : <p>No delivery transitions recorded.</p>}
+          ) : (
+            <p>No delivery transitions recorded.</p>
+          )}
           {canViewDelivery ? (
             <Link href={`/delivery?orderId=${encodeURIComponent(order.id)}`}>
               Open this order in Delivery workspace
@@ -306,7 +320,9 @@ export function OrderDetailPage({
                     <ul>
                       {event.returnItems.map((line) => (
                         <li key={line.orderItemId}>
-                          <small>Returned {line.quantity} × {line.productName}</small>
+                          <small>
+                            Returned {line.quantity} × {line.productName}
+                          </small>
                           <small>Return valuation: {money(line.valuationMinor)}</small>
                           <small>Order-item reference: {line.orderItemId}</small>
                         </li>
@@ -354,9 +370,7 @@ export function OrderDetailPage({
                     <>
                       <small>Approval reference: {event.approvalRequestId}</small>
                       {canReviewApprovals ? (
-                        <Link href={`/approvals/${event.approvalRequestId}`}>
-                          Review approval
-                        </Link>
+                        <Link href={`/approvals/${event.approvalRequestId}`}>Review approval</Link>
                       ) : null}
                     </>
                   ) : null}
@@ -414,7 +428,8 @@ export function OrderDetailPage({
                       dateStyle: 'medium',
                       timeStyle: 'short',
                       timeZone: 'Africa/Cairo',
-                    }).format(new Date(event.createdAt))} (Cairo)
+                    }).format(new Date(event.createdAt))}{' '}
+                    (Cairo)
                   </small>
                   <small>Revision {event.operationalRevision}</small>
                   {event.workerName ? <small>Worker: {event.workerName}</small> : null}
@@ -439,12 +454,14 @@ export function OrderDetailPage({
                 <li key={event.id}>
                   <strong>{friendly(event.actionType)}</strong>
                   <small>
-                    {' '}Audit timestamp:{' '}
+                    {' '}
+                    Audit timestamp:{' '}
                     {new Intl.DateTimeFormat('en-EG', {
                       dateStyle: 'medium',
                       timeStyle: 'short',
                       timeZone: 'Africa/Cairo',
-                    }).format(new Date(event.createdAt))} (Cairo)
+                    }).format(new Date(event.createdAt))}{' '}
+                    (Cairo)
                   </small>
                   {event.actorEmployeeId ? (
                     <small> · Admin actor: {event.actorEmployeeId}</small>

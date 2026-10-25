@@ -136,7 +136,8 @@ export function OrdersPage() {
   );
   const canCancel = principal.permissions.includes('orders.cancel');
   const canRefund = principal.permissions.includes('orders.refund');
-  const canExport = principal.permissions.includes('orders.view') && principal.permissions.includes('reports.view');
+  const canExport =
+    principal.permissions.includes('orders.view') && principal.permissions.includes('reports.view');
   const actionError =
     readableError(ordersApi.cancelOrder.error) ??
     readableError(ordersApi.refundOrder.error) ??
@@ -219,7 +220,8 @@ export function OrdersPage() {
                         dateStyle: 'medium',
                         timeStyle: 'short',
                         timeZone: 'Africa/Cairo',
-                      }).format(new Date(day.startedAt))} · {day.status} · {day.id.slice(0, 8)}
+                      }).format(new Date(day.startedAt))}{' '}
+                      · {day.status} · {day.id.slice(0, 8)}
                     </option>
                   ))}
                 </select>
@@ -403,7 +405,7 @@ export function OrdersPage() {
                     canCancel={canCancel}
                     canRefund={canRefund}
                     canReviewApprovals={principal.permissions.includes('approvals.review')}
-                canViewDelivery={principal.permissions.includes('delivery.view')}
+                    canViewDelivery={principal.permissions.includes('delivery.view')}
                     cancelling={ordersApi.cancelOrder.isPending}
                     refunding={ordersApi.refundOrder.isPending}
                     returning={ordersApi.returnOrderItems.isPending}

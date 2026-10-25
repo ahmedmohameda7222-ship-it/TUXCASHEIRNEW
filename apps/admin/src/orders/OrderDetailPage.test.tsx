@@ -115,29 +115,33 @@ function render(order: AdminOrderDetail, canViewDelivery = false): string {
 
 describe('OrderDetailPage', () => {
   it('shows scoped delivery status, assigned rider and immutable transition timestamps', () => {
-    const html = render({
-      ...fixture,
-      delivery: {
-        state: 'OUT_FOR_DELIVERY',
-        riderName: 'Hassan',
-        timeline: [{
-          id: '12121212-1212-4121-8121-121212121212',
-          fromState: 'ASSIGNED',
-          toState: 'OUT_FOR_DELIVERY',
-          employeeId: null,
-          riderId: null,
-          note: 'Handed to rider',
-          createdAt: '2026-09-21T04:00:00.000Z',
-        }],
+    const html = render(
+      {
+        ...fixture,
+        delivery: {
+          state: 'OUT_FOR_DELIVERY',
+          riderName: 'Hassan',
+          timeline: [
+            {
+              id: '12121212-1212-4121-8121-121212121212',
+              fromState: 'ASSIGNED',
+              toState: 'OUT_FOR_DELIVERY',
+              employeeId: null,
+              riderId: null,
+              note: 'Handed to rider',
+              createdAt: '2026-09-21T04:00:00.000Z',
+            },
+          ],
+        },
       },
-    }, true);
+      true,
+    );
     expect(html).toContain('Delivery tracking');
     expect(html).toContain('Out For Delivery');
     expect(html).toContain('Hassan');
     expect(html).toContain('Handed to rider');
     expect(html).toContain('/delivery?orderId=11111111-1111-4111-8111-111111111111');
   });
-
 
   it('renders immutable financial snapshots and distinct refund / return accounting totals', () => {
     const html = render({
@@ -337,21 +341,23 @@ describe('OrderDetailPage', () => {
     const html = render({
       ...fixture,
       status: 'DONE',
-      financialEvents: [{
-        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        kind: 'REFUND',
-        state: 'PENDING_APPROVAL',
-        amountMinor: 500,
-        approvalRequestId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        reason: {
-          id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
-          key: 'CUSTOMER_REQUEST',
-          label: 'Customer request',
-          family: 'REFUND_RETURN',
-          configurationVersion: 1,
+      financialEvents: [
+        {
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          kind: 'REFUND',
+          state: 'PENDING_APPROVAL',
+          amountMinor: 500,
+          approvalRequestId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          reason: {
+            id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            key: 'CUSTOMER_REQUEST',
+            label: 'Customer request',
+            family: 'REFUND_RETURN',
+            configurationVersion: 1,
+          },
+          createdAt: '2026-10-25T12:00:00.000Z',
         },
-        createdAt: '2026-10-25T12:00:00.000Z',
-      }],
+      ],
     });
     expect(html).toContain('/approvals/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
     expect(html).toContain('Review approval');

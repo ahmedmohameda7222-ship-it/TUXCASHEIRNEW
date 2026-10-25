@@ -92,7 +92,6 @@ describe('Orders Task 2 controls', () => {
     expect(html).toContain('order-level discounts');
   });
 
-
   it('shows only eligible remaining refundable balance and excludes blocked methods', () => {
     const html = renderToStaticMarkup(
       <RefundReturnPage

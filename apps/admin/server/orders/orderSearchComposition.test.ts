@@ -39,7 +39,6 @@ describe('Orders cursor/search query composition', () => {
     expect(query?.get('or')).toContain('created_at.lt.');
   });
 
-
   it('ANDs cursor boundary with text search rather than duplicating PostgREST or parameters', async () => {
     const { store, select } = setup();
     const cursor = Buffer.from(
@@ -86,5 +85,4 @@ describe('Orders cursor/search query composition', () => {
     expect(query?.get('id')).toBe(`eq.${orderId}`);
     expect(query?.getAll('or')).toEqual([]);
   });
-
 });

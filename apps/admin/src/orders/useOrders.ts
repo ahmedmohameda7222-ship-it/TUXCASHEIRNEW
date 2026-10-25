@@ -117,7 +117,9 @@ export function useOrders(
   });
 
   const businessDaysQuery = useQuery({
-    queryKey: shopId ? ['admin', 'orders', shopId, 'business-days'] : ['admin', 'orders', 'no-business-days'],
+    queryKey: shopId
+      ? ['admin', 'orders', shopId, 'business-days']
+      : ['admin', 'orders', 'no-business-days'],
     enabled: Boolean(shopId),
     queryFn: () => {
       if (!shopId) throw new OrdersUiError('concrete_shop_required');

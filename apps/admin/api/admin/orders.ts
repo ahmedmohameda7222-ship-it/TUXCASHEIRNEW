@@ -507,11 +507,12 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
       // UUIDs are globally unique order references, not free-text search terms.
       const exactOrderId = uuidSchema.safeParse(term).success ? term : null;
       if (exactOrderId) query.set('id', `eq.${exactOrderId}`);
-      const searchFilter = exactOrderId || !term
-        ? null
-        : /^\d+$/.test(term)
-          ? `(display_order_no.eq.${term},normalized_phone_snapshot.ilike.*${term}*)`
-          : `(customer_name_snapshot.ilike.*${term}*,normalized_phone_snapshot.ilike.*${term}*,operator_name_snapshot.ilike.*${term}*)`;
+      const searchFilter =
+        exactOrderId || !term
+          ? null
+          : /^\d+$/.test(term)
+            ? `(display_order_no.eq.${term},normalized_phone_snapshot.ilike.*${term}*)`
+            : `(customer_name_snapshot.ilike.*${term}*,normalized_phone_snapshot.ilike.*${term}*,operator_name_snapshot.ilike.*${term}*)`;
 
       if (cursorFilter && searchFilter) {
         query.set('and', `(or${cursorFilter},or${searchFilter})`);

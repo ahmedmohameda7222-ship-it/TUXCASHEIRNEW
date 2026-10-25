@@ -25,19 +25,23 @@ export function renderOrdersCsv(rows: readonly AdminOrderSummary[]): string {
     'Phone',
     'Total minor (EGP)',
   ];
-  const lines = rows.slice(0, ORDER_EXPORT_MAX_ROWS).map((row) => [
-    row.id,
-    row.shopId,
-    row.businessDayId ?? '',
-    row.displayOrderNo,
-    row.createdAt,
-    row.status,
-    row.source,
-    row.orderTypeLabel,
-    row.operatorName ?? '',
-    row.customerName,
-    row.normalizedPhone,
-    row.totalMinor,
-  ]);
-  return '\uFEFF' + [header, ...lines].map((line) => line.map(cell).join(',')).join('\r\n') + '\r\n';
+  const lines = rows
+    .slice(0, ORDER_EXPORT_MAX_ROWS)
+    .map((row) => [
+      row.id,
+      row.shopId,
+      row.businessDayId ?? '',
+      row.displayOrderNo,
+      row.createdAt,
+      row.status,
+      row.source,
+      row.orderTypeLabel,
+      row.operatorName ?? '',
+      row.customerName,
+      row.normalizedPhone,
+      row.totalMinor,
+    ]);
+  return (
+    '\uFEFF' + [header, ...lines].map((line) => line.map(cell).join(',')).join('\r\n') + '\r\n'
+  );
 }

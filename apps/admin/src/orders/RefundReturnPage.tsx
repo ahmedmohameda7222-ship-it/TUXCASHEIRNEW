@@ -147,7 +147,8 @@ export function RefundReturnPage({
 
   async function submitReturn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!reasonCodeId || !pin || returnSelection.hasInvalidQuantity || returnItems.length === 0) return;
+    if (!reasonCodeId || !pin || returnSelection.hasInvalidQuantity || returnItems.length === 0)
+      return;
     await onReturn({ items: returnItems, reasonCodeId, note: note.trim() || null, pin });
     setPin('');
   }
@@ -304,14 +305,14 @@ export function RefundReturnPage({
             </label>
           ))}
           <p>
-            Estimated gross return item valuation: {money(returnEstimatedGrossMinor)}.
-            Calculated from purchase-time base and modifier snapshots before order-level discounts,
-            tax, delivery fees or service charges. This is not a refund or stock movement.
+            Estimated gross return item valuation: {money(returnEstimatedGrossMinor)}. Calculated
+            from purchase-time base and modifier snapshots before order-level discounts, tax,
+            delivery fees or service charges. This is not a refund or stock movement.
           </p>
           {returnSelection.hasInvalidQuantity ? (
             <p role="alert">
-              A selected return quantity is invalid or exceeds the remaining quantity.
-              Correct every item before submitting.
+              A selected return quantity is invalid or exceeds the remaining quantity. Correct every
+              item before submitting.
             </p>
           ) : null}
           <button

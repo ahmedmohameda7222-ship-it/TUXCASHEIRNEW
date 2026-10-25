@@ -15,15 +15,19 @@ describe('Admin return line input validation', () => {
   });
 
   it('accepts distinct positive safe integer quantities only', () => {
-    expect(adminReturnLineItemsSchema.safeParse([
-      { orderItemId: first, quantity: 1 },
-      { orderItemId: second, quantity: 2 },
-    ]).success).toBe(true);
-    expect(adminReturnLineItemsSchema.safeParse([
-      { orderItemId: first, quantity: 0 },
-    ]).success).toBe(false);
-    expect(adminReturnLineItemsSchema.safeParse([
-      { orderItemId: first, quantity: Number.MAX_SAFE_INTEGER + 1 },
-    ]).success).toBe(false);
+    expect(
+      adminReturnLineItemsSchema.safeParse([
+        { orderItemId: first, quantity: 1 },
+        { orderItemId: second, quantity: 2 },
+      ]).success,
+    ).toBe(true);
+    expect(
+      adminReturnLineItemsSchema.safeParse([{ orderItemId: first, quantity: 0 }]).success,
+    ).toBe(false);
+    expect(
+      adminReturnLineItemsSchema.safeParse([
+        { orderItemId: first, quantity: Number.MAX_SAFE_INTEGER + 1 },
+      ]).success,
+    ).toBe(false);
   });
 });

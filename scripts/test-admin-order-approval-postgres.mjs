@@ -66,7 +66,8 @@ const migrations = readdirSync(migrationsDirectory)
   .filter((name) => /^\d+_.+\.sql$/.test(name))
   .sort();
 const targetIndex = migrations.indexOf(migrationName);
-if (targetIndex < 0) throw new Error('Admin order controls migration missing from repository chain.');
+if (targetIndex < 0)
+  throw new Error('Admin order controls migration missing from repository chain.');
 for (const migration of migrations.slice(0, targetIndex + 1)) {
   psql(['-f', resolve(migrationsDirectory, migration)], migration);
 }
@@ -275,7 +276,6 @@ if (
   throw new Error(`held refund snapshot is invalid: ${JSON.stringify(heldRow)}`);
 }
 
-
 const heldRefundReplay = rpc(
   `public.request_admin_order_refund_v1(
     '${REQUESTER_ID}', '${SHOP_ID}', '${ORDER_ID}', '${PAYMENT_ID}',
@@ -355,7 +355,11 @@ const postedRefund = rpc(
   )`,
   'Execute approved refund',
 );
-if (postedRefund.ok !== true || postedRefund.state !== 'POSTED' || postedRefund.replayed !== false) {
+if (
+  postedRefund.ok !== true ||
+  postedRefund.state !== 'POSTED' ||
+  postedRefund.replayed !== false
+) {
   throw new Error(`approved refund did not post: ${JSON.stringify(postedRefund)}`);
 }
 
@@ -381,7 +385,9 @@ if (
   postedRefundReplay.replayed !== true ||
   postedRefundReplay.refundId !== postedRefund.refundId
 ) {
-  throw new Error(`approved refund execution was not idempotent: ${JSON.stringify(postedRefundReplay)}`);
+  throw new Error(
+    `approved refund execution was not idempotent: ${JSON.stringify(postedRefundReplay)}`,
+  );
 }
 
 const completeRefund = rpc(
@@ -447,7 +453,11 @@ const directReturn = rpc(
   )`,
   'Below-threshold return',
 );
-if (directReturn.ok !== true || directReturn.state !== 'POSTED' || directReturn.replayed !== false) {
+if (
+  directReturn.ok !== true ||
+  directReturn.state !== 'POSTED' ||
+  directReturn.replayed !== false
+) {
   throw new Error(`below-threshold return should post directly: ${JSON.stringify(directReturn)}`);
 }
 
@@ -487,7 +497,9 @@ const directReturnConflict = rpc(
   'Return command conflict',
 );
 if (directReturnConflict.ok !== false || directReturnConflict.code !== 'command_id_conflict') {
-  throw new Error(`changed return payload should conflict: ${JSON.stringify(directReturnConflict)}`);
+  throw new Error(
+    `changed return payload should conflict: ${JSON.stringify(directReturnConflict)}`,
+  );
 }
 
 const rejectedReturn = rpc(
@@ -508,7 +520,9 @@ if (
   rejectedReturn.state !== 'PENDING_APPROVAL' ||
   typeof rejectedReturn.approvalRequestId !== 'string'
 ) {
-  throw new Error(`return requiring approval should be held before rejection: ${JSON.stringify(rejectedReturn)}`);
+  throw new Error(
+    `return requiring approval should be held before rejection: ${JSON.stringify(rejectedReturn)}`,
+  );
 }
 
 const rejectedReturnDecision = rpc(
@@ -603,7 +617,9 @@ const returnSelfApproval = rpc(
   'Return self approval attempt',
 );
 if (returnSelfApproval.ok !== false || returnSelfApproval.code !== 'self_approval_forbidden') {
-  throw new Error(`requester bypassed return second-person approval: ${JSON.stringify(returnSelfApproval)}`);
+  throw new Error(
+    `requester bypassed return second-person approval: ${JSON.stringify(returnSelfApproval)}`,
+  );
 }
 
 const approvedReturn = rpc(
@@ -652,7 +668,11 @@ const postedReturn = rpc(
   )`,
   'Execute approved return',
 );
-if (postedReturn.ok !== true || postedReturn.state !== 'POSTED' || postedReturn.replayed !== false) {
+if (
+  postedReturn.ok !== true ||
+  postedReturn.state !== 'POSTED' ||
+  postedReturn.replayed !== false
+) {
   throw new Error(`approved return did not post: ${JSON.stringify(postedReturn)}`);
 }
 
@@ -670,9 +690,7 @@ const returnedItemAmount = Number(
   ).trim(),
 );
 if (returnedItemAmount !== 11000) {
-  throw new Error(
-    `returned item amount omitted immutable modifier charges: ${returnedItemAmount}`,
-  );
+  throw new Error(`returned item amount omitted immutable modifier charges: ${returnedItemAmount}`);
 }
 const postedReturnReplay = rpc(
   `public.execute_approved_admin_order_return_v1(
@@ -695,7 +713,9 @@ if (
   postedReturnReplay.replayed !== true ||
   postedReturnReplay.returnId !== postedReturn.returnId
 ) {
-  throw new Error(`approved return execution was not idempotent: ${JSON.stringify(postedReturnReplay)}`);
+  throw new Error(
+    `approved return execution was not idempotent: ${JSON.stringify(postedReturnReplay)}`,
+  );
 }
 
 console.log('Admin order approval PostgreSQL threshold behavior passed.');
@@ -816,4 +836,6 @@ if (unpaidReplay.ok !== true || unpaidReplay.replayed !== true) {
   throw new Error(`Unpaid cancellation replay not idempotent: ${JSON.stringify(unpaidReplay)}`);
 }
 
-console.log('Paid ACTIVE cancellation guard and unpaid rollback/replay PostgreSQL behavior passed.');
+console.log(
+  'Paid ACTIVE cancellation guard and unpaid rollback/replay PostgreSQL behavior passed.',
+);
