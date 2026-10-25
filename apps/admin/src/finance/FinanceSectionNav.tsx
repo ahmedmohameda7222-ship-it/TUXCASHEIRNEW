@@ -1,11 +1,6 @@
 import { Link } from 'wouter';
 
-export type FinanceSection =
-  | 'accounts'
-  | 'expenses'
-  | 'reconciliation'
-  | 'settlements'
-  | 'end-day';
+export type FinanceSection = 'accounts' | 'expenses' | 'reconciliation' | 'settlements' | 'end-day';
 
 const sections = [
   { id: 'accounts', href: '/finance', label: 'Money' },
