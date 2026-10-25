@@ -234,7 +234,7 @@ export type AdminInventoryCommand =
       readonly orderMultipleMicros: number | null;
     }
   | {
-      readonly type: 'transfer.receive';
+      readonly type: 'transfer.receive' | 'transfer.cancel';
       readonly shopId: string;
       readonly transferId: string;
       readonly commandId: string;
