@@ -1,3 +1,12 @@
+## Orders O11 mobile negative-action acceptance — 2026-10-26 (newer checkpoint)
+
+**Exact verified source SHA `da2c308a604bf8c98329c3581615c57f6e4a587d`: All four CI groups SUCCESS.** Orders full build/isolated PG/32 of 32 Chromium tests [40245652024](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40245652024); Fast CI including TypeScript, unit/integration, formatting, security and migration chain [40245652015](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40245652015); Business Day PostgreSQL [40245652009](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40245652009); multi-module Chromium regression [40245652096](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40245652096). All conclusions read directly from exact-commit workflow jobs.
+
+**New O10/O11 proof:** `e2e/admin-orders.spec.ts` tests mobile 390px Escape in the real `CancelOrderSheet`: existing dialog closes, keyboard focus returns to `Cancel order`, unsent Admin PIN clears on remount, and no POST order mutation occurs. Browser job 121326531884 passed **32/32**, including this test. The tested source is unchanged from `dc135ee1...` except for the new test and ledger documentation. This proof is **mock-auth Chromium**, not live SSO/Owner UAT.
+
+**Still blocked (do not close Orders or advance Catalog):** protected Admin Preview is READY from `dc135ee1...` but has no authenticated matching-sha Operations/Menu acceptance→Admin→Finance/Reports full transaction proof; mobile visual design has no approved screenshot, requiring Owner signoff. All other tabs remain frozen partial/not accepted, PR #165 DRAFT/HOLD, no Production merge/deploy/SQL.
+
+
 ## Orders-only exact-HEAD CI, hosted Preview and financial ledger proof — 2026-10-26
 
 **Inspected code SHA:** `dc135ee1f7488e63e53d69b8be945b855d446ebc`. PR #165 remains **Draft/HOLD**, not merged. No Production deployment/migration and no later-tab feature work. Approved fixed execution sequence remains Orders → Catalog → Inventory → Purchasing → Customers/CRM → Staff → Finance → Reports. This checkpoint is newer than previous ledger entries below.
