@@ -28,6 +28,9 @@ function principal(
 
 function fixtureStore(): OrderStore {
   return {
+    async listOnlineOrderRequests(input) {
+      return { shopId: input.shopId, rows: [] };
+    },
     async searchOrders(input) {
       return { rows: [], nextCursor: null, shopId: input.shopId };
     },
@@ -97,6 +100,17 @@ function fixtureStore(): OrderStore {
 }
 
 describe('Admin order service', () => {
+  it('allows read-only online history with orders.view in the selected shop', async () => {
+    const service = createOrderService(fixtureStore());
+    await expect(service.listOnlineOrderRequests({
+      shopId, status: 'REJECTED', from: null, to: null,
+    }, principal(['orders.view']))).resolves.toEqual({ shopId, rows: [] });
+    expect(() => service.listOnlineOrderRequests({
+      shopId, status: null, from: null, to: null,
+    }, principal(['orders.cancel']))).toThrow(/permission|forbidden/i);
+  });
+
+
   it('loads active order-action reason codes without requiring settings.manage', async () => {
     let captured: Parameters<OrderStore['listActionReasons']>[0] | null = null;
     const store = fixtureStore();
