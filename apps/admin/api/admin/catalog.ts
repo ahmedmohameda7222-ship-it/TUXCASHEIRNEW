@@ -422,15 +422,15 @@ export default async function handler(
         });
         return;
       case 'availability.recurring.save':
-        sendJson(response, 200, {
-          ...(await recurringService.saveRecurringAvailabilityRule(command, principal)),
-        });
+        // Preserve existing rules; do not accept unexecutable unattended transitions.
+        sendJson(response, 409, { ok: false, code: 'scheduler_unavailable' });
         return;
       case 'version.restore':
         sendJson(response, 200, { ...(await service.restoreCatalogVersion(command, principal)) });
         return;
       case 'draft.schedule':
-        sendJson(response, 200, { ...(await service.scheduleCatalogDraft(command, principal)) });
+        // The Vercel Free deployment has no verified unattended scheduler.
+        sendJson(response, 409, { ok: false, code: 'scheduler_unavailable' });
         return;
       case 'schedule.cancel':
         sendJson(response, 200, {
