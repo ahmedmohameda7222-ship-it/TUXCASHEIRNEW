@@ -184,8 +184,13 @@ test('Chromium delivers a locally created Order and exposes its canonical Admin 
   await page.getByRole('combobox', { name: 'Branch' }).selectOption(SHOP);
   await page.getByLabel('Enter PIN to Sign In').fill('1234');
   await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.welcome-action') !== null ||
+      document.querySelector('[aria-label="Operations"]') !== null,
+  );
   const greeting = page.locator('.welcome-action');
-  if (await greeting.isVisible().catch(() => false)) await greeting.click();
+  if (await greeting.isVisible()) await greeting.click();
   await waitForActiveShell(page);
   await prepareRenderedOrderControls(page);
   await page.getByRole('button', { name: 'Place Order', exact: true }).click();
