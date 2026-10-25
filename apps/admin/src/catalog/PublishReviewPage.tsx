@@ -341,14 +341,19 @@ export function PublishReviewPage() {
                       checked={confirmedPublish}
                       disabled={!canPublish || preview.stale || publishing.publishDraft.isPending}
                       onChange={(event) => setConfirmedPublish(event.currentTarget.checked)}
-                    />
-                    {' '}I reviewed the changes and confirm publication for this shop.
+                    />{' '}
+                    I reviewed the changes and confirm publication for this shop.
                   </span>
                 </label>
                 <button
                   className="admin-primary-button"
                   type="button"
-                  disabled={!canPublish || !confirmedPublish || preview.stale || publishing.publishDraft.isPending}
+                  disabled={
+                    !canPublish ||
+                    !confirmedPublish ||
+                    preview.stale ||
+                    publishing.publishDraft.isPending
+                  }
                   onClick={() => void publishNow()}
                 >
                   {publishing.publishDraft.isPending ? 'Publishing…' : 'Publish now'}
