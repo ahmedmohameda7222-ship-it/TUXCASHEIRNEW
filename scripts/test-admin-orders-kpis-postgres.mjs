@@ -135,6 +135,45 @@ select md5('kpi-fixture-payment-'||g||'-2')::uuid, '${SHOP}',
 from generate_series(1,64) g where g%8=1;`, 'Insert 64 mixed POS/ONLINE canonical orders with split payments');
 
 
+ 
+// The trusted KPI must subtract only POSTED refunds, at the refund event
+// timestamp. A pending refund does not lower recognized sales.
+run(`insert into public.admin_reason_codes(
+  id,business_id,shop_id,reason_key,family,label,active,version,updated_by_employee_id
+) values (
+  '59000000-0000-4000-8000-000000000001', '${BUSINESS}', '${SHOP}',
+  'KPI_REFUND_FIXTURE','REFUND_RETURN','KPI refund verification',true,1,'${ACTOR}'
+);
+
+insert into public.admin_order_refunds(
+  id,business_id,shop_id,order_id,payment_id,amount_minor,
+  reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,
+  reason_config_version,note,state,command_id,created_by_employee_id,created_at
+) values (
+  '59000000-0000-4000-8000-000000000002','${BUSINESS}','${SHOP}',
+  md5('kpi-fixture-order-2')::uuid,md5('kpi-fixture-payment-2-1')::uuid,250,
+  '59000000-0000-4000-8000-000000000001','KPI_REFUND_FIXTURE',
+  'KPI refund verification','REFUND_RETURN',1,'Posted following the placement day',
+  'POSTED','kpi-posted-refund-2','${ACTOR}','2026-09-24T06:00:00Z'
+),(
+  '59000000-0000-4000-8000-000000000003','${BUSINESS}','${SHOP}',
+  md5('kpi-fixture-order-3')::uuid,md5('kpi-fixture-payment-3-1')::uuid,100,
+  '59000000-0000-4000-8000-000000000001','KPI_REFUND_FIXTURE',
+  'KPI refund verification','REFUND_RETURN',1,'Not posted or recognized',
+  'PENDING_APPROVAL','kpi-pending-refund-3','${ACTOR}','2026-09-24T06:05:00Z'
+);`, 'Post a real refund ledger event and retain one pending request in disposable PostgreSQL');
+
+const seededRefundState = queryJson(`jsonb_build_object(
+  'posted', (select sum(amount_minor) from public.admin_order_refunds
+    where command_id='kpi-posted-refund-2' and state='POSTED'),
+  'pending', (select sum(amount_minor) from public.admin_order_refunds
+    where command_id='kpi-pending-refund-3' and state='PENDING_APPROVAL')
+)`, 'Verify fixture posted-vs-pending amounts');
+if (Number(seededRefundState.posted) !== 250 || Number(seededRefundState.pending) !== 100) {
+  throw new Error(`Nonzero refund fixture did not persist: ${JSON.stringify(seededRefundState)}`);
+}
+
+
 const acceptedOnline = queryJson(`jsonb_build_object(
   'accepted', (select count(*) from public.online_order_requests
     where shop_id='${SHOP}'::uuid and status='ACCEPTED'
@@ -183,6 +222,15 @@ const timed = kpis("'2026-09-23T05:10:30Z'", "'2026-09-23T05:18:30Z'");
 if (timed.ok !== true || timed.orderCount !== 8) {
   throw new Error(`UTC instant filter mismatch (Cairo UI conversion): ${JSON.stringify(timed)}`);
 }
+const refundDay = kpis("'2026-09-24T00:00:00Z'", "'2026-09-25T00:00:00Z'");
+if (refundDay.ok !== true || refundDay.orderCount !== 0 ||
+  refundDay.netSalesMinor !== -250 || refundDay.averageOrderMinor !== null ||
+  refundDay.denominatorPaidOrderCount !== 0) {
+  throw new Error(`Posted refund event must net -250 on its actual date, excluding pending approvals: ${JSON.stringify(refundDay)}`);
+}
+if (Number(expected.refunds) < 250) {
+  throw new Error(`KPI amount baseline contains no posted refund deduction: ${JSON.stringify(expected)}`);
+}
 const emptyPeriod = kpis("'2026-01-01T00:00:00Z'", "'2026-01-02T00:00:00Z'");
 if (emptyPeriod.ok !== true || emptyPeriod.orderCount !== 0 ||
     emptyPeriod.netSalesMinor !== 0 || emptyPeriod.averageOrderMinor !== null ||
@@ -209,6 +257,9 @@ console.log(JSON.stringify({
   netSalesMinor: full.netSalesMinor,
   averageOrderMinor: full.averageOrderMinor,
   paidDenominator: full.denominatorPaidOrderCount,
+  postedRefundMinor: Number(seededRefundState.posted),
+  pendingExcludedMinor: Number(seededRefundState.pending),
+  refundDayNetSalesMinor: refundDay.netSalesMinor,
   filteredOrders: timed.orderCount,
   privilegeCheck: privileges,
 }));
