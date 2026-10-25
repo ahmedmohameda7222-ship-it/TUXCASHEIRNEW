@@ -6,6 +6,9 @@ on:
       - fix/orders-production-remediation-20261025
     paths:
       - '.github/workflows/orders-rendered-verification.yml'
+      - 'apps/admin/src/orders/**'
+      - 'apps/admin/server/orders/**'
+      - 'apps/admin/api/admin/orders.ts'
   workflow_dispatch:
 
 permissions:
