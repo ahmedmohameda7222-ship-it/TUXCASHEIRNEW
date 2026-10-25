@@ -6,7 +6,16 @@ function cell(value: string | number | null | undefined): string {
   let text = value === null || value === undefined ? '' : String(value);
   // A malicious customer or worker can place a spreadsheet formula in an
   // order-time name or label. Protect text, including leading whitespace.
-  if (/^[\s\u0000-\u001f]*[=+\-@]/u.test(text)) text = `'${text}`;
+  let index = 0;
+  while (index < text.length) {
+    const code = text.charCodeAt(index);
+    if (code <= 32 || /\s/u.test(text[index] ?? '')) {
+      index += 1;
+      continue;
+    }
+    break;
+  }
+  if (/^[=+@-]/u.test(text.slice(index))) text = `'${text}`;
   return `"${text.replaceAll('"', '""')}"`;
 }
 
