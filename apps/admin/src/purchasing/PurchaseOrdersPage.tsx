@@ -12,7 +12,7 @@ import {
   parsePurchaseMoneyMinor,
   validatePurchaseOrderLines,
 } from './purchaseOrderDraft';
-import { expectedOrderValueMinor, formatExpectedOrderValue } from './purchaseOrderValue';
+import { expectedOrderValueMinor, formatExpectedOrderValue, purchaseOrderDisplayReference } from './purchaseOrderValue';
 
 function statusLabel(status: AdminPurchaseOrder['status']): string {
   return status
@@ -253,7 +253,7 @@ export function PurchaseOrdersPage({
             >
               <span className="admin-purchasing-row-reference">
                 <strong>
-                  {order.reference?.trim() || `PO-${order.id.slice(0, 8).toUpperCase()}`}
+                  {purchaseOrderDisplayReference(order)}
                 </strong>
                 <small>{order.createdAt.slice(0, 10)}</small>
               </span>
