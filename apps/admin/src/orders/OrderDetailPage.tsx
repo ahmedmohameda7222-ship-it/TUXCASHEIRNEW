@@ -85,7 +85,8 @@ export function OrderDetailPage({
               dateStyle: 'medium',
               timeStyle: 'short',
               timeZone: 'Africa/Cairo',
-            }).format(new Date(order.createdAt))} (Cairo)
+            }).format(new Date(order.createdAt))}{' '}
+            (Cairo)
           </time>
         </div>
         <strong className="admin-order-detail__total">{money(order.totalMinor)}</strong>
@@ -100,7 +101,11 @@ export function OrderDetailPage({
         <a href="#order-detail-history">History</a>
       </nav>
 
-      <dl id="order-detail-overview" className="admin-order-detail__facts" aria-label="Order overview facts">
+      <dl
+        id="order-detail-overview"
+        className="admin-order-detail__facts"
+        aria-label="Order overview facts"
+      >
         <div>
           <dt>Total amount</dt>
           <dd>{money(order.totalMinor)}</dd>
@@ -211,7 +216,10 @@ export function OrderDetailPage({
         </div>
       </section>
 
-      <details className="admin-order-detail__card admin-order-detail__disclosure" aria-label="Order financial breakdown">
+      <details
+        className="admin-order-detail__card admin-order-detail__disclosure"
+        aria-label="Order financial breakdown"
+      >
         <summary>Financial reconciliation breakdown</summary>
         <h3>Order financial breakdown</h3>
         <dl>
