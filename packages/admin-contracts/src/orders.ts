@@ -23,6 +23,12 @@ export type AdminOrderSummary = {
   displayOrderNo: number;
   displayOrderLabel: string | null;
   createdAt: string;
+  businessDayId?: string | null;
+  operatorName?: string | null;
+  itemsSubtotalMinor?: number;
+  discountMinor?: number;
+  serviceChargeMinor?: number;
+  taxMinor?: number;
   totalMinor: number;
   customerName: string | null;
   normalizedPhone: string | null;
@@ -116,6 +122,12 @@ export type AdminOrderDetail = {
   displayOrderNo: number;
   displayOrderLabel: string | null;
   createdAt: string;
+  businessDayId?: string | null;
+  operatorName?: string | null;
+  itemsSubtotalMinor?: number;
+  discountMinor?: number;
+  serviceChargeMinor?: number;
+  taxMinor?: number;
   totalMinor: number;
   customer: {
     contactId: string | null;
