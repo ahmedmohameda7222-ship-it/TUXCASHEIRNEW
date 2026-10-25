@@ -25,6 +25,7 @@ describe('Catalog shop-scoped publishing entry point', () => {
     expect(catalog).toContain('Draft saved');
     expect(catalog).toContain('Review & Publish');
   });
+
   it('does not discard an unsaved product or definition through catalog quick actions', () => {
     const between = (start: string, end: string) => {
       const startAt = catalog.indexOf(start);
@@ -48,5 +49,4 @@ describe('Catalog shop-scoped publishing entry point', () => {
     expect(catalog).toContain('if (busy || !canSwitchCatalogEditor()) return;');
     expect(catalog).toContain('if (!bulkOpen && !canSwitchCatalogEditor()) return;');
   });
-
 });
