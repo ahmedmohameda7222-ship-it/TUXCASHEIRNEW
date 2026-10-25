@@ -115,7 +115,7 @@ describe('Admin order service', () => {
         },
         principal(['orders.view']),
       ),
-    ).resolves.toEqual({ shopId, rows: [] });
+    ).resolves.toEqual({ shopId, rows: [], nextCursor: null });
     expect(() =>
       service.listOnlineOrderRequests(
         {
