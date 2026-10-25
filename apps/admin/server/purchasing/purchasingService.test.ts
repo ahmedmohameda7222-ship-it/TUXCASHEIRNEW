@@ -13,6 +13,12 @@ const buyer: AdminSessionPrincipal = {
 
 function store(overrides: Partial<PurchasingStore> = {}): PurchasingStore {
   return {
+    loadHistory: vi.fn().mockResolvedValue({
+      shopId: 'shop-a',
+      purchaseOrderId: 'po-1',
+      truncated: false,
+      events: [],
+    }),
     loadWorkspace: vi.fn().mockResolvedValue({
       shopId: 'shop-a',
       suppliers: [],
@@ -68,6 +74,24 @@ function store(overrides: Partial<PurchasingStore> = {}): PurchasingStore {
 }
 
 describe('Admin purchasing service', () => {
+  it('requires purchasing.view and the same authorized business/shop for PO chronology', async () => {
+    const purchasingStore = store();
+    const service = createPurchasingService(purchasingStore);
+    await expect(service.loadHistory('shop-a', 'po-1', buyer)).resolves.toMatchObject({
+      shopId: 'shop-a',
+      purchaseOrderId: 'po-1',
+      events: [],
+    });
+    expect(purchasingStore.loadHistory).toHaveBeenCalledWith('shop-a', 'business-1', 'po-1');
+    await expect(service.loadHistory('shop-b', 'po-1', buyer)).rejects.toThrow(/shop_forbidden/);
+    await expect(service.loadHistory('shop-a', 'po-1', {
+      ...buyer,
+      permissions: ['purchasing.manage', 'purchasing.receive'],
+    })).rejects.toThrow(/permission_forbidden/);
+    expect(purchasingStore.loadHistory).toHaveBeenCalledTimes(1);
+  });
+
+
   it('marks a partially received PO without pretending the remainder arrived', async () => {
     const purchasingStore = store();
     const service = createPurchasingService(purchasingStore);
