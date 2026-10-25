@@ -965,3 +965,23 @@ test('O1 nextCursor reveals additional server rows without changing the full-sho
   await expect(page.locator('dl[aria-label="Orders key metrics"]')).toContainText('65');
   expect(fixture.kpiRequests).toHaveLength(1);
 });
+
+for (const width of [1100, 720] as const) {
+  test(`Orders inspector landmarks remain reachable at ${width}px CSS viewport`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await mockOrders(page);
+    await page.goto('/orders');
+    await page.getByRole('button', { name: /#101/ }).click();
+    const inspector = page.getByRole('navigation', { name: 'Order detail sections' });
+    await expect(inspector.getByRole('link')).toHaveCount(6);
+    await inspector.getByRole('link', { name: 'History' }).click();
+    await expect(page).toHaveURL(/#order-detail-history$/);
+    await expect(page.locator('#order-detail-history')).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await capturePremiumScreenshot(page, 'orders-inspector');
+  });
+}
