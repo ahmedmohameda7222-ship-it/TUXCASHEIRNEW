@@ -40,8 +40,8 @@ jobs:
         run: npm run build:admin
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Run existing Admin rendered E2E
-        run: npm run test:e2e:admin
+      - name: Run targeted Admin Orders rendered E2E
+        run: npx playwright test --config playwright.admin.config.ts e2e/admin-orders.spec.ts
       - name: Preserve screenshots and traces
         if: always()
         uses: actions/upload-artifact@v4
