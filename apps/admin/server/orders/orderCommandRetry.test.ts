@@ -1,24 +1,33 @@
 import { describe, expect, it } from 'vitest';
 
 import { AdminApiError } from '../../src/lib/adminApi';
-import { shouldReleaseOrdersCommandIdAfterFailure } from '../../src/orders/useOrders';
+import { shouldReleaseOrdersCommandIdAfterFailure } from '../../src/orders/orderCommandRetryPolicy';
 
 describe('Orders financial command idempotency after uncertain HTTP responses', () => {
-  it('retains the original command ID for transport failures and server-side 5xx responses', () => {
+  it('retains original command ID for network failures and server-side 5xx responses', () => {
     expect(shouldReleaseOrdersCommandIdAfterFailure(new Error('Failed to fetch'))).toBe(false);
-    expect(shouldReleaseOrdersCommandIdAfterFailure(new AdminApiError(502, 'admin_backend_unavailable'))).toBe(false);
-    expect(shouldReleaseOrdersCommandIdAfterFailure(new AdminApiError(503, 'service_unavailable'))).toBe(false);
-    expect(shouldReleaseOrdersCommandIdAfterFailure(new AdminApiError(504, 'gateway_timeout'))).toBe(false);
+    for (const code of [500, 502, 503, 504]) {
+      expect(
+        shouldReleaseOrdersCommandIdAfterFailure(
+          new AdminApiError(code, 'admin_backend_unavailable'),
+        ),
+      ).toBe(false);
+    }
   });
 
-  it('retains identity when timeout or rate limiting leaves the commit status uncertain', () => {
-    expect(shouldReleaseOrdersCommandIdAfterFailure(new AdminApiError(408, 'request_timeout'))).toBe(false);
-    expect(shouldReleaseOrdersCommandIdAfterFailure(new AdminApiError(429, 'rate_limited'))).toBe(false);
+  it('retains identity when timeout or rate limiting leaves commit status uncertain', () => {
+    for (const code of [408, 429]) {
+      expect(
+        shouldReleaseOrdersCommandIdAfterFailure(new AdminApiError(code, 'uncertain_outcome')),
+      ).toBe(false);
+    }
   });
 
   it('releases retained identity only after definitive client-side rejection', () => {
     for (const code of [400, 401, 403, 404, 409, 422]) {
-      expect(shouldReleaseOrdersCommandIdAfterFailure(new AdminApiError(code, 'request_rejected'))).toBe(true);
+      expect(
+        shouldReleaseOrdersCommandIdAfterFailure(new AdminApiError(code, 'request_rejected')),
+      ).toBe(true);
     }
   });
 });
