@@ -28,6 +28,9 @@ function principal(
 
 function fixtureStore(): OrderStore {
   return {
+    async listBusinessDays(input) {
+      return { shopId: input.shopId, days: [] };
+    },
     async listOnlineOrderRequests(input) {
       return { shopId: input.shopId, rows: [] };
     },
