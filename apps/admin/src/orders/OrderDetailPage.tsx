@@ -262,6 +262,17 @@ export function OrderDetailPage({
                     {friendly(event.state)} · {event.reason.label}
                   </small>
                   {event.note ? <small>{event.note}</small> : null}
+                  {event.kind === 'RETURN' && event.returnItems?.length ? (
+                    <ul>
+                      {event.returnItems.map((line) => (
+                        <li key={line.orderItemId}>
+                          <small>Returned {line.quantity} × {line.productName}</small>
+                          <small>Return valuation: {money(line.valuationMinor)}</small>
+                          <small>Order-item reference: {line.orderItemId}</small>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                   <small>
                     Requested:{' '}
                     {new Intl.DateTimeFormat('en-EG', {
