@@ -421,10 +421,9 @@
 .admin-inventory-table-header,
 .admin-inventory-master-detail .admin-inventory-row {
   display: grid;
-  grid-template-columns: minmax(125px, 2fr) minmax(55px, 0.65fr) repeat(
-      3,
-      minmax(58px, 0.7fr)
-    ) minmax(88px, 0.95fr);
+  grid-template-columns:
+    minmax(125px, 2fr) minmax(55px, 0.65fr) repeat(3, minmax(58px, 0.7fr))
+    minmax(88px, 0.95fr);
   gap: 0.45rem;
   align-items: center;
   padding-inline: 0.8rem;
@@ -594,8 +593,14 @@
   font-weight: 650;
   padding: 0.18rem 0.4rem;
 }
-.admin-inventory-item-active { color: #0f6a4a; background: #eef8f1; }
-.admin-inventory-item-inactive { color: #69746e; background: #f2f3f1; }
+.admin-inventory-item-active {
+  color: #0f6a4a;
+  background: #eef8f1;
+}
+.admin-inventory-item-inactive {
+  color: #69746e;
+  background: #f2f3f1;
+}
 .admin-inventory-inspector-tabs {
   display: flex;
   gap: 1rem;
@@ -615,9 +620,19 @@
   font-size: 0.8rem;
   cursor: pointer;
 }
-.admin-inventory-inspector-tabs button.is-selected { color: #0f6a4a; border-color: #0f6a4a; font-weight: 700; }
-.admin-inventory-inspector-tabs button:focus-visible { outline: 2px solid #0f6a4a; outline-offset: -2px; }
-.admin-inventory-inspector-panel { display: grid; gap: 1rem; }
+.admin-inventory-inspector-tabs button.is-selected {
+  color: #0f6a4a;
+  border-color: #0f6a4a;
+  font-weight: 700;
+}
+.admin-inventory-inspector-tabs button:focus-visible {
+  outline: 2px solid #0f6a4a;
+  outline-offset: -2px;
+}
+.admin-inventory-inspector-panel {
+  display: grid;
+  gap: 1rem;
+}
 .admin-inventory-stock-threshold {
   border: 1px solid #e8e9e6;
   border-radius: 9px;
@@ -627,11 +642,26 @@
   gap: 0.35rem;
   font-size: 0.8rem;
 }
-.admin-inventory-stock-threshold > span { color: #727d78; font-size: 0.75rem; }
-.admin-inventory-stock-threshold dl { margin: 0.5rem 0 0; }
-.admin-inventory-stock-threshold dt, .admin-inventory-definition-overview dt { color: #727d78; font-size: 0.75rem; }
-.admin-inventory-stock-threshold dd { margin: 0.2rem 0; font-weight: 700; }
-.admin-inventory-definition-overview { display: grid; margin: 0; }
+.admin-inventory-stock-threshold > span {
+  color: #727d78;
+  font-size: 0.75rem;
+}
+.admin-inventory-stock-threshold dl {
+  margin: 0.5rem 0 0;
+}
+.admin-inventory-stock-threshold dt,
+.admin-inventory-definition-overview dt {
+  color: #727d78;
+  font-size: 0.75rem;
+}
+.admin-inventory-stock-threshold dd {
+  margin: 0.2rem 0;
+  font-weight: 700;
+}
+.admin-inventory-definition-overview {
+  display: grid;
+  margin: 0;
+}
 .admin-inventory-definition-overview > div {
   display: flex;
   justify-content: space-between;
@@ -640,5 +670,12 @@
   border-bottom: 1px solid #ebede9;
   font-size: 0.8rem;
 }
-.admin-inventory-definition-overview > div:last-child { border-bottom: none; }
-.admin-inventory-definition-overview dd { text-align: right; margin: 0; font-weight: 650; overflow-wrap: anywhere; }
+.admin-inventory-definition-overview > div:last-child {
+  border-bottom: none;
+}
+.admin-inventory-definition-overview dd {
+  text-align: right;
+  margin: 0;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
