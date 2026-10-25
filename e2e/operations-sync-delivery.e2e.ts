@@ -24,7 +24,11 @@ function workerPinHash(pin: string): string {
 
 async function routeRemoteRuntime(
   route: Route,
-  capture: { orderRow: Readonly<Record<string, unknown>> | null; orderPosts: number },
+  capture: {
+    orderRow: Readonly<Record<string, unknown>> | null;
+    orderPosts: number;
+    auxiliaryUnavailablePaths: string[];
+  },
 ): Promise<void> {
   const request = route.request();
   const url = new URL(request.url());
@@ -154,6 +158,10 @@ async function routeRemoteRuntime(
     return;
   }
   if (url.pathname.startsWith('/api/')) {
+    // These auxiliary services are deliberately outside the isolated Order Sync
+    // fixture. Record every unavailable endpoint so a new critical dependency
+    // cannot silently become an accepted 503 response.
+    capture.auxiliaryUnavailablePaths.push(url.pathname);
     await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
     return;
   }
@@ -173,7 +181,8 @@ test('Chromium delivers a locally created Order and exposes its canonical Admin 
   const capture: {
     orderRow: Readonly<Record<string, unknown>> | null;
     orderPosts: number;
-  } = { orderRow: null, orderPosts: 0 };
+    auxiliaryUnavailablePaths: string[];
+  } = { orderRow: null, orderPosts: 0, auxiliaryUnavailablePaths: [] };
   const consoleErrors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
@@ -241,7 +250,25 @@ test('Chromium delivers a locally created Order and exposes its canonical Admin 
     source: 'POS',
     displayOrderLabel: '#1',
   });
-  expect(consoleErrors).toEqual([]);
+  const allowedUnavailable = new Set([
+    '/api/worker-menu-layout',
+    '/api/worker-ui-preferences',
+    '/api/operations-order-rewards',
+    '/api/whatsapp',
+    '/api/operations-session-exit',
+  ]);
+  expect(capture.auxiliaryUnavailablePaths.length).toBeGreaterThan(0);
+  expect(
+    capture.auxiliaryUnavailablePaths.filter((path) => !allowedUnavailable.has(path)),
+  ).toEqual([]);
+  // Browser console 503s belong exclusively to the deliberately unavailable
+  // auxiliary fixture paths above, never the asserted Order Sync endpoint.
+  expect(
+    consoleErrors.filter(
+      (message) =>
+        message !== 'Failed to load resource: the server responded with a status of 503 (Service Unavailable)',
+    ),
+  ).toEqual([]);
 
   await page.screenshot({
     path: testInfo.outputPath('operations-order-delivered-and-synced.png'),
