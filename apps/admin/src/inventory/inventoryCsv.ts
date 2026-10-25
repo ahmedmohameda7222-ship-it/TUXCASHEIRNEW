@@ -26,7 +26,8 @@ function exactMicros(value: number): string {
 function safeCell(value: string): string {
   // Quote all CSV cells, escape internal quotes, and neutralize spreadsheet
   // formulas including those concealed by leading control/whitespace.
-  const sanitized = /^[\u0000-\u0020]*[=+@-]/.test(value) ? `'${value}` : value;
+  const firstContent = [...value].find((character) => character.charCodeAt(0) > 32);
+  const sanitized = firstContent && '=+-@'.includes(firstContent) ? `'${value}` : value;
   return `"${sanitized.replaceAll('"', '""')}"`;
 }
 
