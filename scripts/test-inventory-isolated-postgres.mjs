@@ -388,27 +388,27 @@ const raceArgs=[S,concurrentOrder,businessDay,worker,requirements,'recipe-race-c
 const reserveRaceSql='select (public.reserve_inventory_for_order_v1('+
   raceArgs.map(literal).join(',')+'))::text';
 const firstReserve=spawn('psql',[databaseUrl,'-X','-q','-At','-v','ON_ERROR_STOP=1',
-  '-c','begin; '+reserveRaceSql+'; select pg_sleep(1.5); commit;'],{
+  '-c','begin; '+reserveRaceSql+'; select pg_sleep(3); commit;'],{
   encoding:'utf8'
 });
 let firstOut='',firstErr='';
-const firstReady=new Promise((resolve,reject)=>{
-  const alarm=setTimeout(()=>reject(new Error('First reservation transaction did not start')),7000);
-  firstReserve.stdout.on('data',d=>{
-    firstOut+=d.toString();
-    if(firstOut.includes('"ok"')){clearTimeout(alarm);resolve();}
-  });
-  firstReserve.stderr.on('data',d=>{firstErr+=d.toString();});
-  firstReserve.on('error',reject);
-  firstReserve.on('close',code=>{
-    if(code!==0){clearTimeout(alarm);reject(new Error('First transaction: '+firstErr));}
-  });
-});
+firstReserve.stdout.on('data', d => {firstOut+=d.toString();});
+firstReserve.stderr.on('data', d => {firstErr+=d.toString();});
+// A psql -c with multiple statements may buffer stdout UNTIL COMMIT.
+// Observe the FIRST transaction's actual PostgreSQL advisory lock instead.
+// This ensures the second RPC overlaps an UNCOMMITTED reservation.
+let heldFirstReservationLock=false;
+for(let attempt=0;attempt<45;attempt++){
+  const locks=Number(query("select count(*) from pg_locks where locktype='advisory' "+
+    "and granted and pid<>pg_backend_pid()", 'Watch uncommitted reservation lock'));
+  if(locks>0){heldFirstReservationLock=true;break;}
+  await new Promise(resolve=>setTimeout(resolve,40));
+}
+verify(heldFirstReservationLock,'First reservation holds a DB transaction advisory lock');
 const firstClosed=new Promise((resolve,reject)=>{
   firstReserve.once('close',code=>code===0?resolve():reject(new Error(firstErr)));
   firstReserve.once('error',reject);
 });
-await firstReady;
 const secondReserve=await concurrently(reserveRaceSql,'Concurrent identical reserve retry');
 await firstClosed;
 verify(secondReserve.ok===true && secondReserve.idempotentReplay===true,
