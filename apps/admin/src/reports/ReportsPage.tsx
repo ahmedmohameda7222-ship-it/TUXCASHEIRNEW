@@ -8,6 +8,7 @@ import { OwnerSummaryCard } from '../dashboard/OwnerSummaryCard';
 import { useShopScope } from '../shops/ShopScopeProvider';
 
 import { REPORT_LABELS, ReportFilters } from './ReportFilters';
+import { validReportDateRange } from './reportDateRange';
 import { scopeReportFilters } from './reportScope';
 import { ReportView } from './ReportView';
 import { SavedViews } from './SavedViews';
@@ -130,6 +131,11 @@ export function ReportsPage() {
         options={reports.optionsQuery.data?.options ?? {}}
         onExpand={() => setFilterOptionsExpanded(true)}
       />
+      {!validReportDateRange(scopedFilters.fromDate, scopedFilters.toDate) ? (
+        <p className="admin-inline-error" role="alert">
+          Select a valid From/To date range in ascending order, no longer than 730 days.
+        </p>
+      ) : null}
       <ReportView
         data={reports.reportQuery.data}
         filters={scopedFilters}
