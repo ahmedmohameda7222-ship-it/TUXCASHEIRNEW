@@ -260,7 +260,9 @@ for (const viewport of [
   { width: 390, height: 844 },
   { width: 360, height: 760 },
 ]) {
-  test(`approved Purchasing list/detail/supplier layouts at ${viewport.width}px`, async ({ page }) => {
+  test(`approved Purchasing list/detail/supplier layouts at ${viewport.width}px`, async ({
+    page,
+  }) => {
     await page.setViewportSize(viewport);
     await mockPurchasing(page);
     await page.goto('/purchasing');
@@ -271,30 +273,51 @@ for (const viewport of [
     await expect(page.getByText('No purchase orders match these filters.')).toBeVisible();
     await page.getByRole('button', { name: 'Reset filters' }).click();
     await expect(page.getByRole('button', { name: /PO-100/ })).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: `test-results/purchasing-approved-orders-${viewport.width}.png`, fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({
+      path: `test-results/purchasing-approved-orders-${viewport.width}.png`,
+      fullPage: true,
+    });
 
     await selectPurchaseOrder(page);
     await expect(page.getByRole('tab', { name: 'Overview', exact: true })).toBeVisible();
     await page.getByRole('tab', { name: 'Items', exact: true }).click();
-    await expect(page.locator('.admin-purchasing-line-item strong', { hasText: 'Beef' })).toBeVisible();
+    await expect(
+      page.locator('.admin-purchasing-line-item strong', { hasText: 'Beef' }),
+    ).toBeVisible();
     await page.getByRole('tab', { name: 'History', exact: true }).click();
     await expect(page.getByText(/No receipt or return event history is available/)).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: `test-results/purchasing-approved-detail-${viewport.width}.png`, fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({
+      path: `test-results/purchasing-approved-detail-${viewport.width}.png`,
+      fullPage: true,
+    });
 
     if (viewport.width <= 480) {
       await page.getByRole('link', { name: /back to purchasing/i }).click();
     }
     await openSuppliers(page);
     await expect(page.getByRole('combobox', { name: 'Filter suppliers by status' })).toBeVisible();
-    await page.getByRole('combobox', { name: 'Filter suppliers by status' }).selectOption('archived');
+    await page
+      .getByRole('combobox', { name: 'Filter suppliers by status' })
+      .selectOption('archived');
     await expect(page.getByText('No suppliers match these filters.')).toBeVisible();
     await page.getByRole('button', { name: 'Reset filters' }).click();
     await page.getByRole('button', { name: 'Prime Foods', exact: true }).click();
-    await expect(page.getByRole('complementary', { name: 'Selected supplier detail' })).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: `test-results/purchasing-approved-suppliers-${viewport.width}.png`, fullPage: true });
+    await expect(
+      page.getByRole('complementary', { name: 'Selected supplier detail' }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({
+      path: `test-results/purchasing-approved-suppliers-${viewport.width}.png`,
+      fullPage: true,
+    });
   });
 }
 
@@ -305,7 +328,9 @@ test('purchasing renders suppliers and can order a draft PO through the trusted 
   await page.goto('/purchasing');
 
   await expect(page.getByRole('heading', { name: 'Purchasing' })).toBeVisible();
-  await expect(page.locator('.admin-purchasing-row-supplier', { hasText: 'Prime Foods' })).toBeVisible();
+  await expect(
+    page.locator('.admin-purchasing-row-supplier', { hasText: 'Prime Foods' }),
+  ).toBeVisible();
   await expect(page.getByText('PO-100').first()).toBeVisible();
 
   await selectPurchaseOrder(page);
@@ -502,7 +527,9 @@ test('purchasing posts partial receiving and purchase returns without pretending
   await page.getByLabel('Supplier reference').fill('INV-100');
   await page.getByRole('button', { name: 'Post receipt' }).click();
 
-  await expect(page.locator('.admin-purchasing-order-header').getByText('Partially received')).toBeVisible();
+  await expect(
+    page.locator('.admin-purchasing-order-header').getByText('Partially received'),
+  ).toBeVisible();
   await expect(page.getByText(/6 kg remaining/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Return purchase' }).click();

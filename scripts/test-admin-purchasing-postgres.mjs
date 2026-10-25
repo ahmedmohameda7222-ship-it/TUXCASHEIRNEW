@@ -47,9 +47,7 @@ function psqlAsync(args, label) {
         return;
       }
       rejectPromise(
-        new Error(
-          `${label} failed with exit code ${code ?? 'unknown'}.\n${stdout}${stderr}`,
-        ),
+        new Error(`${label} failed with exit code ${code ?? 'unknown'}.\n${stdout}${stderr}`),
       );
     });
   });
@@ -361,9 +359,7 @@ const supplierMismatchResult = psql(
 ).trim();
 const supplierMismatch = JSON.parse(supplierMismatchResult);
 if (supplierMismatch.ok !== false || supplierMismatch.code !== 'idempotency_conflict') {
-  throw new Error(
-    `supplier command id accepted a different intent: ${supplierMismatchResult}`,
-  );
+  throw new Error(`supplier command id accepted a different intent: ${supplierMismatchResult}`);
 }
 
 const supplierReplayCount = psql(
@@ -449,7 +445,9 @@ const duplicatePurchaseOrderRows = psql(
   'Duplicate purchase-order no-mutation assertion',
 ).trim();
 if (duplicatePurchaseOrderRows !== '0') {
-  throw new Error(`duplicate purchase-order request persisted a header: ${duplicatePurchaseOrderRows}`);
+  throw new Error(
+    `duplicate purchase-order request persisted a header: ${duplicatePurchaseOrderRows}`,
+  );
 }
 
 psql(
@@ -721,16 +719,26 @@ if (JSON.parse(replay).idempotentReplay !== true) {
 
 // Retrying the same command ID with a different request MUST be an explicit conflict.
 for (const caseName of ['quantity', 'cost', 'reference', 'lineId']) {
-  const payload = [{
-    lineId: caseName === 'lineId' ? SECOND_PO_ID : LINE_ID,
-    receivedPurchaseUnitsMicros: caseName === 'quantity' ? 499 : 500,
-    purchaseUnitCostMinor: caseName === 'cost' ? 200001 : 200000,
-  }];
-  const result = JSON.parse(psql(['-At', '-c', `select public.receive_purchase_order_v1(
+  const payload = [
+    {
+      lineId: caseName === 'lineId' ? SECOND_PO_ID : LINE_ID,
+      receivedPurchaseUnitsMicros: caseName === 'quantity' ? 499 : 500,
+      purchaseUnitCostMinor: caseName === 'cost' ? 200001 : 200000,
+    },
+  ];
+  const result = JSON.parse(
+    psql(
+      [
+        '-At',
+        '-c',
+        `select public.receive_purchase_order_v1(
      '${EMPLOYEE_ID}', '${SHOP_ID}', '${PO_ID}', 'receive-partial-1',
      '${caseName === 'reference' ? 'INV-CHANGED' : 'INV-1001'}',
-     '${JSON.stringify(payload)}'::jsonb)::text`],
-  `Conflicting receipt replay (${caseName})`).trim());
+     '${JSON.stringify(payload)}'::jsonb)::text`,
+      ],
+      `Conflicting receipt replay (${caseName})`,
+    ).trim(),
+  );
   if (result.ok !== false || result.code !== 'idempotency_conflict') {
     throw new Error(`receipt replay accepted mismatched ${caseName}: ${JSON.stringify(result)}`);
   }
@@ -826,15 +834,25 @@ if (returnReplay.idempotentReplay !== true) {
 }
 
 for (const caseName of ['quantity', 'reference', 'lineId']) {
-  const payload = [{
-    lineId: caseName === 'lineId' ? SECOND_PO_ID : LINE_ID,
-    returnedPurchaseUnitsMicros: caseName === 'quantity' ? 249 : 250,
-  }];
-  const result = JSON.parse(psql(['-At', '-c', `select public.return_purchase_order_v1(
+  const payload = [
+    {
+      lineId: caseName === 'lineId' ? SECOND_PO_ID : LINE_ID,
+      returnedPurchaseUnitsMicros: caseName === 'quantity' ? 249 : 250,
+    },
+  ];
+  const result = JSON.parse(
+    psql(
+      [
+        '-At',
+        '-c',
+        `select public.return_purchase_order_v1(
      '${EMPLOYEE_ID}', '${SHOP_ID}', '${PO_ID}', 'return-1',
      '${caseName === 'reference' ? 'CN-CHANGED' : 'CN-1001'}',
-     '${JSON.stringify(payload)}'::jsonb)::text`],
-  `Conflicting return replay (${caseName})`).trim());
+     '${JSON.stringify(payload)}'::jsonb)::text`,
+      ],
+      `Conflicting return replay (${caseName})`,
+    ).trim(),
+  );
   if (result.ok !== false || result.code !== 'idempotency_conflict') {
     throw new Error(`return replay accepted mismatched ${caseName}: ${JSON.stringify(result)}`);
   }
@@ -934,7 +952,6 @@ psql(
   ],
   'Purchase return transactional assertions',
 );
-
 
 const VARIANCE_ITEM_ID = '35000000-0000-4000-8000-000000000002';
 const VARIANCE_PO_ID = '55000000-0000-4000-8000-000000000002';
@@ -1055,7 +1072,6 @@ psql(
   'Purchase return price-variance assertions',
 );
 
-
 const COST_WORKER_ID = '26000000-0000-4000-8000-000000000001';
 const COST_MOVEMENT_ID = '76000000-0000-4000-8000-000000000001';
 
@@ -1104,7 +1120,6 @@ if (canonicalConsumptionCost !== 777) {
     `canonical ORDER_CONSUMPTION must snapshot locked cost 777, got ${canonicalConsumptionCost}`,
   );
 }
-
 
 const CHEAP_VARIANCE_ITEM_ID = '35000000-0000-4000-8000-000000000003';
 const CHEAP_VARIANCE_PO_ID = '55000000-0000-4000-8000-000000000003';
@@ -1361,19 +1376,30 @@ psql(
 // *concurrent* identical calls replay once and changed calls conflict, without
 // duplicate stock movements. These checks run only on disposable PostgreSQL.
 const CONCURRENT_LINE_ID = '65000000-0000-4000-8000-0000000000c1';
-psql(['-c', `insert into public.purchase_order_lines(
+psql(
+  [
+    '-c',
+    `insert into public.purchase_order_lines(
   id, purchase_order_id, inventory_item_id, purchase_unit_label,
   base_micros_per_purchase_unit, ordered_purchase_units_micros, ordered_base_micros,
   expected_purchase_unit_cost_minor, expected_unit_cost_minor
 ) values (
   '${CONCURRENT_LINE_ID}', '${SECOND_PO_ID}', '${ITEM_ID}', 'kg',
   1000000000, 1000, 1000000, 180000, 180
-);`], 'Concurrent purchasing isolated PO line fixture');
+);`,
+  ],
+  'Concurrent purchasing isolated PO line fixture',
+);
 
 function concurrencyCommand(kind, command, quantity) {
-  const line = kind === 'receipt'
-    ? { lineId: CONCURRENT_LINE_ID, receivedPurchaseUnitsMicros: quantity, purchaseUnitCostMinor: 180000 }
-    : { lineId: CONCURRENT_LINE_ID, returnedPurchaseUnitsMicros: quantity };
+  const line =
+    kind === 'receipt'
+      ? {
+          lineId: CONCURRENT_LINE_ID,
+          receivedPurchaseUnitsMicros: quantity,
+          purchaseUnitCostMinor: 180000,
+        }
+      : { lineId: CONCURRENT_LINE_ID, returnedPurchaseUnitsMicros: quantity };
   const fn = kind === 'receipt' ? 'receive_purchase_order_v1' : 'return_purchase_order_v1';
   return `select public.${fn}(
     '${EMPLOYEE_ID}', '${SHOP_ID}', '${SECOND_PO_ID}', '${command}',
@@ -1383,28 +1409,51 @@ function concurrencyCommand(kind, command, quantity) {
 function assertConcurrentResults(results, expectedReplay, label) {
   const values = results.map((result) => JSON.parse(result.trim()));
   const successes = values.filter((value) => value.ok === true);
-  const conflicts = values.filter((value) => value.ok === false && value.code === 'idempotency_conflict');
+  const conflicts = values.filter(
+    (value) => value.ok === false && value.code === 'idempotency_conflict',
+  );
   if (expectedReplay) {
-    if (successes.length !== 2 || successes.filter((value) => value.idempotentReplay).length !== 1) {
-      throw new Error(`${label}: identical attempts did not produce one write and one replay: ${JSON.stringify(values)}`);
+    if (
+      successes.length !== 2 ||
+      successes.filter((value) => value.idempotentReplay).length !== 1
+    ) {
+      throw new Error(
+        `${label}: identical attempts did not produce one write and one replay: ${JSON.stringify(values)}`,
+      );
     }
-  } else if (successes.length !== 1 || conflicts.length !== 1 || successes[0]?.idempotentReplay !== false) {
-    throw new Error(`${label}: conflicting attempts were not fenced atomically: ${JSON.stringify(values)}`);
+  } else if (
+    successes.length !== 1 ||
+    conflicts.length !== 1 ||
+    successes[0]?.idempotentReplay !== false
+  ) {
+    throw new Error(
+      `${label}: conflicting attempts were not fenced atomically: ${JSON.stringify(values)}`,
+    );
   }
 }
 async function racePurchasing(kind, command, quantities, expectedReplay) {
   const results = await Promise.all(
-    quantities.map((quantity, index) => psqlAsync(
-      ['-At', '-c', concurrencyCommand(kind, command, quantity)],
-      `${kind} concurrent ${command} attempt ${index + 1}`
-    ))
+    quantities.map((quantity, index) =>
+      psqlAsync(
+        ['-At', '-c', concurrencyCommand(kind, command, quantity)],
+        `${kind} concurrent ${command} attempt ${index + 1}`,
+      ),
+    ),
   );
   assertConcurrentResults(results, expectedReplay, `${kind} ${command}`);
   const movementType = kind === 'receipt' ? 'PURCHASE_RECEIPT' : 'PURCHASE_RETURN';
-  const movementCount = psql(['-At', '-c', `select count(*) from public.inventory_movements
+  const movementCount = psql(
+    [
+      '-At',
+      '-c',
+      `select count(*) from public.inventory_movements
     where shop_id = '${SHOP_ID}' and movement_type = '${movementType}'
-      and command_id = '${command}'`], 'Concurrent inventory movement count').trim();
-  if (movementCount !== '1') throw new Error(`expected one ${kind} ledger movement, got ${movementCount}`);
+      and command_id = '${command}'`,
+    ],
+    'Concurrent inventory movement count',
+  ).trim();
+  if (movementCount !== '1')
+    throw new Error(`expected one ${kind} ledger movement, got ${movementCount}`);
 }
 await racePurchasing('receipt', 'receive-concurrent-identical', [500, 500], true);
 await racePurchasing('receipt', 'receive-concurrent-conflict', [200, 300], false);

@@ -17,7 +17,11 @@ import { requireBusinessWidePermission, requirePermission } from '../authorizati
 
 export interface PurchasingStore {
   loadWorkspace(shopId: string, businessId: string): Promise<AdminPurchasingWorkspace>;
-  loadHistory(shopId: string, businessId: string, purchaseOrderId: string): Promise<AdminPurchaseOrderHistory | null>;
+  loadHistory(
+    shopId: string,
+    businessId: string,
+    purchaseOrderId: string,
+  ): Promise<AdminPurchaseOrderHistory | null>;
   createSupplier(
     input: CreateSupplierInput & { employeeId: string; businessId: string },
   ): Promise<PurchasingCommandResult>;

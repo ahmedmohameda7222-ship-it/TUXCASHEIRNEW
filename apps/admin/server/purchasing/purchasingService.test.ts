@@ -84,13 +84,14 @@ describe('Admin purchasing service', () => {
     });
     expect(purchasingStore.loadHistory).toHaveBeenCalledWith('shop-a', 'business-1', 'po-1');
     await expect(service.loadHistory('shop-b', 'po-1', buyer)).rejects.toThrow(/shop_forbidden/);
-    await expect(service.loadHistory('shop-a', 'po-1', {
-      ...buyer,
-      permissions: ['purchasing.manage', 'purchasing.receive'],
-    })).rejects.toThrow(/permission_forbidden/);
+    await expect(
+      service.loadHistory('shop-a', 'po-1', {
+        ...buyer,
+        permissions: ['purchasing.manage', 'purchasing.receive'],
+      }),
+    ).rejects.toThrow(/permission_forbidden/);
     expect(purchasingStore.loadHistory).toHaveBeenCalledTimes(1);
   });
-
 
   it('marks a partially received PO without pretending the remainder arrived', async () => {
     const purchasingStore = store();

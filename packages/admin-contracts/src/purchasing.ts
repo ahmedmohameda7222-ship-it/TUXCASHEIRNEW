@@ -182,7 +182,6 @@ export type PurchasingCommandResult =
       readonly returnableBaseMicros?: number;
     };
 
-
 /** Bounded, persisted receipt/return chronology for a single authorized PO. */
 export type AdminPurchaseOrderHistory = {
   shopId: string;

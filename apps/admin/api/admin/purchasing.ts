@@ -641,7 +641,11 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
       };
     },
 
-    async loadHistory(shopId, businessId, purchaseOrderId): Promise<AdminPurchaseOrderHistory | null> {
+    async loadHistory(
+      shopId,
+      businessId,
+      purchaseOrderId,
+    ): Promise<AdminPurchaseOrderHistory | null> {
       // The service enforces purchasing.view. The PostgREST service client can
       // bypass RLS, so the order must also match BOTH authorized scopes here.
       const matchingOrders = await client.select<{ id: string }[]>(
@@ -699,7 +703,10 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
         ),
       ]);
 
-      const receiptsById = new Map<string, AdminPurchaseOrderHistory['events'][number]['lines'][number][]>();
+      const receiptsById = new Map<
+        string,
+        AdminPurchaseOrderHistory['events'][number]['lines'][number][]
+      >();
       for (const row of receiptLines) {
         const lines = receiptsById.get(row.purchase_receipt_id) ?? [];
         lines.push({
@@ -740,8 +747,9 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
             }),
           ),
         })),
-      ].sort((left, right) =>
-        right.occurredAt.localeCompare(left.occurredAt) || right.id.localeCompare(left.id),
+      ].sort(
+        (left, right) =>
+          right.occurredAt.localeCompare(left.occurredAt) || right.id.localeCompare(left.id),
       );
 
       return { shopId, purchaseOrderId, events, truncated };

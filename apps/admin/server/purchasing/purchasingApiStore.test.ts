@@ -302,7 +302,6 @@ describe('Admin purchasing workspace pagination', () => {
   });
 });
 
-
 describe('Admin persisted purchase history read boundaries', () => {
   it('does not read event tables for an order outside its authorized business and shop', async () => {
     const select = vi.fn(async (table: string, query: URLSearchParams) => {
@@ -326,16 +325,28 @@ describe('Admin persisted purchase history read boundaries', () => {
     const returns = [
       { id: 'return-a', supplier_reference: 'RET-3', returned_at: '2026-10-25T11:00:00Z' },
     ];
-    const receiptLines = [{
-      id: 'receipt-line-a',
-      purchase_receipt_id: 'receipt-a',
-      purchase_order_line_id: 'po-line-a',
-      received_purchase_units_micros: '500000',
-      purchase_unit_cost_minor: '12500.000000',
-    }];
+    const receiptLines = [
+      {
+        id: 'receipt-line-a',
+        purchase_receipt_id: 'receipt-a',
+        purchase_order_line_id: 'po-line-a',
+        received_purchase_units_micros: '500000',
+        purchase_unit_cost_minor: '12500.000000',
+      },
+    ];
     const returnLines = [
-      { id: 'return-line-a', purchase_return_id: 'return-a', purchase_order_line_id: 'po-line-a', returned_purchase_units_micros: '100000' },
-      { id: 'return-line-b', purchase_return_id: 'return-a', purchase_order_line_id: 'po-line-a', returned_purchase_units_micros: '50000' },
+      {
+        id: 'return-line-a',
+        purchase_return_id: 'return-a',
+        purchase_order_line_id: 'po-line-a',
+        returned_purchase_units_micros: '100000',
+      },
+      {
+        id: 'return-line-b',
+        purchase_return_id: 'return-a',
+        purchase_order_line_id: 'po-line-a',
+        returned_purchase_units_micros: '50000',
+      },
     ];
     const select = vi.fn(async (table: string, query: URLSearchParams) => {
       if (table === 'purchase_orders') {
@@ -368,12 +379,24 @@ describe('Admin persisted purchase history read boundaries', () => {
       type: 'RETURN',
       occurredAt: '2026-10-25T11:00:00Z',
       supplierReference: 'RET-3',
-      lines: [{ purchaseOrderLineId: 'po-line-a', quantityPurchaseUnitsMicros: 150000, purchaseUnitCostMinor: null }],
+      lines: [
+        {
+          purchaseOrderLineId: 'po-line-a',
+          quantityPurchaseUnitsMicros: 150000,
+          purchaseUnitCostMinor: null,
+        },
+      ],
     });
     expect(result?.events[1]).toMatchObject({
       type: 'RECEIPT',
       supplierReference: 'INV-42',
-      lines: [{ purchaseOrderLineId: 'po-line-a', quantityPurchaseUnitsMicros: 500000, purchaseUnitCostMinor: 12500 }],
+      lines: [
+        {
+          purchaseOrderLineId: 'po-line-a',
+          quantityPurchaseUnitsMicros: 500000,
+          purchaseUnitCostMinor: 12500,
+        },
+      ],
     });
   });
 });
