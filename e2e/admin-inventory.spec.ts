@@ -65,6 +65,17 @@ async function mockInventory(
     if (request.method() === 'GET') {
       const url = new URL(request.url());
       expect(url.searchParams.get('shopId')).toBe(shopId);
+      const view = url.searchParams.get('view');
+      if (view === 'stocktake-eligibility') {
+        await route.fulfill({ status: 200, contentType: 'application/json',
+          body: JSON.stringify({ allowed: true, code: 'off_shift_allowed' }) });
+        return;
+      }
+      if (view === 'stocktake-sessions') {
+        await route.fulfill({ status: 200, contentType: 'application/json',
+          body: JSON.stringify({ ok: true, sessions: [] }) });
+        return;
+      }
       const requestedInventoryItemId = url.searchParams.get('inventoryItemId');
       if (requestedInventoryItemId !== null) {
         expect(requestedInventoryItemId).toBe(itemId);
@@ -216,6 +227,14 @@ async function mockInventory(
       });
       return;
     }
+    if (command.type === 'stocktake.save') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, idempotentReplay: false, draftRevision: 1 }),
+      });
+      return;
+    }
     if (command.type === 'stocktake.post') {
       const lines = command.lines as Array<{ actualCountMicros: number }>;
       onHandMicros = lines[0]?.actualCountMicros ?? onHandMicros;
@@ -240,13 +259,15 @@ test('inventory renders on-hand, reserved, available, history, and action entry 
   await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible();
   await page.getByRole('button', { name: /Beef/ }).click();
 
-  await expect(page.getByText('On Hand', { exact: true })).toBeVisible();
+  await expect(page.getByText('On hand', { exact: true })).toBeVisible();
   await expect(page.getByRole('definition').filter({ hasText: /^3\.2 kg$/ })).toBeVisible();
   await expect(page.getByText('Reserved', { exact: true })).toBeVisible();
   await expect(page.getByRole('definition').filter({ hasText: /^1\.1 kg$/ })).toBeVisible();
   await expect(page.getByText('Available', { exact: true })).toBeVisible();
   await expect(page.getByRole('definition').filter({ hasText: /^2\.1 kg$/ })).toBeVisible();
-  await expect(page.getByText('BULK STOCK RECEIVED')).toBeVisible();
+  await page.getByRole('tab', { name: 'Stock & movements' }).click();
+  await expect(page.getByText('Bulk stock received')).toBeVisible();
+  await page.getByRole('tab', { name: 'Overview' }).click();
 
   await expect(page.getByRole('button', { name: 'Adjust stock' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Record waste' })).toBeVisible();
@@ -262,7 +283,8 @@ test('inventory keeps inactive item history read-only without adjustment actions
   await page.goto('/inventory');
 
   await page.getByRole('button', { name: /Beef/ }).click();
-  await expect(page.getByText('BULK STOCK RECEIVED')).toBeVisible();
+  await page.getByRole('tab', { name: 'Stock & movements' }).click();
+  await expect(page.getByText('Bulk stock received')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Adjust stock' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Record waste' })).toHaveCount(0);
 });
@@ -405,15 +427,26 @@ test('inventory stocktake shows business quantities and preserves count authorit
   await page.getByLabel('Actual count for Beef').fill('3.0');
   await expect(page.getByText('1 / 1 counted')).toBeVisible();
   await expect(page.getByText('-0.2 kg')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Post stock count' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect.poll(() => fixture.commands.length).toBe(2);
+  await expect(page.getByRole('button', { name: 'Post stock count' })).toBeEnabled();
   await page.getByRole('button', { name: 'Post stock count' }).click();
 
-  await expect.poll(() => fixture.commands.length).toBe(2);
+  await expect.poll(() => fixture.commands.length).toBe(3);
   expect(fixture.commands[0]).toMatchObject({
     type: 'stocktake.begin',
     shopId,
     inventoryItemIds: [itemId],
   });
   expect(fixture.commands[1]).toMatchObject({
+    type: 'stocktake.save',
+    shopId,
+    stocktakeId: '99999999-9999-4999-8999-999999999999',
+    expectedRevision: 0,
+    lines: [{ inventoryItemId: itemId, actualCountMicros: 3_000_000 }],
+  });
+  expect(fixture.commands[2]).toMatchObject({
     type: 'stocktake.post',
     shopId,
     stocktakeId: '99999999-9999-4999-8999-999999999999',
