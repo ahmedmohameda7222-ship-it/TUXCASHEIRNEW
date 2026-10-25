@@ -104,6 +104,27 @@ const commandSchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 
+type DeliveryStateRow = {
+  order_id: string;
+  state: string;
+  rider_id: string | null;
+};
+
+type DeliveryEventRow = {
+  id: string;
+  from_state: string | null;
+  to_state: string;
+  employee_id: string | null;
+  rider_id: string | null;
+  note: string | null;
+  created_at: string;
+};
+
+type DeliveryRiderRow = {
+  id: string;
+  display_name: string;
+};
+
 type OnlineRequestRow = {
   id: string;
   shop_id: string;
@@ -588,6 +609,45 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           ),
         ]);
 
+      const isDelivery = order.order_type_behavior_snapshot === 'DELIVERY';
+      const [deliveryStates, deliveryEvents] = isDelivery
+        ? await Promise.all([
+            client.select<DeliveryStateRow[]>(
+              'delivery_order_states',
+              new URLSearchParams({
+                select: 'order_id,state,rider_id',
+                business_id: `eq.${input.businessId}`,
+                shop_id: `eq.${input.shopId}`,
+                order_id: `eq.${input.orderId}`,
+                limit: '1',
+              }),
+            ),
+            client.select<DeliveryEventRow[]>(
+              'delivery_order_state_events',
+              new URLSearchParams({
+                select: 'id,from_state,to_state,employee_id,rider_id,note,created_at',
+                business_id: `eq.${input.businessId}`,
+                shop_id: `eq.${input.shopId}`,
+                order_id: `eq.${input.orderId}`,
+                order: 'created_at.asc,id.asc',
+              }),
+            ),
+          ])
+        : [[], []];
+      const deliveryRiderId = deliveryStates[0]?.rider_id ?? null;
+      const riderRows = deliveryRiderId
+        ? await client.select<DeliveryRiderRow[]>(
+            'delivery_riders',
+            new URLSearchParams({
+              select: 'id,display_name',
+              business_id: `eq.${input.businessId}`,
+              shop_id: `eq.${input.shopId}`,
+              id: `eq.${deliveryRiderId}`,
+              limit: '1',
+            }),
+          )
+        : [];
+
       const itemIds = items.map((item) => item.id);
       const inventoryItemIds = [
         ...new Set(movementRows.map((movement) => movement.inventory_item_id)),
@@ -800,6 +860,21 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           deliveryZoneLabel: order.delivery_zone_label_snapshot,
           finalDeliveryFeeMinor: safeInteger(order.final_delivery_fee_minor),
         },
+        delivery: isDelivery
+          ? {
+              state: deliveryStates[0]?.state ?? null,
+              riderName: riderRows[0]?.display_name ?? null,
+              timeline: deliveryEvents.map((event) => ({
+                id: event.id,
+                fromState: event.from_state,
+                toState: event.to_state,
+                employeeId: event.employee_id,
+                riderId: event.rider_id,
+                note: event.note,
+                createdAt: event.created_at,
+              })),
+            }
+          : null,
         payments: payments.map((payment) => ({
           id: payment.id,
           methodLabel: payment.payment_method_label_snapshot,
