@@ -32,6 +32,6 @@ export function scopeReportFilters(
     ...filters,
     shopIds,
     offset: scopeChanged ? 0 : filters.offset,
-    context: scopeChanged ? {} : filters.context,
+    ...(scopeChanged ? { context: {} } : {}),
   };
 }
