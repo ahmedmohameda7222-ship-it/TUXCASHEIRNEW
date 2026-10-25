@@ -510,8 +510,9 @@
 
 .admin-order-detail__disclosure > summary {
   min-height: var(--tux-touch-target);
-  display: flex;
-  align-items: center;
+  display: list-item;
+  padding-block: 0.7rem;
+  list-style-position: inside;
   cursor: pointer;
   font-weight: 700;
   font-size: 0.83rem;
@@ -535,5 +536,19 @@
   .admin-orders-list .admin-order-row {
     min-height: 58px;
     padding-block: 0.55rem;
+  }
+}
+
+/* The printable Admin summary must include the immutable ledger details even
+   if the on-screen archival disclosures are closed. These selectors override
+   the UA details:not([open]) rule only in print media. */
+@media print {
+  .admin-order-detail__disclosure > summary {
+    display: none !important;
+  }
+
+  .admin-order-detail__disclosure > :not(summary) {
+    display: block !important;
+    visibility: visible !important;
   }
 }
