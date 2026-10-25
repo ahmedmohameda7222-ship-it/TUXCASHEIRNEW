@@ -478,7 +478,7 @@ test('orders search filters real Admin list and exposes status-contextual action
   await expect(page.getByRole('button', { name: 'Cancel order' })).toHaveCount(0);
 
   // The approved Orders view keeps search immediately available; filters remain a disclosure.
-  await expect(page.getByRole('textbox', { name: 'Search', exact: true })).toBeVisible();
+  await expect(page.getByRole('searchbox', { name: 'Search', exact: true })).toBeVisible();
   await page.getByText('Search and filters', { exact: true }).click();
   await page.getByLabel('Search').fill('Mona');
   await page.getByRole('combobox', { name: 'Status' }).first().selectOption('DONE');
