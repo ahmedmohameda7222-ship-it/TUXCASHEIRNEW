@@ -100,7 +100,11 @@ export function OrderDetailPage({
   const canRefundOrReturn = ['DONE', 'RETURNED'].includes(order.status) && canRefund;
 
   return (
-    <article ref={articleRef} className="admin-order-detail" aria-labelledby="admin-order-detail-title">
+    <article
+      ref={articleRef}
+      className="admin-order-detail"
+      aria-labelledby="admin-order-detail-title"
+    >
       <header className="admin-order-detail__summary">
         <div>
           <h2 id="admin-order-detail-title">
