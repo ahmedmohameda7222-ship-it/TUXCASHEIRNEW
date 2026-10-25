@@ -447,3 +447,28 @@ test('rejected employee creation preserves the Add employee sheet and does not c
   await expect(sheet.getByLabel('Name')).toHaveValue('Existing Employee');
   await expect(page.getByRole('alert')).toContainText('employee already exists');
 });
+
+test('new employee sheet persists actual hire date and notes through the trusted create command', async ({
+  page,
+}) => {
+  const commands = await mockWorkforce(page);
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Amira QA');
+  await sheet.getByLabel('Phone').fill('+201098765432');
+  await sheet.getByLabel('Hire date').fill('2026-10-01');
+  await sheet.getByLabel('Internal notes').fill('Cross-trained at counter');
+  await sheet.getByRole('button', { name: 'Add employee' }).click();
+  await expect.poll(() => commands.some((command) => command['type'] === 'employee.create')).toBe(
+    true,
+  );
+  expect(commands.find((command) => command['type'] === 'employee.create')).toMatchObject({
+    shopId,
+    displayName: 'Amira QA',
+    phone: '+201098765432',
+    hireDate: '2026-10-01',
+    notes: 'Cross-trained at counter',
+    role: 'STAFF',
+  });
+});
