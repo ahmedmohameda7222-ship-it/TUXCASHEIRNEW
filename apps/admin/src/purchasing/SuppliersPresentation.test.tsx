@@ -27,6 +27,8 @@ describe('premium supplier presentation', () => {
       />,
     );
     expect(html).toContain('admin-supplier-card__identity');
+    expect(html).toContain('Filter suppliers by status');
+    expect(html).toContain('admin-supplier-directory');
     expect(html).toContain('admin-supplier-card__facts');
     expect(html).toContain('admin-supplier-card__actions');
     expect(html).toContain('aria-label="Actions for Delta Produce"');
