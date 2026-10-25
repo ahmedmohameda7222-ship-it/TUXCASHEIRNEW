@@ -836,6 +836,15 @@ function sendMutationResult(
   sendJson(response, 400, result);
 }
 
+export function classifyPaidOrderCancellationDatabaseError(
+  responseBody: string,
+): { status: 409; error: 'paid_active_cancellation_requires_settlement' } | null {
+  if (responseBody.includes('TUX_ADMIN_PAID_CANCEL_REQUIRES_SETTLEMENT')) {
+    return { status: 409, error: 'paid_active_cancellation_requires_settlement' };
+  }
+  return null;
+}
+
 export function classifyOrderRefundDatabaseError(
   responseBody: string,
 ): { status: 409; error: 'payment_refund_not_allowed' } | null {
@@ -859,6 +868,11 @@ function handleFailure(response: AdminResponse, error: unknown): void {
     return;
   }
   if (error instanceof AdminSupabaseError) {
+    const cancellationSafetyFailure = classifyPaidOrderCancellationDatabaseError(error.responseBody);
+    if (cancellationSafetyFailure) {
+      sendJson(response, cancellationSafetyFailure.status, { error: cancellationSafetyFailure.error });
+      return;
+    }
     const refundPolicyFailure = classifyOrderRefundDatabaseError(error.responseBody);
     if (refundPolicyFailure) {
       sendJson(response, refundPolicyFailure.status, { error: refundPolicyFailure.error });
