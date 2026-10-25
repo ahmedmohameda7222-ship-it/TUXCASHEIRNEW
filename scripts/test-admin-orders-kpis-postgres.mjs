@@ -53,6 +53,24 @@ if (privileges.anonymous || privileges.authenticated || !privileges.service) {
   throw new Error(`Orders KPI RPC permission exposure: ${JSON.stringify(privileges)}`);
 }
 
+// This test probes read-only aggregation across already-persisted mixed sources.
+// Synthetic ONLINE rows are *not* passed through the separate Menu acceptance
+// flow: disable only the online request correlation trigger for fixture seeding.
+// Its integrity and Menu acceptance are verified independently by cross-app tests.
+run(`do $seed$
+declare trigger_name text;
+begin
+  for trigger_name in
+    select t.tgname from pg_trigger t
+    join pg_proc p on p.oid=t.tgfoid
+    where t.tgrelid='public.orders'::regclass
+      and p.proname='resolve_tux_online_order_request_from_order_v1'
+  loop
+    execute format('alter table public.orders disable trigger %I', trigger_name);
+  end loop;
+end;
+$seed$;`, 'Temporarily isolate Online request correlation for aggregate fixtures');
+
 run(`insert into public.orders(
   id, shop_id, business_day_id, display_order_no, idempotency_key, source, status,
   operator_worker_id, operator_name_snapshot, order_type_id, order_type_label_snapshot,
@@ -87,7 +105,7 @@ select md5('kpi-fixture-payment-'||g||'-2')::uuid, '${SHOP}',
   400, null, null, '2026-09-23T05:10:00Z'::timestamptz + g*interval '1 minute'
 from generate_series(1,64) g where g%8=1;`, 'Insert 64 mixed POS/ONLINE canonical orders with split payments');
 
-const kpis = (from='null', to='null', actor=ACTOR, shop=SHOP) =>
+\n// Restore the original Online correlation check before any assertions.\nrun(`do $restore$\ndeclare trigger_name text;\nbegin\n  for trigger_name in\n    select t.tgname from pg_trigger t\n    join pg_proc p on p.oid=t.tgfoid\n    where t.tgrelid='public.orders'::regclass\n      and p.proname='resolve_tux_online_order_request_from_order_v1'\n  loop\n    execute format('alter table public.orders enable trigger %I', trigger_name);\n  end loop;\nend;\n$restore$;`, 'Re-enable Online source correlation for all subsequent queries');\n\nconst kpis = (from='null', to='null', actor=ACTOR, shop=SHOP) =>
   queryJson(`public.admin_orders_kpis_v1('${actor}'::uuid,'${shop}'::uuid,
     ${from}::timestamptz,${to}::timestamptz)`, 'Authoritative Orders KPI RPC');
 
