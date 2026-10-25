@@ -49,9 +49,8 @@ export function CatalogFirstRunGuide({
       )}
       {canEdit && hasCopySources ? (
         <p>
-          Or use the existing, permission-checked shop-copy workflow to stage catalog entities
-          into this shop.
-          {' '}
+          Or use the existing, permission-checked shop-copy workflow to stage catalog entities into
+          this shop.{' '}
           <Link className="admin-secondary-button" href="/catalog/products/publishing">
             Copy from an existing shop
           </Link>
