@@ -769,6 +769,74 @@ psql(
   'Seed paid and unpaid ACTIVE cancellation cases',
 );
 
+// The Admin cancel RPC releases inventory reservations before setting order status.
+// Seed real reservation movements: a guard exception must unwind all preceding writes.
+const RESERVED_ITEM_ID = '60000000-0000-4000-8000-000000000092';
+const PAID_RESERVATION_ID = '61000000-0000-4000-8000-000000000092';
+const UNPAID_RESERVATION_ID = '61000000-0000-4000-8000-000000000093';
+
+psql(
+  [
+    '-c',
+    `insert into public.inventory_items(id,shop_id,name,unit_label,tracking_mode)
+       values ('${RESERVED_ITEM_ID}', '${SHOP_ID}', 'Cancellation rollback ingredient', 'g',
+               'RECIPE_TRACKED');
+     insert into public.inventory_movements(
+       id,shop_id,business_day_id,inventory_item_id,movement_type,
+       quantity_delta_micros,reserved_delta_micros,admin_employee_id,source_kind,
+       idempotency_key,created_at
+     ) values (
+       gen_random_uuid(), '${SHOP_ID}', '${DAY_ID}', '${RESERVED_ITEM_ID}',
+       'ADMIN_ADJUSTMENT', 10000, 0, '${REQUESTER_ID}', 'ADMIN',
+       'cancel-regression-opening-stock',now()
+     );
+     insert into public.inventory_movements(
+       id,shop_id,business_day_id,inventory_item_id,movement_type,
+       quantity_delta_micros,reserved_delta_micros,worker_id,source_kind,
+       idempotency_key,order_id,created_at
+     ) values
+       (gen_random_uuid(), '${SHOP_ID}', '${DAY_ID}', '${RESERVED_ITEM_ID}',
+        'ORDER_RESERVATION',0,1500,'${WORKER_ID}','OPERATIONS',
+        'cancel-regression-paid-reserve','${PAID_ACTIVE_ID}',now()),
+       (gen_random_uuid(), '${SHOP_ID}', '${DAY_ID}', '${RESERVED_ITEM_ID}',
+        'ORDER_RESERVATION',0,1700,'${WORKER_ID}','OPERATIONS',
+        'cancel-regression-unpaid-reserve','${UNPAID_ACTIVE_ID}',now());
+     insert into public.inventory_reservations(
+       id,shop_id,order_id,inventory_item_id,business_day_id,quantity_micros,
+       status,reserve_command_id,last_command_id,created_by_worker_id
+     ) values
+       ('${PAID_RESERVATION_ID}','${SHOP_ID}','${PAID_ACTIVE_ID}','${RESERVED_ITEM_ID}',
+        '${DAY_ID}',1500,'ACTIVE','paid-reserve-1','paid-reserve-1','${WORKER_ID}'),
+       ('${UNPAID_RESERVATION_ID}','${SHOP_ID}','${UNPAID_ACTIVE_ID}','${RESERVED_ITEM_ID}',
+        '${DAY_ID}',1700,'ACTIVE','unpaid-reserve-1','unpaid-reserve-1','${WORKER_ID}');`,
+  ],
+  'Seed actual paid/unpaid inventory reservations for transactional rollback',
+);
+
+const guardMetadata = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select jsonb_build_object(
+         'enabled', exists(select 1 from pg_trigger where tgrelid='public.orders'::regclass
+           and tgname='orders_paid_admin_cancel_guard' and tgenabled='O'),
+         'anonExec', has_function_privilege('anon',
+           'private.reject_paid_active_admin_cancellation_v1()', 'EXECUTE'),
+         'authenticatedExec', has_function_privilege('authenticated',
+           'private.reject_paid_active_admin_cancellation_v1()', 'EXECUTE'),
+         'serviceExec', has_function_privilege('service_role',
+           'private.reject_paid_active_admin_cancellation_v1()', 'EXECUTE')
+       )::text`,
+    ],
+    'Cancellation trigger and principle-of-least-privilege introspection',
+  ).trim(),
+);
+if (!guardMetadata.enabled || guardMetadata.anonExec ||
+    guardMetadata.authenticatedExec || guardMetadata.serviceExec) {
+  throw new Error(`Guard activation / EXECUTE grants invalid: ${JSON.stringify(guardMetadata)}`);
+}
+
 psql(
   [
     '-c',
@@ -813,6 +881,118 @@ if (paidState !== 'ACTIVE:5000:0:0') {
   throw new Error(`Paid cancellation changed financial/lifecycle state: ${paidState}`);
 }
 
+const paidReservationAfterReject = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select jsonb_build_object(
+         'status', r.status,
+         'lastCommandId', r.last_command_id,
+         'releaseCount', (select count(*) from public.inventory_movements m
+           where m.order_id='${PAID_ACTIVE_ID}' and m.movement_type='ORDER_RESERVATION_RELEASE'),
+         'reservedMicros', (select sum(m.reserved_delta_micros)
+           from public.inventory_movements m where m.order_id='${PAID_ACTIVE_ID}'),
+         'auditCount', (select count(*) from public.admin_audit_events a
+           where a.target_id='${PAID_ACTIVE_ID}')
+       )::text
+       from public.inventory_reservations r where r.id='${PAID_RESERVATION_ID}'`,
+    ],
+    'Paid cancellation must unwind release movement/reservation and audit',
+  ).trim(),
+);
+if (
+  paidReservationAfterReject.status !== 'ACTIVE' ||
+  paidReservationAfterReject.lastCommandId !== 'paid-reserve-1' ||
+  Number(paidReservationAfterReject.releaseCount) !== 0 ||
+  Number(paidReservationAfterReject.reservedMicros) !== 1500 ||
+  Number(paidReservationAfterReject.auditCount) !== 0
+) {
+  throw new Error(`Paid cancellation leaked effects: ${JSON.stringify(paidReservationAfterReject)}`);
+}
+
+// A second payment method on the same ACTIVE order tests mixed allocation,
+// while the first attempt above establishes the partial-payment case.
+psql(
+  [
+    '-c',
+    `insert into public.payment_methods(
+       id,shop_id,display_name,logic_type,requires_reconciliation,active,sort_order
+     ) values (
+       '58000000-0000-4000-8000-000000000092','${SHOP_ID}','Test Cash','CASH',true,true,1
+     );
+     insert into public.payments(
+       id,shop_id,order_id,part_index,payment_method_id,
+       payment_method_label_snapshot,logic_type_snapshot,allocated_minor,created_at
+     ) values (
+       '5b000000-0000-4000-8000-000000000093','${SHOP_ID}','${PAID_ACTIVE_ID}',2,
+       '58000000-0000-4000-8000-000000000092','Test Cash','CASH',6000,now()
+     );`,
+  ],
+  'Mixed Card and Cash allocations',
+);
+psql(
+  [
+    '-c',
+    `do $mixed_paid_guard$
+     declare observed text;
+     begin
+       begin
+         perform public.cancel_admin_order_v1(
+           '${REQUESTER_ID}', '${SHOP_ID}', '${PAID_ACTIVE_ID}',
+           '${CANCEL_REASON_ID}', 0, 'Mixed payment guard',
+           'mixed-cancel-should-reject', '${BUSINESS_ID}'
+         );
+         raise exception 'mixed payment ACTIVE cancellation unexpectedly succeeded';
+       exception when others then
+         get stacked diagnostics observed = MESSAGE_TEXT;
+         if observed <> 'TUX_ADMIN_PAID_CANCEL_REQUIRES_SETTLEMENT' then raise; end if;
+       end;
+     end;
+     $mixed_paid_guard$;`,
+  ],
+  'Mixed payment cancellation rejection',
+);
+const mixedRollback = psql(
+  [
+    '-At',
+    '-c',
+    `select o.status || ':' ||
+       (select sum(p.allocated_minor) from public.payments p where p.order_id=o.id)::text || ':' ||
+       (select count(*) from public.inventory_movements m where m.order_id=o.id
+         and m.movement_type='ORDER_RESERVATION_RELEASE')::text || ':' ||
+       (select count(*) from public.admin_order_command_receipts c where c.order_id=o.id)::text
+       from public.orders o where o.id='${PAID_ACTIVE_ID}'`,
+  ],
+  'Mixed payment rollback evidence',
+).trim();
+if (mixedRollback !== 'ACTIVE:11000:0:0') {
+  throw new Error(`Mixed payment cancellation changed state: ${mixedRollback}`);
+}
+
+// Explicitly prove the trigger is not a general Operations status guard.
+// The direct worker-shaped transition is rolled back inside this isolated transaction.
+psql(
+  [
+    '-c',
+    `begin;
+     update public.orders set status='CANCELLED',
+       cancelled_by_worker_id='${WORKER_ID}',
+       cancelled_by_admin_employee_id=null
+       where id='${PAID_ACTIVE_ID}' and status='ACTIVE';
+     do $scope_check$
+     begin
+       if not exists(select 1 from public.orders
+         where id='${PAID_ACTIVE_ID}' and status='CANCELLED') then
+         raise exception 'non-Admin lifecycle transition was blocked';
+       end if;
+     end;
+     $scope_check$;
+     rollback;`,
+  ],
+  'Worker-shaped lifecycle transition is outside Admin-only guard',
+);
+
 const unpaidCancel = rpc(
   `public.cancel_admin_order_v1(
     '${REQUESTER_ID}', '${SHOP_ID}', '${UNPAID_ACTIVE_ID}',
@@ -834,6 +1014,23 @@ const unpaidReplay = rpc(
 );
 if (unpaidReplay.ok !== true || unpaidReplay.replayed !== true) {
   throw new Error(`Unpaid cancellation replay not idempotent: ${JSON.stringify(unpaidReplay)}`);
+}
+
+const unpaidReleaseState = psql(
+  [
+    '-At',
+    '-c',
+    `select r.status || ':' ||
+       (select count(*) from public.inventory_movements m
+         where m.order_id='${UNPAID_ACTIVE_ID}' and m.movement_type='ORDER_RESERVATION_RELEASE')::text ||
+       ':' || (select coalesce(sum(m.reserved_delta_micros),0) from public.inventory_movements m
+         where m.order_id='${UNPAID_ACTIVE_ID}')::text
+       from public.inventory_reservations r where r.id='${UNPAID_RESERVATION_ID}'`,
+  ],
+  'Unpaid cancellation releases its reserved inventory once',
+).trim();
+if (unpaidReleaseState !== 'RELEASED:1:0') {
+  throw new Error(`Unpaid cancellation did not safely release stock: ${unpaidReleaseState}`);
 }
 
 console.log(
