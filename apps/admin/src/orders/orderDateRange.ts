@@ -30,11 +30,11 @@ function cairoParts(epochMillis: number): ClockParts {
       .map((part) => [part.type, Number(part.value)]),
   );
   return {
-    year: values.year,
-    month: values.month,
-    day: values.day,
-    hour: values.hour,
-    minute: values.minute,
+    year: values.year ?? Number.NaN,
+    month: values.month ?? Number.NaN,
+    day: values.day ?? Number.NaN,
+    hour: values.hour ?? Number.NaN,
+    minute: values.minute ?? Number.NaN,
   };
 }
 
