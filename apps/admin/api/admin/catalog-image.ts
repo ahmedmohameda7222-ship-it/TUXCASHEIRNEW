@@ -10,6 +10,7 @@ import {
   resolveCatalogImagePublicUrl,
   uploadCatalogProductImage,
 } from '../../server/catalog/catalogImageUpload.js';
+import { assertCatalogImageProductScope } from '../../server/catalog/catalogImageProductScope.js';
 import { getAdminServerEnv } from '../../server/env.js';
 import {
   firstHeader,
@@ -89,6 +90,11 @@ export default async function handler(
       return;
     }
     requirePermission(context.principal, 'catalog.edit', shopId);
+    await assertCatalogImageProductScope(client, {
+      businessId: context.principal.businessId,
+      shopId,
+      productId,
+    });
     const bytes = await readUpload(request);
     const uploaded = await uploadCatalogProductImage({
       businessId: context.principal.businessId,
