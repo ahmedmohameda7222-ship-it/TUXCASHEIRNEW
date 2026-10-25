@@ -977,8 +977,11 @@ psql(
   [
     '-c',
     `begin;
-     update public.orders set status='CANCELLED',
+     update public.orders set status='CANCELLED', cancelled_at=now(),
+       cancellation_reason='Worker test cancellation',
+       cancellation_food_prepared=false, cancellation_stock_restored=false,
        cancelled_by_worker_id='${WORKER_ID}',
+       cancelled_by_worker_name_snapshot='Order Worker',
        cancelled_by_admin_employee_id=null
        where id='${PAID_ACTIVE_ID}' and status='ACTIVE';
      do $scope_check$
