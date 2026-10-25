@@ -361,6 +361,15 @@ export function OrdersPage() {
                     }
                   />
                 ) : null}
+                <div className="admin-orders-list__columns" aria-hidden="true">
+                  <span>Order</span>
+                  <span>Customer</span>
+                  <span>Type</span>
+                  <span>Source</span>
+                  <span>Amount</span>
+                  <span>Status</span>
+                  <span>Date &amp; time</span>
+                </div>
                 {rows.map((row) => (
                   <button
                     className={
@@ -374,26 +383,24 @@ export function OrdersPage() {
                       setAction(null);
                     }}
                   >
-                    <span className="admin-order-row__identity">
+                    <span className="admin-order-row__number">
                       <strong>{row.displayOrderLabel ?? `#${row.displayOrderNo}`}</strong>
-                      <small>{row.customerName ?? row.normalizedPhone ?? 'Walk-in'}</small>
-                      <small>
-                        {row.orderTypeLabel} · {orderSourceLabel(row.source)}
-                      </small>
                     </span>
-                    <span className="admin-order-row__summary">
-                      <b className="admin-order-row__amount">{formatEgp(row.totalMinor)}</b>
-                      <span className="admin-order-row__status">
-                        {orderStatusLabel(row.status)}
-                      </span>
-                      <time dateTime={row.createdAt}>
-                        {new Intl.DateTimeFormat('en-EG', {
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                          timeZone: 'Africa/Cairo',
-                        }).format(new Date(row.createdAt))}
-                      </time>
+                    <span className="admin-order-row__customer">
+                      <strong>{row.customerName ?? 'Walk-in'}</strong>
+                      {row.normalizedPhone ? <small>{row.normalizedPhone}</small> : null}
                     </span>
+                    <span className="admin-order-row__type">{row.orderTypeLabel}</span>
+                    <span className="admin-order-row__source">{orderSourceLabel(row.source)}</span>
+                    <b className="admin-order-row__amount">{formatEgp(row.totalMinor)}</b>
+                    <span className="admin-order-row__status">{orderStatusLabel(row.status)}</span>
+                    <time className="admin-order-row__time" dateTime={row.createdAt}>
+                      {new Intl.DateTimeFormat('en-EG', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                        timeZone: 'Africa/Cairo',
+                      }).format(new Date(row.createdAt))}
+                    </time>
                   </button>
                 ))}
                 {ordersApi.searchQuery.hasNextPage ? (
