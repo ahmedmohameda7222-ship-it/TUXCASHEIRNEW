@@ -257,8 +257,7 @@
     width: calc(100% - (2 * var(--tux-space-3)));
     max-width: calc(100% - (2 * var(--tux-space-3)));
     max-height: calc(
-      100dvh - (2 * var(--tux-space-3)) - env(safe-area-inset-top) -
-        env(safe-area-inset-bottom)
+      100dvh - (2 * var(--tux-space-3)) - env(safe-area-inset-top) - env(safe-area-inset-bottom)
     );
     border-radius: var(--tux-radius-lg);
   }
