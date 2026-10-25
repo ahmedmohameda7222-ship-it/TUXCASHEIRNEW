@@ -131,7 +131,9 @@ export function CatalogPage() {
 
   function canSwitchCatalogEditor(): boolean {
     if (hasUnsavedDrafts()) {
-      setModeError('Save your unfinished edits or close the editor to discard them before switching.');
+      setModeError(
+        'Save your unfinished edits or close the editor to discard them before switching.',
+      );
       return false;
     }
     setModeError(null);
