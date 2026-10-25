@@ -23,21 +23,28 @@
 |---|---|---|---|
 | P00/T0 | This progress file; isolated branch | GitHub main SHA exact; ZIP checksum verifier exit 0; live Supabase project verified | PARTIAL — local baseline scripts unrun |
 | P01/T1 | `AdminMetricStrip.tsx`, CSS/test, InventoryPage, OrdersPage | RED-first contract committed; Fast CI all jobs SUCCESS at `98b48f9a30d09c0e7b27f55108dc71d7dd548915`; full shell screenshots pending | PARTIAL |
-| P02/O1 | `OrdersPage.tsx`, `orders.css`, `e2e/admin-orders.spec.ts` | Persistent search + secondary filters; Orders 11/11 browser, full regression and PG checks passed at `98b48f9a30d09c0e7b27f55108dc71d7dd548915`; full screenshot diff and cursor completeness proof pending | PARTIAL |
+| P02/O1 | `OrdersPage.tsx`, `orders.css`, `e2e/admin-orders.spec.ts` | Persistent search/secondary filters passed 11/11 Orders browser at `98b48f9a30d09c0e7b27f55108dc71d7dd548915`; later seven-column factual desktop directory and tablet/phone cards committed with new browser assertion, exact-head CI pending | PARTIAL |
 | P02/O2–O4 | — | — | NOT STARTED |
 | P03/C1–C5 | — | — | NOT STARTED |
 | P04/I1–I4 | Inventory summary only | Inventory source counts maintained; full approved layout/screenshots pending | NOT VERIFIED |
 | P05/P1–P4 | — | — | NOT STARTED |
-| P06/CRM1–CRM4 | — | — | NOT STARTED |
+| P06/CRM1–CRM2 | — | Full corrected directory/profile layout, activity, pagination and authorization still pending | NOT STARTED |
+| P06/CRM3–CRM4 | `CustomersPage.tsx`, `crmMutationGuard.ts` and unit/browser specs | Guard denies application-level `ok:false` for adjustment/policy and prevents false success toast; preserve dirty policy on refetch and reset draft on shop switch; verified focused CI status must be read at exact HEAD | PARTIAL — E2E / hosted business rules pending |
 | P07/S1–S4 | — | — | NOT STARTED |
 | P08/F1 | `FinanceSectionNav.tsx`, 4 Finance call sites, `routes.tsx`, `FinanceReconciliationPage.tsx`, Finance unit/browser specs + CSS | Three primary sections; existing advanced settlements/Z routes preserved by permission-gated disclosure; first rendered run 38/39 passed at `afe53de5` with exact-heading test selector fixed later; physical Operations source not supplied | PARTIAL — F4 NOT COMPLETE |\n| P08/F2–F5 | Finance readonly facts only, no Ops counted-method projection | F4 needs actual Operations per-method physical count source and cross-app proof; F2/F3/F5 not implemented | NOT VERIFIED |
 | P09/R1–R5 | — | — | NOT STARTED |
-| P10/G2 | `.github/workflows/admin-eight-tabs-rendered.yml` | Runs Orders + Inventory + Finance Chromium on branch; at `afe53de5`, 38/39 passed with one test-selector ambiguity now corrected, rerun awaiting exact HEAD | PARTIAL |\n| P10/G1/G3 | — | Hosted cross-app and final owner approval still required | NOT STARTED |
+| P10/G2 | `.github/workflows/admin-eight-tabs-rendered.yml`, `e2e/premiumVisualEvidence.ts` | Scoped Chromium acceptance now covers Orders, Inventory, Finance and CRM; `TUX_ADMIN_EIGHT_TABS_CAPTURE=1` captures six widths (360/390/768/1024/1440/1536) in artifact. Current new screenshot exact-head run pending; mock-auth screenshots are not hosted acceptance | PARTIAL |\n| P10/G1/G3 | — | Hosted cross-app and final owner approval still required | NOT STARTED |
 
 ### Requirements evidence (never promote from source inspection to PASS)
 - `O03`: Four approved metric labels rendered using a shared primitive, but numbers are explicitly unavailable until authoritative entire-shop aggregate and finance permissions are implemented. **NOT VERIFIED**, KPI service blocker.
 - `I02`: Reusable tiles take shop-scoped `inventoryCounts(items)` from authenticated workspace; no monetary totals or fabricated movement count. Still requires pagination-completeness and rendered comparison. **NOT VERIFIED**.
 - Finance F1 primary navigation and read-only partial F4 are implemented, but **NOT VERIFIED against approved screenshot or hosted Operations count**. Operations count absent from trusted Finance day contract; payment breakdown must not be presented as physical actual.\n- Every requirement among all 111 rows remains **NOT VERIFIED for final acceptance** until task-specific source/runtime evidence is linked in the coverage matrix. This progress ledger is not a substitute.
+
+## Later implementation checkpoint
+- Completed source-level work after the initial Finance checkpoint: CRM terminal-result guard, unsaved policy refresh protection and 2 browser regressions; seven-column Orders desktop directory with responsive table-to-card layout and a new browser assertion.
+- Screenshot capture workflow writes mock-auth Chromium screenshots for Orders/Inventory/Finance/CRM at the exact approved review widths and stores them as GitHub Actions artifacts. Capture availability and visual parity require reviewing a completed exact-head run.
+- As of commit `3b9bfafaa76d34c5c0c08ce3c275ae796f8b76ed`: Orders financial PostgreSQL acceptance succeeded; Fast CI, isolated Orders rendered/full regression and the four-module Chromium+screenshots job were still in progress. **Do not imply they passed.**
+- No SQL, Supabase migration, production deployment or branch merge was executed for these changes. Existing Finance method totals cannot be reclassified as Operations physical counts.
 
 ## Supabase development state
 - Live project `TUX V2`, ref `awpdcsayuwbsruwvaosg`, region `eu-central-1`, `ACTIVE_HEALTHY` confirmed via connected account `TUX V2 And masjid`.
