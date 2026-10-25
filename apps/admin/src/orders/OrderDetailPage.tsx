@@ -1,4 +1,5 @@
 import type { AdminOrderDetail } from '@tux/admin-contracts';
+import { useEffect, useRef } from 'react';
 
 function money(minor: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -46,6 +47,35 @@ export function OrderDetailPage({
   onRefund(): void;
   onReturn(): void;
 }) {
+  const articleRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const expandedForPrint = new Set<HTMLDetailsElement>();
+    const beforePrint = () => {
+      articleRef.current
+        ?.querySelectorAll<HTMLDetailsElement>('.admin-order-detail__disclosure')
+        .forEach((details) => {
+          if (details.open) return;
+          details.open = true;
+          expandedForPrint.add(details);
+        });
+    };
+    const afterPrint = () => {
+      expandedForPrint.forEach((details) => {
+        details.open = false;
+      });
+      expandedForPrint.clear();
+    };
+
+    window.addEventListener('beforeprint', beforePrint);
+    window.addEventListener('afterprint', afterPrint);
+    return () => {
+      window.removeEventListener('beforeprint', beforePrint);
+      window.removeEventListener('afterprint', afterPrint);
+      afterPrint();
+    };
+  }, []);
+
   const recordedPaymentMinor = order.payments.reduce(
     (sum, payment) => sum + payment.allocatedMinor,
     0,
@@ -70,7 +100,7 @@ export function OrderDetailPage({
   const canRefundOrReturn = ['DONE', 'RETURNED'].includes(order.status) && canRefund;
 
   return (
-    <article className="admin-order-detail" aria-labelledby="admin-order-detail-title">
+    <article ref={articleRef} className="admin-order-detail" aria-labelledby="admin-order-detail-title">
       <header className="admin-order-detail__summary">
         <div>
           <h2 id="admin-order-detail-title">
