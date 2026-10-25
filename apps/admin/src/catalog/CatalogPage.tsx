@@ -129,7 +129,17 @@ export function CatalogPage() {
     catalog.saveBulkProducts.isPending ||
     catalog.setAvailability.isPending;
 
+  function canSwitchCatalogEditor(): boolean {
+    if (hasUnsavedDrafts()) {
+      setModeError('Save your unfinished edits or close the editor to discard them before switching.');
+      return false;
+    }
+    setModeError(null);
+    return true;
+  }
+
   function openProduct(productId: string) {
+    if (!canSwitchCatalogEditor()) return;
     setUnsavedProduct(null);
     navigate(detailPath('/catalog/products', productId));
   }
@@ -143,6 +153,7 @@ export function CatalogPage() {
 
   function startNewProduct() {
     if (!shopId || !newProductCategoryId || !canEdit || !canPrice) return;
+    if (!canSwitchCatalogEditor()) return;
     const product = newProductForShop(shopId, newProductCategoryId, scopedProducts);
     setDraftSaved(false);
     setUnsavedProduct(product);
@@ -150,6 +161,8 @@ export function CatalogPage() {
   }
 
   function closeEditor() {
+    if (hasUnsavedDrafts() && !window.confirm('Discard your unsaved product edits?')) return;
+    setModeError(null);
     if (unsavedProduct) {
       setUnsavedProduct(null);
     }
@@ -218,12 +231,9 @@ export function CatalogPage() {
               type="button"
               disabled={busy}
               onClick={() => {
+                if (!canSwitchCatalogEditor()) return;
                 if (definitionsOpen) {
                   setDefinitionsOpen(false);
-                  return;
-                }
-                if (hasUnsavedDrafts()) {
-                  setModeError('Save or discard unfinished changes before editing definitions.');
                   return;
                 }
                 setBulkOpen(false);
@@ -246,13 +256,8 @@ export function CatalogPage() {
               type="button"
               disabled={busy}
               onClick={() => {
+                if (!bulkOpen && !canSwitchCatalogEditor()) return;
                 setModeError(null);
-                if (!bulkOpen && hasUnsavedDrafts()) {
-                  setModeError(
-                    'Save or discard unfinished editor changes before opening Bulk Edit.',
-                  );
-                  return;
-                }
                 if (!bulkOpen) {
                   setDefinitionsOpen(false);
                   setUnsavedProduct(null);
@@ -402,7 +407,7 @@ export function CatalogPage() {
           canPrice={canPrice}
           hasCopySources={principal.shopIds.some((id) => id !== shopId)}
           onManageCategories={() => {
-            if (busy) return;
+            if (busy || !canSwitchCatalogEditor()) return;
             void catalog.prepareDefinitionsDraft
               .mutateAsync()
               .then(() => {
