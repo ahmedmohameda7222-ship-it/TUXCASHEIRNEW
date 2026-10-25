@@ -1021,6 +1021,24 @@ test('approved Orders 1536×1024 reference composition remains fully navigable',
   expect(inspectorBox).not.toBeNull();
   expect(kpiBox!.x + kpiBox!.width).toBeLessThanOrEqual(inspectorBox!.x);
   expect(Math.abs(kpiBox!.y - inspectorBox!.y)).toBeLessThanOrEqual(20);
+  const revenueHeight = await page
+    .locator('dl[aria-label="Orders key metrics"] dd')
+    .nth(1)
+    .evaluate((element) => element.getBoundingClientRect().height);
+  expect(revenueHeight).toBeLessThanOrEqual(28);
+  const completedStatus = page.locator('.admin-order-row__status').filter({ hasText: 'Completed' });
+  const statusHeight = await completedStatus.evaluate(
+    (element) => element.getBoundingClientRect().height,
+  );
+  expect(statusHeight).toBeLessThanOrEqual(28);
+
+  const itemAmount = page.locator('.admin-order-detail__row').first().locator('span:last-child strong');
+  const itemCaption = page.locator('.admin-order-detail__row').first().locator('span:last-child small');
+  const amountBox = await itemAmount.boundingBox();
+  const captionBox = await itemCaption.boundingBox();
+  expect(amountBox).not.toBeNull();
+  expect(captionBox).not.toBeNull();
+  expect(captionBox!.y).toBeGreaterThanOrEqual(amountBox!.y + amountBox!.height);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
