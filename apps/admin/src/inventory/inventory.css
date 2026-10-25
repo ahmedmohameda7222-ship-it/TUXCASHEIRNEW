@@ -575,3 +575,70 @@
     font-size: 0.7rem;
   }
 }
+
+.admin-inventory-inspector-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+  font-size: 0.78rem;
+  color: #727d78;
+  margin-top: 0.5rem;
+}
+.admin-inventory-item-active,
+.admin-inventory-item-inactive {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 5px;
+  font-size: 0.7rem;
+  font-weight: 650;
+  padding: 0.18rem 0.4rem;
+}
+.admin-inventory-item-active { color: #0f6a4a; background: #eef8f1; }
+.admin-inventory-item-inactive { color: #69746e; background: #f2f3f1; }
+.admin-inventory-inspector-tabs {
+  display: flex;
+  gap: 1rem;
+  border-bottom: 1px solid #e8e9e6;
+  overflow-x: auto;
+}
+.admin-inventory-inspector-tabs button {
+  appearance: none;
+  flex-shrink: 0;
+  min-height: 40px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.5rem 0.15rem;
+  background: transparent;
+  color: #727d78;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.admin-inventory-inspector-tabs button.is-selected { color: #0f6a4a; border-color: #0f6a4a; font-weight: 700; }
+.admin-inventory-inspector-tabs button:focus-visible { outline: 2px solid #0f6a4a; outline-offset: -2px; }
+.admin-inventory-inspector-panel { display: grid; gap: 1rem; }
+.admin-inventory-stock-threshold {
+  border: 1px solid #e8e9e6;
+  border-radius: 9px;
+  background: #f9faf8;
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+}
+.admin-inventory-stock-threshold > span { color: #727d78; font-size: 0.75rem; }
+.admin-inventory-stock-threshold dl { margin: 0.5rem 0 0; }
+.admin-inventory-stock-threshold dt, .admin-inventory-definition-overview dt { color: #727d78; font-size: 0.75rem; }
+.admin-inventory-stock-threshold dd { margin: 0.2rem 0; font-weight: 700; }
+.admin-inventory-definition-overview { display: grid; margin: 0; }
+.admin-inventory-definition-overview > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #ebede9;
+  font-size: 0.8rem;
+}
+.admin-inventory-definition-overview > div:last-child { border-bottom: none; }
+.admin-inventory-definition-overview dd { text-align: right; margin: 0; font-weight: 650; overflow-wrap: anywhere; }
