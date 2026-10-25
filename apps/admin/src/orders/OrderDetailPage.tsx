@@ -347,8 +347,26 @@ export function OrderDetailPage({
               <li className="admin-order-detail__row" key={event.id}>
                 <span>
                   <strong>{friendly(event.eventType)}</strong>
-                  {event.workerName ? <small>{event.workerName}</small> : null}
-                  {event.reason ? <small>{event.reason.label}</small> : null}
+                  <small>
+                    {event.fromStatus ? friendly(event.fromStatus) : 'New'} →{' '}
+                    {friendly(event.toStatus)}
+                  </small>
+                  <small>
+                    {new Intl.DateTimeFormat('en-EG', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                      timeZone: 'Africa/Cairo',
+                    }).format(new Date(event.createdAt))} (Cairo)
+                  </small>
+                  <small>Revision {event.operationalRevision}</small>
+                  {event.workerName ? <small>Worker: {event.workerName}</small> : null}
+                  {event.adminEmployeeId ? (
+                    <small>Admin actor: {event.adminEmployeeId}</small>
+                  ) : null}
+                  {!event.workerName && !event.adminEmployeeId ? (
+                    <small>Actor not recorded</small>
+                  ) : null}
+                  {event.reason ? <small>Reason: {event.reason.label}</small> : null}
                   {event.note ? <small>{event.note}</small> : null}
                 </span>
               </li>
@@ -360,7 +378,20 @@ export function OrderDetailPage({
             <summary>Administrative history</summary>
             <ul>
               {order.auditEvents.map((event) => (
-                <li key={event.id}>{friendly(event.actionType)}</li>
+                <li key={event.id}>
+                  <strong>{friendly(event.actionType)}</strong>
+                  <small>
+                    {' '}Audit timestamp:{' '}
+                    {new Intl.DateTimeFormat('en-EG', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                      timeZone: 'Africa/Cairo',
+                    }).format(new Date(event.createdAt))} (Cairo)
+                  </small>
+                  {event.actorEmployeeId ? (
+                    <small> · Admin actor: {event.actorEmployeeId}</small>
+                  ) : null}
+                </li>
               ))}
             </ul>
           </details>
