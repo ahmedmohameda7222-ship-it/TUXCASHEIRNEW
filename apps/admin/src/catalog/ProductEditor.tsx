@@ -33,6 +33,7 @@ export type ProductEditorProps = {
   onRequestAdvanced?(): void | Promise<void>;
   onSaveDraft(draft: ProductEditorDraft): void | Promise<void>;
   onSetAvailability(soldOut: boolean): void | Promise<void>;
+  onUploadImage?(file: File): Promise<{ imageKey: string; publicUrl: string }>;
 };
 
 const MAX_POSTGRES_INTEGER = 2_147_483_647;
@@ -71,6 +72,7 @@ function changedPathsFor(original: CatalogProductDetail, next: CatalogProductDet
   if (original.categoryId !== next.categoryId) paths.push('products[].categoryId');
   if (original.isCombo !== next.isCombo) paths.push('products[].isCombo');
   if (original.sortOrder !== next.sortOrder) paths.push('products[].sortOrder');
+  if (original.imageKey !== next.imageKey) paths.push('products[].imageKey');
   return paths;
 }
 
@@ -85,6 +87,7 @@ export function ProductEditor({
   onRequestAdvanced,
   onSaveDraft,
   onSetAvailability,
+  onUploadImage,
 }: ProductEditorProps) {
   const [advancedOpen, setAdvancedOpen] = useState(initialAdvancedOpen);
   const [name, setName] = useState(product.name);
@@ -95,13 +98,18 @@ export function ProductEditor({
   const [selectedCategoryId, setSelectedCategoryId] = useState(product.categoryId);
   const [comboEnabled, setComboEnabled] = useState(product.isCombo);
   const [sortOrder, setSortOrder] = useState(String(product.sortOrder));
+  const [imageKey, setImageKey] = useState<string | null>(product.imageKey);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
   const [modifierState, setModifierState] = useState<
     Record<string, { linked: boolean; maxQuantity: string }>
   >({});
   const [comboState, setComboState] = useState<Record<string, boolean>>({});
   const [recipeState, setRecipeState] = useState<Record<string, string>>({});
 
-  const readOnly = !canEdit || busy;
+  const readOnly = !canEdit || busy || imageUploading;
   const priceReadOnly = readOnly || !canPrice;
   const statusCopy = product.soldOut ? 'Mark available' : 'Mark sold out';
   const nextSoldOut = !product.soldOut;
@@ -149,7 +157,8 @@ export function ProductEditor({
     visible !== product.active ||
     selectedCategoryId !== product.categoryId ||
     comboEnabled !== product.isCombo ||
-    sortOrder !== String(product.sortOrder);
+    sortOrder !== String(product.sortOrder) ||
+    imageKey !== product.imageKey;
   const advancedDirty = advancedModel
     ? advancedModel.modifiers.some((modifier) => {
         const current = modifierState[modifier.id];
@@ -174,7 +183,7 @@ export function ProductEditor({
         );
       })
     : false;
-  useUnsavedShopDraft(baseDirty || advancedDirty);
+  useUnsavedShopDraft(baseDirty || advancedDirty || selectedImageFile !== null || imageUploading);
 
   const draftPreview = useMemo(() => {
     let priceMinor = product.priceMinor;
@@ -193,6 +202,7 @@ export function ProductEditor({
       categoryId: selectedCategoryId,
       isCombo: comboEnabled,
       sortOrder: Number(sortOrder),
+      imageKey,
     };
   }, [
     bestSeller,
@@ -205,6 +215,7 @@ export function ProductEditor({
     selectedCategoryId,
     comboEnabled,
     sortOrder,
+    imageKey,
   ]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -235,6 +246,32 @@ export function ProductEditor({
   }
 
   const [archiveConfirmationOpen, setArchiveConfirmationOpen] = useState(false);
+
+  async function uploadSelectedImage() {
+    if (readOnly || !selectedImageFile || !onUploadImage) return;
+    setImageError(null);
+    if (
+      selectedImageFile.size === 0 ||
+      selectedImageFile.size > 2 * 1024 * 1024 ||
+      !['image/png', 'image/jpeg', 'image/webp', 'image/avif'].includes(
+        selectedImageFile.type,
+      )
+    ) {
+      setImageError('Choose a PNG, JPEG, WebP, or AVIF image of at most 2 MB.');
+      return;
+    }
+    setImageUploading(true);
+    try {
+      const result = await onUploadImage(selectedImageFile);
+      setImageKey(result.imageKey);
+      setUploadedImageUrl(result.publicUrl);
+      setSelectedImageFile(null);
+    } catch {
+      setImageError('Image upload failed. No image change has been saved.');
+    } finally {
+      setImageUploading(false);
+    }
+  }
 
   async function archiveProduct() {
     if (readOnly) return;
@@ -395,9 +432,58 @@ export function ProductEditor({
           </div>
         </div>
         <div className="admin-product-image-state" role="status">
-          <strong>{product.imageKey ? 'Image assigned' : 'No image assigned'}</strong>
-          <span>Product images are managed outside this screen.</span>
+          <strong>{imageKey ? 'Image assigned' : 'No image assigned'}</strong>
+          <span>Image upload changes remain in Draft until saved and published.</span>
+          {uploadedImageUrl ? (
+            <img
+              src={uploadedImageUrl}
+              alt={`Selected image for ${product.name}`}
+              loading="lazy"
+              width="200"
+              height="140"
+            />
+          ) : null}
         </div>
+        {onUploadImage ? (
+          <div className="admin-form-grid">
+            <label className="admin-field">
+              <span>Choose product image (PNG, JPEG, WebP, AVIF — maximum 2 MB)</span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/avif"
+                disabled={readOnly}
+                onChange={(event) => {
+                  setSelectedImageFile(event.currentTarget.files?.[0] ?? null);
+                  setImageError(null);
+                }}
+              />
+            </label>
+            <button
+              className="admin-secondary-button"
+              type="button"
+              disabled={readOnly || selectedImageFile === null}
+              onClick={() => void uploadSelectedImage()}
+            >
+              {imageUploading ? 'Uploading image…' : 'Upload image'}
+            </button>
+            {imageKey ? (
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={readOnly}
+                onClick={() => {
+                  setImageKey(null);
+                  setUploadedImageUrl(null);
+                  setSelectedImageFile(null);
+                  setImageError(null);
+                }}
+              >
+                Remove image from draft
+              </button>
+            ) : null}
+            {imageError ? <p role="alert">{imageError}</p> : null}
+          </div>
+        ) : null}
         <label className="admin-check-field">
           <input
             type="checkbox"
