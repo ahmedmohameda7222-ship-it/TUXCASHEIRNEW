@@ -282,6 +282,23 @@ for (const viewport of [
     });
 
     await selectPurchaseOrder(page);
+    if (viewport.width <= 390) {
+      const geometry = await page.locator('.admin-purchasing-order-header').evaluate((header) => {
+        const identity = header.querySelector('.admin-purchasing-order-header__identity');
+        const badge = header.querySelector(':scope > strong');
+        if (!identity || !badge) throw new Error('Missing PO header parts');
+        return {
+          gap: badge.getBoundingClientRect().top - identity.getBoundingClientRect().bottom,
+          height: header.getBoundingClientRect().height,
+        };
+      });
+      expect(geometry.gap).toBeLessThan(24);
+      expect(geometry.height).toBeLessThan(110);
+      const tabsFit = await page.locator('.admin-purchasing-inspector-tabs').evaluate(
+        (element) => element.scrollWidth <= element.clientWidth + 1,
+      );
+      expect(tabsFit).toBe(true);
+    }
     await expect(page.getByRole('tab', { name: 'Overview', exact: true })).toBeVisible();
     await page.getByRole('tab', { name: 'Items', exact: true }).click();
     await expect(
