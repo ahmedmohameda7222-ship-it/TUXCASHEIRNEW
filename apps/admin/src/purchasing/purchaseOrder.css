@@ -34,18 +34,19 @@
 }
 @media (max-width: 480px) {
   .admin-purchasing-order-header {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    align-items: center;
+    padding: 0.5rem 0;
   }
 
-  /* In column direction the desktop flex-basis becomes a 10rem height. */
+  /* Keep the compact reference's PO identity/status side by side. */
   .admin-purchasing-order-header__identity {
-    flex: 0 1 auto;
-    width: 100%;
+    flex: 1 1 10rem;
+    width: auto;
   }
 
   .admin-purchasing-order-header > strong {
-    align-self: flex-start;
+    align-self: center;
   }
 
   /* All five inspector tabs must remain visible, without a sideways scroll. */
