@@ -135,7 +135,12 @@ function summary(order: AdminOrderDetail): AdminOrderSummary {
 
 async function mockOrders(
   page: Page,
-  options: { staleCancellation?: boolean; emptyOrders?: boolean; paidActive?: boolean } = {},
+  options: {
+    staleCancellation?: boolean;
+    emptyOrders?: boolean;
+    paidActive?: boolean;
+    financeVisible?: boolean;
+  } = {},
 ) {
   let active = detail({
     id: activeOrderId,
@@ -158,12 +163,23 @@ async function mockOrders(
   if (options.paidActive) active = { ...active, payments: done.payments };
   const commands: Record<string, unknown>[] = [];
   const searches: URL[] = [];
+  const kpiRequests: URL[] = [];
 
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(ownerSession),
+      body: JSON.stringify(
+        options.financeVisible
+          ? {
+              ...ownerSession,
+              principal: {
+                ...ownerSession.principal,
+                permissions: [...ownerSession.principal.permissions, 'finance.view'],
+              },
+            }
+          : ownerSession,
+      ),
     });
   });
 
@@ -184,6 +200,26 @@ async function mockOrders(
 
     if (request.method() === 'GET') {
       expect(url.searchParams.get('shopId')).toBe(shopId);
+      if (url.searchParams.get('view') === 'kpis') {
+        kpiRequests.push(url);
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            shopId,
+            orderCount: options.emptyOrders ? 0 : 65,
+            activeOrderCount: options.emptyOrders ? 0 : 7,
+            netSalesMinor: options.financeVisible ? (options.emptyOrders ? 0 : 471550) : null,
+            averageOrderMinor: options.financeVisible && !options.emptyOrders ? 7918 : null,
+            denominatorPaidOrderCount: options.financeVisible
+              ? options.emptyOrders
+                ? 0
+                : 58
+              : null,
+          }),
+        });
+        return;
+      }
       if (url.searchParams.get('view') === 'action-reasons') {
         await route.fulfill({
           status: 200,
@@ -453,6 +489,7 @@ async function mockOrders(
   return {
     commands,
     searches,
+    kpiRequests,
     get active() {
       return active;
     },
