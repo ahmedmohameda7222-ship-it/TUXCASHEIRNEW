@@ -1,7 +1,15 @@
-name: TUX Full Regression (Manual)
+name: TUX Full Regression (Manual + Catalog PR)
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ci-full.yml'
+      - 'apps/admin/src/catalog/**'
+      - 'apps/admin/server/catalog/**'
+      - 'apps/admin/api/admin/catalog*'
+      - 'packages/admin-contracts/src/catalog.ts'
 
 permissions:
   contents: read
