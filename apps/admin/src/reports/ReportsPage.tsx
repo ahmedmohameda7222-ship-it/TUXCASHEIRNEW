@@ -50,9 +50,7 @@ export function ReportsPage() {
   const scopeChanged = previousScopeKey.current !== scopeKey;
   const scopedFilters = scopeReportFilters(
     filters,
-    scope.kind === 'shop'
-      ? { kind: 'shop', shopId: scope.shopId }
-      : { kind: 'all-shops' },
+    scope.kind === 'shop' ? { kind: 'shop', shopId: scope.shopId } : { kind: 'all-shops' },
     principal.shopIds,
     scopeChanged,
     principal.role === 'OWNER',
