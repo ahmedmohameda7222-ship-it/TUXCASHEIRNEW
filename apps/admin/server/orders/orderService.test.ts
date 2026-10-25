@@ -32,7 +32,7 @@ function fixtureStore(): OrderStore {
       return { shopId: input.shopId, days: [] };
     },
     async listOnlineOrderRequests(input) {
-      return { shopId: input.shopId, rows: [] };
+      return { shopId: input.shopId, rows: [], nextCursor: null };
     },
     async searchOrders(input) {
       return { rows: [], nextCursor: null, shopId: input.shopId };
