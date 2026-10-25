@@ -35,8 +35,8 @@ describe('AdminMetricStrip', () => {
         ]}
       />,
     );
-    expect((html.match(/<dt>/g) ?? [])).toHaveLength(4);
-    expect((html.match(/<dd>/g) ?? [])).toHaveLength(4);
+    expect(html.match(/<dt>/g) ?? []).toHaveLength(4);
+    expect(html.match(/<dd>/g) ?? []).toHaveLength(4);
     expect(html).toContain('admin-inventory-summary');
     expect(html).toContain('admin-metric-strip--warning');
     expect(html).toContain('admin-metric-strip--critical');
