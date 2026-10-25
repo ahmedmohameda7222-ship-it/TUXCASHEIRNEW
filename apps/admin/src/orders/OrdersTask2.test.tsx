@@ -74,6 +74,25 @@ const order: AdminOrderDetail = {
 };
 
 describe('Orders Task 2 controls', () => {
+  it('clearly separates estimated return gross valuation from customer refunds and stock effects', () => {
+    const html = renderToStaticMarkup(
+      <RefundReturnPage
+        mode="return"
+        order={order}
+        reasons={[refundReason]}
+        refunding={false}
+        returning={false}
+        onCancel={vi.fn()}
+        onRefund={vi.fn()}
+        onReturn={vi.fn()}
+      />,
+    );
+    expect(html).toContain('Estimated gross return item valuation');
+    expect(html).toContain('This is not a refund or stock movement');
+    expect(html).toContain('order-level discounts');
+  });
+
+
   it('shows only eligible remaining refundable balance and excludes blocked methods', () => {
     const html = renderToStaticMarkup(
       <RefundReturnPage
