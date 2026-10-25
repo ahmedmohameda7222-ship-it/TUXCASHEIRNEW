@@ -1,4 +1,4 @@
-import type { AdminStocktakeSnapshot } from '@tux/admin-contracts';
+import type { AdminStocktakeDraftSession, AdminStocktakeSnapshot } from '@tux/admin-contracts';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 
@@ -68,6 +68,7 @@ function mutationErrorMessage(error: unknown): string | null {
 type WorkspaceMode =
   | 'detail'
   | 'stocktake-select'
+  | 'stocktake-history'
   | 'stocktake'
   | 'transfer'
   | 'reorder'
@@ -119,6 +120,9 @@ export function InventoryPage() {
   const [sort, setSort] = useState<InventorySort>('name');
   const [page, setPage] = useState(1);
   const [stocktakeSnapshot, setStocktakeSnapshot] = useState<AdminStocktakeSnapshot | null>(null);
+  const [stocktakeRevision, setStocktakeRevision] = useState(0);
+  const [stocktakeStale, setStocktakeStale] = useState(false);
+  const [stocktakeSavedValues, setStocktakeSavedValues] = useState<Record<string, number | null>>({});
 
   const workspace = inventory.workspaceQuery.data;
   const mutationError = latestMutationError([
@@ -126,6 +130,8 @@ export function InventoryPage() {
     inventory.recordWaste,
     inventory.beginStocktake,
     inventory.postStocktake,
+    inventory.saveStocktakeDraft,
+    inventory.cancelStocktakeDraft,
     inventory.updateReplenishment,
     inventory.sendTransfer,
     inventory.receiveTransfer,
@@ -147,6 +153,9 @@ export function InventoryPage() {
     setAdjustmentApprovalPending(false);
     setDefinitionOpen(false);
     setStocktakeSnapshot(null);
+    setStocktakeRevision(0);
+    setStocktakeStale(false);
+    setStocktakeSavedValues({});
     setMode('detail');
   }, [shopId]);
   const stocktakeItems = useMemo(() => items.filter((item) => item.active), [items]);
@@ -175,12 +184,35 @@ export function InventoryPage() {
       {
         onSuccess: (snapshot) => {
           setStocktakeSnapshot(snapshot);
+          setStocktakeRevision(0);
+          setStocktakeStale(false);
+          setStocktakeSavedValues({});
           setMode('stocktake');
           setItemAction(null);
           navigate('/inventory');
         },
       },
     );
+  };
+
+  const resumeStocktake = (session: AdminStocktakeDraftSession) => {
+    if (!shopId || session.shopId !== shopId || session.status !== 'DRAFT') return;
+    setStocktakeSnapshot({
+      stocktakeId: session.stocktakeId,
+      lines: session.lines.map((line) => ({
+        inventoryItemId: line.inventoryItemId,
+        snapshotOnHandMicros: line.snapshotOnHandMicros,
+        snapshotReservedMicros: line.snapshotReservedMicros,
+        unitCostMinor: line.unitCostMinor,
+      })),
+    });
+    setStocktakeRevision(session.draftRevision);
+    setStocktakeStale(session.stale);
+    setStocktakeSavedValues(
+      Object.fromEntries(session.lines.map((line) => [line.inventoryItemId, line.actualCountMicros])),
+    );
+    setMode('stocktake');
+    navigate('/inventory');
   };
 
   if (!shopId) {
@@ -346,6 +378,12 @@ export function InventoryPage() {
               >
                 Variance &amp; margins
               </button>
+              {canStocktake ? (
+                <button className="admin-secondary-button" type="button"
+                  onClick={() => openWorkflow('stocktake-history')}>
+                  Stock count history
+                </button>
+              ) : null}
               {canManageMasterBindings ? (
                 <button
                   className="admin-secondary-button"
