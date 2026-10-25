@@ -594,6 +594,23 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   });
 }
 
+test('selected supplier details appear adjacent to compact directory on desktop', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockPurchasing(page);
+  await page.goto('/purchasing');
+  await openSuppliers(page);
+  const directory = page.locator('.admin-supplier-directory');
+  const inspector = page.getByRole('complementary', { name: 'Selected supplier detail' });
+  await expect(inspector).toBeVisible();
+  await expect(inspector.getByText('Prime Foods')).toBeVisible();
+  const listBounds = await directory.boundingBox();
+  const detailBounds = await inspector.boundingBox();
+  expect(listBounds).not.toBeNull();
+  expect(detailBounds).not.toBeNull();
+  expect(detailBounds!.x).toBeGreaterThan(listBounds!.x + listBounds!.width - 3);
+  expect(Math.abs(detailBounds!.y - listBounds!.y)).toBeLessThan(40);
+});
+
 test('supplier form exposes linked field guidance and restores focus after Escape', async ({
   page,
 }) => {
