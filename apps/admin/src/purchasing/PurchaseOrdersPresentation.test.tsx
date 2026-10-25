@@ -56,7 +56,8 @@ describe('approved purchase order directory', () => {
 
   it('displays purchase order reference, supplier, delivery and status without fake sample values', () => {
     const html = render([order]);
-    expect(html).toContain('PO-11111111');
+    expect(html).toMatch(/PO-[0-9A-Z]{13}/);
+    expect(html).not.toContain('PO-11111111');
     expect(html).toContain('Alpha Foods');
     expect(html).toContain('2026-10-31');
     expect(html).toContain('Ordered');
