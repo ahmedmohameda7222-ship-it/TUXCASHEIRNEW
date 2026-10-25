@@ -306,6 +306,41 @@ describe('OrderDetailPage', () => {
     expect(html).toContain('Audit timestamp');
   });
 
+  it('shows each returned item with immutable name, quantity and valuation separately from refunds', () => {
+    const html = render({
+      ...fixture,
+      status: 'DONE',
+      financialEvents: [
+        {
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          kind: 'RETURN',
+          state: 'POSTED',
+          amountMinor: 5750,
+          approvalRequestId: null,
+          reason: {
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            key: 'QUALITY_ISSUE',
+            label: 'Quality issue',
+            family: 'REFUND_RETURN',
+            configurationVersion: 2,
+          },
+          createdAt: '2026-09-21T11:00:00Z',
+          returnItems: [
+            {
+              orderItemId: '55555555-5555-4555-8555-555555555555',
+              productName: 'TUX Burger',
+              quantity: 1,
+              valuationMinor: 5750,
+            },
+          ],
+        },
+      ],
+    });
+    expect(html).toContain('Returned 1 × TUX Burger');
+    expect(html).toContain('Return valuation: EGP 57.50');
+    expect(html).toContain('Return valuation; no payment refund implied');
+  });
+
   it('renders immutable order context needed to investigate a lifecycle action', () => {
     const html = render(fixture);
 
