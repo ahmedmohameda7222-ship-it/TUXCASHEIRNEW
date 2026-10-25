@@ -204,20 +204,22 @@ export function OrdersPage() {
               { id: 'active', label: 'Active orders', value: null },
             ]}
           />
-          <details
-            className="admin-orders-filters"
-            open={Boolean(query || status || source || businessDayId || fromInput || toInput)}
-          >
-            <summary>Search and filters</summary>
-            <section className="admin-order-task-section is-compact" aria-label="Order filters">
-              <label className="admin-field">
-                <span>Search</span>
-                <input
-                  value={query}
-                  placeholder="Order number, customer, phone or operator"
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-              </label>
+          <div className="admin-orders-toolbar">
+            <label className="admin-field admin-orders-search-persistent">
+              <span>Search</span>
+              <input
+                type="search"
+                value={query}
+                placeholder="Order number, customer, phone or operator"
+                onChange={(event) => setQuery(event.currentTarget.value)}
+              />
+            </label>
+            <details
+              className="admin-orders-filters"
+              open={Boolean(status || source || businessDayId || fromInput || toInput)}
+            >
+              <summary>Search and filters</summary>
+              <section className="admin-order-task-section is-compact" aria-label="Order filters">
               <label className="admin-field">
                 <span>Status</span>
                 <select
@@ -293,8 +295,9 @@ export function OrdersPage() {
                   <option value="ONLINE">Online</option>
                 </select>
               </label>
-            </section>
-          </details>
+              </section>
+            </details>
+          </div>
 
           {canExport && !timeRange.error ? (
             <a
