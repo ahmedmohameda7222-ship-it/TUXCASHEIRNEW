@@ -114,6 +114,21 @@ function render(order: AdminOrderDetail, canViewDelivery = false): string {
 }
 
 describe('OrderDetailPage', () => {
+  it('prioritizes real customer and fulfillment above detailed items, and moves immutable identity to a disclosure', () => {
+    const html = render(fixture);
+    expect(html).toContain('Order #42');
+    expect(html).toContain('Full order identity and references');
+    expect(html.indexOf('id="order-detail-customer"')).toBeLessThan(
+      html.indexOf('id="order-detail-items"'),
+    );
+    expect(html.indexOf('id="order-detail-fulfillment"')).toBeLessThan(
+      html.indexOf('id="order-detail-items"'),
+    );
+    expect(html).toContain('11111111-1111-4111-8111-111111111111');
+    expect(html).toContain('Business day: Not available');
+  });
+
+
   it('provides six accessible inspector landmarks without concealing financial or inventory chronology', () => {
     const html = render({ ...fixture, status: 'DONE' });
     const navigation = html.match(
