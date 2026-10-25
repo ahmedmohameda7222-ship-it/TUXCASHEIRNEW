@@ -586,7 +586,7 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     await list.getByRole('button', { name: /Beef/ }).click();
     await expect(page.getByLabel('Inventory item detail')).toBeVisible();
 
-    if (viewport.width <= 480) {
+    if (viewport.width <= 1150) {
       await expect(list).toBeHidden();
       await expect(page.getByRole('link', { name: /back to inventory/i })).toBeVisible();
     } else {
