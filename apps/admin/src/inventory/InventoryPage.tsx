@@ -455,6 +455,7 @@ export function InventoryPage() {
         />
       ) : (
         <ResponsiveMasterDetail
+          className="admin-inventory-master-detail"
           listLabel="Inventory items"
           detailLabel="Inventory item detail"
           detailActive={selectedItemId !== null}
