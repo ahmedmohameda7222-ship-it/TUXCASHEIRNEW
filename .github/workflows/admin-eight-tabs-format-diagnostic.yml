@@ -1,0 +1,29 @@
+name: Temporary Admin Prettier diagnostic
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/admin-eight-tabs-format-diagnostic.yml'
+      - 'apps/admin/src/finance/FinanceSectionNav.tsx'
+      - 'apps/admin/src/finance/FinanceReconciliationPage.tsx'
+
+permissions:
+  contents: read
+
+jobs:
+  format-diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Show exact Prettier differences (no writes to GitHub)
+        run: |
+          npx prettier --write apps/admin/src/finance/FinanceSectionNav.tsx apps/admin/src/finance/FinanceReconciliationPage.tsx
+          git --no-pager diff -- apps/admin/src/finance/FinanceSectionNav.tsx apps/admin/src/finance/FinanceReconciliationPage.tsx
