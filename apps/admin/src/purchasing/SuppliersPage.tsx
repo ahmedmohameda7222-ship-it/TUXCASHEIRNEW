@@ -47,7 +47,7 @@ export function SuppliersPage({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'archived'>('all');
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
-  const selectedSupplier = suppliers.find((supplier) => supplier.id === selectedSupplierId) ?? null;
+  const [mobileInspectorExpanded, setMobileInspectorExpanded] = useState(false);
   const visibleSuppliers = suppliers.filter((supplier) => {
     if (statusFilter === 'active' && !supplier.active) return false;
     if (statusFilter === 'archived' && supplier.active) return false;
@@ -55,6 +55,10 @@ export function SuppliersPage({
       .filter(Boolean)
       .some((value) => value!.toLowerCase().includes(search.trim().toLowerCase()));
   });
+  const selectedSupplier =
+    visibleSuppliers.find((supplier) => supplier.id === selectedSupplierId) ??
+    visibleSuppliers[0] ??
+    null;
 
   function beginEdit(supplier: AdminSupplier) {
     setEditingSupplier(supplier);
@@ -90,6 +94,8 @@ export function SuppliersPage({
           </button>
         ) : null}
       </div>
+      <div className="admin-purchasing-suppliers-workspace">
+        <div className="admin-purchasing-suppliers-list">
       <div className="admin-purchasing-supplier-filters">
         <label className="admin-field">
           <span>Search suppliers</span>
@@ -152,7 +158,7 @@ export function SuppliersPage({
                 className="admin-supplier-select"
                 type="button"
                 aria-pressed={selectedSupplierId === supplier.id}
-                onClick={() => setSelectedSupplierId(supplier.id)}
+                onClick={() => { setSelectedSupplierId(supplier.id); setMobileInspectorExpanded(true); }}
               >
                 {supplier.name}
               </button>
@@ -180,44 +186,6 @@ export function SuppliersPage({
                 <dd>{supplier.email ?? 'Not provided'}</dd>
               </div>
             </dl>
-            {canManageLifecycle && typeof supplier.version === 'number' ? (
-              <div
-                className="admin-supplier-card__actions"
-                role="group"
-                aria-label={'Actions for ' + supplier.name}
-              >
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  disabled={pending}
-                  onClick={() => beginEdit(supplier)}
-                >
-                  Edit {supplier.name}
-                </button>
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  disabled={pending}
-                  onClick={() => {
-                    if (supplier.active) {
-                      setArchiveTarget(supplier);
-                    } else {
-                      onManage(
-                        {
-                          type: 'supplier.restore',
-                          supplierId: supplier.id,
-                          expectedVersion: supplier.version!,
-                          payload: {},
-                        },
-                        () => undefined,
-                      );
-                    }
-                  }}
-                >
-                  {supplier.active ? 'Archive' : 'Restore'} {supplier.name}
-                </button>
-              </div>
-            ) : null}
           </article>
         ))}
         {visibleSuppliers.length === 0 ? (
@@ -226,9 +194,12 @@ export function SuppliersPage({
           </p>
         ) : null}
       </div>
+        </div>
       {selectedSupplier ? (
         <aside
-          className="admin-purchasing-supplier-inspector"
+          className={mobileInspectorExpanded
+            ? 'admin-purchasing-supplier-inspector'
+            : 'admin-purchasing-supplier-inspector is-mobile-collapsed'}
           aria-label="Selected supplier detail"
         >
           <div className="admin-section-heading">
@@ -249,15 +220,55 @@ export function SuppliersPage({
               <dd>{selectedSupplier.email ?? 'Not provided'}</dd>
             </div>
           </dl>
+
+          {canManageLifecycle && typeof selectedSupplier.version === 'number' ? (
+              <div
+                className="admin-supplier-card__actions"
+                role="group"
+                aria-label={'Actions for ' + selectedSupplier.name}
+              >
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  disabled={pending}
+                  onClick={() => beginEdit(selectedSupplier)}
+                >
+                  Edit {selectedSupplier.name}
+                </button>
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    if (selectedSupplier.active) {
+                      setArchiveTarget(supplier);
+                    } else {
+                      onManage(
+                        {
+                          type: 'supplier.restore',
+                          supplierId: selectedSupplier.id,
+                          expectedVersion: selectedSupplier.version!,
+                          payload: {},
+                        },
+                        () => undefined,
+                      );
+                    }
+                  }}
+                >
+                  {selectedSupplier.active ? 'Archive' : 'Restore'} {selectedSupplier.name}
+                </button>
+              </div>
+            ) : null}
           <button
             className="admin-secondary-button"
             type="button"
-            onClick={() => setSelectedSupplierId(null)}
+            onClick={() => { setSelectedSupplierId(null); setMobileInspectorExpanded(false); }}
           >
             Close supplier details
           </button>
         </aside>
       ) : null}
+      </div>
       <AdminDialog
         open={archiveTarget !== null}
         destructive
