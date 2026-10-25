@@ -48,11 +48,12 @@ const migrationPaths=[
  '20261025172000_inventory_transfer_cancel_compensation.sql',
  '20261025173000_inventory_stocktake_draft_recovery.sql',
  '20261025174000_inventory_stocktake_ledger_replay_fence.sql',
+ '20261025175000_inventory_reservation_replay_payload_integrity.sql',
 ];
 for (const path of migrationPaths) {
   execute(['-f',resolve('supabase/migrations',path)],'Apply '+path);
 }
-console.log('Inventory acceptance: all 5 migrations executed in isolated PostgreSQL fixture.');
+console.log('Inventory acceptance: all 6 migrations executed in isolated PostgreSQL fixture.');
 
 function send(items,command,source=S,destination=D,actor=E) {
   return call('send_stock_transfer_v1',actor,source,destination,items,command);
