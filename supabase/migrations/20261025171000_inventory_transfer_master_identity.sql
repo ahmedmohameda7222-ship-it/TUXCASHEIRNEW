@@ -111,7 +111,7 @@ begin
     perform private.assert_inventory_item_shop_v1(p_source_shop_id, v_item_id);
     -- Master IDs are the business-wide canonical identity. Never equate
     -- similarly named products across shops; never silently choose the first.
-    select count(*), min(destination_item.id)
+    select count(*), min(destination_item.id::text)::uuid
       into v_mapping_count, v_destination_item_id
     from public.catalog_inventory_item_shop_bindings source_binding
     join public.catalog_inventory_item_shop_bindings destination_binding
