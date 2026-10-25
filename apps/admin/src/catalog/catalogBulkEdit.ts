@@ -80,13 +80,14 @@ function patchProduct(
       if (typeof patch.enabled !== 'boolean')
         throw new CatalogBulkEditError('Invalid best-seller state.');
       return { ...product, bestSeller: patch.enabled };
-    case 'sortOrder.adjust':
+    case 'sortOrder.adjust': {
       if (!Number.isSafeInteger(patch.delta))
         throw new CatalogBulkEditError('Sort-order adjustment must be a whole number.');
       const nextOrder = product.sortOrder + patch.delta;
       if (!Number.isSafeInteger(nextOrder) || nextOrder < 0)
         throw new CatalogBulkEditError('Sort order cannot be negative or overflow.');
       return { ...product, sortOrder: nextOrder };
+    }
   }
 }
 
