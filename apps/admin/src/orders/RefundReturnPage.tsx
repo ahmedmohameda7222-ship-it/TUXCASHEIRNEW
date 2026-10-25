@@ -98,6 +98,16 @@ export function RefundReturnPage({
     [order.items, returnQuantities],
   );
 
+  const returnEstimatedGrossMinor = returnItems.reduce((total, requested) => {
+    const purchased = order.items.find((item) => item.id === requested.orderItemId);
+    if (!purchased) return total;
+    const modifierUnitMinor = purchased.modifiers.reduce(
+      (sum, modifier) => sum + modifier.quantity * modifier.unitPriceMinor,
+      0,
+    );
+    return total + requested.quantity * (purchased.unitPriceMinor + modifierUnitMinor);
+  }, 0);
+
   async function submitRefund(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parsedAmount = Number(amountMinor);
@@ -279,6 +289,11 @@ export function RefundReturnPage({
               />
             </label>
           ))}
+          <p>
+            Estimated gross return item valuation: {money(returnEstimatedGrossMinor)}.
+            Calculated from purchase-time base and modifier snapshots before order-level discounts,
+            tax, delivery fees or service charges. This is not a refund or stock movement.
+          </p>
           <button
             className="admin-primary-button"
             type="submit"
