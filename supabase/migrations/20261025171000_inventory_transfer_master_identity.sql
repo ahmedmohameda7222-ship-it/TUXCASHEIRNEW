@@ -211,8 +211,7 @@ begin
     'ok', true, 'idempotentReplay', false, 'transferId', v_transfer_id
   );
 end;
-$function$
-
+$function$;
 
 -- Preserve and explicitly reassert the original trusted BFF-only execution boundary.
 revoke all on function public.send_stock_transfer_v1(uuid, uuid, uuid, jsonb, text)
