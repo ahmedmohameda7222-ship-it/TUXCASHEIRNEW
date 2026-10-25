@@ -46,6 +46,7 @@ const migrationPaths=[
  '20261025170000_inventory_offshift_quiescence.sql',
  '20261025171000_inventory_transfer_master_identity.sql',
  '20261025172000_inventory_transfer_cancel_compensation.sql',
+ '20261025173000_inventory_stocktake_draft_recovery.sql',
 ];
 for (const path of migrationPaths) {
   execute(['-f',resolve('supabase/migrations',path)],'Apply '+path);
@@ -143,3 +144,52 @@ beginCount(stocktake2);
 query(post(stocktake2,'post-2'),'Fresh after-shift posting');
 eq(query("select status from public.stocktakes where id="+literal(stocktake2)),'POSTED','Fresh count finalizes');
 console.log('Inventory acceptance: active-shift begin/post deny; open order deny; stale ledger rollback; clean after-shift posting PASSED.');
+
+
+// New persisted count session and draft write acceptance, after prior core guards.
+const stocktake3='60000000-0000-4000-8000-000000000003';
+beginCount(stocktake3);
+const sessions=call('read_admin_stocktake_sessions_v1',E,S);
+verify(sessions.ok && Array.isArray(sessions.sessions),'Authorized shop stocktake sessions readable');
+verify(sessions.sessions.some(x=>x.stocktakeId===stocktake3&&x.status==='DRAFT'),'Refresh restores actual server DRAFT');
+verify(sessions.sessions.find(x=>x.stocktakeId===stocktake1)?.stale===true,'Delayed receipt visibly marks stale DRAFT');
+const saved=[{inventoryItemId:A,actualCountMicros:9000000}];
+let result=call('save_admin_stocktake_draft_v1',E,S,stocktake3,0,saved,'draft-save-1');
+verify(result.ok && result.draftRevision===1,'Draft save increments optimistic version');
+verify(call('save_admin_stocktake_draft_v1',E,S,stocktake3,0,saved,'draft-save-1').idempotentReplay===true,
+ 'Exact draft save command retry idempotent');
+eq(call('save_admin_stocktake_draft_v1',E,S,stocktake3,0,
+ [{inventoryItemId:A,actualCountMicros:5000000}],'draft-save-1').code,
+ 'idempotency_conflict','Altered same-command draft content denied');
+eq(call('save_admin_stocktake_draft_v1',E,S,stocktake3,0,saved,'draft-save-stale').code,
+ 'stale_version','Old revision cannot overwrite later saved count');
+const resumed=call('read_admin_stocktake_sessions_v1',E,S).sessions.find(x=>x.stocktakeId===stocktake3);
+eq(Number(resumed.lines[0].actualCountMicros),9000000,'Reload restores saved entered count');
+const openWorker=query("insert into public.worker_sessions(shop_id) values("+literal(S)+") returning id");
+eq(call('save_admin_stocktake_draft_v1',E,S,stocktake3,1,saved,'draft-save-trading').code,
+ 'stocktake_requires_off_shift','Draft entry prohibited when shift reopened');
+query("update public.worker_sessions set ended_at=now() where id="+literal(openWorker));
+const newSaved=[{inventoryItemId:A,actualCountMicros:8000000}];
+result=call('save_admin_stocktake_draft_v1',E,S,stocktake3,1,newSaved,'draft-save-2');
+verify(result.ok && result.draftRevision===2,'Legitimate second save after shift');
+const cancelled=call('cancel_admin_stocktake_draft_v1',E,S,stocktake3,'draft-cancel-1');
+verify(cancelled.ok && !cancelled.idempotentReplay,'Discard open DRAFT without stock movement');
+verify(call('cancel_admin_stocktake_draft_v1',E,S,stocktake3,'draft-cancel-1').idempotentReplay,
+ 'Exact cancellation replay idempotent');
+eq(call('cancel_admin_stocktake_draft_v1',E,S,stocktake3,'changed-cancel').code,
+ 'idempotency_conflict','Changed cancel key rejected');
+eq(call('save_admin_stocktake_draft_v1',E,S,stocktake3,2,newSaved,'save-after-cancel').code,
+ 'stocktake_not_editable','CANCELLED draft cannot be saved');
+eq(Number(query("select count(*) from public.inventory_movements where command_id like 'draft-%'")),
+ 0,'No ledger movement from draft save/cancel');
+reject("select public.read_admin_stocktake_sessions_v1("+literal(FOREIGN)+","+literal(S)+")",
+ 'authority_scope_forbidden','Foreign employee denied persisted count history');
+for(const signature of [
+ 'read_admin_stocktake_sessions_v1(uuid,uuid)',
+ 'save_admin_stocktake_draft_v1(uuid,uuid,uuid,bigint,jsonb,text)',
+ 'cancel_admin_stocktake_draft_v1(uuid,uuid,uuid,text)'
+]) {
+ const grants=query("select has_function_privilege('anon','public."+signature+"','EXECUTE')::text || ',' || has_function_privilege('service_role','public."+signature+"','EXECUTE')::text");
+ eq(grants,'false,true','Draft RPC BFF service boundary: '+signature);
+}
+console.log('Inventory acceptance: authorized persisted session resume, exact saved counts, version conflict, off-shift save, cancel, replay and grants PASSED.');
