@@ -12,7 +12,7 @@ import { CancelOrderSheet } from './CancelOrderSheet';
 import { OrderDetailPage } from './OrderDetailPage';
 import { OnlineRequestsPanel } from './OnlineRequestsPanel';
 import { RefundReturnPage } from './RefundReturnPage';
-import { useOrders, type OrderSearchFilters } from './useOrders';
+import { buildOrderSearchUrl, useOrders, type OrderSearchFilters } from './useOrders';
 import { toOrderTimeRange } from './orderDateRange';
 import './orders.css';
 
@@ -130,6 +130,7 @@ export function OrdersPage() {
   );
   const canCancel = principal.permissions.includes('orders.cancel');
   const canRefund = principal.permissions.includes('orders.refund');
+  const canExport = principal.permissions.includes('orders.view') && principal.permissions.includes('reports.view');
   const actionError =
     readableError(ordersApi.cancelOrder.error) ??
     readableError(ordersApi.refundOrder.error) ??
@@ -242,6 +243,15 @@ export function OrdersPage() {
             </section>
           </details>
 
+          {canExport && !timeRange.error ? (
+            <a
+              className="admin-secondary-button"
+              href={`${buildOrderSearchUrl({ shopId, ...filters })}&view=export`}
+              download="tux-orders.csv"
+            >
+              Export up to 1,000 filtered orders (CSV)
+            </a>
+          ) : null}
           {timeRange.error ? <p role="alert">{timeRange.error}</p> : null}
           {actionError ? <p role="alert">{actionError}</p> : null}
 
