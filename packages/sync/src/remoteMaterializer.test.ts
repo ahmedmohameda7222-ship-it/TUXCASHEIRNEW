@@ -19,6 +19,7 @@ import {
   type ProductId,
   type ShopId,
   type WorkerId,
+  type WorkerSessionId,
 } from '@tux/domain';
 import { describe, expect, it } from 'vitest';
 import { buildRemoteMaterializationPlanV1, shouldApplyRemoteMutation } from './remoteMaterializer';
@@ -104,6 +105,42 @@ function outbox(
 }
 
 describe('buildRemoteMaterializationPlanV1', () => {
+  it('upserts a closed worker session so sign-out remains idempotent after atomic End Day', () => {
+    const session = {
+      id: parseEntityId<WorkerSessionId>('34333333-3333-4333-8333-333333333333'),
+      shopId,
+      businessDayId: dayId,
+      workerId,
+      startedAt: instant('2026-08-20T00:00:00.000Z'),
+      endedAt: instant('2026-08-20T01:00:00.000Z'),
+    };
+    const event = {
+      ...outbox(
+        'abababab-abab-4bab-8bab-ababababab01',
+        'WORKER_SIGNED_OUT',
+        operationsSyncPayloadJson({
+          eventType: 'WORKER_SIGNED_OUT',
+          version: 1,
+          session,
+          previousSession: null,
+        }),
+      ),
+      aggregateType: 'WORKER_SESSION' as const,
+      aggregateId: session.id,
+      aggregateRevision: 1,
+    };
+
+    const plan = buildRemoteMaterializationPlanV1(toOperationsSyncEnvelopeV1(event));
+    expect(plan.mutations).toEqual([
+      expect.objectContaining({
+        table: 'worker_sessions',
+        mode: 'UPSERT',
+        conflictColumns: ['id'],
+        row: expect.objectContaining({ id: session.id, ended_at: session.endedAt }),
+      }),
+    ]);
+  });
+
   it('uses exact local identities and retains placement-only configuration version', () => {
     const event = outbox(
       'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',

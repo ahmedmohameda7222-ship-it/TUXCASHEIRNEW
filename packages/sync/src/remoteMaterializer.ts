@@ -175,7 +175,6 @@ function workerSessionMutation(session: WorkerSession): RemoteTableMutation {
     });
   }
   return mutation('worker_sessions', ['id'], row, {
-    mode: 'UPDATE',
     guard: {
       kind: 'MONOTONIC_TIMESTAMP',
       column: 'ended_at',
