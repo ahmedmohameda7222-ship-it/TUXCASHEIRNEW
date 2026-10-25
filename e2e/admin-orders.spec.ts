@@ -1121,3 +1121,29 @@ test('O4 immutable print action keeps its explanatory text readable without over
       layout.explanationLeft - layout.buttonRight >= 8,
   ).toBe(true);
 });
+
+test('O3 inspector archives stay keyboard-discoverable and print includes their immutable facts', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockOrders(page);
+  await page.goto('/orders');
+  await page.getByRole('button', { name: /#101/ }).click();
+  const detail = page.getByLabel('Order detail');
+  const identity = detail.getByText('Full order identity and references', { exact: true });
+  const reconciliation = detail.getByText('Financial reconciliation breakdown', { exact: true });
+  await expect(identity).toBeVisible();
+  await expect(reconciliation).toBeVisible();
+
+  await identity.click();
+  await expect(detail.getByText('Unique order reference:', { exact: false })).toBeVisible();
+  await reconciliation.click();
+  await expect(detail.getByText('Allocated payments', { exact: true })).toBeVisible();
+
+  // The user can print without manually opening archival disclosures.
+  await identity.click();
+  await reconciliation.click();
+  await page.emulateMedia({ media: 'print' });
+  await expect(detail.getByText('Unique order reference:', { exact: false })).toBeVisible();
+  await expect(detail.getByText('Allocated payments', { exact: true })).toBeVisible();
+});
