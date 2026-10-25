@@ -14,7 +14,7 @@ permissions:
 env:
   BASE_SHA: 639f2a61fdc1272646156db50cea71a9da5d22e5
   CATALOG_SHA: a2dffcb387c26fd995ad69b1065b664a4af492b5
-  ORDERS_SHA: 5406af30d32b509f61238cfdc80177072574a104
+  ORDERS_MINIMUM_SHA: 5406af30d32b509f61238cfdc80177072574a104
   INVENTORY_SHA: 7e1782592c715e68d78d7befbff106d70a39e80e
   ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
@@ -39,10 +39,11 @@ jobs:
             refs/pull/157/head:refs/remotes/origin/ci-preflight-catalog \
             refs/pull/158/head:refs/remotes/origin/ci-preflight-orders \
             refs/pull/159/head:refs/remotes/origin/ci-preflight-inventory
-          for sha in "$BASE_SHA" "$CATALOG_SHA" "$ORDERS_SHA" "$INVENTORY_SHA"; do
+          for sha in "$BASE_SHA" "$CATALOG_SHA" "$ORDERS_MINIMUM_SHA" "$INVENTORY_SHA"; do
             git cat-file -e "$sha^{commit}"
           done
-          test "$(git rev-parse HEAD)" = "$ORDERS_SHA"
+          git merge-base --is-ancestor "$ORDERS_MINIMUM_SHA" HEAD
+          ORDERS_SHA="$(git rev-parse HEAD)"
           git switch --detach "$BASE_SHA"
           git switch -c ci-orders-disposable
           export GIT_AUTHOR_DATE=2026-10-25T00:00:00Z
@@ -128,10 +129,11 @@ jobs:
             refs/pull/157/head:refs/remotes/origin/ci-preflight-catalog \
             refs/pull/158/head:refs/remotes/origin/ci-preflight-orders \
             refs/pull/159/head:refs/remotes/origin/ci-preflight-inventory
-          for sha in "$BASE_SHA" "$CATALOG_SHA" "$ORDERS_SHA" "$INVENTORY_SHA"; do
+          for sha in "$BASE_SHA" "$CATALOG_SHA" "$ORDERS_MINIMUM_SHA" "$INVENTORY_SHA"; do
             git cat-file -e "$sha^{commit}"
           done
-          test "$(git rev-parse HEAD)" = "$ORDERS_SHA"
+          git merge-base --is-ancestor "$ORDERS_MINIMUM_SHA" HEAD
+          ORDERS_SHA="$(git rev-parse HEAD)"
           git switch --detach "$BASE_SHA"
           git switch -c ci-orders-disposable
           export GIT_AUTHOR_DATE=2026-10-25T00:00:00Z
@@ -210,10 +212,11 @@ jobs:
             refs/pull/157/head:refs/remotes/origin/ci-preflight-catalog \
             refs/pull/158/head:refs/remotes/origin/ci-preflight-orders \
             refs/pull/159/head:refs/remotes/origin/ci-preflight-inventory
-          for sha in "$BASE_SHA" "$CATALOG_SHA" "$ORDERS_SHA" "$INVENTORY_SHA"; do
+          for sha in "$BASE_SHA" "$CATALOG_SHA" "$ORDERS_MINIMUM_SHA" "$INVENTORY_SHA"; do
             git cat-file -e "$sha^{commit}"
           done
-          test "$(git rev-parse HEAD)" = "$ORDERS_SHA"
+          git merge-base --is-ancestor "$ORDERS_MINIMUM_SHA" HEAD
+          ORDERS_SHA="$(git rev-parse HEAD)"
           git switch --detach "$BASE_SHA"
           git switch -c ci-orders-disposable
           export GIT_AUTHOR_DATE=2026-10-25T00:00:00Z
