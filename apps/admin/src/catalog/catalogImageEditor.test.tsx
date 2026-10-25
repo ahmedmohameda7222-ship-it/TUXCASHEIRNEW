@@ -59,4 +59,23 @@ describe('Catalog image editor', () => {
     expect(markup).toContain('Remove image from draft');
     expect(markup).toContain('Image assigned');
   });
+  it('disables uploading an entirely unsaved product until its first draft save', () => {
+    const markup = renderToStaticMarkup(
+      <Router ssrPath="/catalog/products">
+        <ProductEditor
+          product={product}
+          canEdit
+          canPrice
+          imageRequiresSaveFirst
+          onSaveDraft={vi.fn()}
+          onSetAvailability={vi.fn()}
+          onUploadImage={vi.fn()}
+        />
+      </Router>,
+    );
+    expect(markup).toContain('Save this product draft first');
+    expect(markup).toMatch(/type="file"[^>]*disabled/);
+    expect(markup).toMatch(/disabled[^>]*>Upload image/);
+  });
+
 });
