@@ -923,10 +923,11 @@ psql(
      );
      insert into public.payments(
        id,shop_id,order_id,part_index,payment_method_id,
-       payment_method_label_snapshot,logic_type_snapshot,allocated_minor,created_at
+       payment_method_label_snapshot,logic_type_snapshot,allocated_minor,
+       received_minor,change_minor,created_at
      ) values (
        '5b000000-0000-4000-8000-000000000093','${SHOP_ID}','${PAID_ACTIVE_ID}',2,
-       '58000000-0000-4000-8000-000000000092','Test Cash','CASH',6000,now()
+       '58000000-0000-4000-8000-000000000092','Test Cash','CASH',6000,6000,0,now()
      );`,
   ],
   'Mixed Card and Cash allocations',
