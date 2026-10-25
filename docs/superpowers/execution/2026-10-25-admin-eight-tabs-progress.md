@@ -1,3 +1,23 @@
+## Owner-mandated sequential execution correction — 2026-10-26
+
+**Mandatory execution order:** Orders (O1–O4) → Catalog → Inventory → Purchasing → Customers/CRM → Staff → Finance → Reports. **Current exclusive implementation workstream: Orders.** This replaces any prior order implied in this ledger. All other tab changes already committed are retained intact but remain **PARTIAL / NOT ACCEPTED** and MUST NOT be expanded until Orders has all O1–O4 gates passed.
+
+**Safety checkpoint:** Branch `feat/admin-eight-tabs-approved-ui-20261025`, Draft PR #165; at the immediately preceding checkpoint HEAD `b7e0009b223b04fe74822850e5e48555379e1337` (recheck later exact SHA). Fast CI run 40238112883 completed success, including changed-file formatting, typecheck, tests, quality gate. Orders financial RPC and Orders rendered tests passed within run 40238112742; full source regression and six-module browser run were still in progress at inspection. Temporary formatter diagnostic removed; valid later-tab changes preserved. No merge, production deployment or Supabase changes made.
+
+### Strict per-tab acceptance lock
+- **Orders O1–O4:** IN PROGRESS — O2 trusted full-shop financial aggregate and O3/O4 hosted integration/visual acceptance remain missing. No DONE status before all O01–O12 requirements have exact-SHA evidence.
+- **Catalog C1–C5:** NOT ACCEPTED; only inherited existing Catalog and isolated baseline, no new implementation until Orders closes.
+- **Inventory I1–I4:** PARTIAL pre-correction tile work; NOT ACCEPTED.
+- **Purchasing P1–P4:** NOT ACCEPTED.
+- **Customers/CRM CRM1–CRM4:** PARTIAL pre-correction code/tests; NOT ACCEPTED.
+- **Staff S1–S4:** PARTIAL pre-correction code/tests; NOT ACCEPTED.
+- **Finance F1–F5:** PARTIAL pre-correction code/tests; NOT ACCEPTED.
+- **Reports R1–R5:** PARTIAL pre-correction code/tests; NOT ACCEPTED.
+- **Shared P00/P01/P10:** supporting evidence only; never closes a tab.
+
+Keep all unrelated valid commits. Changes in other tabs may only be touched for a verified Orders dependency or non-feature cross-tab regression defect, with justification documented. Preserve all existing approval and operational controls.
+
+
 # TUX Admin Eight Tabs — implementation progress
 
 **Implementation source:** owner-approved `TUX_Admin_8_Tabs_Implementation_Handoff_REVIEWED_V2.zip` and `03_IMPLEMENTATION_PLAN.md`. Exact progress must be checked against current branch HEAD before continuation; this file is not evidence that a task passed.
