@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { orderMutationFailureStatus } from '../../api/admin/orders';
 
 /** Source guard only. An isolated PostgreSQL concurrency test remains required. */
 const migration = () =>
@@ -10,6 +11,12 @@ const migration = () =>
   );
 
 describe('P1 paid ACTIVE cancellation financial safety', () => {
+  it('returns a retryable HTTP conflict rather than misclassifying the financial gate', () => {
+    expect(orderMutationFailureStatus('paid_active_order_requires_settlement')).toBe(409);
+    expect(orderMutationFailureStatus('order_not_found')).toBe(404);
+    expect(orderMutationFailureStatus('permission_forbidden')).toBe(403);
+  });
+
   it('checks recorded payments while the canonical order row is locked, before releasing stock or changing status', () => {
     const sql = migration().toLowerCase();
     const orderLock = sql.indexOf('for update;');
