@@ -43,14 +43,17 @@ export function RefundReturnPage({
 }) {
   const [reasonCodeId, setReasonCodeId] = useState(reasons[0]?.id ?? '');
   const refundablePayments = useMemo(
-    () => order.payments.filter(
-      (payment) => payment.refundAllowedSnapshot === true &&
-        (payment.remainingRefundableMinor ?? 0) > 0,
-    ),
+    () =>
+      order.payments.filter(
+        (payment) =>
+          payment.refundAllowedSnapshot === true && (payment.remainingRefundableMinor ?? 0) > 0,
+      ),
     [order.payments],
   );
   const [paymentId, setPaymentId] = useState(refundablePayments[0]?.id ?? '');
-  const [amountMinor, setAmountMinor] = useState(String(refundablePayments[0]?.remainingRefundableMinor ?? ''));
+  const [amountMinor, setAmountMinor] = useState(
+    String(refundablePayments[0]?.remainingRefundableMinor ?? ''),
+  );
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('');
   const [returnQuantities, setReturnQuantities] = useState<Record<string, string>>({});
@@ -71,9 +74,9 @@ export function RefundReturnPage({
     const maximum = selected.remainingRefundableMinor ?? 0;
     setAmountMinor((current) => {
       const amount = Number(current);
-      return String(Number.isSafeInteger(amount) && amount > 0 && amount <= maximum
-        ? amount
-        : maximum);
+      return String(
+        Number.isSafeInteger(amount) && amount > 0 && amount <= maximum ? amount : maximum,
+      );
     });
   }, [refundablePayments, paymentId]);
 
@@ -203,19 +206,24 @@ export function RefundReturnPage({
             const selected = refundablePayments.find((payment) => payment.id === paymentId);
             return selected ? (
               <p>
-                Original allocation: {money(selected.allocatedMinor)} ·
-                Posted refunds: {money(selected.postedRefundMinor ?? 0)} ·
-                Pending approval: {money(selected.pendingRefundMinor ?? 0)} ·
-                Available to refund: {money(selected.remainingRefundableMinor ?? 0)}
+                Original allocation: {money(selected.allocatedMinor)} · Posted refunds:{' '}
+                {money(selected.postedRefundMinor ?? 0)} · Pending approval:{' '}
+                {money(selected.pendingRefundMinor ?? 0)} · Available to refund:{' '}
+                {money(selected.remainingRefundableMinor ?? 0)}
               </p>
-            ) : <p role="status">No eligible refundable payment balance remains.</p>;
+            ) : (
+              <p role="status">No eligible refundable payment balance remains.</p>
+            );
           })()}
           <label className="admin-field">
             <span>Refund amount (EGP)</span>
             <input
               type="number"
               min={0.01}
-              max={(refundablePayments.find((payment) => payment.id === paymentId)?.remainingRefundableMinor ?? 0) / 100}
+              max={
+                (refundablePayments.find((payment) => payment.id === paymentId)
+                  ?.remainingRefundableMinor ?? 0) / 100
+              }
               step={0.01}
               value={Number(amountMinor) / 100 || ''}
               disabled={refunding || returning || !paymentId}
@@ -228,9 +236,16 @@ export function RefundReturnPage({
             className="admin-primary-button"
             type="submit"
             disabled={
-              refunding || returning || !reasonCodeId || !paymentId || !pin ||
-              !Number.isSafeInteger(Number(amountMinor)) || Number(amountMinor) <= 0 ||
-              Number(amountMinor) > (refundablePayments.find((payment) => payment.id === paymentId)?.remainingRefundableMinor ?? 0)
+              refunding ||
+              returning ||
+              !reasonCodeId ||
+              !paymentId ||
+              !pin ||
+              !Number.isSafeInteger(Number(amountMinor)) ||
+              Number(amountMinor) <= 0 ||
+              Number(amountMinor) >
+                (refundablePayments.find((payment) => payment.id === paymentId)
+                  ?.remainingRefundableMinor ?? 0)
             }
           >
             {refunding ? 'Refunding…' : 'Submit refund'}
@@ -246,8 +261,9 @@ export function RefundReturnPage({
           {order.items.map((item) => (
             <label className="admin-field" key={item.id}>
               <span>
-                {item.productName} · purchased {item.quantity} · already returned {item.postedReturnQuantity ?? 0}
-                {' '}· pending {item.pendingReturnQuantity ?? 0} · remaining {item.remainingReturnableQuantity ?? 0}
+                {item.productName} · purchased {item.quantity} · already returned{' '}
+                {item.postedReturnQuantity ?? 0} · pending {item.pendingReturnQuantity ?? 0} ·
+                remaining {item.remainingReturnableQuantity ?? 0}
               </span>
               <input
                 aria-label={`Return quantity for ${item.productName}`}

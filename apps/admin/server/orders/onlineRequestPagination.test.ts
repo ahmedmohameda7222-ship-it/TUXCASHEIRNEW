@@ -30,9 +30,9 @@ function onlineRow(number: number) {
 describe('read-only online request cursor pagination', () => {
   it('returns bounded pages, deterministic next cursor, and preserves tenant and date filters', async () => {
     const select = vi.fn(async (table: string) =>
-      table === 'business_shops' ? [{ shop_id: shopId }] : [
-        onlineRow(3), onlineRow(2), onlineRow(1),
-      ],
+      table === 'business_shops'
+        ? [{ shop_id: shopId }]
+        : [onlineRow(3), onlineRow(2), onlineRow(1)],
     );
     const store = createOrderStore({ select } as unknown as AdminSupabaseClient);
     const first = await store.listOnlineOrderRequests({
@@ -47,8 +47,13 @@ describe('read-only online request cursor pagination', () => {
     expect(first.rows).toHaveLength(2);
     expect(first.nextCursor).toEqual(expect.any(String));
     const second = await store.listOnlineOrderRequests({
-      shopId, businessId, status: 'REJECTED',
-      from: null, to: null, cursor: first.nextCursor, limit: 2,
+      shopId,
+      businessId,
+      status: 'REJECTED',
+      from: null,
+      to: null,
+      cursor: first.nextCursor,
+      limit: 2,
     });
     const selects = select.mock.calls as unknown as Array<[string, URLSearchParams]>;
     const firstQuery = selects.find(([table]) => table === 'online_order_requests')?.[1];
@@ -64,10 +69,17 @@ describe('read-only online request cursor pagination', () => {
   it('rejects malformed cursors before database selection', async () => {
     const select = vi.fn(async () => [{ shop_id: shopId }]);
     const store = createOrderStore({ select } as unknown as AdminSupabaseClient);
-    await expect(store.listOnlineOrderRequests({
-      shopId, businessId, status: null, from: null, to: null,
-      cursor: 'not-a-valid-cursor', limit: 50,
-    })).rejects.toThrow('invalid_online_request_cursor');
+    await expect(
+      store.listOnlineOrderRequests({
+        shopId,
+        businessId,
+        status: null,
+        from: null,
+        to: null,
+        cursor: 'not-a-valid-cursor',
+        limit: 50,
+      }),
+    ).rejects.toThrow('invalid_online_request_cursor');
     expect(select).toHaveBeenCalledTimes(1);
   });
 });

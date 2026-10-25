@@ -26,7 +26,11 @@ import {
   type AdminResponse,
 } from '../../server/http.js';
 import { createOrderService, type OrderStore } from '../../server/orders/orderService.js';
-import { effectiveFinancialState, projectPaymentRefundBalances, projectReturnQuantities } from '../../server/orders/orderFinancialProjection.js';
+import {
+  effectiveFinancialState,
+  projectPaymentRefundBalances,
+  projectReturnQuantities,
+} from '../../server/orders/orderFinancialProjection.js';
 import { cairoCalendarDayRange } from '../../server/orders/cairoCalendarDay.js';
 import { readAdminSessionToken } from '../../server/session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
@@ -651,11 +655,9 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
               }),
             );
       const approvalsById = new Map(approvalRows.map((approval) => [approval.id, approval]));
-      const approvalFor = (id: string | null) =>
-        id === null ? undefined : approvalsById.get(id);
-      const effectiveState = (
-        row: RefundRow | ReturnRow,
-      ) => effectiveFinancialState(row.state, approvalFor(row.approval_request_id)?.status ?? null);
+      const approvalFor = (id: string | null) => (id === null ? undefined : approvalsById.get(id));
+      const effectiveState = (row: RefundRow | ReturnRow) =>
+        effectiveFinancialState(row.state, approvalFor(row.approval_request_id)?.status ?? null);
       const paymentBalances = projectPaymentRefundBalances(
         payments.map((payment) => ({
           id: payment.id,
@@ -673,7 +675,13 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
         returnItemRows.flatMap((line) => {
           const parent = returnRows.find((itemReturn) => itemReturn.id === line.return_id);
           return parent
-            ? [{ orderItemId: line.order_item_id, quantity: safeInteger(line.quantity), state: effectiveState(parent) }]
+            ? [
+                {
+                  orderItemId: line.order_item_id,
+                  quantity: safeInteger(line.quantity),
+                  state: effectiveState(parent),
+                },
+              ]
             : [];
         }),
       );
@@ -685,7 +693,8 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           state: effectiveState(refund),
           paymentId: refund.payment_id,
           requestedByEmployeeId: refund.created_by_employee_id,
-          approvedByEmployeeId: approvalFor(refund.approval_request_id)?.approver_employee_id ?? null,
+          approvedByEmployeeId:
+            approvalFor(refund.approval_request_id)?.approver_employee_id ?? null,
           decidedAt: approvalFor(refund.approval_request_id)?.decided_at ?? null,
           executedAt: approvalFor(refund.approval_request_id)?.executed_at ?? null,
           decisionReason: approvalFor(refund.approval_request_id)?.decision_reason ?? null,
@@ -706,7 +715,8 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           kind: 'RETURN' as const,
           state: effectiveState(orderReturn),
           requestedByEmployeeId: orderReturn.created_by_employee_id,
-          approvedByEmployeeId: approvalFor(orderReturn.approval_request_id)?.approver_employee_id ?? null,
+          approvedByEmployeeId:
+            approvalFor(orderReturn.approval_request_id)?.approver_employee_id ?? null,
           decidedAt: approvalFor(orderReturn.approval_request_id)?.decided_at ?? null,
           executedAt: approvalFor(orderReturn.approval_request_id)?.executed_at ?? null,
           decisionReason: approvalFor(orderReturn.approval_request_id)?.decision_reason ?? null,
@@ -956,9 +966,13 @@ function handleFailure(response: AdminResponse, error: unknown): void {
     return;
   }
   if (error instanceof AdminSupabaseError) {
-    const cancellationSafetyFailure = classifyPaidOrderCancellationDatabaseError(error.responseBody);
+    const cancellationSafetyFailure = classifyPaidOrderCancellationDatabaseError(
+      error.responseBody,
+    );
     if (cancellationSafetyFailure) {
-      sendJson(response, cancellationSafetyFailure.status, { error: cancellationSafetyFailure.error });
+      sendJson(response, cancellationSafetyFailure.status, {
+        error: cancellationSafetyFailure.error,
+      });
       return;
     }
     const refundPolicyFailure = classifyOrderRefundDatabaseError(error.responseBody);
@@ -1080,8 +1094,10 @@ export default async function handler(
       if (url.searchParams.get('view') === 'online-requests') {
         const rawStatus = url.searchParams.get('status');
         const status =
-          rawStatus === 'PENDING' || rawStatus === 'PROCESSING' ||
-          rawStatus === 'ACCEPTED' || rawStatus === 'REJECTED'
+          rawStatus === 'PENDING' ||
+          rawStatus === 'PROCESSING' ||
+          rawStatus === 'ACCEPTED' ||
+          rawStatus === 'REJECTED'
             ? rawStatus
             : null;
         const day = url.searchParams.get('date');
@@ -1101,20 +1117,29 @@ export default async function handler(
         const limit = Number.isSafeInteger(rawLimit) ? rawLimit : 50;
         const parseOptionalInstant = (value: string | null): string | null => {
           if (!value) return null;
-          if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value) ||
-              !Number.isFinite(Date.parse(value))) {
+          if (
+            !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value) ||
+            !Number.isFinite(Date.parse(value))
+          ) {
             throw new Error('invalid_orders_date_filter');
           }
           return value;
         };
-        sendJson(response, 200, await service.listOnlineOrderRequests({
-          shopId,
-          status,
-          from: parseOptionalInstant(from),
-          to: parseOptionalInstant(to),
-          cursor,
-          limit,
-        }, context.principal));
+        sendJson(
+          response,
+          200,
+          await service.listOnlineOrderRequests(
+            {
+              shopId,
+              status,
+              from: parseOptionalInstant(from),
+              to: parseOptionalInstant(to),
+              cursor,
+              limit,
+            },
+            context.principal,
+          ),
+        );
         return;
       }
       if (url.searchParams.get('view') === 'action-reasons') {

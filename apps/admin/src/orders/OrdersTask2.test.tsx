@@ -81,8 +81,19 @@ describe('Orders Task 2 controls', () => {
         order={{
           ...order,
           payments: [
-            { ...order.payments[0]!, remainingRefundableMinor: 4500, postedRefundMinor: 5000, pendingRefundMinor: 3000 },
-            { ...order.payments[0]!, id: '30000000-0000-4000-8000-000000000002', methodLabel: 'Nonrefundable digital', refundAllowedSnapshot: false, remainingRefundableMinor: 0 },
+            {
+              ...order.payments[0]!,
+              remainingRefundableMinor: 4500,
+              postedRefundMinor: 5000,
+              pendingRefundMinor: 3000,
+            },
+            {
+              ...order.payments[0]!,
+              id: '30000000-0000-4000-8000-000000000002',
+              methodLabel: 'Nonrefundable digital',
+              refundAllowedSnapshot: false,
+              remainingRefundableMinor: 0,
+            },
           ],
         }}
         reasons={[refundReason]}
@@ -103,7 +114,17 @@ describe('Orders Task 2 controls', () => {
     const html = renderToStaticMarkup(
       <RefundReturnPage
         mode="return"
-        order={{ ...order, items: [{ ...order.items[0]!, postedReturnQuantity: 1, pendingReturnQuantity: 0, remainingReturnableQuantity: 1 }] }}
+        order={{
+          ...order,
+          items: [
+            {
+              ...order.items[0]!,
+              postedReturnQuantity: 1,
+              pendingReturnQuantity: 0,
+              remainingReturnableQuantity: 1,
+            },
+          ],
+        }}
         reasons={[refundReason]}
         refunding={false}
         returning={false}

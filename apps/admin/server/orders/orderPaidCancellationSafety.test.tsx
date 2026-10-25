@@ -17,14 +17,18 @@ function order(paid: boolean): AdminOrderDetail {
     totalMinor: 10000,
     customer: null,
     fulfillment: null,
-    payments: paid ? [{
-      id: '33333333-3333-4333-8333-333333333333',
-      methodLabel: 'Cash',
-      logicType: 'CASH',
-      allocatedMinor: 10000,
-      receivedMinor: 10000,
-      changeMinor: 0,
-    }] : [],
+    payments: paid
+      ? [
+          {
+            id: '33333333-3333-4333-8333-333333333333',
+            methodLabel: 'Cash',
+            logicType: 'CASH',
+            allocatedMinor: 10000,
+            receivedMinor: 10000,
+            changeMinor: 0,
+          },
+        ]
+      : [],
     items: [],
     statusHistory: [],
     financialEvents: [],
@@ -34,17 +38,19 @@ function order(paid: boolean): AdminOrderDetail {
 }
 
 function render(paid: boolean) {
-  return renderToStaticMarkup(<OrderDetailPage
-    order={order(paid)}
-    canCancel
-    canRefund
-    cancelling={false}
-    refunding={false}
-    returning={false}
-    onCancel={vi.fn()}
-    onRefund={vi.fn()}
-    onReturn={vi.fn()}
-  />);
+  return renderToStaticMarkup(
+    <OrderDetailPage
+      order={order(paid)}
+      canCancel
+      canRefund
+      cancelling={false}
+      refunding={false}
+      returning={false}
+      onCancel={vi.fn()}
+      onRefund={vi.fn()}
+      onReturn={vi.fn()}
+    />,
+  );
 }
 
 describe('paid ACTIVE cancellation financial safety', () => {
@@ -60,8 +66,10 @@ describe('paid ACTIVE cancellation financial safety', () => {
   });
 
   it('maps authoritative paid cancellation refusal to a stable conflict', () => {
-    expect(classifyPaidOrderCancellationDatabaseError(
-      '{"message":"TUX_ADMIN_PAID_CANCEL_REQUIRES_SETTLEMENT"}',
-    )).toEqual({ status: 409, error: 'paid_active_cancellation_requires_settlement' });
+    expect(
+      classifyPaidOrderCancellationDatabaseError(
+        '{"message":"TUX_ADMIN_PAID_CANCEL_REQUIRES_SETTLEMENT"}',
+      ),
+    ).toEqual({ status: 409, error: 'paid_active_cancellation_requires_settlement' });
   });
 });

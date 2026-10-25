@@ -39,9 +39,10 @@ export function OrdersPage() {
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const [location, navigate] = useLocation();
   const selectedId = detailIdFromPath(location, '/orders');
-  const deepLink = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search)
-    : new URLSearchParams();
+  const deepLink =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search)
+      : new URLSearchParams();
   const [onlineView, setOnlineView] = useState(deepLink.get('view') === 'online-requests');
   const onlineDate = deepLink.get('date') ?? '';
   const initialOnlineStatus =
@@ -146,269 +147,295 @@ export function OrdersPage() {
         <span>Only orders belonging to this authorized shop are shown.</span>
       </div>
       <nav aria-label="Orders workspace views" className="admin-orders-shop-context">
-        <button type="button" className="admin-secondary-button" aria-current={!onlineView ? 'page' : undefined} onClick={() => setOnlineView(false)}>Canonical orders</button>
-        <button type="button" className="admin-secondary-button" aria-current={onlineView ? 'page' : undefined} onClick={() => setOnlineView(true)}>Online requests</button>
+        <button
+          type="button"
+          className="admin-secondary-button"
+          aria-current={!onlineView ? 'page' : undefined}
+          onClick={() => setOnlineView(false)}
+        >
+          Canonical orders
+        </button>
+        <button
+          type="button"
+          className="admin-secondary-button"
+          aria-current={onlineView ? 'page' : undefined}
+          onClick={() => setOnlineView(true)}
+        >
+          Online requests
+        </button>
       </nav>
       {onlineView ? (
-        <OnlineRequestsPanel shopId={shopId} initialStatus={initialOnlineStatus} date={/^\d{4}-\d{2}-\d{2}$/.test(onlineDate) ? onlineDate : ''} />
+        <OnlineRequestsPanel
+          shopId={shopId}
+          initialStatus={initialOnlineStatus}
+          date={/^\d{4}-\d{2}-\d{2}$/.test(onlineDate) ? onlineDate : ''}
+        />
       ) : (
         <>
-      <details
-        className="admin-orders-filters"
-        open={Boolean(query || status || source || fromInput || toInput)}
-      >
-        <summary>Search and filters</summary>
-        <section className="admin-order-task-section is-compact" aria-label="Order filters">
-          <label className="admin-field">
-            <span>Search</span>
-            <input
-              value={query}
-              placeholder="Order number, customer, phone or operator"
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
-          <label className="admin-field">
-            <span>Status</span>
-            <select
-              value={status}
-              onChange={(event) => setStatus(event.target.value as AdminOrderStatus | '')}
-            >
-              <option value="">All statuses</option>
-              <option value="ACTIVE">Active</option>
-              <option value="DONE">Done</option>
-              <option value="CANCELLED">Cancelled</option>
-              <option value="RETURNED">Returned</option>
-            </select>
-          </label>
-          <label className="admin-field">
-            <span>From date/time (Cairo)</span>
-            <input
-              type="datetime-local"
-              value={fromInput}
-              onChange={(event) => setFromInput(event.currentTarget.value)}
-            />
-          </label>
-          <label className="admin-field">
-            <span>To date/time (Cairo)</span>
-            <input
-              type="datetime-local"
-              value={toInput}
-              min={fromInput || undefined}
-              onChange={(event) => setToInput(event.currentTarget.value)}
-            />
-          </label>
-          {fromInput || toInput ? (
-            <button
-              className="admin-secondary-button"
-              type="button"
-              onClick={() => {
-                setFromInput('');
-                setToInput('');
-              }}
-            >
-              Clear date filters
-            </button>
-          ) : null}
-          <label className="admin-field">
-            <span>Source</span>
-            <select
-              value={source}
-              onChange={(event) => setSource(event.target.value as AdminOrderSource | '')}
-            >
-              <option value="">All sources</option>
-              <option value="POS">POS</option>
-              <option value="ONLINE">Online</option>
-            </select>
-          </label>
-        </section>
-      </details>
+          <details
+            className="admin-orders-filters"
+            open={Boolean(query || status || source || fromInput || toInput)}
+          >
+            <summary>Search and filters</summary>
+            <section className="admin-order-task-section is-compact" aria-label="Order filters">
+              <label className="admin-field">
+                <span>Search</span>
+                <input
+                  value={query}
+                  placeholder="Order number, customer, phone or operator"
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </label>
+              <label className="admin-field">
+                <span>Status</span>
+                <select
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value as AdminOrderStatus | '')}
+                >
+                  <option value="">All statuses</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="DONE">Done</option>
+                  <option value="CANCELLED">Cancelled</option>
+                  <option value="RETURNED">Returned</option>
+                </select>
+              </label>
+              <label className="admin-field">
+                <span>From date/time (Cairo)</span>
+                <input
+                  type="datetime-local"
+                  value={fromInput}
+                  onChange={(event) => setFromInput(event.currentTarget.value)}
+                />
+              </label>
+              <label className="admin-field">
+                <span>To date/time (Cairo)</span>
+                <input
+                  type="datetime-local"
+                  value={toInput}
+                  min={fromInput || undefined}
+                  onChange={(event) => setToInput(event.currentTarget.value)}
+                />
+              </label>
+              {fromInput || toInput ? (
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  onClick={() => {
+                    setFromInput('');
+                    setToInput('');
+                  }}
+                >
+                  Clear date filters
+                </button>
+              ) : null}
+              <label className="admin-field">
+                <span>Source</span>
+                <select
+                  value={source}
+                  onChange={(event) => setSource(event.target.value as AdminOrderSource | '')}
+                >
+                  <option value="">All sources</option>
+                  <option value="POS">POS</option>
+                  <option value="ONLINE">Online</option>
+                </select>
+              </label>
+            </section>
+          </details>
 
-      {timeRange.error ? <p role="alert">{timeRange.error}</p> : null}
-      {actionError ? <p role="alert">{actionError}</p> : null}
+          {timeRange.error ? <p role="alert">{timeRange.error}</p> : null}
+          {actionError ? <p role="alert">{actionError}</p> : null}
 
-      <ResponsiveMasterDetail
-        listLabel="Orders"
-        detailLabel="Order detail"
-        detailActive={selectedId !== null}
-        backHref="/orders"
-        list={
-          <div className="admin-orders-list">
-            {ordersApi.searchQuery.isLoading ? <LoadingState title="Loading orders" /> : null}
-            {ordersApi.searchQuery.isError ? (
-              <ErrorState
-                title="Orders could not be loaded"
-                action={
+          <ResponsiveMasterDetail
+            listLabel="Orders"
+            detailLabel="Order detail"
+            detailActive={selectedId !== null}
+            backHref="/orders"
+            list={
+              <div className="admin-orders-list">
+                {ordersApi.searchQuery.isLoading ? <LoadingState title="Loading orders" /> : null}
+                {ordersApi.searchQuery.isError ? (
+                  <ErrorState
+                    title="Orders could not be loaded"
+                    action={
+                      <button
+                        className="admin-secondary-button"
+                        type="button"
+                        onClick={() => void ordersApi.searchQuery.refetch()}
+                      >
+                        Retry
+                      </button>
+                    }
+                  />
+                ) : null}
+                {rows.length === 0 &&
+                !ordersApi.searchQuery.isLoading &&
+                !ordersApi.searchQuery.isError &&
+                !timeRange.error ? (
+                  <EmptyState
+                    title={
+                      hasActiveFilters
+                        ? 'No orders match these filters'
+                        : 'No orders in this shop yet'
+                    }
+                    description={
+                      hasActiveFilters
+                        ? `No results in ${shopName}. Clear the filters to return to its complete order history.`
+                        : `No order history exists for ${shopName} yet. New orders will appear here. To review another shop, use the Shop selector above.`
+                    }
+                    action={
+                      hasActiveFilters ? (
+                        <button
+                          type="button"
+                          className="admin-secondary-button"
+                          onClick={clearFilters}
+                        >
+                          Clear order filters
+                        </button>
+                      ) : undefined
+                    }
+                  />
+                ) : null}
+                {rows.map((row) => (
+                  <button
+                    className={
+                      row.id === selectedId ? 'admin-order-row is-selected' : 'admin-order-row'
+                    }
+                    aria-current={row.id === selectedId ? 'true' : undefined}
+                    key={row.id}
+                    type="button"
+                    onClick={() => {
+                      navigate(detailPath('/orders', row.id));
+                      setAction(null);
+                    }}
+                  >
+                    <span className="admin-order-row__identity">
+                      <strong>{row.displayOrderLabel ?? `#${row.displayOrderNo}`}</strong>
+                      <small>{row.customerName ?? row.normalizedPhone ?? 'Walk-in'}</small>
+                      <small>
+                        {row.orderTypeLabel} · {orderSourceLabel(row.source)}
+                      </small>
+                    </span>
+                    <span className="admin-order-row__summary">
+                      <b className="admin-order-row__amount">{formatEgp(row.totalMinor)}</b>
+                      <span className="admin-order-row__status">
+                        {orderStatusLabel(row.status)}
+                      </span>
+                      <time dateTime={row.createdAt}>
+                        {new Intl.DateTimeFormat('en-EG', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                          timeZone: 'Africa/Cairo',
+                        }).format(new Date(row.createdAt))}
+                      </time>
+                    </span>
+                  </button>
+                ))}
+                {ordersApi.searchQuery.hasNextPage ? (
                   <button
                     className="admin-secondary-button"
                     type="button"
-                    onClick={() => void ordersApi.searchQuery.refetch()}
+                    disabled={ordersApi.searchQuery.isFetchingNextPage}
+                    onClick={() => void ordersApi.searchQuery.fetchNextPage()}
                   >
-                    Retry
+                    {ordersApi.searchQuery.isFetchingNextPage ? 'Loading…' : 'Load more'}
                   </button>
-                }
-              />
-            ) : null}
-            {rows.length === 0 &&
-            !ordersApi.searchQuery.isLoading &&
-            !ordersApi.searchQuery.isError &&
-            !timeRange.error ? (
-              <EmptyState
-                title={
-                  hasActiveFilters ? 'No orders match these filters' : 'No orders in this shop yet'
-                }
-                description={
-                  hasActiveFilters
-                    ? `No results in ${shopName}. Clear the filters to return to its complete order history.`
-                    : `No order history exists for ${shopName} yet. New orders will appear here. To review another shop, use the Shop selector above.`
-                }
-                action={
-                  hasActiveFilters ? (
-                    <button type="button" className="admin-secondary-button" onClick={clearFilters}>
-                      Clear order filters
+                ) : null}
+              </div>
+            }
+            detail={
+              ordersApi.detailQuery.isLoading ? (
+                <LoadingState title="Loading order detail" />
+              ) : ordersApi.detailQuery.isError ? (
+                <ErrorState
+                  title="Order unavailable"
+                  description={`This order may not exist or may not be accessible in ${shopName}. Return to the current shop's orders.`}
+                  action={
+                    <button
+                      className="admin-secondary-button"
+                      type="button"
+                      onClick={() => navigate('/orders')}
+                    >
+                      Back to shop orders
                     </button>
-                  ) : undefined
-                }
-              />
-            ) : null}
-            {rows.map((row) => (
-              <button
-                className={
-                  row.id === selectedId ? 'admin-order-row is-selected' : 'admin-order-row'
-                }
-                aria-current={row.id === selectedId ? 'true' : undefined}
-                key={row.id}
-                type="button"
-                onClick={() => {
-                  navigate(detailPath('/orders', row.id));
-                  setAction(null);
-                }}
-              >
-                <span className="admin-order-row__identity">
-                  <strong>{row.displayOrderLabel ?? `#${row.displayOrderNo}`}</strong>
-                  <small>{row.customerName ?? row.normalizedPhone ?? 'Walk-in'}</small>
-                  <small>
-                    {row.orderTypeLabel} · {orderSourceLabel(row.source)}
-                  </small>
-                </span>
-                <span className="admin-order-row__summary">
-                  <b className="admin-order-row__amount">{formatEgp(row.totalMinor)}</b>
-                  <span className="admin-order-row__status">{orderStatusLabel(row.status)}</span>
-                  <time dateTime={row.createdAt}>
-                    {new Intl.DateTimeFormat('en-EG', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                      timeZone: 'Africa/Cairo',
-                    }).format(new Date(row.createdAt))}
-                  </time>
-                </span>
-              </button>
-            ))}
-            {ordersApi.searchQuery.hasNextPage ? (
-              <button
-                className="admin-secondary-button"
-                type="button"
-                disabled={ordersApi.searchQuery.isFetchingNextPage}
-                onClick={() => void ordersApi.searchQuery.fetchNextPage()}
-              >
-                {ordersApi.searchQuery.isFetchingNextPage ? 'Loading…' : 'Load more'}
-              </button>
-            ) : null}
-          </div>
-        }
-        detail={
-          ordersApi.detailQuery.isLoading ? (
-            <LoadingState title="Loading order detail" />
-          ) : ordersApi.detailQuery.isError ? (
-            <ErrorState
-              title="Order unavailable"
-              description={`This order may not exist or may not be accessible in ${shopName}. Return to the current shop's orders.`}
-              action={
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  onClick={() => navigate('/orders')}
-                >
-                  Back to shop orders
-                </button>
-              }
-            />
-          ) : detail ? (
-            <>
-              <OrderDetailPage
-                order={detail}
-                canCancel={canCancel}
-                canRefund={canRefund}
-                cancelling={ordersApi.cancelOrder.isPending}
-                refunding={ordersApi.refundOrder.isPending}
-                returning={ordersApi.returnOrderItems.isPending}
-                onCancel={() => setAction('cancel')}
-                onRefund={() => setAction('refund')}
-                onReturn={() => setAction('return')}
-              />
-              {action === 'cancel' ? (
-                <CancelOrderSheet
-                  order={detail}
-                  reasons={cancellationReasons}
-                  pending={ordersApi.cancelOrder.isPending}
-                  onCancel={() => setAction(null)}
-                  onSubmit={(input) =>
-                    ordersApi.cancelOrder.mutate(
-                      {
-                        orderId: detail.id,
-                        expectedOperationalRevision: detail.operationalRevision,
-                        ...input,
-                      },
-                      { onSuccess: () => setAction(null) },
-                    )
                   }
                 />
-              ) : null}
-              {action === 'refund' || action === 'return' ? (
-                <RefundReturnPage
-                  mode={action}
-                  order={detail}
-                  reasons={refundReasons}
-                  refunding={ordersApi.refundOrder.isPending}
-                  returning={ordersApi.returnOrderItems.isPending}
-                  onCancel={() => setAction(null)}
-                  onRefund={(input) =>
-                    ordersApi.refundOrder.mutate(
-                      { orderId: detail.id, ...input },
-                      { onSuccess: () => setAction(null) },
-                    )
-                  }
-                  onReturn={(input) =>
-                    ordersApi.returnOrderItems.mutate(
-                      { orderId: detail.id, ...input },
-                      { onSuccess: () => setAction(null) },
-                    )
+              ) : detail ? (
+                <>
+                  <OrderDetailPage
+                    order={detail}
+                    canCancel={canCancel}
+                    canRefund={canRefund}
+                    cancelling={ordersApi.cancelOrder.isPending}
+                    refunding={ordersApi.refundOrder.isPending}
+                    returning={ordersApi.returnOrderItems.isPending}
+                    onCancel={() => setAction('cancel')}
+                    onRefund={() => setAction('refund')}
+                    onReturn={() => setAction('return')}
+                  />
+                  {action === 'cancel' ? (
+                    <CancelOrderSheet
+                      order={detail}
+                      reasons={cancellationReasons}
+                      pending={ordersApi.cancelOrder.isPending}
+                      onCancel={() => setAction(null)}
+                      onSubmit={(input) =>
+                        ordersApi.cancelOrder.mutate(
+                          {
+                            orderId: detail.id,
+                            expectedOperationalRevision: detail.operationalRevision,
+                            ...input,
+                          },
+                          { onSuccess: () => setAction(null) },
+                        )
+                      }
+                    />
+                  ) : null}
+                  {action === 'refund' || action === 'return' ? (
+                    <RefundReturnPage
+                      mode={action}
+                      order={detail}
+                      reasons={refundReasons}
+                      refunding={ordersApi.refundOrder.isPending}
+                      returning={ordersApi.returnOrderItems.isPending}
+                      onCancel={() => setAction(null)}
+                      onRefund={(input) =>
+                        ordersApi.refundOrder.mutate(
+                          { orderId: detail.id, ...input },
+                          { onSuccess: () => setAction(null) },
+                        )
+                      }
+                      onReturn={(input) =>
+                        ordersApi.returnOrderItems.mutate(
+                          { orderId: detail.id, ...input },
+                          { onSuccess: () => setAction(null) },
+                        )
+                      }
+                    />
+                  ) : null}
+                </>
+              ) : (
+                <EmptyState
+                  title="Order unavailable in this shop"
+                  description={`This order is not available in ${shopName}. Open an order from the current shop's history instead.`}
+                  action={
+                    <button
+                      className="admin-secondary-button"
+                      type="button"
+                      onClick={() => navigate('/orders')}
+                    >
+                      Back to shop orders
+                    </button>
                   }
                 />
-              ) : null}
-            </>
-          ) : (
-            <EmptyState
-              title="Order unavailable in this shop"
-              description={`This order is not available in ${shopName}. Open an order from the current shop's history instead.`}
-              action={
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  onClick={() => navigate('/orders')}
-                >
-                  Back to shop orders
-                </button>
-              }
-            />
-          )
-        }
-        emptyDetail={
-          <EmptyState
-            title="Select an order"
-            description="Review payment, customer, delivery, inventory status and order history."
+              )
+            }
+            emptyDetail={
+              <EmptyState
+                title="Select an order"
+                description="Review payment, customer, delivery, inventory status and order history."
+              />
+            }
           />
-        }
-      />
         </>
       )}
     </PageScaffold>

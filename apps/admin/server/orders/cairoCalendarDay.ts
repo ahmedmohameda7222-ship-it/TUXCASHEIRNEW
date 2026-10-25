@@ -25,9 +25,7 @@ function firstUtcInstantForCairoDay(day: string): number {
   return lower;
 }
 
-export function cairoCalendarDayRange(
-  day: string,
-): { from: string; to: string } | null {
+export function cairoCalendarDayRange(day: string): { from: string; to: string } | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
   const instant = Date.parse(`${day}T00:00:00.000Z`);
   if (!Number.isFinite(instant) || new Date(instant).toISOString().slice(0, 10) !== day) {

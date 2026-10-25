@@ -42,15 +42,19 @@ export function OrderDetailPage({
   onRefund(): void;
   onReturn(): void;
 }) {
-  const recordedPaymentMinor = order.payments.reduce((sum, payment) => sum + payment.allocatedMinor, 0);
+  const recordedPaymentMinor = order.payments.reduce(
+    (sum, payment) => sum + payment.allocatedMinor,
+    0,
+  );
   const hasRecordedPayment = recordedPaymentMinor > 0;
   const postedRefundMinor = order.financialEvents
     .filter((event) => event.kind === 'REFUND' && event.state === 'POSTED')
     .reduce((sum, event) => sum + event.amountMinor, 0);
   const pendingRefundMinor = order.financialEvents
-    .filter((event) =>
-      event.kind === 'REFUND' &&
-      ['PENDING_APPROVAL', 'APPROVED', 'EXECUTING'].includes(event.state),
+    .filter(
+      (event) =>
+        event.kind === 'REFUND' &&
+        ['PENDING_APPROVAL', 'APPROVED', 'EXECUTING'].includes(event.state),
     )
     .reduce((sum, event) => sum + event.amountMinor, 0);
   const postedReturnValuationMinor = order.financialEvents
@@ -79,7 +83,9 @@ export function OrderDetailPage({
       <section className="admin-order-detail__card" aria-label="Order identity">
         <h3>Order identity</h3>
         <p>Business day: {order.businessDayId ?? 'Not available'}</p>
-        <p>Unique order reference: <code>{order.id}</code></p>
+        <p>
+          Unique order reference: <code>{order.id}</code>
+        </p>
         {order.operatorName ? <p>Operator: {order.operatorName}</p> : null}
         <p>
           Created:{' '}
@@ -88,7 +94,8 @@ export function OrderDetailPage({
               dateStyle: 'medium',
               timeStyle: 'short',
               timeZone: 'Africa/Cairo',
-            }).format(new Date(order.createdAt))} (Cairo)
+            }).format(new Date(order.createdAt))}{' '}
+            (Cairo)
           </time>
         </p>
       </section>
@@ -171,17 +178,29 @@ export function OrderDetailPage({
         <h3>Order financial breakdown</h3>
         <dl>
           <dt>Items subtotal</dt>
-          <dd>{order.itemsSubtotalMinor === undefined ? 'Not available' : money(order.itemsSubtotalMinor)}</dd>
+          <dd>
+            {order.itemsSubtotalMinor === undefined
+              ? 'Not available'
+              : money(order.itemsSubtotalMinor)}
+          </dd>
           <dt>Discount</dt>
-          <dd>{order.discountMinor === undefined ? 'Not available' : money(order.discountMinor)}</dd>
+          <dd>
+            {order.discountMinor === undefined ? 'Not available' : money(order.discountMinor)}
+          </dd>
           <dt>Delivery fee</dt>
           <dd>{money(order.fulfillment?.finalDeliveryFeeMinor ?? 0)}</dd>
           <dt>Service charge</dt>
-          <dd>{order.serviceChargeMinor === undefined ? 'Not available' : money(order.serviceChargeMinor)}</dd>
+          <dd>
+            {order.serviceChargeMinor === undefined
+              ? 'Not available'
+              : money(order.serviceChargeMinor)}
+          </dd>
           <dt>Tax</dt>
           <dd>{order.taxMinor === undefined ? 'Not available' : money(order.taxMinor)}</dd>
           <dt>Grand total</dt>
-          <dd><strong>{money(order.totalMinor)}</strong></dd>
+          <dd>
+            <strong>{money(order.totalMinor)}</strong>
+          </dd>
           <dt>Allocated payments</dt>
           <dd>{money(recordedPaymentMinor)}</dd>
           <dt>Posted refunds</dt>
@@ -196,9 +215,9 @@ export function OrderDetailPage({
           <dd>{money(outstandingSettlementMinor)}</dd>
         </dl>
         <small>
-          Figures are calculated from recorded order snapshots and financial adjustments.
-          Payment allocation does not prove external collection, and a posted accounting
-          refund does not prove a completed external payout. Return valuation is not a refund.
+          Figures are calculated from recorded order snapshots and financial adjustments. Payment
+          allocation does not prove external collection, and a posted accounting refund does not
+          prove a completed external payout. Return valuation is not a refund.
         </small>
       </section>
 
@@ -213,9 +232,14 @@ export function OrderDetailPage({
                 <span>
                   {payment.methodLabel}
                   {payment.receivedMinor !== null ? (
-                    <small>Cash received {money(payment.receivedMinor)} · change {money(payment.changeMinor ?? 0)}</small>
+                    <small>
+                      Cash received {money(payment.receivedMinor)} · change{' '}
+                      {money(payment.changeMinor ?? 0)}
+                    </small>
                   ) : null}
-                  {payment.refundAllowedSnapshot === false ? <small>Nonrefundable method</small> : null}
+                  {payment.refundAllowedSnapshot === false ? (
+                    <small>Nonrefundable method</small>
+                  ) : null}
                 </span>
                 <strong>{money(payment.allocatedMinor)}</strong>
               </li>
@@ -238,14 +262,51 @@ export function OrderDetailPage({
                     {friendly(event.state)} · {event.reason.label}
                   </small>
                   {event.note ? <small>{event.note}</small> : null}
-                  <small>Requested: {new Intl.DateTimeFormat('en-EG', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Cairo' }).format(new Date(event.createdAt))}</small>
-                  {event.requestedByEmployeeId ? <small>Requester: {event.requestedByEmployeeId}</small> : null}
-                  {event.approvedByEmployeeId ? <small>Approver: {event.approvedByEmployeeId}</small> : null}
-                  {event.decidedAt ? <small>Decision: {new Intl.DateTimeFormat('en-EG', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Cairo' }).format(new Date(event.decidedAt))}</small> : null}
-                  {event.executedAt ? <small>Execution: {new Intl.DateTimeFormat('en-EG', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Cairo' }).format(new Date(event.executedAt))}</small> : null}
-                  {event.decisionReason ? <small>Decision reason: {event.decisionReason}</small> : null}
-                  {event.approvalRequestId ? <small>Approval reference: {event.approvalRequestId}</small> : null}
-                  <small>{event.kind === 'RETURN' ? 'Return valuation; no payment refund implied' : 'Refund record; external payout not confirmed'}</small>
+                  <small>
+                    Requested:{' '}
+                    {new Intl.DateTimeFormat('en-EG', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                      timeZone: 'Africa/Cairo',
+                    }).format(new Date(event.createdAt))}
+                  </small>
+                  {event.requestedByEmployeeId ? (
+                    <small>Requester: {event.requestedByEmployeeId}</small>
+                  ) : null}
+                  {event.approvedByEmployeeId ? (
+                    <small>Approver: {event.approvedByEmployeeId}</small>
+                  ) : null}
+                  {event.decidedAt ? (
+                    <small>
+                      Decision:{' '}
+                      {new Intl.DateTimeFormat('en-EG', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                        timeZone: 'Africa/Cairo',
+                      }).format(new Date(event.decidedAt))}
+                    </small>
+                  ) : null}
+                  {event.executedAt ? (
+                    <small>
+                      Execution:{' '}
+                      {new Intl.DateTimeFormat('en-EG', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                        timeZone: 'Africa/Cairo',
+                      }).format(new Date(event.executedAt))}
+                    </small>
+                  ) : null}
+                  {event.decisionReason ? (
+                    <small>Decision reason: {event.decisionReason}</small>
+                  ) : null}
+                  {event.approvalRequestId ? (
+                    <small>Approval reference: {event.approvalRequestId}</small>
+                  ) : null}
+                  <small>
+                    {event.kind === 'RETURN'
+                      ? 'Return valuation; no payment refund implied'
+                      : 'Refund record; external payout not confirmed'}
+                  </small>
                 </span>
                 <strong>{money(event.amountMinor)}</strong>
               </li>
@@ -307,10 +368,21 @@ export function OrderDetailPage({
       </section>
 
       {order.status === 'ACTIVE' && hasRecordedPayment ? (
-        <section className="admin-order-detail__card" role="status" aria-label="Paid active order cancellation restriction">
+        <section
+          className="admin-order-detail__card"
+          role="status"
+          aria-label="Paid active order cancellation restriction"
+        >
           <h3>Paid active order</h3>
-          <p>Recorded payments: {money(recordedPaymentMinor)}. Admin cancellation is blocked until an authorized financial settlement policy is available.</p>
-          <p>Keep the order active or complete the existing Operations lifecycle and use the authorized refund workflow when eligible. Nonrefundable payment methods require an explicit finance resolution. A ledger adjustment does not confirm an external refund.</p>
+          <p>
+            Recorded payments: {money(recordedPaymentMinor)}. Admin cancellation is blocked until an
+            authorized financial settlement policy is available.
+          </p>
+          <p>
+            Keep the order active or complete the existing Operations lifecycle and use the
+            authorized refund workflow when eligible. Nonrefundable payment methods require an
+            explicit finance resolution. A ledger adjustment does not confirm an external refund.
+          </p>
         </section>
       ) : null}
 

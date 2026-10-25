@@ -154,12 +154,14 @@ describe('OrderDetailPage', () => {
   it('uses immutable modifier snapshots in the complete line total for multiple items', () => {
     const html = render({
       ...fixture,
-      items: [{
-        ...fixture.items[0]!,
-        quantity: 2,
-        unitPriceMinor: 11000,
-        modifiers: [{ id: null, label: 'Extra cheese', quantity: 2, unitPriceMinor: 500 }],
-      }],
+      items: [
+        {
+          ...fixture.items[0]!,
+          quantity: 2,
+          unitPriceMinor: 11000,
+          modifiers: [{ id: null, label: 'Extra cheese', quantity: 2, unitPriceMinor: 500 }],
+        },
+      ],
     });
     expect(html).toContain('Base unit');
     expect(html).toContain('Modifier extras');

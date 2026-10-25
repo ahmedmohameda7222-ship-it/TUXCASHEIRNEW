@@ -76,14 +76,14 @@ export function CancelOrderSheet({
           <p>Pending refund requests: {money(pendingRefundMinor)}</p>
           <p>Remaining refundable amount: {money(remainingRefundableMinor)}</p>
           <p>
-            Inventory: unpaid cancellation releases eligible active reservations; consumed stock
-            is not automatically restocked.
+            Inventory: unpaid cancellation releases eligible active reservations; consumed stock is
+            not automatically restocked.
           </p>
           {paidActiveOrder ? (
             <p role="alert">
-              You cannot cancel an ACTIVE order with recorded payments. This action does not
-              refund the customer. Request authorized financial settlement before any lifecycle
-              correction; refunds and external payment reversals must be confirmed separately.
+              You cannot cancel an ACTIVE order with recorded payments. This action does not refund
+              the customer. Request authorized financial settlement before any lifecycle correction;
+              refunds and external payment reversals must be confirmed separately.
             </p>
           ) : (
             <p>

@@ -20,9 +20,7 @@ describe('order date/time filtering', () => {
   it('permits independent bounds while rejecting reversed ranges', () => {
     expect(toOrderTimeRange('', '').from).toBeNull();
     expect(toOrderTimeRange('', '2026-10-12T12:15').to).not.toBeNull();
-    expect(toOrderTimeRange('2026-10-13T08:30', '2026-10-12T12:15').error).toMatch(
-      /before/i,
-    );
+    expect(toOrderTimeRange('2026-10-13T08:30', '2026-10-12T12:15').error).toMatch(/before/i);
     expect(toOrderTimeRange('not-a-date', '').error).toMatch(/date/i);
   });
 

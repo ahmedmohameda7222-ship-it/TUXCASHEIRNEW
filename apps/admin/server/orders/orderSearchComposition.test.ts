@@ -22,7 +22,16 @@ describe('Orders cursor/search query composition', () => {
       JSON.stringify(['2026-10-24T14:30:00.000Z', '44444444-4444-4444-8444-444444444444']),
       'utf8',
     ).toString('base64url');
-    await store.searchOrders({ businessId, shopId, employeeId, cursor, query: 'Mona', statuses: ['DONE'], source: 'POS', limit: 25 });
+    await store.searchOrders({
+      businessId,
+      shopId,
+      employeeId,
+      cursor,
+      query: 'Mona',
+      statuses: ['DONE'],
+      source: 'POS',
+      limit: 25,
+    });
 
     const calls = select.mock.calls as unknown as Array<[string, URLSearchParams]>;
     const query = calls.find(([table]) => table === 'orders')?.[1];

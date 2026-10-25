@@ -29,7 +29,9 @@ describe('P1 paid ACTIVE cancellation financial safety', () => {
     const sql = migration();
     expect(sql).toContain('security definer');
     expect(sql).toContain('set search_path = pg_catalog, public, private');
-    expect(sql).toContain('revoke all on function private.reject_paid_active_admin_cancellation_v1');
+    expect(sql).toContain(
+      'revoke all on function private.reject_paid_active_admin_cancellation_v1',
+    );
     expect(sql).toContain('from public, anon, authenticated, service_role');
   });
 

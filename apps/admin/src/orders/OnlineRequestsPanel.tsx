@@ -83,9 +83,7 @@ export function OnlineRequestsPanel({
           }
         />
       ) : null}
-      {mismatchedShop ? (
-        <p role="alert">Request shop mismatch. Results withheld.</p>
-      ) : null}
+      {mismatchedShop ? <p role="alert">Request shop mismatch. Results withheld.</p> : null}
       {!requests.isLoading && !requests.isError && pages.length > 0 && rows.length === 0 ? (
         <EmptyState
           title="No matching online requests"
@@ -113,9 +111,7 @@ export function OnlineRequestsPanel({
                 <summary>Submitted items</summary>
                 <pre>{JSON.stringify(request.trustedItems, null, 2)}</pre>
               </details>
-              <p>
-                Requested item subtotal: {(request.itemsSubtotalMinor / 100).toFixed(2)} EGP
-              </p>
+              <p>Requested item subtotal: {(request.itemsSubtotalMinor / 100).toFixed(2)} EGP</p>
               {request.acceptedOrderId ? (
                 <Link href={`/orders/${request.acceptedOrderId}`}>Open canonical order</Link>
               ) : null}

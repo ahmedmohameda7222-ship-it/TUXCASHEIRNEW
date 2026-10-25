@@ -39,9 +39,12 @@ describe('Orders financial projections', () => {
   });
 
   it('returns zero available capacity for nonrefundable methods', () => {
-    expect(projectPaymentRefundBalances(
-      [{ id: 'p1', allocatedMinor: 10000, refundAllowedSnapshot: false }], [],
-    ).get('p1')?.remainingRefundableMinor).toBe(0);
+    expect(
+      projectPaymentRefundBalances(
+        [{ id: 'p1', allocatedMinor: 10000, refundAllowedSnapshot: false }],
+        [],
+      ).get('p1')?.remainingRefundableMinor,
+    ).toBe(0);
   });
 
   it('subtracts posted and pending return item quantities and releases rejected requests', () => {
