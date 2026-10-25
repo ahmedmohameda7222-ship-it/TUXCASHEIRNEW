@@ -457,6 +457,50 @@ export function InventoryPage() {
             })
           }
         />
+      ) : mode === 'stocktake-history' && canStocktake ? (
+        <section className="admin-inventory-workflow" aria-labelledby="stocktake-history-title">
+          <div className="admin-inventory-workflow__header">
+            <div>
+              <p className="admin-page__eyebrow">After-shift physical counts</p>
+              <h2 id="stocktake-history-title">Stock count history</h2>
+            </div>
+            <button className="admin-secondary-button" type="button"
+              onClick={() => setMode('detail')}>Back to inventory</button>
+          </div>
+          {inventory.stocktakeSessionsQuery.isError ? (
+            <p role="alert">Could not verify persisted count history. No changes were made.</p>
+          ) : inventory.stocktakeSessionsQuery.isLoading ? (
+            <p role="status">Loading authoritative count history…</p>
+          ) : inventory.stocktakeSessionsQuery.data?.sessions.length ? (
+            <div className="admin-inventory-transfer-list">
+              {inventory.stocktakeSessionsQuery.data.sessions.map((session) => (
+                <article className="admin-inventory-transfer-row" key={session.stocktakeId}>
+                  <div>
+                    <strong>{session.status} · {session.lines.length} items</strong>
+                    <small>Started {new Date(session.startedAt).toLocaleString('en-GB')}</small>
+                    {session.stale ? <span role="status">Stale snapshot — reconcile before a new count</span> : null}
+                    {session.postedAt ? <small>Posted {new Date(session.postedAt).toLocaleString('en-GB')}</small> : null}
+                    {session.cancelledAt ? <small>Cancelled {new Date(session.cancelledAt).toLocaleString('en-GB')}</small> : null}
+                  </div>
+                  {session.status === 'DRAFT' ? (
+                    <div className="admin-inventory-page-actions">
+                      <button className="admin-secondary-button" type="button"
+                        onClick={() => resumeStocktake(session)}>Resume draft</button>
+                      <button className="admin-secondary-button" type="button"
+                        disabled={inventory.cancelStocktakeDraft.isPending}
+                        onClick={() => {
+                          if (!window.confirm('Cancel this saved physical count without altering inventory?')) return;
+                          inventory.cancelStocktakeDraft.mutate(session.stocktakeId);
+                        }}>Cancel draft</button>
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="admin-inventory-muted">No recorded stock counts for this shop.</p>
+          )}
+        </section>
       ) : mode === 'stocktake-select' ? (
         <section
           className="admin-inventory-workflow"
@@ -528,15 +572,40 @@ export function InventoryPage() {
         />
       ) : mode === 'stocktake' && stocktakeSnapshot ? (
         <StocktakePage
+          key={stocktakeSnapshot.stocktakeId}
           items={items}
           snapshot={stocktakeSnapshot}
+          initialActualByItem={stocktakeSavedValues}
+          stale={stocktakeStale}
+          saving={inventory.saveStocktakeDraft.isPending}
           pending={inventory.postStocktake.isPending || !stocktakeAllowed}
           onBack={() => {
             setStocktakeSnapshot(null);
             setMode('detail');
           }}
+          onSaveDraft={(lines, onSaved) => {
+            if (!stocktakeAllowed || stocktakeStale) return;
+            inventory.saveStocktakeDraft.mutate({
+              stocktakeId: stocktakeSnapshot.stocktakeId,
+              expectedRevision: stocktakeRevision,
+              lines,
+            }, {
+              onSuccess: (result) => {
+                if (result.draftRevision !== undefined) setStocktakeRevision(result.draftRevision);
+                onSaved();
+              },
+            });
+          }}
+          onCancelDraft={() => inventory.cancelStocktakeDraft.mutate(
+            stocktakeSnapshot.stocktakeId, {
+              onSuccess: () => {
+                setStocktakeSnapshot(null);
+                setMode('detail');
+              },
+            },
+          )}
           onSubmit={(lines) => {
-            if (!stocktakeAllowed) return;
+            if (!stocktakeAllowed || stocktakeStale) return;
             inventory.postStocktake.mutate(
               { stocktakeId: stocktakeSnapshot.stocktakeId, lines },
               {
