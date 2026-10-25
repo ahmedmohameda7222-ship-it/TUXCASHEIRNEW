@@ -49,18 +49,21 @@
     align-self: center;
   }
 
-  /* All five inspector tabs must remain visible, without a sideways scroll. */
+  /* Fit every tab into the visible inspector, even on 360px phones. */
   .admin-purchasing-inspector-tabs {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 0;
-    overflow-x: visible;
+    overflow: hidden;
   }
 
   .admin-purchasing-inspector-tabs button {
-    flex: 1 1 0;
     min-width: 0;
-    padding: 10px 3px;
-    font-size: 11px;
-    white-space: nowrap;
+    padding: 10px 2px;
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 
