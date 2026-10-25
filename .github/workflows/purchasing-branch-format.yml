@@ -1,0 +1,43 @@
+name: Purchasing branch formatter
+
+on:
+  push:
+    branches:
+      - fix/purchasing-approved-ui-production-20261025
+    paths:
+      - 'apps/admin/src/purchasing/**'
+      - '.github/workflows/purchasing-branch-format.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: purchasing-formatter-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Format Purchasing-owned files only
+        run: npx prettier --write 'apps/admin/src/purchasing/*.{ts,tsx,css}'
+      - name: Commit formatting only to the isolated Purchasing branch
+        run: |
+          if git diff --quiet -- apps/admin/src/purchasing; then exit 0; fi
+          test "$(git branch --show-current)" = 'fix/purchasing-approved-ui-production-20261025'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- apps/admin/src/purchasing
+          git commit -m 'style(purchasing): apply repository Prettier formatting'
+          git push origin HEAD:fix/purchasing-approved-ui-production-20261025
