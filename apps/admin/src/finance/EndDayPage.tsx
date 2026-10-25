@@ -115,7 +115,10 @@ export function EndDayPage() {
       title="X Report / Financial End Day"
       description="X is always read-only. Operations closes the Business Day; Admin only reconciles and finalizes financial Z afterward."
     >
-      <FinanceSectionNav active="end-day" />
+      <FinanceSectionNav
+        active="end-day"
+        canReconcile={principal.permissions.includes('finance.reconcile')}
+      />
       <nav className="tux-finance-endday-tasks" aria-label="End day workflow">
         <a
           href="#end-day-x-report"
