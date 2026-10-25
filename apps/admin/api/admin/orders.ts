@@ -330,23 +330,35 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
   return {
     async listOnlineOrderRequests(input): Promise<AdminOnlineOrderRequestsResult> {
       await assertBusinessShop(client, input.businessId, input.shopId);
+      const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
+      const cursor = decodeCursor(input.cursor ?? null);
+      if (input.cursor && !cursor) throw new Error('invalid_online_request_cursor');
       const query = new URLSearchParams({
         select:
           'id,shop_id,status,customer_name,normalized_phone,fulfillment_preference,payment_preference,trusted_items,items_subtotal_minor,created_at,resolved_at,accepted_order_id,rejection_reason,source_fingerprint,catalog_revision',
         shop_id: `eq.${input.shopId}`,
-        order: input.status === 'REJECTED'
-          ? 'resolved_at.desc.nullslast,id.desc'
-          : 'created_at.desc,id.desc',
-        limit: '100',
+        // Stable keyset pagination uses the immutable submission timestamp.
+        // REJECTED date filtering below still uses resolved_at.
+        order: 'created_at.desc,id.desc',
+        limit: String(limit + 1),
       });
       if (input.status) query.set('status', `eq.${input.status}`);
       const dateColumn = input.status === 'REJECTED' ? 'resolved_at' : 'created_at';
       if (input.from) query.append(dateColumn, `gte.${input.from}`);
       if (input.to) query.append(dateColumn, `lte.${input.to}`);
+      if (cursor) {
+        query.set(
+          'or',
+          `(created_at.lt.${cursor[0]},and(created_at.eq.${cursor[0]},id.lt.${cursor[1]}))`,
+        );
+      }
       const rows = await client.select<OnlineRequestRow[]>('online_order_requests', query);
+      const visible = rows.slice(0, limit);
+      const last = rows.length > limit ? (visible.at(-1) ?? null) : null;
       return {
         shopId: input.shopId,
-        rows: rows.map((row) => ({
+        nextCursor: last ? encodeCursor(last) : null,
+        rows: visible.map((row) => ({
           id: row.id,
           shopId: row.shop_id,
           status: row.status,
@@ -1080,6 +1092,13 @@ export default async function handler(
         }
         const from = dateRange?.from ?? url.searchParams.get('from');
         const to = dateRange?.to ?? url.searchParams.get('to');
+        const cursor = url.searchParams.get('cursor');
+        if (cursor && !decodeCursor(cursor)) {
+          sendJson(response, 400, { error: 'invalid_online_request_cursor' });
+          return;
+        }
+        const rawLimit = Number(url.searchParams.get('limit') ?? '50');
+        const limit = Number.isSafeInteger(rawLimit) ? rawLimit : 50;
         const parseOptionalInstant = (value: string | null): string | null => {
           if (!value) return null;
           if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value) ||
@@ -1093,6 +1112,8 @@ export default async function handler(
           status,
           from: parseOptionalInstant(from),
           to: parseOptionalInstant(to),
+          cursor,
+          limit,
         }, context.principal));
         return;
       }
