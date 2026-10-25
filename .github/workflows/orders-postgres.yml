@@ -76,6 +76,7 @@ jobs:
           for size in 1536x960 1440x900 1024x900 768x1024 390x844 360x800; do
             test -s "artifacts/p04-p07/orders-${size}.png"
           done
+          test -s artifacts/p04-p07/orders-reference-1536x1024.png
       - name: Preserve rendered evidence
         if: always()
         uses: actions/upload-artifact@v4
