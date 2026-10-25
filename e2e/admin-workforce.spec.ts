@@ -241,6 +241,7 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     await page.goto('/staff');
 
     await expect(page.getByRole('button', { name: 'Add employee' })).toBeVisible();
+    await capturePremiumScreenshot(page, 'workforce-list');
     await selectEmployee(page, 'Mona Ali');
     await expect(page.getByRole('tablist', { name: 'Employee detail sections' })).toBeVisible();
     await page.getByRole('tab', { name: 'Schedule' }).click();
