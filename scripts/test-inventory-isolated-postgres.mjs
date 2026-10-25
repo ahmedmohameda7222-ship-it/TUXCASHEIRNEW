@@ -375,3 +375,47 @@ eq(call('reserve_inventory_for_order_v1',S,posOrder,businessDay,worker,
 eq(balance(S,A),initialBeef-1000000,
   'Rejected altered replay never changes consumed stock');
 console.log('Inventory acceptance: changed recipe payload cannot spoof reservation replay.');
+
+
+// Deterministic two-connection same-command retry: transaction one writes the
+// reservation but holds its transaction locks open; transaction two retries
+// BEFORE commit. The losing connection must wait and then return an exact
+// idempotent replay, not falsely return reservation_conflict.
+const concurrentOrder='80000000-0000-4000-8000-000000000007';
+query('insert into public.orders(id,shop_id,status) values('+
+  literal(concurrentOrder)+','+literal(S)+",'DONE')",'Seed retry race order');
+const raceArgs=[S,concurrentOrder,businessDay,worker,requirements,'recipe-race-command'];
+const reserveRaceSql='select (public.reserve_inventory_for_order_v1('+
+  raceArgs.map(literal).join(',')+'))::text';
+const firstReserve=spawn('psql',[databaseUrl,'-X','-q','-At','-v','ON_ERROR_STOP=1',
+  '-c','begin; '+reserveRaceSql+'; select pg_sleep(1.5); commit;'],{
+  encoding:'utf8'
+});
+let firstOut='',firstErr='';
+const firstReady=new Promise((resolve,reject)=>{
+  const alarm=setTimeout(()=>reject(new Error('First reservation transaction did not start')),7000);
+  firstReserve.stdout.on('data',d=>{
+    firstOut+=d.toString();
+    if(firstOut.includes('"ok"')){clearTimeout(alarm);resolve();}
+  });
+  firstReserve.stderr.on('data',d=>{firstErr+=d.toString();});
+  firstReserve.on('error',reject);
+  firstReserve.on('close',code=>{
+    if(code!==0){clearTimeout(alarm);reject(new Error('First transaction: '+firstErr));}
+  });
+});
+const firstClosed=new Promise((resolve,reject)=>{
+  firstReserve.once('close',code=>code===0?resolve():reject(new Error(firstErr)));
+  firstReserve.once('error',reject);
+});
+await firstReady;
+const secondReserve=await concurrently(reserveRaceSql,'Concurrent identical reserve retry');
+await firstClosed;
+verify(secondReserve.ok===true && secondReserve.idempotentReplay===true,
+  'Second same-command reservation must be serialized as a valid replay');
+eq(query('select count(*) from public.inventory_reservations where order_id='+
+  literal(concurrentOrder)),'2','Two concurrent requests reserve two lines exactly once');
+eq(query('select count(*) from public.inventory_movements where order_id='+
+  literal(concurrentOrder)+" and movement_type='ORDER_RESERVATION'"),
+  '2','Two concurrent requests append reservation ledger exactly once per ingredient');
+console.log('Inventory acceptance: two-connection same-command reservation race idempotent.');
