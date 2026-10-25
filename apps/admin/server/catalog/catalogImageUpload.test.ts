@@ -14,31 +14,26 @@ const png = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]);
 describe('trusted catalog image uploads', () => {
   it('accepts real PNG/WebP/JPEG signatures and rejects spoofed SVG and mismatched formats', () => {
     expect(validateCatalogImageBytes('image/png', png)).toBe('png');
-    expect(validateCatalogImageBytes('image/jpeg', Uint8Array.from([255, 216, 255, 0]))).toBe('jpg');
+    expect(validateCatalogImageBytes('image/jpeg', Uint8Array.from([255, 216, 255, 0]))).toBe(
+      'jpg',
+    );
     expect(
-      validateCatalogImageBytes(
-        'image/webp',
-        new TextEncoder().encode('RIFFxxxxWEBPxxx'),
-      ),
+      validateCatalogImageBytes('image/webp', new TextEncoder().encode('RIFFxxxxWEBPxxx')),
     ).toBe('webp');
     expect(() => validateCatalogImageBytes('image/png', new TextEncoder().encode('<svg>'))).toThrow(
       CatalogImageUploadError,
     );
-    expect(() => validateCatalogImageBytes('image/svg+xml', png)).toThrow(
-      CatalogImageUploadError,
-    );
-    expect(() => validateCatalogImageBytes('image/jpeg', png)).toThrow(
-      CatalogImageUploadError,
-    );
+    expect(() => validateCatalogImageBytes('image/svg+xml', png)).toThrow(CatalogImageUploadError);
+    expect(() => validateCatalogImageBytes('image/jpeg', png)).toThrow(CatalogImageUploadError);
   });
 
   it('rejects empty and oversized uploads before Storage can be called', () => {
     expect(() => validateCatalogImageBytes('image/png', new Uint8Array(0))).toThrow(
       CatalogImageUploadError,
     );
-    expect(() => validateCatalogImageBytes('image/png', new Uint8Array(2 * 1024 * 1024 + 1))).toThrow(
-      CatalogImageUploadError,
-    );
+    expect(() =>
+      validateCatalogImageBytes('image/png', new Uint8Array(2 * 1024 * 1024 + 1)),
+    ).toThrow(CatalogImageUploadError);
   });
 
   it('uploads through a single service-key authenticated Storage call under a shop-scoped immutable key', async () => {
