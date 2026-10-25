@@ -256,9 +256,7 @@ export function PurchaseOrdersPage({
               onClick={() => onSelect(order.id)}
             >
               <span className="admin-purchasing-row-reference">
-                <strong>
-                  {purchaseOrderDisplayReference(order)}
-                </strong>
+                <strong>{purchaseOrderDisplayReference(order)}</strong>
                 <small>{order.createdAt.slice(0, 10)}</small>
               </span>
               <span className="admin-purchasing-row-supplier">{order.supplierName}</span>
