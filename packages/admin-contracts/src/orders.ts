@@ -19,6 +19,7 @@ export type AdminOnlineOrderRequest = {
 export type AdminOnlineOrderRequestsResult = {
   shopId: string;
   rows: readonly AdminOnlineOrderRequest[];
+  nextCursor: string | null;
 };
 
 export const ADMIN_ORDER_STATUSES = ['ACTIVE', 'DONE', 'CANCELLED', 'RETURNED'] as const;
