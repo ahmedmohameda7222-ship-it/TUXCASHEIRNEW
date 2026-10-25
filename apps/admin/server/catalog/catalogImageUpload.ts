@@ -57,6 +57,31 @@ export function validateCatalogImageBytes(
   throw new CatalogImageUploadError('image_format_invalid');
 }
 
+export function resolveCatalogImagePublicUrl(input: {
+  businessId: string;
+  shopId: string;
+  imageKey: string;
+  supabaseUrl: string;
+}): string {
+  if (![input.businessId, input.shopId].every((id) => uuidPattern.test(id))) {
+    throw new CatalogImageUploadError('image_scope_invalid');
+  }
+  const segments = input.imageKey.split('/');
+  if (
+    segments.length !== 4 ||
+    segments[0] !== input.businessId ||
+    segments[1] !== input.shopId ||
+    !uuidPattern.test(segments[2] ?? '') ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|jpg|webp|avif)$/i.test(segments[3] ?? '')
+  ) {
+    throw new CatalogImageUploadError('image_scope_invalid');
+  }
+  return new URL(
+    `/storage/v1/object/public/${CATALOG_IMAGE_BUCKET}/${input.imageKey}`,
+    input.supabaseUrl,
+  ).toString();
+}
+
 export type CatalogImageUploadInput = {
   businessId: string;
   shopId: string;
@@ -77,7 +102,7 @@ export async function uploadCatalogProductImage(
   const extension = validateCatalogImageBytes(input.contentType, input.bytes);
   const imageKey = `${input.businessId}/${input.shopId}/${input.productId}/${randomUUID()}.${extension}`;
   const origin = new URL(input.supabaseUrl).origin;
-  const publicPath = `/storage/v1/object/public/${CATALOG_IMAGE_BUCKET}/${imageKey}`;
+
   const uploadPath = `/storage/v1/object/${CATALOG_IMAGE_BUCKET}/${imageKey}`;
   let response: Response;
   try {
@@ -96,5 +121,13 @@ export async function uploadCatalogProductImage(
     throw new CatalogImageUploadError('image_storage_unavailable');
   }
   if (!response.ok) throw new CatalogImageUploadError('image_storage_unavailable');
-  return { imageKey, publicUrl: new URL(publicPath, origin).toString() };
+  return {
+    imageKey,
+    publicUrl: resolveCatalogImagePublicUrl({
+      businessId: input.businessId,
+      shopId: input.shopId,
+      imageKey,
+      supabaseUrl: origin,
+    }),
+  };
 }
