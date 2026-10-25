@@ -31,6 +31,6 @@ describe('Catalog Round 2 presentation contract', () => {
       "requestCatalogNavigation('/catalog/products/publishing')",
     );
     expect(source('PublishReviewPage.tsx')).toContain('<Link');
-    expect(source('PublishReviewPage.tsx')).not.toMatch(/<a[^>]+href="\\/catalog\\/products"/);
+    expect(source('PublishReviewPage.tsx')).not.toContain('<a href="/catalog/products"');
   });
 });
