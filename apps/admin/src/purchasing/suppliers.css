@@ -218,7 +218,6 @@
   }
 }
 
-
 /* Approved desktop procurement master/inspector layout, local to Suppliers. */
 .admin-purchasing-suppliers-workspace {
   display: grid;
@@ -239,7 +238,9 @@
   margin-top: 0;
   min-width: 0;
 }
-.admin-purchasing-suppliers-workspace .admin-purchasing-supplier-inspector .admin-supplier-card__actions {
+.admin-purchasing-suppliers-workspace
+  .admin-purchasing-supplier-inspector
+  .admin-supplier-card__actions {
   display: flex;
   justify-content: flex-start;
   flex-wrap: wrap;
@@ -247,7 +248,10 @@
   margin: 12px 0;
   border-top: 1px solid #e3eae5;
 }
-.admin-purchasing-suppliers-workspace .admin-purchasing-supplier-inspector .admin-supplier-card__actions button {
+.admin-purchasing-suppliers-workspace
+  .admin-purchasing-supplier-inspector
+  .admin-supplier-card__actions
+  button {
   min-height: 36px;
   font-size: 12px;
 }

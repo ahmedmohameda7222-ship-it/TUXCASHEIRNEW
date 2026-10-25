@@ -96,132 +96,136 @@ export function SuppliersPage({
       </div>
       <div className="admin-purchasing-suppliers-workspace">
         <div className="admin-purchasing-suppliers-list">
-      <div className="admin-purchasing-supplier-filters">
-        <label className="admin-field">
-          <span>Search suppliers</span>
-          <input
-            type="search"
-            value={search}
-            placeholder="Supplier, contact, phone or email"
-            onChange={(event) => setSearch(event.currentTarget.value)}
-          />
-        </label>
-        <label className="admin-field">
-          <span>Filter suppliers by status</span>
-          <select
-            value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(event.currentTarget.value as 'all' | 'active' | 'archived')
-            }
-          >
-            <option value="all">All suppliers</option>
-            <option value="active">Active</option>
-            <option value="archived">Archived</option>
-          </select>
-        </label>
-        <button
-          className="admin-purchasing-reset"
-          type="button"
-          onClick={() => {
-            setSearch('');
-            setStatusFilter('all');
-          }}
-        >
-          Reset filters
-        </button>
-      </div>
-      <div className="admin-purchasing-filter-summary">
-        <span>
-          {visibleSuppliers.length} matching suppliers from {suppliers.length} loaded records
-        </span>
-      </div>
-      <div className="admin-supplier-directory" role="list">
-        <div className="admin-supplier-directory__heading" aria-hidden="true">
-          <span>Supplier</span>
-          <span>Contact</span>
-          <span>Phone</span>
-          <span>Email</span>
-
-        </div>
-        {visibleSuppliers.map((supplier) => (
-          <article
-            className={
-              selectedSupplier?.id === supplier.id
-                ? 'admin-supplier-card is-selected'
-                : 'admin-supplier-card'
-            }
-            role="listitem"
-            key={supplier.id}
-          >
-            <header className="admin-supplier-card__identity">
-              <button
-                className="admin-supplier-select"
-                type="button"
-                aria-pressed={selectedSupplier?.id === supplier.id}
-                onClick={() => { setSelectedSupplierId(supplier.id); setMobileInspectorExpanded(true); }}
-              >
-                {supplier.name}
-              </button>
-              <span
-                className={
-                  supplier.active
-                    ? 'admin-supplier-card__status'
-                    : 'admin-supplier-card__status is-archived'
+          <div className="admin-purchasing-supplier-filters">
+            <label className="admin-field">
+              <span>Search suppliers</span>
+              <input
+                type="search"
+                value={search}
+                placeholder="Supplier, contact, phone or email"
+                onChange={(event) => setSearch(event.currentTarget.value)}
+              />
+            </label>
+            <label className="admin-field">
+              <span>Filter suppliers by status</span>
+              <select
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(event.currentTarget.value as 'all' | 'active' | 'archived')
                 }
               >
-                {supplier.active ? 'Active' : 'Archived'}
-              </span>
-            </header>
-            <dl className="admin-supplier-card__facts">
+                <option value="all">All suppliers</option>
+                <option value="active">Active</option>
+                <option value="archived">Archived</option>
+              </select>
+            </label>
+            <button
+              className="admin-purchasing-reset"
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setStatusFilter('all');
+              }}
+            >
+              Reset filters
+            </button>
+          </div>
+          <div className="admin-purchasing-filter-summary">
+            <span>
+              {visibleSuppliers.length} matching suppliers from {suppliers.length} loaded records
+            </span>
+          </div>
+          <div className="admin-supplier-directory" role="list">
+            <div className="admin-supplier-directory__heading" aria-hidden="true">
+              <span>Supplier</span>
+              <span>Contact</span>
+              <span>Phone</span>
+              <span>Email</span>
+            </div>
+            {visibleSuppliers.map((supplier) => (
+              <article
+                className={
+                  selectedSupplier?.id === supplier.id
+                    ? 'admin-supplier-card is-selected'
+                    : 'admin-supplier-card'
+                }
+                role="listitem"
+                key={supplier.id}
+              >
+                <header className="admin-supplier-card__identity">
+                  <button
+                    className="admin-supplier-select"
+                    type="button"
+                    aria-pressed={selectedSupplier?.id === supplier.id}
+                    onClick={() => {
+                      setSelectedSupplierId(supplier.id);
+                      setMobileInspectorExpanded(true);
+                    }}
+                  >
+                    {supplier.name}
+                  </button>
+                  <span
+                    className={
+                      supplier.active
+                        ? 'admin-supplier-card__status'
+                        : 'admin-supplier-card__status is-archived'
+                    }
+                  >
+                    {supplier.active ? 'Active' : 'Archived'}
+                  </span>
+                </header>
+                <dl className="admin-supplier-card__facts">
+                  <div>
+                    <dt>Contact</dt>
+                    <dd>{supplier.contactName ?? 'Not provided'}</dd>
+                  </div>
+                  <div>
+                    <dt>Phone</dt>
+                    <dd>{supplier.phone ?? 'Not provided'}</dd>
+                  </div>
+                  <div>
+                    <dt>Email</dt>
+                    <dd>{supplier.email ?? 'Not provided'}</dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
+            {visibleSuppliers.length === 0 ? (
+              <p className="admin-purchasing-empty">
+                {suppliers.length === 0 ? 'No suppliers yet' : 'No suppliers match these filters.'}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        {selectedSupplier ? (
+          <aside
+            className={
+              mobileInspectorExpanded
+                ? 'admin-purchasing-supplier-inspector'
+                : 'admin-purchasing-supplier-inspector is-mobile-collapsed'
+            }
+            aria-label="Selected supplier detail"
+          >
+            <div className="admin-section-heading">
+              <h3>{selectedSupplier.name}</h3>
+              <span>{selectedSupplier.active ? 'Active' : 'Archived'}</span>
+            </div>
+            <dl>
               <div>
                 <dt>Contact</dt>
-                <dd>{supplier.contactName ?? 'Not provided'}</dd>
+                <dd>{selectedSupplier.contactName ?? 'Not provided'}</dd>
               </div>
               <div>
                 <dt>Phone</dt>
-                <dd>{supplier.phone ?? 'Not provided'}</dd>
+                <dd>{selectedSupplier.phone ?? 'Not provided'}</dd>
               </div>
               <div>
                 <dt>Email</dt>
-                <dd>{supplier.email ?? 'Not provided'}</dd>
+                <dd>{selectedSupplier.email ?? 'Not provided'}</dd>
               </div>
             </dl>
-          </article>
-        ))}
-        {visibleSuppliers.length === 0 ? (
-          <p className="admin-purchasing-empty">
-            {suppliers.length === 0 ? 'No suppliers yet' : 'No suppliers match these filters.'}
-          </p>
-        ) : null}
-      </div>
-        </div>
-      {selectedSupplier ? (
-        <aside
-          className={mobileInspectorExpanded
-            ? 'admin-purchasing-supplier-inspector'
-            : 'admin-purchasing-supplier-inspector is-mobile-collapsed'}
-          aria-label="Selected supplier detail"
-        >
-          <div className="admin-section-heading">
-            <h3>{selectedSupplier.name}</h3>
-            <span>{selectedSupplier.active ? 'Active' : 'Archived'}</span>
-          </div>
-          <dl>
-            <div>
-              <dt>Contact</dt>
-              <dd>{selectedSupplier.contactName ?? 'Not provided'}</dd>
-            </div>
-            <div>
-              <dt>Phone</dt>
-              <dd>{selectedSupplier.phone ?? 'Not provided'}</dd>
-            </div>
-            <div>
-              <dt>Email</dt>
-              <dd>{selectedSupplier.email ?? 'Not provided'}</dd>
-            </div>
-          </dl>
 
-          {canManageLifecycle && typeof selectedSupplier.version === 'number' ? (
+            {canManageLifecycle && typeof selectedSupplier.version === 'number' ? (
               <div
                 className="admin-supplier-card__actions"
                 role="group"
@@ -259,15 +263,18 @@ export function SuppliersPage({
                 </button>
               </div>
             ) : null}
-          <button
-            className="admin-secondary-button"
-            type="button"
-            onClick={() => { setSelectedSupplierId(null); setMobileInspectorExpanded(false); }}
-          >
-            Close supplier details
-          </button>
-        </aside>
-      ) : null}
+            <button
+              className="admin-secondary-button"
+              type="button"
+              onClick={() => {
+                setSelectedSupplierId(null);
+                setMobileInspectorExpanded(false);
+              }}
+            >
+              Close supplier details
+            </button>
+          </aside>
+        ) : null}
       </div>
       <AdminDialog
         open={archiveTarget !== null}
