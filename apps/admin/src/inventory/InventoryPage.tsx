@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 
 import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
+import { AdminMetricStrip } from '../components/layout/AdminMetricStrip';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
@@ -430,24 +431,26 @@ export function InventoryPage() {
           {mutationErrorText}
         </p>
       ) : null}
-      <section className="admin-inventory-summary" aria-label="Inventory summary">
-        <div>
-          <span>Total items</span>
-          <strong>{counts.total}</strong>
-        </div>
-        <div>
-          <span>Thresholds not set</span>
-          <strong>{counts.unconfigured}</strong>
-        </div>
-        <div>
-          <span>Low stock</span>
-          <strong>{counts.lowStock}</strong>
-        </div>
-        <div>
-          <span>Out of stock</span>
-          <strong>{counts.outOfStock}</strong>
-        </div>
-      </section>
+      <AdminMetricStrip
+        label="Inventory summary"
+        className="admin-inventory-summary"
+        metrics={[
+          { id: 'total', label: 'Total items', value: counts.total },
+          { id: 'unconfigured', label: 'Thresholds not set', value: counts.unconfigured },
+          {
+            id: 'low',
+            label: 'Low stock',
+            value: counts.lowStock,
+            tone: counts.lowStock > 0 ? 'warning' : 'default',
+          },
+          {
+            id: 'out',
+            label: 'Out of stock',
+            value: counts.outOfStock,
+            tone: counts.outOfStock > 0 ? 'critical' : 'default',
+          },
+        ]}
+      />
       {definitionOpen && canManageDefinitions ? (
         <InventoryDefinitionEditor
           item={items.find((item) => item.id === definitionItemId) ?? null}
