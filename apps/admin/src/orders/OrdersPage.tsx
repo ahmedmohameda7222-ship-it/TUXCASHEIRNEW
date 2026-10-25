@@ -365,6 +365,7 @@ export function OrdersPage() {
                     order={detail}
                     canCancel={canCancel}
                     canRefund={canRefund}
+                    canReviewApprovals={principal.permissions.includes('approvals.review')}
                     cancelling={ordersApi.cancelOrder.isPending}
                     refunding={ordersApi.refundOrder.isPending}
                     returning={ordersApi.returnOrderItems.isPending}
