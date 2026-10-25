@@ -6,6 +6,11 @@ on:
       - fix/purchasing-approved-ui-production-20261025
     paths:
       - 'apps/admin/src/purchasing/**'
+      - 'apps/admin/api/admin/purchasing.ts'
+      - 'apps/admin/server/purchasing/**'
+      - 'packages/admin-contracts/src/purchasing.ts'
+      - 'e2e/admin-purchasing.spec.ts'
+      - 'scripts/test-admin-purchasing-postgres.mjs'
       - '.github/workflows/purchasing-branch-format.yml'
 
 permissions:
@@ -31,13 +36,21 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - name: Format Purchasing-owned files only
-        run: npx prettier --write 'apps/admin/src/purchasing/*.{ts,tsx,css}'
+        run: |
+          npx prettier --write 'apps/admin/src/purchasing/*.{ts,tsx,css}' \
+            apps/admin/api/admin/purchasing.ts \
+            apps/admin/server/purchasing/purchasingService.ts \
+            apps/admin/server/purchasing/purchasingService.test.ts \
+            apps/admin/server/purchasing/purchasingApiStore.test.ts \
+            packages/admin-contracts/src/purchasing.ts \
+            e2e/admin-purchasing.spec.ts \
+            scripts/test-admin-purchasing-postgres.mjs
       - name: Commit formatting only to the isolated Purchasing branch
         run: |
-          if git diff --quiet -- apps/admin/src/purchasing; then exit 0; fi
+          if git diff --quiet -- apps/admin/src/purchasing apps/admin/api/admin/purchasing.ts apps/admin/server/purchasing packages/admin-contracts/src/purchasing.ts e2e/admin-purchasing.spec.ts scripts/test-admin-purchasing-postgres.mjs; then exit 0; fi
           test "$(git branch --show-current)" = 'fix/purchasing-approved-ui-production-20261025'
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- apps/admin/src/purchasing
+          git add -- apps/admin/src/purchasing apps/admin/api/admin/purchasing.ts apps/admin/server/purchasing/purchasingService.ts apps/admin/server/purchasing/purchasingService.test.ts apps/admin/server/purchasing/purchasingApiStore.test.ts packages/admin-contracts/src/purchasing.ts e2e/admin-purchasing.spec.ts scripts/test-admin-purchasing-postgres.mjs
           git commit -m 'style(purchasing): apply repository Prettier formatting'
           git push origin HEAD:fix/purchasing-approved-ui-production-20261025
