@@ -24,16 +24,12 @@ export const EIGHT_TABS_EVIDENCE_VIEWPORTS = [
 export function premiumVisualViewports<T extends { width: number; height: number; name?: string }>(
   defaults: readonly T[],
 ) {
-  if (process.env['TUX_ADMIN_EIGHT_TABS_CAPTURE'] === '1')
-    return EIGHT_TABS_EVIDENCE_VIEWPORTS;
+  if (process.env['TUX_ADMIN_EIGHT_TABS_CAPTURE'] === '1') return EIGHT_TABS_EVIDENCE_VIEWPORTS;
   return process.env['P04_P07_CAPTURE'] === '1' ? PREMIUM_EVIDENCE_VIEWPORTS : defaults;
 }
 
 export async function capturePremiumScreenshot(page: Page, scene: string): Promise<void> {
-  if (
-    process.env['P04_P07_CAPTURE'] !== '1' &&
-    process.env['TUX_ADMIN_EIGHT_TABS_CAPTURE'] !== '1'
-  )
+  if (process.env['P04_P07_CAPTURE'] !== '1' && process.env['TUX_ADMIN_EIGHT_TABS_CAPTURE'] !== '1')
     return;
   mkdirSync('artifacts/p04-p07', { recursive: true });
   const viewport = page.viewportSize();
