@@ -630,7 +630,7 @@ export function InventoryPage() {
               },
               {
                 onSuccess: (result) => {
-                  if (result.draftRevision !== undefined)
+                  if (result.ok && result.draftRevision !== undefined)
                     setStocktakeRevision(result.draftRevision);
                   onSaved();
                 },
