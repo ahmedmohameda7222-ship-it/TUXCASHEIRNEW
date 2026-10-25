@@ -52,17 +52,34 @@ describe('off-shift persisted stocktake controls', () => {
   it('exposes real save draft and abandon actions without posting inventory', () => {
     const html = renderToStaticMarkup(
       <StocktakePage
-        items={[{
-          id: 'inventory-beef', name: 'Beef', unitLabel: 'kg',
-          trackingMode: 'RECIPE_TRACKED', definitionVersion: 1,
-          lowStockThresholdMicros: null, conversions: [], active: true,
-          onHandMicros: 8_000_000, reservedMicros: 0, availableMicros: 8_000_000,
-          weightedUnitCostMinor: 100, history: [],
-        }]}
-        snapshot={{ stocktakeId: 'stocktake-1', lines: [{
-          inventoryItemId: 'inventory-beef', snapshotOnHandMicros: 8_000_000,
-          snapshotReservedMicros: 0, unitCostMinor: 100,
-        }] }}
+        items={[
+          {
+            id: 'inventory-beef',
+            name: 'Beef',
+            unitLabel: 'kg',
+            trackingMode: 'RECIPE_TRACKED',
+            definitionVersion: 1,
+            lowStockThresholdMicros: null,
+            conversions: [],
+            active: true,
+            onHandMicros: 8_000_000,
+            reservedMicros: 0,
+            availableMicros: 8_000_000,
+            weightedUnitCostMinor: 100,
+            history: [],
+          },
+        ]}
+        snapshot={{
+          stocktakeId: 'stocktake-1',
+          lines: [
+            {
+              inventoryItemId: 'inventory-beef',
+              snapshotOnHandMicros: 8_000_000,
+              snapshotReservedMicros: 0,
+              unitCostMinor: 100,
+            },
+          ],
+        }}
         pending={false}
         saving={false}
         stale={false}
@@ -79,10 +96,17 @@ describe('off-shift persisted stocktake controls', () => {
 
   it('marks a stale recovered snapshot as unpostable', () => {
     const html = renderToStaticMarkup(
-      <StocktakePage items={[]} snapshot={{ stocktakeId: 'stale', lines: [] }}
-        pending={false} saving={false} stale={true}
-        onBack={() => undefined} onSubmit={() => undefined}
-        onSaveDraft={() => undefined} onCancelDraft={() => undefined} />,
+      <StocktakePage
+        items={[]}
+        snapshot={{ stocktakeId: 'stale', lines: [] }}
+        pending={false}
+        saving={false}
+        stale={true}
+        onBack={() => undefined}
+        onSubmit={() => undefined}
+        onSaveDraft={() => undefined}
+        onCancelDraft={() => undefined}
+      />,
     );
     expect(html).toContain('changed since the physical count began');
     expect(html).toContain('disabled');
