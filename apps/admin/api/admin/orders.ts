@@ -88,6 +88,12 @@ type OrderRow = {
   source: 'POS' | 'ONLINE';
   display_order_no: number | string;
   created_at: string;
+  business_day_id: string;
+  operator_name_snapshot: string | null;
+  items_subtotal_minor: number | string;
+  discount_minor: number | string;
+  service_charge_minor: number | string;
+  tax_minor: number | string;
   total_minor: number | string;
   customer_contact_id: string | null;
   customer_name_snapshot: string | null;
@@ -331,7 +337,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
       const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
       const query = new URLSearchParams({
         select:
-          'id,shop_id,status,operational_revision,source,display_order_no,created_at,total_minor,customer_contact_id,customer_name_snapshot,normalized_phone_snapshot,order_type_label_snapshot,order_type_behavior_snapshot,address_snapshot,delivery_zone_label_snapshot,final_delivery_fee_minor',
+          'id,shop_id,status,operational_revision,source,display_order_no,created_at,business_day_id,operator_name_snapshot,items_subtotal_minor,discount_minor,service_charge_minor,tax_minor,total_minor,customer_contact_id,customer_name_snapshot,normalized_phone_snapshot,order_type_label_snapshot,order_type_behavior_snapshot,address_snapshot,delivery_zone_label_snapshot,final_delivery_fee_minor',
         shop_id: `eq.${input.shopId}`,
         order: 'created_at.desc,id.desc',
         limit: String(limit + 1),
@@ -380,6 +386,12 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           displayOrderNo: safeInteger(row.display_order_no),
           displayOrderLabel: `#${safeInteger(row.display_order_no)}`,
           createdAt: row.created_at,
+          businessDayId: row.business_day_id,
+          operatorName: row.operator_name_snapshot,
+          itemsSubtotalMinor: safeInteger(row.items_subtotal_minor),
+          discountMinor: safeInteger(row.discount_minor),
+          serviceChargeMinor: safeInteger(row.service_charge_minor),
+          taxMinor: safeInteger(row.tax_minor),
           totalMinor: safeInteger(row.total_minor),
           customerName: row.customer_name_snapshot,
           normalizedPhone: row.normalized_phone_snapshot,
@@ -395,7 +407,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
         'orders',
         new URLSearchParams({
           select:
-            'id,shop_id,status,operational_revision,source,display_order_no,created_at,total_minor,customer_contact_id,customer_name_snapshot,normalized_phone_snapshot,order_type_label_snapshot,order_type_behavior_snapshot,address_snapshot,delivery_zone_label_snapshot,final_delivery_fee_minor',
+            'id,shop_id,status,operational_revision,source,display_order_no,created_at,business_day_id,operator_name_snapshot,items_subtotal_minor,discount_minor,service_charge_minor,tax_minor,total_minor,customer_contact_id,customer_name_snapshot,normalized_phone_snapshot,order_type_label_snapshot,order_type_behavior_snapshot,address_snapshot,delivery_zone_label_snapshot,final_delivery_fee_minor',
           id: `eq.${input.orderId}`,
           shop_id: `eq.${input.shopId}`,
           limit: '1',
@@ -653,6 +665,12 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
         displayOrderNo: safeInteger(order.display_order_no),
         displayOrderLabel: `#${safeInteger(order.display_order_no)}`,
         createdAt: order.created_at,
+        businessDayId: order.business_day_id,
+        operatorName: order.operator_name_snapshot,
+        itemsSubtotalMinor: safeInteger(order.items_subtotal_minor),
+        discountMinor: safeInteger(order.discount_minor),
+        serviceChargeMinor: safeInteger(order.service_charge_minor),
+        taxMinor: safeInteger(order.tax_minor),
         totalMinor: safeInteger(order.total_minor),
         customer:
           order.customer_contact_id ||
