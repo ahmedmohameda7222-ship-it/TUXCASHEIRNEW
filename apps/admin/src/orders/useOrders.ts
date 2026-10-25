@@ -7,6 +7,7 @@ import type {
   AdminOrderFinancialMutationResult,
   AdminOrderSearchInput,
   AdminOrderSearchResult,
+  AdminOrderKpisResult,
   AdminOrderSource,
   AdminOrderStatus,
   AdminReasonCodeConfiguration,
@@ -115,6 +116,21 @@ export function useOrders(
       );
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  });
+
+  // Separately authorized complete-population aggregation. Never derive KPI values
+  // from the cursor-paginated orders search (initial list limit: 50).
+  const kpiQuery = useQuery({
+    queryKey: ['admin', 'orders', shopId, 'kpis', filters.from, filters.to],
+    enabled: Boolean(shopId) && searchEnabled,
+    refetchInterval: ORDER_REFRESH_INTERVAL_MS,
+    queryFn: () => {
+      if (!shopId) throw new OrdersUiError('concrete_shop_required');
+      const params = new URLSearchParams({ shopId, view: 'kpis' });
+      if (filters.from) params.set('from', filters.from);
+      if (filters.to) params.set('to', filters.to);
+      return adminFetch<AdminOrderKpisResult>(`/api/admin/orders?${params}`);
+    },
   });
 
   const businessDaysQuery = useQuery({
@@ -253,6 +269,7 @@ export function useOrders(
 
   return {
     searchQuery,
+    kpiQuery,
     businessDaysQuery,
     detailQuery,
     actionReasonsQuery,
