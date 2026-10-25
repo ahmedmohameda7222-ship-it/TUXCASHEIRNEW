@@ -341,7 +341,8 @@ test('dirty shell exits keep or discard the exact editor transaction', async ({
   await page.getByRole('menuitem', { name: 'Sign out' }).click();
   guard = page.getByRole('dialog', { name: 'Discard menu changes?' });
   await guard.getByRole('button', { name: 'Discard changes' }).click();
-  await expect(page.getByText('Business Day active — operator sign-in required')).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Operations' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'TUX Operations' })).toBeVisible();
 });
 
 test('pickup rollback, save failure, and save-in-flight freeze preserve transaction invariants', async ({

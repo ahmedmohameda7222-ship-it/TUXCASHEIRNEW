@@ -535,7 +535,7 @@ async function mockAdvancedCatalog(page: Page) {
   return { commands, productId, modifierId, beverageId, inventoryItemId };
 }
 
-test('publish review shows version-fenced draft diff, history, and Cairo scheduling', async ({
+test('publish review shows version-fenced draft diff and prevents unverified scheduling', async ({
   page,
 }) => {
   const fixture = await mockPublishing(page);
@@ -545,19 +545,11 @@ test('publish review shows version-fenced draft diff, history, and Cairo schedul
   await expect(page.getByText('Live', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('1 product changed')).toBeVisible();
   await expect(page.getByText('1 price change')).toBeVisible();
-  await expect(page.getByLabel('Schedule publish').getByText('Africa/Cairo')).toBeVisible();
+  await expect(page.getByText('Automatic scheduling is unavailable')).toBeVisible();
   await expect(page.getByText('Version 47')).toBeVisible();
-
-  await page.getByLabel('Activation time (Cairo)').fill('2099-09-12T08:00');
-  await page.getByRole('button', { name: 'Schedule publish' }).click();
-  await expect(page.getByText('Publish scheduled.')).toBeVisible();
-  expect(fixture.commands.at(-1)).toMatchObject({
-    type: 'draft.schedule',
-    draftId,
-    expectedDraftRevision: 2,
-    expectedVersion: 48,
-    localScheduledAt: '2099-09-12T08:00',
-  });
+  await expect(page.getByLabel('Activation time (Cairo)')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Schedule publish' })).toHaveCount(0);
+  expect(fixture.commands).toEqual([]);
 });
 
 test('catalog price approval remains pending without falsely publishing prices', async ({
@@ -567,6 +559,11 @@ test('catalog price approval remains pending without falsely publishing prices',
   await page.goto('/catalog/products/publishing');
 
   await page.getByLabel('Requester PIN (when required by approval policy)').fill('2468');
+  await page
+    .getByRole('checkbox', {
+      name: 'I reviewed the changes and confirm publication for this shop.',
+    })
+    .check();
   await page.getByRole('button', { name: 'Publish now' }).click();
   await expect(
     page.getByText(
@@ -971,7 +968,8 @@ for (const viewport of ADMIN_WIDE_TABLET_VIEWPORTS) {
     await expect(page.getByRole('heading', { name: 'Review & publish' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Publish now' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Restore version 47' })).toBeVisible();
-    await expect(page.getByLabel('Activation time (Cairo)')).toBeVisible();
+    await expect(page.getByText('Automatic scheduling is unavailable')).toBeVisible();
+    await expect(page.getByLabel('Activation time (Cairo)')).toHaveCount(0);
   });
 }
 
