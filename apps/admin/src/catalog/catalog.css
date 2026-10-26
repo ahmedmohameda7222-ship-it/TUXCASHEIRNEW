@@ -673,10 +673,7 @@
 .admin-catalog-list__columns,
 .admin-product-row {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(110px, 1.3fr) minmax(85px, 1fr) minmax(
-      100px,
-      1fr
-    ) 26px;
+  grid-template-columns: minmax(0, 3fr) repeat(3, minmax(0, 1fr)) 26px;
   align-items: center;
   gap: 12px;
   padding-inline: 16px;
