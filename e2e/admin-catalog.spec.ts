@@ -344,7 +344,7 @@ test('C2 category creation persists to its shop draft without publication', asyn
   await page.getByRole('button', { name: 'Add category' }).click();
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Sides');
   await page.getByRole('button', { name: 'Save definition to draft' }).click();
-  await expect(page.getByText('Sides', { exact: true })).toBeVisible();
+  await expect(page.getByRole('tabpanel').locator('.admin-catalog-definition-row').filter({ hasText: 'Sides' })).toBeVisible();
 
   expect(fixture.commands.map((command) => command.type)).toEqual(['draft.create', 'draft.save']);
   const saved = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
