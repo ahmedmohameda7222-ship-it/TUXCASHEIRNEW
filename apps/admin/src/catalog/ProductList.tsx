@@ -183,7 +183,9 @@ export function ProductList({
               <span>Status</span>
               <select
                 value={status}
-                onChange={(event) => onStatusChange(event.currentTarget.value as CatalogStatusFilter)}
+                onChange={(event) =>
+                onStatusChange(event.currentTarget.value as CatalogStatusFilter)
+              }
               >
                 <option value="all">All status</option>
                 <option value="available">Available</option>
@@ -224,7 +226,11 @@ export function ProductList({
           <span>{visibleProducts.length === 1 ? 'product' : 'products'}</span>
         </div>
 
-        <div className="admin-catalog-list__columns" aria-hidden="true" data-catalog-product-columns>
+        <div
+          className="admin-catalog-list__columns"
+          aria-hidden="true"
+          data-catalog-product-columns
+        >
           <span>Product</span>
           <span>Category</span>
           <span>Price</span>
