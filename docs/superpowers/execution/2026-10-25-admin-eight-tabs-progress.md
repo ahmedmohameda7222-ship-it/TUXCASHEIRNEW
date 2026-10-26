@@ -1,3 +1,13 @@
+## 2026-10-26 — Catalog C1 exact-head engineering acceptance
+
+**Decision: C1 PRE-MERGE ENGINEERING GATE PASSED at immutable `960f941d5520913832dfe1fc4cc18fd12c835fd4` only.** This decision covers Catalog C1 Product Directory/search/selection/mobile actions, not C2–C5, not entire Catalog, and not deferred Owner/hosted physical UAT. C1 RED→GREEN category-bar structural regression and 390px primary action width regression are green at this exact head. Product data, image-key authorized thumbnail GET and stock/status remain trusted shop-scoped sources; search/status/category filters, selection navigation, unsaved draft, shop switching and live vs draft actions are browser-tested.
+
+**Five independent workflow groups on exact head SUCCESS:** Fast CI `40354746700` (format/lint, TypeScript, 118/118 related tests and security), isolated Orders financial PG/Chromium/full build `40354746687`, Business Day real PostgreSQL `40354746901`, six-tab rendered acceptance `40354746780`, full monorepo `40354746801` (2433/2433 root unit tests, 302 passed/19 skipped Admin Chromium, complete run green). Screenshot artifact `admin-rendered-e2e` #12665223058 carries `test-results/catalog-c1-products-desktop-1440.png`, `catalog-c1-products-mobile-390.png`, `catalog-c1-browse-360.png`, `catalog-c1-browse-768.png`, `catalog-c1-browse-1024.png`; independently opened 1440, 390 and 360 screenshots. The visual hierarchy, full-width mobile management actions and separate category bar now match core approved Products layout. Recorded differences: approved sample has 49 items and draft banner, test fixture has 12 and no draft; global Admin shell/nav branding and visual density differ, not adjusted in C1 because these are cross-tab shared design; Owner final visual acceptance remains POST-MERGE UAT DEFERRED.
+
+**Sequential unlock: C2 Categories & Modifiers/Extras is the sole ACTIVE implementation task.** C3–C5 and Inventory/Purchasing/CRM/Staff/Finance/Reports remain NOT ACCEPTED/LOCKED. Keep PR #165 open/draft; no production migration, deployment or merge.
+
+---
+
 ## C1 390px mobile toolbar visual defect — 2026-10-26
 
 - **Actual React browser visual evidence at immutable `cd022d2823efe96268d83db1fe2a9461c75f43ab`:** [Admin E2E 40352161947](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40352161947), artifact `admin-rendered-e2e` ID `12665520467`, `test-results/catalog-c1-products-mobile-390.png` and desktop 1440 / 360 / 768 / 1024. Against the original approved `02-products-mobile-390.png`, the two Catalog header actions were shrink-wrapped to roughly 242px each, leaving unnecessary empty space; the reference stretches both full available content width. This is a C1 actual rendered UI difference, not a mocked feature requirement.
