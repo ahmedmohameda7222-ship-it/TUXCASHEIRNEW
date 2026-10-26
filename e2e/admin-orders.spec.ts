@@ -1206,7 +1206,9 @@ test('O11 mobile Escape restores cancellation focus and clears unsent PIN', asyn
   ).toHaveValue('');
 });
 
-test('O10 successful Admin cancellation sends PIN only to reauthentication and leaves no stored PIN', async ({ page }) => {
+test('O10 successful Admin cancellation sends PIN only to reauthentication and leaves no stored PIN', async ({
+  page,
+}) => {
   const unexpectedConsoleLeaks: string[] = [];
   page.on('console', (entry) => {
     if (entry.text().includes('1234')) unexpectedConsoleLeaks.push(entry.type());
