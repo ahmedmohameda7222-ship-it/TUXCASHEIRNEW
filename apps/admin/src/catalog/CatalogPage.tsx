@@ -390,7 +390,7 @@ export function CatalogPage() {
             </select>
           </label>
           <button
-            className="admin-primary-button"
+            className="admin-primary-button admin-catalog-create-button"
             type="button"
             disabled={!canEdit || !canPrice || !newProductCategoryId || busy}
             title={!canPrice ? 'Creating a product requires catalog.pricing access.' : undefined}
