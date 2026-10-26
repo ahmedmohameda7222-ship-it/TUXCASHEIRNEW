@@ -1,3 +1,17 @@
+## Owner-authorized pre-merge implementation gate / postponed physical UAT — 2026-10-26
+
+**Owner's revised authoritative release decision:** complete ALL EIGHT TABS and their source-level functional, backend, security, responsive Chromium and cross-app contract tests **sequentially** on Draft PR #165. The previous requirement to obtain exact-SHA **hosted/physical Admin + Menu + Operations end-to-end UAT and final Owner phone visual signoff before leaving Orders is rescinded** for the implementation sequence. Those tests and final visual/physical acceptance are explicitly **DEFERRED UNTIL AFTER all tasks are completed, Owner separately approves a squash merge to main, and post-merge real-app testing begins**. Any post-merge defects will be corrected in subsequent PRs; no present completion claim substitutes for that physical test. Never merge automatically.
+
+**Pre-merge requirements are NOT waived**: fully implement the current tab; verify targeted and full typecheck/format/lint, real disposable PostgreSQL, security/RBAC/replay, responsive running React screenshots, and available cross-app API/contract tests; independently review actual evidence and document differences. Do not advance if implementation, automated tests, or security is failing.
+
+**Orders O1–O4:** PRE-MERGE ENGINEERING GATE **PASSED** on exact source `9b5f48d67b6a57f73a26d163b9e4882ad6cc398d`: four green independent CI workflow groups (40270793434; 40270793470; 40270793509; 40270793423), Orders 33/33 Chromium, six-module 112/112 Chromium, real PG refund/PIN/RBAC assertions, dev Orders/Finance same-shop aggregate equality, 1536/390 responsive screenshot artifacts. Not pixel-perfect: old shell/fixture-dense reference differences and no Owner-selected mobile screenshot recorded below. **POST-MERGE HOSTED/OWNER VISUAL/PHYSICAL ACCEPTANCE DEFERRED, NOT PASSED.** Engineering may now advance to Catalog.
+
+**Catalog C1 source work ongoing (NOT ACCEPTED yet):** initial approved browse contract RED test in `apps/admin/src/catalog/p02CatalogBrowse.test.tsx` produced exact expected failure at `6195934a95c370d4c05bbf7b8b7de2875cf5dfc2` (Fast CI job 121405158147). Implemented in `ProductList.tsx` genuine shop-scoped category counts/shortcuts, desktop four factual columns, mobile readable row/card, accessibility and Reset; responsive CSS in `catalog.css`; added `e2e/admin-catalog.spec.ts` desktop 1440/mobile 390 workflow/screenshots. Latest implementation source before this ledger-only commit: `7a240cf7f23fcb23e3836f6a0d26985905e0dbe5`. CI GREEN and selected visual review must be independently verified before C1 closes. No C2–C5 work yet.
+
+**Strict sequence:** Orders (pre-merge engineering gate PASSED; physical UAT DEFERRED) → **Catalog C1 ACTIVE, C2–C5 LOCKED** → Inventory partial/locked → Purchasing locked → Customers/CRM partial/locked → Staff partial/locked → Finance partial/locked → Reports partial/locked. No newer tab considered accepted. No production deployment, main merge, production SQL or owner signoff implied by this change.
+
+---
+
 ## 2026-10-26 — Orders-only continuation, exact hosted Preview and PIN/Finance evidence
 
 **Single active tab remains Orders O1–O4.** Catalog, Inventory, Purchasing, CRM, Staff, Finance and Reports are preserved but NOT ACCEPTED and must not be expanded until Orders' final H/V gates close. Existing Draft PR #165 stays OPEN / DRAFT / HOLD. No Production migration, merge, promotion, or deployment.
