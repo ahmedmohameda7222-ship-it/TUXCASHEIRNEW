@@ -1032,6 +1032,84 @@
   color: #fff;
 }
 
+.admin-catalog-definition-columns {
+  display: grid;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-control);
+  background: var(--tux-surface-panel);
+  color: var(--tux-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-catalog-definition-columns[data-catalog-definition-columns='categories'],
+.admin-catalog-definition-row--categories {
+  grid-template-columns: minmax(0, 1fr) 140px 100px 156px;
+}
+
+.admin-catalog-definition-columns[data-catalog-definition-columns='modifiers'],
+.admin-catalog-definition-row--modifiers {
+  grid-template-columns: minmax(0, 1fr) 155px 125px 156px;
+}
+
+.admin-catalog-definition-compact-meta {
+  display: none;
+}
+
+.admin-catalog-definition-type {
+  font-size: 12px;
+  color: var(--tux-text-secondary);
+}
+
+.admin-catalog-definition-position,
+.admin-catalog-definition-price {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-catalog-definition-status {
+  justify-self: start;
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-catalog-definition-status.is-active {
+  color: #285c43;
+  background: #edf4ef;
+}
+
+.admin-catalog-definition-status.is-archived {
+  color: var(--tux-text-secondary);
+  background: var(--tux-surface-subtle);
+}
+
+@media (max-width: 1199px) {
+  .admin-catalog-definition-columns {
+    display: none;
+  }
+
+  .admin-catalog-definition-row--categories,
+  .admin-catalog-definition-row--modifiers {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-catalog-definition-row .admin-catalog-definition-status,
+  .admin-catalog-definition-row .admin-catalog-definition-position,
+  .admin-catalog-definition-row .admin-catalog-definition-price,
+  .admin-catalog-definition-row .admin-catalog-definition-type {
+    display: none;
+  }
+
+  .admin-catalog-definition-compact-meta {
+    display: block;
+  }
+}
+
 .admin-catalog-definition-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
