@@ -291,11 +291,13 @@ test('C2 definitions tabs show the selected collection and protect an open edito
   await expect(categories).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('heading', { name: 'Categories', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Modifiers / extras' })).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/catalog-c2-categories-mobile-390.png' });
 
   await modifiers.click();
   await expect(modifiers).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('heading', { name: 'Modifiers / extras' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Categories', exact: true })).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/catalog-c2-modifiers-mobile-390.png' });
   await page.getByRole('button', { name: 'Add modifier' }).click();
   await expect(page.getByRole('heading', { name: 'Modifier details' })).toBeVisible();
   await expect(categories).toBeDisabled();
@@ -304,6 +306,39 @@ test('C2 definitions tabs show the selected collection and protect an open edito
   await categories.click();
   await expect(categories).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('heading', { name: 'Categories', exact: true })).toBeVisible();
+});
+
+test('C2 definitions tabs match accessible desktop collection switching', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+  await expect(page.getByRole('button', { name: 'Add category' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/catalog-c2-categories-desktop-1440.png' });
+
+  await page.getByRole('tab', { name: /Modifiers \/ Extras/ }).click();
+  await expect(page.getByRole('button', { name: 'Add modifier' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add category' })).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/catalog-c2-modifiers-desktop-1440.png' });
+});
+
+test('C2 category creation persists to its shop draft without publication', async ({ page }) => {
+  const fixture = await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+  await page.getByRole('button', { name: 'Add category' }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Sides');
+  await page.getByRole('button', { name: 'Save definition to draft' }).click();
+  await expect(page.getByText('Sides', { exact: true })).toBeVisible();
+
+  expect(fixture.commands.map((command) => command.type)).toEqual(['draft.create', 'draft.save']);
+  const saved = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
+  expect(saved?.snapshot).toMatchObject({ shopId });
+  const definitions = (saved?.snapshot as { categories?: Array<{ shopId: string; name: string }> })
+    ?.categories;
+  expect(definitions).toEqual(
+    expect.arrayContaining([expect.objectContaining({ shopId, name: 'Sides' })]),
+  );
 });
 
 test('catalog search filters the live workspace without mutating authority', async ({ page }) => {
