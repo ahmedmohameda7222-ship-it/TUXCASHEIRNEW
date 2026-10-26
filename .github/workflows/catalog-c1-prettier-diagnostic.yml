@@ -1,0 +1,24 @@
+name: Catalog C1 temporary Prettier diagnostic
+on:
+  push:
+    branches:
+      - feat/admin-eight-tabs-approved-ui-20261025
+    paths:
+      - .github/workflows/catalog-c1-prettier-diagnostic.yml
+permissions:
+  contents: read
+jobs:
+  exact-format-diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Print exact formatter-only patch
+        run: |
+          npx prettier --write apps/admin/src/catalog/catalog.css e2e/admin-catalog.spec.ts apps/admin/src/catalog/ProductList.tsx apps/admin/src/catalog/p02CatalogBrowse.test.tsx
+          git diff --color=never -- apps/admin/src/catalog/catalog.css e2e/admin-catalog.spec.ts apps/admin/src/catalog/ProductList.tsx apps/admin/src/catalog/p02CatalogBrowse.test.tsx
