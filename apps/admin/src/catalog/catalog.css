@@ -795,3 +795,50 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* C1 phone-only filter disclosure; existing select contracts stay real and reachable. */
+.admin-catalog-filter-toggle {
+  display: none;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-control);
+  padding: 8px 12px;
+  background: var(--tux-surface-panel);
+  color: var(--tux-text-primary);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .admin-catalog-list__filters {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .admin-catalog-list__filters .admin-search-field {
+    grid-column: 1 / -1;
+  }
+
+  .admin-catalog-filter-toggle {
+    display: inline-flex;
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .admin-catalog-reset {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .admin-catalog-list__filter-row {
+    display: none;
+  }
+
+  .admin-catalog-list__filter-row.is-open {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+}
