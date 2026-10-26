@@ -166,11 +166,6 @@ export function CatalogDefinitionsEditor({
 
   return (
     <section className="admin-form-grid" aria-label="Catalog definitions">
-      <div className="admin-catalog-draft-banner">
-        <strong>
-          Category and modifier changes remain in Draft until validated and published.
-        </strong>
-      </div>
       <nav
         className="admin-catalog-definition-tabs"
         role="tablist"
@@ -209,7 +204,10 @@ export function CatalogDefinitionsEditor({
           className="admin-catalog-editor__section"
         >
           <div className="admin-catalog-editor__section-heading">
-            <h2 id="catalog-categories-heading">Categories</h2>
+            <div>
+              <h2 id="catalog-categories-heading">Categories</h2>
+              <p>Organize the menu structure, status and display order.</p>
+            </div>
             {canEdit ? (
               <button
                 className="admin-primary-button"
@@ -225,8 +223,8 @@ export function CatalogDefinitionsEditor({
             <p>No categories configured. Add a category to start creating products.</p>
           ) : null}
           {orderedCategories.map((category, index) => (
-            <article className="admin-settings-row admin-settings-row--stack" key={category.id}>
-              <div className="admin-settings-row__main">
+            <article className="admin-catalog-definition-row" key={category.id}>
+              <div className="admin-catalog-definition-row__main">
                 <strong>{category.name}</strong>
                 <span>
                   {category.active ? 'Active' : 'Archived'} · Position {category.sortOrder}
@@ -292,7 +290,10 @@ export function CatalogDefinitionsEditor({
           className="admin-catalog-editor__section"
         >
           <div className="admin-catalog-editor__section-heading">
-            <h2 id="catalog-modifiers-heading">Modifiers / extras</h2>
+            <div>
+              <h2 id="catalog-modifiers-heading">Modifiers / extras</h2>
+              <p>Manage extras, their prices, status and display order.</p>
+            </div>
             {canEdit && canPrice ? (
               <button
                 className="admin-primary-button"
@@ -306,8 +307,8 @@ export function CatalogDefinitionsEditor({
           </div>
           {orderedModifiers.length === 0 ? <p>No modifiers configured for this draft.</p> : null}
           {orderedModifiers.map((modifier, index) => (
-            <article className="admin-settings-row admin-settings-row--stack" key={modifier.id}>
-              <div className="admin-settings-row__main">
+            <article className="admin-catalog-definition-row" key={modifier.id}>
+              <div className="admin-catalog-definition-row__main">
                 <strong>{modifier.name}</strong>
                 <span>
                   {formatEgpMinor(modifier.priceMinor)} EGP ·{' '}
@@ -366,6 +367,9 @@ export function CatalogDefinitionsEditor({
           ))}
         </section>
       )}
+      <p className="admin-catalog-definition-tip">
+        Category and modifier changes are saved as Draft until published.
+      </p>
       {editor && canEdit ? (
         <form className="admin-form-grid" onSubmit={submit}>
           <h3>{editor.collection === 'categories' ? 'Category details' : 'Modifier details'}</h3>
