@@ -30,11 +30,7 @@ export function filterCatalogProducts(
   });
 }
 
-function CatalogProductThumbnail({
-  product,
-}: {
-  product: CatalogProductDetail;
-}) {
+function CatalogProductThumbnail({ product }: { product: CatalogProductDetail }) {
   const [image, setImage] = useState<{
     shopId: string;
     imageKey: string;
