@@ -291,6 +291,7 @@ test('C2 definitions tabs show the selected collection and protect an open edito
   await expect(categories).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('heading', { name: 'Categories', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Modifiers / extras' })).toHaveCount(0);
+  await expect(page.locator('[data-catalog-definition-columns="categories"]')).toBeHidden();
   await page.screenshot({ path: 'test-results/catalog-c2-categories-mobile-390.png' });
 
   await modifiers.click();
@@ -314,11 +315,17 @@ test('C2 definitions tabs match accessible desktop collection switching', async 
   await page.goto('/catalog/products');
   await page.getByRole('button', { name: 'Manage categories & extras' }).click();
   await expect(page.getByRole('button', { name: 'Add category' })).toBeVisible();
+  const categoryColumns = page.locator('[data-catalog-definition-columns="categories"]');
+  await expect(categoryColumns).toBeVisible();
+  await expect(categoryColumns).toContainText(['Category', 'Status', 'Position', 'Actions']);
   await page.screenshot({ path: 'test-results/catalog-c2-categories-desktop-1440.png' });
 
   await page.getByRole('tab', { name: /Modifiers \/ Extras/ }).click();
   await expect(page.getByRole('button', { name: 'Add modifier' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add category' })).toHaveCount(0);
+  const modifierColumns = page.locator('[data-catalog-definition-columns="modifiers"]');
+  await expect(modifierColumns).toBeVisible();
+  await expect(modifierColumns).toContainText(['Modifier', 'Price', 'Status', 'Actions']);
   await page.screenshot({ path: 'test-results/catalog-c2-modifiers-desktop-1440.png' });
 });
 
