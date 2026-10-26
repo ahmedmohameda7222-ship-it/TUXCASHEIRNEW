@@ -919,3 +919,21 @@
     min-height: 44px;
   }
 }
+
+/* C1 approved Catalog hierarchy: only Catalog's primary create action uses
+   the selected green, without changing shell or unrelated feature buttons. */
+.admin-catalog-new-product-controls > .admin-primary-button:not(:disabled) {
+  background: #165e43;
+  border-color: #165e43;
+  color: #fff;
+}
+
+.admin-catalog-new-product-controls > .admin-primary-button:not(:disabled):hover {
+  background: #104c36;
+  border-color: #104c36;
+}
+
+.admin-catalog-new-product-controls > .admin-primary-button:focus-visible {
+  outline: 2px solid #165e43;
+  outline-offset: 2px;
+}
