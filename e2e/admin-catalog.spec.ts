@@ -348,6 +348,35 @@ test('C2 definitions tabs match accessible desktop collection switching', async 
   await page.screenshot({ path: 'test-results/catalog-c2-modifiers-desktop-1440.png' });
 });
 
+test('C2 desktop definition data rows use the same four grid columns as their headers', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+
+  const categoryRow = page.locator('.admin-catalog-definition-row--categories').first();
+  await expect(categoryRow).toBeVisible();
+  const categoryGrid = await categoryRow.evaluate(
+    (element) => getComputedStyle(element).gridTemplateColumns.split(' ').length,
+  );
+  expect(categoryGrid).toBe(4);
+
+  await page.getByRole('tab', { name: /Modifiers \/ Extras/ }).click();
+  await page.getByRole('button', { name: 'Add modifier' }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Cheese');
+  await page.getByRole('textbox', { name: 'Extra price (EGP)' }).fill('12.50');
+  await page.getByRole('button', { name: 'Save definition to draft' }).click();
+
+  const modifierRow = page.locator('.admin-catalog-definition-row--modifiers').first();
+  await expect(modifierRow).toBeVisible();
+  const modifierGrid = await modifierRow.evaluate(
+    (element) => getComputedStyle(element).gridTemplateColumns.split(' ').length,
+  );
+  expect(modifierGrid).toBe(4);
+});
+
 test('C2 Manage workspace shows one draft notice and no product creation toolbar', async ({
   page,
 }) => {
