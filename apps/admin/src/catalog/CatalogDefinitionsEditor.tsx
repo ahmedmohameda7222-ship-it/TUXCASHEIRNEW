@@ -230,54 +230,56 @@ export function CatalogDefinitionsEditor({
                   {category.active ? 'Active' : 'Archived'} · Position {category.sortOrder}
                 </span>
               </div>
+
               {canEdit ? (
-                <details className="admin-catalog-record-actions">
-                  <summary>Actions for {category.name}</summary>
-                  <div className="admin-inventory-page-actions">
-                    <button
-                      className="admin-secondary-button"
-                      type="button"
-                      disabled={pending}
-                      onClick={() => setEditor(editingCategory(category))}
-                    >
-                      Edit {category.name}
-                    </button>
-                    <button
-                      className="admin-secondary-button"
-                      type="button"
-                      disabled={pending}
-                      onClick={() =>
-                        void persist('categories', {
-                          id: category.id,
+                <div className="admin-catalog-definition-actions" role="group" aria-label={`Actions for ${category.name}`}>
+                  <button
+                    className="admin-catalog-definition-action-button"
+                    type="button"
+                    aria-label={`Move up ${category.name}`}
+                    disabled={pending || index === 0}
+                    onClick={() => changeOrder('categories', category.id, 'up')}
+                  >
+                    <span aria-hidden="true">⌃</span>
+                  </button>
+                  <button
+                    className="admin-catalog-definition-action-button"
+                    type="button"
+                    aria-label={`Move down ${category.name}`}
+                    disabled={pending || index === orderedCategories.length - 1}
+                    onClick={() => changeOrder('categories', category.id, 'down')}
+                  >
+                    <span aria-hidden="true">⌄</span>
+                  </button>
+                  <button
+                    className="admin-catalog-definition-action-button"
+                    type="button"
+                    aria-label={`Edit ${category.name}`}
+                    disabled={pending}
+                    onClick={() => setEditor(editingCategory(category))}
+                  >
+                    <span aria-hidden="true">✎</span>
+                  </button>
+                  <button
+                    className="admin-catalog-definition-action-button"
+                    type="button"
+                    aria-label={`${category.active ? 'Archive' : 'Restore'} ${category.name}`}
+                    disabled={pending}
+                    onClick={() =>
+                      void persist('categories', {
+                        id: category.id,
                           shopId,
                           slug: category.slug,
                           name: category.name,
                           description: category.description,
                           sortOrder: category.sortOrder,
                           active: !category.active,
-                        })
-                      }
-                    >
-                      {category.active ? 'Archive' : 'Restore'} {category.name}
-                    </button>
-                    <button
-                      className="admin-secondary-button"
-                      type="button"
-                      disabled={pending || index === 0}
-                      onClick={() => changeOrder('categories', category.id, 'up')}
-                    >
-                      Move up
-                    </button>
-                    <button
-                      className="admin-secondary-button"
-                      type="button"
-                      disabled={pending || index === orderedCategories.length - 1}
-                      onClick={() => changeOrder('categories', category.id, 'down')}
-                    >
-                      Move down
-                    </button>
-                  </div>
-                </details>
+                      })
+                    }
+                  >
+                    <span aria-hidden="true">{category.active ? '▤' : '↻'}</span>
+                  </button>
+                </div>
               ) : null}
             </article>
           ))}
@@ -315,53 +317,55 @@ export function CatalogDefinitionsEditor({
                   {modifier.active ? 'Active' : 'Archived'}
                 </span>
               </div>
+
               {canEdit ? (
-                <details className="admin-catalog-record-actions">
-                  <summary>Actions for {modifier.name}</summary>
-                  <div className="admin-inventory-page-actions">
-                    <button
-                      className="admin-secondary-button"
-                      type="button"
-                      disabled={pending}
-                      onClick={() => setEditor(editingModifier(modifier))}
-                    >
-                      Edit {modifier.name}
-                    </button>
-                    <button
-                      className="admin-secondary-button"
-                      type="button"
-                      disabled={pending}
-                      onClick={() =>
-                        void persist('modifiers', {
-                          id: modifier.id,
+                <div className="admin-catalog-definition-actions" role="group" aria-label={`Actions for ${modifier.name}`}>
+                  <button
+                    className="admin-catalog-definition-action-button"
+                    type="button"
+                    aria-label={`Move up ${modifier.name}`}
+                    disabled={pending || index === 0}
+                    onClick={() => changeOrder('modifiers', modifier.id, 'up')}
+                  >
+                    <span aria-hidden="true">⌃</span>
+                  </button>
+                  <button
+                    className="admin-catalog-definition-action-button"
+                    type="button"
+                    aria-label={`Move down ${modifier.name}`}
+                    disabled={pending || index === orderedModifiers.length - 1}
+                    onClick={() => changeOrder('modifiers', modifier.id, 'down')}
+                  >
+                    <span aria-hidden="true">⌄</span>
+                  </button>
+                  <button
+                    className="admin-catalog-definition-action-button"
+                    type="button"
+                    aria-label={`Edit ${modifier.name}`}
+                    disabled={pending}
+                    onClick={() => setEditor(editingModifier(modifier))}
+                  >
+                    <span aria-hidden="true">✎</span>
+                  </button>
+                  <button
+                    className="admin-catalog-definition-action-button"
+                    type="button"
+                    aria-label={`${modifier.active ? 'Archive' : 'Restore'} ${modifier.name}`}
+                    disabled={pending}
+                    onClick={() =>
+                      void persist('modifiers', {
+                        id: modifier.id,
                           shopId,
                           name: modifier.name,
                           priceMinor: modifier.priceMinor,
                           active: !modifier.active,
                           sortOrder: modifier.sortOrder,
-                        })
-                      }
-                    >
-                      {modifier.active ? 'Archive' : 'Restore'} {modifier.name}
-                    </button>
-                    <button
-                      className="admin-secondary-button"
-                      type="button"
-                      disabled={pending || index === 0}
-                      onClick={() => changeOrder('modifiers', modifier.id, 'up')}
-                    >
-                      Move up
-                    </button>
-                    <button
-                      className="admin-secondary-button"
-                      type="button"
-                      disabled={pending || index === orderedModifiers.length - 1}
-                      onClick={() => changeOrder('modifiers', modifier.id, 'down')}
-                    >
-                      Move down
-                    </button>
-                  </div>
-                </details>
+                      })
+                    }
+                  >
+                    <span aria-hidden="true">{modifier.active ? '▤' : '↻'}</span>
+                  </button>
+                </div>
               ) : null}
             </article>
           ))}
