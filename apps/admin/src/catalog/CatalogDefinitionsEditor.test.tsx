@@ -38,6 +38,25 @@ describe('catalog category/modifier management', () => {
     expect(html).not.toContain('Edit Cheese');
     expect(html).toContain('Draft');
   });
+  it('does not render categories from another shop even if the upstream payload is mixed', () => {
+    const html = renderToStaticMarkup(
+      <CatalogDefinitionsEditor
+        shopId="shop"
+        categories={[
+          ...categories,
+          { ...categories[0]!, id: 'other-shop-category', shopId: 'other-shop', name: 'Private' },
+        ]}
+        modifiers={modifiers}
+        canEdit
+        canPrice
+        pending={false}
+        onSave={vi.fn()}
+      />,
+    );
+    expect(html).toContain('Burgers');
+    expect(html).not.toContain('Private');
+  });
+
   it('does not expose mutating actions without catalog.edit', () => {
     const html = renderToStaticMarkup(
       <CatalogDefinitionsEditor
