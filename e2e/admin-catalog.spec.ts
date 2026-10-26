@@ -613,3 +613,28 @@ test('C1 approved primary Catalog action is green with no redundant eyebrow at d
     );
   }
 });
+
+for (const viewport of [
+  { width: 360, height: 800 },
+  { width: 768, height: 1024 },
+  { width: 1024, height: 900 },
+] as const) {
+  test(`C1 approved browse preserves search, real selection and no overflow at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await mockCatalog(page, { productCount: 12 });
+    await page.goto('/catalog/products');
+    await expect(page.getByRole('heading', { name: 'Catalog' })).toBeVisible();
+    await expect(page.getByRole('searchbox', { name: 'Search products' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Classic Smash/ })).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await page.screenshot({
+      path: `test-results/catalog-c1-browse-${viewport.width}.png`,
+      fullPage: false,
+      animations: 'disabled',
+    });
+  });
+}
