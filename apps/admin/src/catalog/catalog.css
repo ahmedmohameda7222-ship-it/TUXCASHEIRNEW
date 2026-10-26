@@ -627,11 +627,17 @@
 }
 
 /* Catalog C1: approved responsive Products directory, retaining real draft and query controls. */
+.admin-catalog-products-browse {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
 .admin-catalog-category-tabs {
   display: flex;
   gap: 6px;
   overflow-x: auto;
-  padding: 12px 14px;
+  padding: 0;
   scrollbar-width: thin;
 }
 
