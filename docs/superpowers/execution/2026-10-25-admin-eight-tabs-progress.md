@@ -1,3 +1,18 @@
+## 2026-10-27 C2 continuation — desktop table parity, transactional CRUD and RBAC checks
+
+**Last independently inspected source HEAD before this ledger commit:** `a088693fd6354c0978d18148fb84a06949924e56` in existing open Draft PR #165. No merge, no Production deployment/SQL. Owner's hosted authenticated and physical UAT explicitly deferred until **after** all eight tabs and a separately authorized squash merge; it is NOT considered passed.
+
+**Gate ledger:** Orders O1–O4 premerge engineering previously PASS; Catalog C1 source-engineering gate passed at `960f941d5520913832dfe1fc4cc18fd12c835fd4` with original evidence. **Catalog C2 is ACTIVE, NOT ACCEPTED.** C3–C5, Inventory, Purchasing, Customers/CRM, Staff, Finance and Reports remain LOCKED/NOT ACCEPTED (later-tab partial source changes preserved, never reverted).
+
+**RED→GREEN work:**
+- Existing C2 regression from `e426562`: `getByText('Sides')` was ambiguous between a product-category `<option>` and the real created Categories row. Fixed category Browser locator scoped to active `tabpanel` in `2767ebf`–`27cd748`, preserving the actual versioned draft.save assertion. On exact `27cd748`, Fast CI `40409348812` and isolated Orders `40409348820` succeeded; later HEADs require new evidence.
+- Explicit desktop category columns were absent. Unit RED `d984eb7` ([Fast run 40410254951](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40410254951)) failed on missing `data-catalog-definition-columns="categories"`. Implemented Catalog-local `Category / Status / Position / Actions` and `Modifier / Price / Status / Actions` responsive grid at `234ddf9`/`77281c5`; mobile compact rows remain accessible and keep direct move/edit/archive/restore buttons. New 1440px table-column and 390px hidden-header assertions plus screenshots included.
+- Added real mocked-API Chromium category create→reorder→archive→restore test asserting collision-free persisted `sortOrder` 0/10, draft only; modifier create EGP 12.50→authorized price edit EGP 15.75 with saved draft snapshots and mobile screenshot; view-only and edit-without-pricing permission controls (latest `a088693`). These are **tests authored, not yet claim of green browser acceptance**.
+
+**Current-head outstanding gate:** Fast TUX CI `40411554639`, full monorepo/Chromium `40411554664`, Orders PG/Browser `40411554893`, cross-tab rendered `40411554807`, P0 PG `40411554701` all need exact-head final conclusions. At ledger write, changed-file style, related unit, and security had passed but suite-wide results were incomplete. Verify desktop 1440 and mobile 390 against approved Catalog refs 09–12 and inspect screenshots/artifacts from final current HEAD, not older captures. Do not close C2 or unlock C3 until modifier/archive/reorder/RBAC/conflict and visual gates all pass.
+
+---
+
 ## Catalog C2 focused implementation and acceptance checkpoint — 2026-10-26
 
 **Exact source HEAD inspected before this ledger update:** `6ae034e39d2b9c306f43e5740b11c4e4015f400c`; PR #165 DRAFT/HOLD. C1 premerge engineering passed at immutable `960f941d5520913832dfe1fc4cc18fd12c835fd4` with 5/5 independent green workflows, screenshots 1440/390/360, shop/query/browser checks. That does NOT imply post-merge authenticated physical/Owner UAT, which Owner has intentionally deferred until all tabs are implemented and separately approved squash merge.
