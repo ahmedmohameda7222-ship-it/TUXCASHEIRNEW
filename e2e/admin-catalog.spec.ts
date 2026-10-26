@@ -317,7 +317,12 @@ test('C2 definitions tabs match accessible desktop collection switching', async 
   await expect(page.getByRole('button', { name: 'Add category' })).toBeVisible();
   const categoryColumns = page.locator('[data-catalog-definition-columns="categories"]');
   await expect(categoryColumns).toBeVisible();
-  await expect(categoryColumns.locator('span')).toHaveText(['Category', 'Status', 'Position', 'Actions']);
+  await expect(categoryColumns.locator('span')).toHaveText([
+    'Category',
+    'Status',
+    'Position',
+    'Actions',
+  ]);
   await page.screenshot({ path: 'test-results/catalog-c2-categories-desktop-1440.png' });
 
   await page.getByRole('tab', { name: /Modifiers \/ Extras/ }).click();
@@ -325,7 +330,12 @@ test('C2 definitions tabs match accessible desktop collection switching', async 
   await expect(page.getByRole('button', { name: 'Add category' })).toHaveCount(0);
   const modifierColumns = page.locator('[data-catalog-definition-columns="modifiers"]');
   await expect(modifierColumns).toBeVisible();
-  await expect(modifierColumns.locator('span')).toHaveText(['Modifier', 'Price', 'Status', 'Actions']);
+  await expect(modifierColumns.locator('span')).toHaveText([
+    'Modifier',
+    'Price',
+    'Status',
+    'Actions',
+  ]);
   await page.screenshot({ path: 'test-results/catalog-c2-modifiers-desktop-1440.png' });
 });
 
