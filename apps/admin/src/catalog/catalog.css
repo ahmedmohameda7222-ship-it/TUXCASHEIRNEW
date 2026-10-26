@@ -1066,39 +1066,38 @@
   margin: 0;
 }
 
-.admin-catalog-definition-row .admin-catalog-record-actions {
-  position: relative;
+.admin-catalog-definition-actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
 }
 
-.admin-catalog-definition-row .admin-catalog-record-actions > summary {
-  width: 44px;
-  min-height: 44px;
+.admin-catalog-definition-action-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
   justify-content: center;
+  width: 34px;
+  min-height: 34px;
   border: 1px solid var(--tux-border-subtle);
-  border-radius: var(--tux-radius-control);
-  font-size: 0;
-  list-style: none;
-}
-
-.admin-catalog-definition-row .admin-catalog-record-actions > summary::after {
-  content: '⋯';
-  font-size: 20px;
-  line-height: 1;
-}
-
-.admin-catalog-definition-row .admin-catalog-record-actions[open] .admin-inventory-page-actions {
-  position: absolute;
-  z-index: 4;
-  top: calc(100% + 4px);
-  right: 0;
-  display: grid;
-  gap: 6px;
-  min-width: 168px;
-  padding: 8px;
-  border: 1px solid var(--tux-border-subtle);
-  border-radius: var(--tux-radius-control);
+  border-radius: 8px;
   background: var(--tux-surface-panel);
-  box-shadow: var(--tux-shadow-sm);
+  color: var(--tux-text-primary);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.admin-catalog-definition-action-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.admin-catalog-definition-action-button:focus-visible {
+  outline: 2px solid var(--tux-text-primary);
+  outline-offset: 2px;
 }
 
 @media (max-width: 767px) {
