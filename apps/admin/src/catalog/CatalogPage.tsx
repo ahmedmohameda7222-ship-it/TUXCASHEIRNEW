@@ -467,7 +467,14 @@ export function CatalogPage() {
       ) : null}
 
       {catalog.activeDraft ? (
-        <div className="admin-catalog-draft-banner" role="status">
+        <div
+          className={
+            definitionsOpen
+              ? 'admin-catalog-draft-banner is-managing'
+              : 'admin-catalog-draft-banner'
+          }
+          role="status"
+        >
           <div>
             <strong>Draft in progress</strong>
             <span>Your saved changes are not visible to customers yet.</span>
@@ -540,18 +547,14 @@ export function CatalogPage() {
         </div>
       ) : null}
 
-      <div className="admin-catalog-scope" role="status">
-        <strong>
-          {principal.shopSummaries?.find((shop) => shop.id === shopId)?.name ?? 'Selected shop'}
-        </strong>
-        <span>
-          {definitionsOpen
-            ? 'Organize catalog definitions'
-            : mobileEditing
-              ? 'Editing product draft'
-              : 'Browse live catalog'}
-        </span>
-      </div>
+      {!definitionsOpen ? (
+        <div className="admin-catalog-scope" role="status">
+          <strong>
+            {principal.shopSummaries?.find((shop) => shop.id === shopId)?.name ?? 'Selected shop'}
+          </strong>
+          <span>{mobileEditing ? 'Editing product draft' : 'Browse live catalog'}</span>
+        </div>
+      ) : null}
 
       {!bulkOpen && !definitionsOpen && scopedProducts.length === 0 ? (
         <CatalogFirstRunGuide
