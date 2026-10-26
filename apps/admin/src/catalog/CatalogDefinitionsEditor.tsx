@@ -376,11 +376,10 @@ export function CatalogDefinitionsEditor({
               maxLength={160}
               value={editor.name}
               disabled={pending}
-              onChange={(event) =>
-                setEditor((current) =>
-                  current ? { ...current, name: event.currentTarget.value } : current,
-                )
-              }
+              onChange={(event) => {
+                const nextValue = event.currentTarget.value;
+                setEditor((current) => (current ? { ...current, name: nextValue } : current));
+              }}
             />
           </label>
           {editor.collection === 'categories' ? (
@@ -391,11 +390,10 @@ export function CatalogDefinitionsEditor({
                 maxLength={600}
                 value={editor.description}
                 disabled={pending}
-                onChange={(event) =>
-                  setEditor((current) =>
-                    current ? { ...current, description: event.currentTarget.value } : current,
-                  )
-                }
+                onChange={(event) => {
+                  const nextValue = event.currentTarget.value;
+                  setEditor((current) => (current ? { ...current, description: nextValue } : current));
+                }}
               />
             </label>
           ) : (
@@ -405,11 +403,10 @@ export function CatalogDefinitionsEditor({
                 inputMode="decimal"
                 value={editor.price}
                 disabled={pending || !canPrice}
-                onChange={(event) =>
-                  setEditor((current) =>
-                    current ? { ...current, price: event.currentTarget.value } : current,
-                  )
-                }
+                onChange={(event) => {
+                  const nextValue = event.currentTarget.value;
+                  setEditor((current) => (current ? { ...current, price: nextValue } : current));
+                }}
               />
             </label>
           )}
@@ -421,11 +418,10 @@ export function CatalogDefinitionsEditor({
               step={1}
               value={editor.sortOrder}
               disabled={pending}
-              onChange={(event) =>
-                setEditor((current) =>
-                  current ? { ...current, sortOrder: event.currentTarget.value } : current,
-                )
-              }
+              onChange={(event) => {
+                const nextValue = event.currentTarget.value;
+                setEditor((current) => (current ? { ...current, sortOrder: nextValue } : current));
+              }}
             />
           </label>
           <label className="admin-check-field">
@@ -433,11 +429,10 @@ export function CatalogDefinitionsEditor({
               type="checkbox"
               checked={editor.active}
               disabled={pending}
-              onChange={(event) =>
-                setEditor((current) =>
-                  current ? { ...current, active: event.currentTarget.checked } : current,
-                )
-              }
+              onChange={(event) => {
+                const nextValue = event.currentTarget.checked;
+                setEditor((current) => (current ? { ...current, active: nextValue } : current));
+              }}
             />
             <span>Active</span>
           </label>
