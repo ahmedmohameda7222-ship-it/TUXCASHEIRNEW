@@ -444,7 +444,7 @@ test('C2 modifier create and authorized price edit persist only in the catalog d
   await page.getByRole('button', { name: 'Edit Cheese' }).click();
   await page.getByRole('textbox', { name: 'Extra price (EGP)' }).fill('15.75');
   await page.getByRole('button', { name: 'Save definition to draft' }).click();
-  await expect(page.getByText('EGP 15.75')).toBeVisible();
+  await expect(page.locator('.admin-catalog-definition-row')).toContainText('15.75');
   changed = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
   modifiers = (changed?.snapshot as { modifiers?: Array<{
     name: string;
