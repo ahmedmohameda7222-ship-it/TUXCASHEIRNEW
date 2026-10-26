@@ -589,3 +589,27 @@ test('C1 product browse uses authorized image preview for an existing imageKey',
   await expect(thumbnail).toHaveAttribute('alt', '');
   expect(requestedImages).toContain('products/classic-smash.png');
 });
+
+test('C1 approved primary Catalog action is green with no redundant eyebrow at desktop and mobile', async ({
+  page,
+}) => {
+  await mockCatalog(page, { productCount: 12 });
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await page.goto('/catalog/products');
+    const action = page.getByRole('button', { name: 'New product' });
+    await expect(action).toBeVisible();
+    await expect(page.getByText('Catalog control', { exact: true })).toHaveCount(0);
+    const rgb = await action.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const color = style.backgroundColor.match(/\d+/g)?.slice(0, 3).map(Number);
+      return color ?? [];
+    });
+    expect(rgb).toHaveLength(3);
+    expect(rgb[1]).toBeGreaterThan(rgb[0]);
+    expect(rgb[1]).toBeGreaterThan(rgb[2]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
+});
