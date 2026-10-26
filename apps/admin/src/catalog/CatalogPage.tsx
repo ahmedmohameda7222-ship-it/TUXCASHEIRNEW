@@ -402,22 +402,24 @@ export function CatalogPage() {
         </div>
       }
     >
-      <div className="admin-catalog-draft-banner" role="status">
-        <div>
-          <strong>
-            {principal.shopSummaries?.find((shop) => shop.id === shopId)?.name ?? 'Selected shop'}
-            {' · '}Published version {catalog.workspaceQuery.data.currentPublishVersion}
-          </strong>
-          <span>
-            Save Draft is private. Review & Publish, then Publish Now after any required approval,
-            updates Operations and the public menu.
+      {catalog.compatibleDrafts.length > 0 && !catalog.activeDraft ? (
+        <div className="admin-catalog-draft-banner" role="status">
+          <div>
+            <strong>
+              {principal.shopSummaries?.find((shop) => shop.id === shopId)?.name ?? 'Selected shop'}
+              {' · '}Published version {catalog.workspaceQuery.data.currentPublishVersion}
+            </strong>
+            <span>
+              Save Draft is private. Review & Publish, then Publish Now after any required approval,
+              updates Operations and the public menu.
+            </span>
+          </div>
+          <span className="admin-status-pill">
+            {catalog.compatibleDrafts.length} pending{' '}
+            {catalog.compatibleDrafts.length === 1 ? 'draft' : 'drafts'}
           </span>
         </div>
-        <span className="admin-status-pill">
-          {catalog.compatibleDrafts.length} pending{' '}
-          {catalog.compatibleDrafts.length === 1 ? 'draft' : 'drafts'}
-        </span>
-      </div>
+      ) : null}
 
       {draftSaved ? (
         <div className="admin-callout" role="status">
