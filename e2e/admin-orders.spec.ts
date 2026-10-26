@@ -1205,3 +1205,36 @@ test('O11 mobile Escape restores cancellation focus and clears unsent PIN', asyn
     page.getByRole('dialog', { name: 'Cancel order' }).getByLabel('Admin PIN'),
   ).toHaveValue('');
 });
+
+test('O10 successful Admin cancellation sends PIN only to reauthentication and leaves no stored PIN', async ({ page }) => {
+  const unexpectedConsoleLeaks: string[] = [];
+  page.on('console', (entry) => {
+    if (entry.text().includes('1234')) unexpectedConsoleLeaks.push(entry.type());
+  });
+  const fixture = await mockOrders(page);
+  await page.goto('/orders');
+  await page.getByRole('button', { name: /#101/ }).click();
+  await page.getByRole('button', { name: 'Cancel order' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Cancel order' });
+  await dialog.getByLabel('Admin PIN').fill('1234');
+  await dialog.getByRole('button', { name: 'Confirm cancellation' }).click();
+  await expect.poll(() => fixture.commands.length).toBe(1);
+  await expect(dialog).toHaveCount(0);
+
+  const command = fixture.commands[0];
+  expect(command).toMatchObject({
+    type: 'order.cancel',
+    shopId,
+    orderId: activeOrderId,
+    reasonCodeId: cancellationReasonId,
+  });
+  expect(command).not.toHaveProperty('pin');
+  expect(JSON.stringify(command)).not.toContain('"1234"');
+  const browserState = await page.evaluate(() => ({
+    local: Object.keys(localStorage).map((key) => [key, localStorage.getItem(key)]),
+    session: Object.keys(sessionStorage).map((key) => [key, sessionStorage.getItem(key)]),
+  }));
+  expect(JSON.stringify(browserState)).not.toContain('"1234"');
+  expect(unexpectedConsoleLeaks).toEqual([]);
+});
