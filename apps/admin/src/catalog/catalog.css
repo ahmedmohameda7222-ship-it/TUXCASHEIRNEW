@@ -842,3 +842,69 @@
     grid-row: 3;
   }
 }
+
+/* C1 visual parity: mobile browse shows real products in the first viewport.
+ * Advanced commands are reachable after the product list, not removed. */
+.admin-catalog-mobile-secondary-tools {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .admin-catalog-new-product-controls {
+    width: 100%;
+    max-width: none;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .admin-catalog-new-product-controls > .admin-catalog-secondary-management,
+  .admin-catalog-new-product-controls > .admin-catalog-category-choice {
+    display: none;
+  }
+
+  .admin-catalog-new-product-controls > button:not(.admin-catalog-secondary-management) {
+    width: 100%;
+    min-height: 44px;
+    grid-column: 1;
+  }
+
+  .admin-catalog-draft-banner {
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .admin-catalog-draft-banner span:not(.admin-status-pill) {
+    font-size: 12px;
+  }
+
+  .admin-catalog-scope {
+    display: none;
+  }
+
+  .admin-catalog-mobile-secondary-tools {
+    display: block;
+    margin-top: 12px;
+    border: 1px solid var(--tux-border-subtle);
+    border-radius: var(--tux-radius-control);
+    background: var(--tux-surface-panel);
+  }
+
+  .admin-catalog-mobile-secondary-tools > summary {
+    min-height: 44px;
+    padding: 12px;
+    color: var(--tux-text-secondary);
+    cursor: pointer;
+  }
+
+  .admin-catalog-mobile-secondary-tools__actions {
+    display: grid;
+    gap: 10px;
+    padding: 0 12px 12px;
+  }
+
+  .admin-catalog-mobile-secondary-tools__actions .admin-secondary-button {
+    width: 100%;
+    min-height: 44px;
+  }
+}
