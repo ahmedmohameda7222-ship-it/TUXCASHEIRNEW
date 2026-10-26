@@ -34,6 +34,9 @@ type FixtureProduct = {
   sortOrder: number;
 };
 
+type C2CategorySnapshot = { name: string; sortOrder: number; active: boolean };
+type C2ModifierSnapshot = { name: string; priceMinor: number };
+
 type CatalogCommandBody = {
   type?: string;
   soldOut?: boolean;
@@ -390,10 +393,8 @@ test('C2 category reordering and archive/restore remain atomic unpublished draft
   await expect(categoryNames).toHaveText(['Sides', 'Burgers']);
 
   const reordered = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
-  const orderedCategories = (reordered?.snapshot as { categories?: Array<{
-    name: string;
-    sortOrder: number;
-  }> })?.categories;
+  const orderedSnapshot = reordered?.snapshot as { categories?: C2CategorySnapshot[] };
+  const orderedCategories = orderedSnapshot.categories;
   expect(orderedCategories?.map(({ name, sortOrder }) => ({ name, sortOrder }))).toEqual([
     { name: 'Sides', sortOrder: 0 },
     { name: 'Burgers', sortOrder: 10 },
@@ -405,10 +406,8 @@ test('C2 category reordering and archive/restore remain atomic unpublished draft
   await expect(page.getByRole('button', { name: 'Archive Sides' })).toBeVisible();
 
   const restored = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
-  const restoredCategories = (restored?.snapshot as { categories?: Array<{
-    name: string;
-    active: boolean;
-  }> })?.categories;
+  const restoredSnapshot = restored?.snapshot as { categories?: C2CategorySnapshot[] };
+  const restoredCategories = restoredSnapshot.categories;
   expect(restoredCategories?.find(({ name }) => name === 'Sides')?.active).toBe(true);
   expect(fixture.commands.map(({ type }) => type)).toEqual([
     'draft.create',
@@ -435,10 +434,8 @@ test('C2 modifier create and authorized price edit persist only in the catalog d
   await page.screenshot({ path: 'test-results/catalog-c2-created-modifier-mobile-390.png' });
 
   let changed = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
-  let modifiers = (changed?.snapshot as { modifiers?: Array<{
-    name: string;
-    priceMinor: number;
-  }> })?.modifiers;
+  const initialSnapshot = changed?.snapshot as { modifiers?: C2ModifierSnapshot[] };
+  let modifiers = initialSnapshot.modifiers;
   expect(modifiers?.find(({ name }) => name === 'Cheese')?.priceMinor).toBe(1250);
 
   await page.getByRole('button', { name: 'Edit Cheese' }).click();
@@ -446,10 +443,8 @@ test('C2 modifier create and authorized price edit persist only in the catalog d
   await page.getByRole('button', { name: 'Save definition to draft' }).click();
   await expect(page.locator('.admin-catalog-definition-row')).toContainText('15.75');
   changed = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
-  modifiers = (changed?.snapshot as { modifiers?: Array<{
-    name: string;
-    priceMinor: number;
-  }> })?.modifiers;
+  const updatedSnapshot = changed?.snapshot as { modifiers?: C2ModifierSnapshot[] };
+  modifiers = updatedSnapshot.modifiers;
   expect(modifiers?.find(({ name }) => name === 'Cheese')?.priceMinor).toBe(1575);
   expect(fixture.commands.map(({ type }) => type)).toEqual([
     'draft.create',
