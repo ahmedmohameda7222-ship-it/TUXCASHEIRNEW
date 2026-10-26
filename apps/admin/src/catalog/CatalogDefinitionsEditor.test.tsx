@@ -38,6 +38,25 @@ describe('catalog category/modifier management', () => {
     expect(html).not.toContain('Edit Cheese');
     expect(html).toContain('Draft');
   });
+  it('renders direct accessible reorder/edit/archive controls without a hidden overflow menu', () => {
+    const html = renderToStaticMarkup(
+      <CatalogDefinitionsEditor
+        shopId="shop"
+        categories={categories}
+        modifiers={modifiers}
+        canEdit
+        canPrice
+        pending={false}
+        onSave={vi.fn()}
+      />,
+    );
+    expect(html).toContain('aria-label="Move up Burgers"');
+    expect(html).toContain('aria-label="Move down Burgers"');
+    expect(html).toContain('aria-label="Edit Burgers"');
+    expect(html).toContain('aria-label="Archive Burgers"');
+    expect(html).not.toContain('<details');
+  });
+
   it('does not render categories from another shop even if the upstream payload is mixed', () => {
     const html = renderToStaticMarkup(
       <CatalogDefinitionsEditor
