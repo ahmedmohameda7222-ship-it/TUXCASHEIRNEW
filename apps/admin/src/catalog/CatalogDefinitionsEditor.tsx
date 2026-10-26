@@ -75,16 +75,16 @@ export function CatalogDefinitionsEditor({
   const tabIdPrefix = useId();
   const [error, setError] = useState<string | null>(null);
   useUnsavedShopDraft(editor !== null);
-  const orderedCategories = [...categories].sort(
-    (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
-  );
-  const orderedModifiers = [...modifiers].sort(
-    (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
-  );
+  const orderedCategories = categories
+    .filter((category) => category.shopId === shopId)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  const orderedModifiers = modifiers
+    .filter((modifier) => modifier.shopId === shopId)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
 
   function beginCreate(collection: CatalogDefinitionCollection) {
     if (!canEdit || (collection === 'modifiers' && !canPrice)) return;
-    const current = collection === 'categories' ? categories : modifiers;
+    const current = collection === 'categories' ? orderedCategories : orderedModifiers;
     setEditor({
       collection,
       id: crypto.randomUUID(),
@@ -130,7 +130,7 @@ export function CatalogDefinitionsEditor({
       });
     } else {
       try {
-        const previous = modifiers.find((modifier) => modifier.id === editor.id);
+        const previous = orderedModifiers.find((modifier) => modifier.id === editor.id);
         const priceMinor = canPrice ? parseEgpToMinor(editor.price) : (previous?.priceMinor ?? 0);
         void persist('modifiers', {
           id: editor.id,
