@@ -1,3 +1,14 @@
+## 2026-10-27 C2 authorization and modifier-reorder regression checkpoint
+
+- **Pre-documentation HEAD:** `529dd84abd6b2eeea92267229a88f1802faa4ce3`; Draft PR #165 remains open. No merge, deploy, Production SQL or post-merge Owner UAT.
+- C2 RED/GREEN desktop table UI, category CRUD, modifier price, view-only/editor-only permission cases implemented in earlier C2 commits and logged above. C2 remains **ACTIVE / NOT ACCEPTED** until all mandatory current-HEAD Browser screenshots, security/functional/backend tests, and independent acceptance pass. Orders O1–O4 and Catalog C1 earlier source gates are not re-opened, but regression checks must remain green.
+- New server-side CAT-MGMT-02 regression at `0822521`: `catalogService.saveCatalogDraftChange` must reject a forged modifier `modifiers[].priceMinor` bundle change for a principal with only `catalog.edit`, before invoking persistence. Server pathTouchesPricing and PostgreSQL canonical validation remain authoritative; never trust UI alone.
+- New collision-free modifier reorder regression at `529dd84`: preserving `productModifierLinks` while moving two modifiers to sort orders 0/10 through the existing versioned bundle, with no in-place input mutation.
+- **Verification pending on new exact HEAD:** Fast CI, Orders PostgreSQL/browser, P0 PG, full Chromium/monorepo and rendered cross-tab workflows. No green claim for these two newest test additions before the job conclusions and logs are reviewed.
+- Catalog C3–C5 and Inventory/Purchasing/Customers/Staff/Finance/Reports remain LOCKED / NOT ACCEPTED. Owner-hosted/physical real-app UAT remains deferred until all tasks and independently authorized squash merge.
+
+---
+
 ## 2026-10-27 C2 continuation — desktop table parity, transactional CRUD and RBAC checks
 
 **Last independently inspected source HEAD before this ledger commit:** `a088693fd6354c0978d18148fb84a06949924e56` in existing open Draft PR #165. No merge, no Production deployment/SQL. Owner's hosted authenticated and physical UAT explicitly deferred until **after** all eight tabs and a separately authorized squash merge; it is NOT considered passed.
