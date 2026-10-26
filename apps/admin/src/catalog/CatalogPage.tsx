@@ -322,7 +322,13 @@ export function CatalogPage() {
       title="Catalog"
       description="Manage products, prices, availability, and changes waiting to be published."
       primaryAction={
-        <div className="admin-catalog-new-product-controls">
+        <div
+          className={
+            definitionsOpen
+              ? 'admin-catalog-new-product-controls is-managing'
+              : 'admin-catalog-new-product-controls'
+          }
+        >
           {canEdit ? (
             <button
               className="admin-secondary-button"
