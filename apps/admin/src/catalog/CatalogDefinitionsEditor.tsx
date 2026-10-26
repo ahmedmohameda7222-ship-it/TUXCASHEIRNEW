@@ -230,9 +230,12 @@ export function CatalogDefinitionsEditor({
                   {category.active ? 'Active' : 'Archived'} · Position {category.sortOrder}
                 </span>
               </div>
-
               {canEdit ? (
-                <div className="admin-catalog-definition-actions" role="group" aria-label={`Actions for ${category.name}`}>
+                <div
+                  className="admin-catalog-definition-actions"
+                  role="group"
+                  aria-label={`Actions for ${category.name}`}
+                >
                   <button
                     className="admin-catalog-definition-action-button"
                     type="button"
@@ -268,12 +271,12 @@ export function CatalogDefinitionsEditor({
                     onClick={() =>
                       void persist('categories', {
                         id: category.id,
-                          shopId,
-                          slug: category.slug,
-                          name: category.name,
-                          description: category.description,
-                          sortOrder: category.sortOrder,
-                          active: !category.active,
+                        shopId,
+                        slug: category.slug,
+                        name: category.name,
+                        description: category.description,
+                        sortOrder: category.sortOrder,
+                        active: !category.active,
                       })
                     }
                   >
@@ -317,9 +320,12 @@ export function CatalogDefinitionsEditor({
                   {modifier.active ? 'Active' : 'Archived'}
                 </span>
               </div>
-
               {canEdit ? (
-                <div className="admin-catalog-definition-actions" role="group" aria-label={`Actions for ${modifier.name}`}>
+                <div
+                  className="admin-catalog-definition-actions"
+                  role="group"
+                  aria-label={`Actions for ${modifier.name}`}
+                >
                   <button
                     className="admin-catalog-definition-action-button"
                     type="button"
@@ -355,11 +361,11 @@ export function CatalogDefinitionsEditor({
                     onClick={() =>
                       void persist('modifiers', {
                         id: modifier.id,
-                          shopId,
-                          name: modifier.name,
-                          priceMinor: modifier.priceMinor,
-                          active: !modifier.active,
-                          sortOrder: modifier.sortOrder,
+                        shopId,
+                        name: modifier.name,
+                        priceMinor: modifier.priceMinor,
+                        active: !modifier.active,
+                        sortOrder: modifier.sortOrder,
                       })
                     }
                   >
