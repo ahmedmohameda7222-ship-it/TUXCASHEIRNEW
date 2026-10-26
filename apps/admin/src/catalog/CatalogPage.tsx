@@ -615,7 +615,7 @@ export function CatalogPage() {
               <summary>More catalog tools</summary>
               <div className="admin-catalog-mobile-secondary-tools__actions">
                 <button
-                  className="admin-secondary-button"
+                  className="admin-secondary-button admin-catalog-mobile-tool-button"
                   type="button"
                   onClick={() => requestCatalogNavigation('/catalog/products/publishing')}
                 >
@@ -623,7 +623,7 @@ export function CatalogPage() {
                 </button>
                 {canEdit ? (
                   <button
-                    className="admin-secondary-button"
+                    className="admin-secondary-button admin-catalog-mobile-tool-button"
                     type="button"
                     disabled={busy}
                     onClick={() => {
