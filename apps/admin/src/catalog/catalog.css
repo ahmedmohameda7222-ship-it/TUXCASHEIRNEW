@@ -996,6 +996,19 @@
   }
 }
 
+/* C2 uses the approved cream Draft treatment without changing Product browse banners. */
+.admin-catalog-draft-banner.is-managing {
+  border-color: #eddbbd;
+  background: #fffbf3;
+}
+
+.admin-catalog-draft-banner.is-managing .admin-status-pill {
+  border-color: transparent;
+  border-radius: 6px;
+  background: #fff0d7;
+  color: #9a692d;
+}
+
 /* C2: a Manage screen has only its contextual Back action, not product commands. */
 .admin-catalog-new-product-controls.is-managing {
   display: flex;
