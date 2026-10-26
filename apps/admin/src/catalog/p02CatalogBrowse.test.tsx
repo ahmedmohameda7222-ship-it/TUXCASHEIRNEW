@@ -101,9 +101,9 @@ describe('P02 catalog browse regression', () => {
       slug: 'daily-special',
       description: null,
     };
-    expect(
-      filterCatalogProducts([dailySpecial], 'burgers', 'all', '', [category]),
-    ).toEqual([dailySpecial]);
+    expect(filterCatalogProducts([dailySpecial], 'burgers', 'all', '', [category])).toEqual([
+      dailySpecial,
+    ]);
   });
 
   it('C1 mobile filter controls declare an accessible collapsed Filters disclosure', () => {
