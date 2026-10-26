@@ -319,7 +319,6 @@ export function CatalogPage() {
 
   return (
     <PageScaffold
-      eyebrow="Catalog control"
       title="Catalog"
       description="Manage products, prices, availability, and changes waiting to be published."
       primaryAction={
