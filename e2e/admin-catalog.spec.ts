@@ -543,6 +543,7 @@ test('C1 mobile landing exposes the first real product without scrolling past se
   await page.setViewportSize({ width: 390, height: 844 });
   await mockCatalog(page, { productCount: 12 });
   await page.goto('/catalog/products');
+  await expect(page.getByText('0 pending drafts')).toHaveCount(0);
 
   await expect(page.getByRole('button', { name: 'Manage categories & extras' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'New product' })).toBeVisible();
