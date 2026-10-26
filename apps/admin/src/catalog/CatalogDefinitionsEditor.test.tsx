@@ -31,9 +31,11 @@ describe('catalog category/modifier management', () => {
       />,
     );
     expect(html).toContain('Add category');
-    expect(html).toContain('Add modifier');
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain('role="tab"');
+    expect(html).toContain('aria-selected="true"');
     expect(html).toContain('Edit Burgers');
-    expect(html).toContain('Edit Cheese');
+    expect(html).not.toContain('Edit Cheese');
     expect(html).toContain('Draft');
   });
   it('does not expose mutating actions without catalog.edit', () => {
