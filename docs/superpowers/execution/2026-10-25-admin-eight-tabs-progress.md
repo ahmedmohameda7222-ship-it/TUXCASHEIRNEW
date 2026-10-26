@@ -1,3 +1,15 @@
+## 2026-10-27 Catalog C2 exact-head premerge engineering acceptance
+
+**DECISION: Catalog C2 PRE-MERGE ENGINEERING GATE PASS at immutable `677f4423bb13617a5921ceec276136471d6ec21e`; C3 now sole ACTIVE tab-task.** Owner authenticated hosted/physical UAT remains explicitly DEFERRED until after all tabs and separately authorized squash merge. This is not acceptance for entire Catalog C1–C5 nor production deployment.
+
+**Exact-head independent five workflow groups SUCCESS:** [Fast CI 40420003422](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40420003422) (unit/integration, format/lint, TypeScript, security, migration checks); [P0 Business Day real PostgreSQL 40420003415](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40420003415); [Orders PG/browser/builds 40420003404](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40420003404); [six-tab rendered 40420003425](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40420003425); [Full Regression 40420003412](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40420003412), with all eight jobs green and **311 Admin Chromium tests PASS / 19 skipped**. Explicit C2 browser tests for mobile/desktop accessible Categories vs Modifiers tabs, desktop four-track grid alignment, single warm Draft banner, no extra Manage shop bar, category create→draft.save→reorder→archive→restore, modifier EGP price draft create/edit, catalog.view-only/can-edit-without-pricing permissions all executed green. Server modifier price permission and stable modifier/product-link reorder regressions and mixed-shop isolation covered.
+
+**Independent actual browser screenshots reviewed:** Full-run artifact `admin-rendered-e2e` #12698200125, `test-results/catalog-c2-categories-desktop-1440.png`, `catalog-c2-categories-mobile-390.png`, `catalog-c2-modifiers-desktop-1440.png`, `catalog-c2-modifiers-mobile-390.png`, `catalog-c2-created-modifier-mobile-390.png`. Compared to approved `09-categories-desktop-1440`, `10-categories-mobile-390`, `11-extras-desktop-1440`, `12-extras-mobile-390`. Core layout, selection, command placement, four columns, mobile compact direct actions, and Draft non-live hierarchy implemented. Approved reference example shows 7 categories/13 extras while the actual test fixture has one category/no modifiers before editing; no fabricated data injected. Shared Admin chrome/overall font metrics differ and are deliberately out of Catalog C2 scope for later Owner product-wide visual review.
+
+**Safety restrictions:** PR #165 remains Draft/open; no merge, deployment, Production SQL, or Owner physical UAT. C1 and C2 premerge engineering source passes only; C3 ACTIVE; C4–C5 LOCKED and Inventory/Purchasing/Customers/Staff/Finance/Reports all not accepted/LOCKED, preserving valid partial code.
+
+---
+
 ## 2026-10-27 C2 authorization and modifier-reorder regression checkpoint
 
 - **Pre-documentation HEAD:** `529dd84abd6b2eeea92267229a88f1802faa4ce3`; Draft PR #165 remains open. No merge, deploy, Production SQL or post-merge Owner UAT.
