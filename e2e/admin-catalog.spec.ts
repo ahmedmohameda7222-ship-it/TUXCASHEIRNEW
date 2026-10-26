@@ -536,3 +536,18 @@ test('C1 mobile category browse preserves real product routing without horizonta
   await page.getByRole('button', { name: 'Products', exact: true }).click();
   await expect(page.locator('[data-catalog-list]')).toBeVisible();
 });
+
+
+test('C1 mobile landing exposes the first real product without scrolling past secondary tools', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCatalog(page, { productCount: 12 });
+  await page.goto('/catalog/products');
+
+  await expect(page.getByRole('button', { name: 'Manage categories & extras' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New product' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Classic Smash/ })).toBeInViewport({
+    ratio: 0.25,
+  });
+});
