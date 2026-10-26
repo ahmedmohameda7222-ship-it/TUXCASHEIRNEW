@@ -278,6 +278,34 @@ for (const viewport of ADMIN_WIDE_TABLET_VIEWPORTS) {
   });
 }
 
+test('C2 definitions tabs show the selected collection and protect an open editor', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+
+  const categories = page.getByRole('tab', { name: /Categories/ });
+  const modifiers = page.getByRole('tab', { name: /Modifiers \/ Extras/ });
+  await expect(categories).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'Categories', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Modifiers / extras' })).toHaveCount(0);
+
+  await modifiers.click();
+  await expect(modifiers).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'Modifiers / extras' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Categories', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add modifier' }).click();
+  await expect(page.getByRole('heading', { name: 'Modifier details' })).toBeVisible();
+  await expect(categories).toBeDisabled();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  await categories.click();
+  await expect(categories).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'Categories', exact: true })).toBeVisible();
+});
+
 test('catalog search filters the live workspace without mutating authority', async ({ page }) => {
   await mockCatalog(page);
   await page.goto('/catalog/products');
