@@ -75,7 +75,12 @@ function canonicalBundle(product: FixtureProduct, version: number) {
 
 async function mockCatalog(
   page: Page,
-  options: { allowSecondShop?: boolean; productCount?: number; emptyCatalog?: boolean } = {},
+  options: {
+    allowSecondShop?: boolean;
+    productCount?: number;
+    emptyCatalog?: boolean;
+    permissions?: string[];
+  } = {},
 ) {
   let publishVersion = 48;
   let draftRevision = 1;
@@ -106,6 +111,7 @@ async function mockCatalog(
         ...ownerSession,
         principal: {
           ...ownerSession.principal,
+          permissions: options.permissions ?? ownerSession.principal.permissions,
           shopIds: options.allowSecondShop ? [shopId, secondShopId] : [shopId],
           shopSummaries: options.allowSecondShop
             ? [
@@ -451,6 +457,29 @@ test('C2 modifier create and authorized price edit persist only in the catalog d
     'draft.save',
     'draft.save',
   ]);
+});
+
+test('C2 read-only viewers cannot manage definitions, and editors without pricing cannot add extras', async ({
+  page,
+}) => {
+  await mockCatalog(page, { permissions: ['catalog.view'] });
+  await page.goto('/catalog/products');
+  await expect(page.getByRole('button', { name: 'Manage categories & extras' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'New product' })).toBeDisabled();
+});
+
+test('C2 catalog.edit alone permits category drafts but no modifier pricing actions', async ({
+  page,
+}) => {
+  const fixture = await mockCatalog(page, {
+    permissions: ['catalog.view', 'catalog.edit'],
+  });
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+  await expect(page.getByRole('button', { name: 'Add category' })).toBeVisible();
+  await page.getByRole('tab', { name: /Modifiers \/ Extras/ }).click();
+  await expect(page.getByRole('button', { name: 'Add modifier' })).toHaveCount(0);
+  expect(fixture.commands.map(({ type }) => type)).toEqual(['draft.create']);
 });
 
 test('catalog search filters the live workspace without mutating authority', async ({ page }) => {
