@@ -184,8 +184,8 @@ export function ProductList({
               <select
                 value={status}
                 onChange={(event) =>
-                onStatusChange(event.currentTarget.value as CatalogStatusFilter)
-              }
+                  onStatusChange(event.currentTarget.value as CatalogStatusFilter)
+                }
               >
                 <option value="all">All status</option>
                 <option value="available">Available</option>
