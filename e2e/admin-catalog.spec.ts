@@ -374,6 +374,90 @@ test('C2 category creation persists to its shop draft without publication', asyn
   );
 });
 
+test('C2 category reordering and archive/restore remain atomic unpublished drafts', async ({
+  page,
+}) => {
+  const fixture = await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+  await page.getByRole('button', { name: 'Add category' }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Sides');
+  await page.getByRole('button', { name: 'Save definition to draft' }).click();
+
+  const categoryNames = page.locator('.admin-catalog-definition-row__main strong');
+  await expect(categoryNames).toHaveText(['Burgers', 'Sides']);
+  await page.getByRole('button', { name: 'Move up Sides' }).click();
+  await expect(categoryNames).toHaveText(['Sides', 'Burgers']);
+
+  const reordered = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
+  const orderedCategories = (reordered?.snapshot as { categories?: Array<{
+    name: string;
+    sortOrder: number;
+  }> })?.categories;
+  expect(orderedCategories?.map(({ name, sortOrder }) => ({ name, sortOrder }))).toEqual([
+    { name: 'Sides', sortOrder: 0 },
+    { name: 'Burgers', sortOrder: 10 },
+  ]);
+
+  await page.getByRole('button', { name: 'Archive Sides' }).click();
+  await expect(page.getByRole('button', { name: 'Restore Sides' })).toBeVisible();
+  await page.getByRole('button', { name: 'Restore Sides' }).click();
+  await expect(page.getByRole('button', { name: 'Archive Sides' })).toBeVisible();
+
+  const restored = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
+  const restoredCategories = (restored?.snapshot as { categories?: Array<{
+    name: string;
+    active: boolean;
+  }> })?.categories;
+  expect(restoredCategories?.find(({ name }) => name === 'Sides')?.active).toBe(true);
+  expect(fixture.commands.map(({ type }) => type)).toEqual([
+    'draft.create',
+    'draft.save',
+    'draft.save',
+    'draft.save',
+    'draft.save',
+  ]);
+});
+
+test('C2 modifier create and authorized price edit persist only in the catalog draft', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const fixture = await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+  await page.getByRole('tab', { name: /Modifiers \/ Extras/ }).click();
+  await page.getByRole('button', { name: 'Add modifier' }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Cheese');
+  await page.getByRole('textbox', { name: 'Extra price (EGP)' }).fill('12.50');
+  await page.getByRole('button', { name: 'Save definition to draft' }).click();
+  await expect(page.getByRole('button', { name: 'Edit Cheese' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/catalog-c2-created-modifier-mobile-390.png' });
+
+  let changed = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
+  let modifiers = (changed?.snapshot as { modifiers?: Array<{
+    name: string;
+    priceMinor: number;
+  }> })?.modifiers;
+  expect(modifiers?.find(({ name }) => name === 'Cheese')?.priceMinor).toBe(1250);
+
+  await page.getByRole('button', { name: 'Edit Cheese' }).click();
+  await page.getByRole('textbox', { name: 'Extra price (EGP)' }).fill('15.75');
+  await page.getByRole('button', { name: 'Save definition to draft' }).click();
+  await expect(page.getByText('EGP 15.75')).toBeVisible();
+  changed = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
+  modifiers = (changed?.snapshot as { modifiers?: Array<{
+    name: string;
+    priceMinor: number;
+  }> })?.modifiers;
+  expect(modifiers?.find(({ name }) => name === 'Cheese')?.priceMinor).toBe(1575);
+  expect(fixture.commands.map(({ type }) => type)).toEqual([
+    'draft.create',
+    'draft.save',
+    'draft.save',
+  ]);
+});
+
 test('catalog search filters the live workspace without mutating authority', async ({ page }) => {
   await mockCatalog(page);
   await page.goto('/catalog/products');
