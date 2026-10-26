@@ -76,6 +76,26 @@ describe('catalog category/modifier management', () => {
     expect(html).not.toContain('Private');
   });
 
+  it('C2 renders explicit desktop category status and position columns', () => {
+    const html = renderToStaticMarkup(
+      <CatalogDefinitionsEditor
+        shopId="shop"
+        categories={categories}
+        modifiers={modifiers}
+        canEdit
+        canPrice
+        pending={false}
+        onSave={vi.fn()}
+      />,
+    );
+    expect(html).toContain('data-catalog-definition-columns="categories"');
+    expect(html).toContain('>Category</span>');
+    expect(html).toContain('>Status</span>');
+    expect(html).toContain('>Position</span>');
+    expect(html).toContain('class="admin-catalog-definition-status');
+    expect(html).toContain('class="admin-catalog-definition-position');
+  });
+
   it('does not expose mutating actions without catalog.edit', () => {
     const html = renderToStaticMarkup(
       <CatalogDefinitionsEditor
