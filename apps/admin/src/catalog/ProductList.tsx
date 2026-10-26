@@ -1,4 +1,5 @@
 import type { CatalogCategorySummary, CatalogProductDetail } from '@tux/admin-contracts';
+import { useId, useState } from 'react';
 
 import { AvailabilityStatus } from './AvailabilityStatus';
 import { formatEgpMinor } from './ProductEditor';
@@ -10,17 +11,22 @@ export function filterCatalogProducts(
   search: string,
   status: CatalogStatusFilter,
   categoryId: string,
+  categories: readonly CatalogCategorySummary[] = [],
 ): CatalogProductDetail[] {
   const query = search.trim().toLocaleLowerCase();
+  const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
   return products.filter((product) => {
     if (categoryId && product.categoryId !== categoryId) return false;
     if (status === 'available' && (!product.active || product.soldOut)) return false;
     if (status === 'sold-out' && (!product.active || !product.soldOut)) return false;
     if (status === 'archived' && product.active) return false;
     if (!query) return true;
-    return [product.name, product.slug ?? '', product.description ?? ''].some((value) =>
-      value.toLocaleLowerCase().includes(query),
-    );
+    return [
+      product.name,
+      product.slug ?? '',
+      product.description ?? '',
+      categoryNames.get(product.categoryId) ?? '',
+    ].some((value) => value.toLocaleLowerCase().includes(query));
   });
 }
 
@@ -47,7 +53,9 @@ export function ProductList({
   onCategoryChange(value: string): void;
   onSelectProduct(productId: string): void;
 }) {
-  const visibleProducts = filterCatalogProducts(products, search, status, categoryId);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filterControlsId = useId();
+  const visibleProducts = filterCatalogProducts(products, search, status, categoryId, categories);
   const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
   const activeCategories = categories.filter((category) => category.active);
   const categoryCounts = new Map(
@@ -90,7 +98,23 @@ export function ProductList({
             onChange={(event) => onSearchChange(event.currentTarget.value)}
           />
         </label>
-        <div className="admin-catalog-list__filter-row">
+        <button
+          className="admin-catalog-filter-toggle"
+          type="button"
+          aria-expanded={filtersOpen}
+          aria-controls={filterControlsId}
+          onClick={() => setFiltersOpen((current) => !current)}
+        >
+          Filters
+        </button>
+        <div
+          id={filterControlsId}
+          className={
+            filtersOpen
+              ? 'admin-catalog-list__filter-row is-open'
+              : 'admin-catalog-list__filter-row'
+          }
+        >
           <label className="admin-select-field">
             <span>Status</span>
             <select
