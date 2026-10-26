@@ -1,5 +1,5 @@
 import type { CatalogCategorySummary, CatalogProductDetail } from '@tux/admin-contracts';
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 
 import { AvailabilityStatus } from './AvailabilityStatus';
 import { formatEgpMinor } from './ProductEditor';
@@ -28,6 +28,73 @@ export function filterCatalogProducts(
       categoryNames.get(product.categoryId) ?? '',
     ].some((value) => value.toLocaleLowerCase().includes(query));
   });
+}
+
+function CatalogProductThumbnail({
+  product,
+}: {
+  product: CatalogProductDetail;
+}) {
+  const [image, setImage] = useState<{
+    shopId: string;
+    imageKey: string;
+    publicUrl: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!product.imageKey) return;
+    let cancelled = false;
+    const imageKey = product.imageKey;
+    const query = new URLSearchParams({ shopId: product.shopId, imageKey });
+    void fetch(`/api/admin/catalog-image?${query.toString()}`, {
+      credentials: 'same-origin',
+    })
+      .then(async (response): Promise<string | null> => {
+        if (!response.ok) return null;
+        const data: unknown = await response.json();
+        if (
+          typeof data !== 'object' ||
+          data === null ||
+          !('publicUrl' in data) ||
+          typeof data.publicUrl !== 'string'
+        ) {
+          return null;
+        }
+        const url = new URL(data.publicUrl);
+        return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+      })
+      .then((publicUrl) => {
+        if (!cancelled && publicUrl) {
+          setImage({ shopId: product.shopId, imageKey, publicUrl });
+        }
+      })
+      .catch(() => {
+        // A temporarily unavailable preview must not hide or change the product.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [product.shopId, product.imageKey]);
+
+  const imageMatchesProduct =
+    image?.shopId === product.shopId && image.imageKey === product.imageKey;
+
+  return (
+    <span className="admin-product-row__monogram" aria-hidden="true">
+      {imageMatchesProduct ? (
+        <img
+          src={image.publicUrl}
+          alt=""
+          width={36}
+          height={36}
+          loading="lazy"
+          onError={() => setImage(null)}
+        />
+      ) : (
+        product.name.trim().slice(0, 2).toLocaleUpperCase()
+      )}
+    </span>
+  );
 }
 
 export function ProductList({
@@ -181,9 +248,7 @@ export function ProductList({
             onClick={() => onSelectProduct(product.id)}
           >
             <span className="admin-product-row__main">
-              <span className="admin-product-row__monogram" aria-hidden="true">
-                {product.name.trim().slice(0, 2).toLocaleUpperCase()}
-              </span>
+              <CatalogProductThumbnail product={product} />
               <span className="admin-product-row__identity">
                 <strong>{product.name}</strong>
                 <small>
