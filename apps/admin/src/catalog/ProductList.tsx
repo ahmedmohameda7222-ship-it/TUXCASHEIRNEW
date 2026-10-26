@@ -49,16 +49,44 @@ export function ProductList({
 }) {
   const visibleProducts = filterCatalogProducts(products, search, status, categoryId);
   const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
+  const activeCategories = categories.filter((category) => category.active);
+  const categoryCounts = new Map(
+    activeCategories.map((category) => [
+      category.id,
+      products.filter((product) => product.categoryId === category.id).length,
+    ]),
+  );
 
   return (
     <section className="admin-catalog-list" aria-label="Products" data-catalog-list>
+      <nav className="admin-catalog-category-tabs" aria-label="Product categories">
+        <button
+          type="button"
+          className={!categoryId ? 'is-active' : ''}
+          aria-pressed={!categoryId}
+          onClick={() => onCategoryChange('')}
+        >
+          All products <span>{products.length}</span>
+        </button>
+        {activeCategories.map((category) => (
+          <button
+            type="button"
+            key={category.id}
+            className={categoryId === category.id ? 'is-active' : ''}
+            aria-pressed={categoryId === category.id}
+            onClick={() => onCategoryChange(category.id)}
+          >
+            {category.name} <span>{categoryCounts.get(category.id) ?? 0}</span>
+          </button>
+        ))}
+      </nav>
       <div className="admin-catalog-list__filters">
         <label className="admin-search-field">
           <span className="sr-only">Search products</span>
           <input
             type="search"
             value={search}
-            placeholder="Search products"
+            placeholder="Search products by name…"
             onChange={(event) => onSearchChange(event.currentTarget.value)}
           />
         </label>
@@ -90,6 +118,17 @@ export function ProductList({
             </select>
           </label>
         </div>
+        <button
+          className="admin-secondary-button admin-catalog-reset"
+          type="button"
+          onClick={() => {
+            onSearchChange('');
+            onStatusChange('all');
+            onCategoryChange('');
+          }}
+        >
+          Reset
+        </button>
       </div>
 
       <div className="admin-catalog-list__summary" aria-live="polite">
@@ -97,6 +136,13 @@ export function ProductList({
         <span>{visibleProducts.length === 1 ? 'product' : 'products'}</span>
       </div>
 
+      <div className="admin-catalog-list__columns" aria-hidden="true" data-catalog-product-columns>
+        <span>Product</span>
+        <span>Category</span>
+        <span>Price</span>
+        <span>Availability</span>
+        <span />
+      </div>
       <div className="admin-catalog-list__items">
         {visibleProducts.map((product) => (
           <button
@@ -111,13 +157,31 @@ export function ProductList({
             onClick={() => onSelectProduct(product.id)}
           >
             <span className="admin-product-row__main">
-              <strong>{product.name}</strong>
-              <span>{categoryNames.get(product.categoryId) ?? 'Uncategorized'}</span>
+              <span className="admin-product-row__monogram" aria-hidden="true">
+                {product.name.trim().slice(0, 2).toLocaleUpperCase()}
+              </span>
+              <span className="admin-product-row__identity">
+                <strong>{product.name}</strong>
+                <small>
+                  Product · {categoryNames.get(product.categoryId) ?? 'Uncategorized'}
+                  <span className="admin-product-row__mobile-price">
+                    {' · '}EGP {formatEgpMinor(product.priceMinor)}
+                  </span>
+                </small>
+              </span>
+            </span>
+            <span className="admin-product-row__category">
+              {categoryNames.get(product.categoryId) ?? 'Uncategorized'}
             </span>
             <span className="admin-product-row__price">
               EGP {formatEgpMinor(product.priceMinor)}
             </span>
-            <AvailabilityStatus active={product.active} soldOut={product.soldOut} />
+            <span className="admin-product-row__availability">
+              <AvailabilityStatus active={product.active} soldOut={product.soldOut} />
+            </span>
+            <span className="admin-product-row__open" aria-hidden="true">
+              ›
+            </span>
           </button>
         ))}
         {visibleProducts.length === 0 ? (
