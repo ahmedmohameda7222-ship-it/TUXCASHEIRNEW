@@ -475,3 +475,55 @@ test('version history link and browser Back preserve dirty edits until explicitl
   await dialog.getByRole('button', { name: 'Stay and keep editing' }).click();
   await expect(name).toHaveValue('Keep through browser navigation');
 });
+
+
+test('C1 products desktop shows approved category shortcuts and factual data columns', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockCatalog(page, { productCount: 12 });
+  await page.goto('/catalog/products');
+
+  const categories = page.getByRole('navigation', { name: 'Product categories' });
+  await expect(categories.getByRole('button', { name: 'All products 12' })).toBeVisible();
+  await expect(categories.getByRole('button', { name: 'Burgers 12' })).toBeVisible();
+  const columns = page.locator('[data-catalog-product-columns]');
+  await expect(columns).toBeVisible();
+  await expect(columns).toContainText('Product');
+  await expect(columns).toContainText('Category');
+  await expect(columns).toContainText('Price');
+  await expect(columns).toContainText('Availability');
+
+  await categories.getByRole('button', { name: 'Burgers 12' }).click();
+  await page.getByRole('searchbox', { name: 'Search products' }).fill('no-match');
+  await expect(page.getByText('No products match these filters.')).toBeVisible();
+  await page.getByRole('button', { name: 'Reset', exact: true }).click();
+  await expect(page.getByRole('button', { name: /Classic Smash/ })).toBeVisible();
+  await expect(categories.getByRole('button', { name: 'All products 12' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.screenshot({ path: 'test-results/catalog-c1-products-desktop-1440.png' });
+});
+
+test('C1 mobile category browse preserves real product routing without horizontal overflow', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCatalog(page, { productCount: 12 });
+  await page.goto('/catalog/products');
+
+  const categories = page.getByRole('navigation', { name: 'Product categories' });
+  await expect(categories.getByRole('button', { name: 'Burgers 12' })).toBeVisible();
+  await expect(page.locator('[data-catalog-product-columns]')).toBeHidden();
+  await expect(page.getByRole('button', { name: /Classic Smash/ })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.screenshot({ path: 'test-results/catalog-c1-products-mobile-390.png' });
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  await expect(page.locator('[data-catalog-inspector]')).toBeVisible();
+  await expect(page).toHaveURL(/\/catalog\/products\/11111111-1111-4111-8111-111111111111$/);
+  await page.getByRole('button', { name: 'Products', exact: true }).click();
+  await expect(page.locator('[data-catalog-list]')).toBeVisible();
+});
