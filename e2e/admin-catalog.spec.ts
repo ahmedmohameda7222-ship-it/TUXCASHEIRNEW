@@ -322,6 +322,21 @@ test('C2 definitions tabs match accessible desktop collection switching', async 
   await page.screenshot({ path: 'test-results/catalog-c2-modifiers-desktop-1440.png' });
 });
 
+test('C2 Manage workspace shows one draft notice and no product creation toolbar', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+
+  await expect(page.getByRole('button', { name: 'Back to products' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New product' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Bulk Edit' })).toHaveCount(0);
+  await expect(page.locator('.admin-catalog-draft-banner')).toHaveCount(1);
+  await expect(page.locator('.admin-catalog-definition-row')).toHaveCount(1);
+});
+
 test('C2 category creation persists to its shop draft without publication', async ({ page }) => {
   const fixture = await mockCatalog(page);
   await page.goto('/catalog/products');
