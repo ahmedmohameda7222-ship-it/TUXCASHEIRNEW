@@ -94,6 +94,27 @@ describe('P02 catalog browse regression', () => {
     expect(html).toContain('<strong>2</strong><span>products</span>');
   });
 
+  it('C1 keeps category shortcuts outside the bordered products directory', () => {
+    const html = renderToStaticMarkup(
+      <ProductList
+        products={[product]}
+        categories={[category]}
+        selectedProductId={null}
+        search=""
+        status="all"
+        categoryId=""
+        onSearchChange={vi.fn()}
+        onStatusChange={vi.fn()}
+        onCategoryChange={vi.fn()}
+        onSelectProduct={vi.fn()}
+      />,
+    );
+    const categoriesEnd = html.indexOf('</nav>');
+    const directoryStart = html.indexOf('<section class="admin-catalog-list"');
+    expect(categoriesEnd).toBeGreaterThan(0);
+    expect(directoryStart).toBeGreaterThan(categoriesEnd);
+  });
+
   it('C1 search includes the authorized category label without matching product name or slug', () => {
     const dailySpecial = {
       ...product,
