@@ -606,8 +606,8 @@ test('C1 approved primary Catalog action is green with no redundant eyebrow at d
       return color ?? [];
     });
     expect(rgb).toHaveLength(3);
-    expect(rgb[1]).toBeGreaterThan(rgb[0]);
-    expect(rgb[1]).toBeGreaterThan(rgb[2]);
+    expect(rgb[1]!).toBeGreaterThan(rgb[0]!);
+    expect(rgb[1]!).toBeGreaterThan(rgb[2]!);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
