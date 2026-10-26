@@ -515,6 +515,16 @@ test('C1 mobile category browse preserves real product routing without horizonta
   const categories = page.getByRole('navigation', { name: 'Product categories' });
   await expect(categories.getByRole('button', { name: 'Burgers 12' })).toBeVisible();
   await expect(page.locator('[data-catalog-product-columns]')).toBeHidden();
+  const filters = page.getByRole('button', { name: 'Filters', exact: true });
+  await expect(filters).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('combobox', { name: 'Status' })).toBeHidden();
+  await filters.click();
+  await expect(page.getByRole('combobox', { name: 'Status' })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Status' }).selectOption('sold-out');
+  await expect(page.getByRole('button', { name: /Classic Smash/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Reset', exact: true }).click();
+  await filters.click();
+  await expect(filters).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByRole('button', { name: /Classic Smash/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
