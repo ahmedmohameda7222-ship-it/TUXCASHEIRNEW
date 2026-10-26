@@ -351,7 +351,7 @@ export function CatalogPage() {
           ) : null}
           {canEdit ? (
             <button
-              className="admin-secondary-button"
+              className="admin-secondary-button admin-catalog-secondary-management"
               type="button"
               disabled={busy}
               onClick={() => {
@@ -369,13 +369,13 @@ export function CatalogPage() {
             </button>
           ) : null}
           <button
-            className="admin-secondary-button"
+            className="admin-secondary-button admin-catalog-secondary-management"
             type="button"
             onClick={() => requestCatalogNavigation('/catalog/products/publishing')}
           >
             Review & Publish ({catalog.compatibleDrafts.length})
           </button>
-          <label>
+          <label className="admin-catalog-category-choice">
             <span>New product category</span>
             <select
               aria-label="New product category"
@@ -409,8 +409,8 @@ export function CatalogPage() {
             {' · '}Published version {catalog.workspaceQuery.data.currentPublishVersion}
           </strong>
           <span>
-            Save Draft keeps changes private. Review & Publish, then Publish Now after any required
-            approval, to update Operations and the public menu.
+            Save Draft keeps changes private. Review & Publish, with any required approval, updates
+            Operations and the public menu.
           </span>
         </div>
         <span className="admin-status-pill">
@@ -611,6 +611,50 @@ export function CatalogPage() {
               onCategoryChange={handleCategoryFilterChange}
               onSelectProduct={openProduct}
             />
+            <details className="admin-catalog-mobile-secondary-tools">
+              <summary>More catalog tools</summary>
+              <div className="admin-catalog-mobile-secondary-tools__actions">
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  onClick={() => requestCatalogNavigation('/catalog/products/publishing')}
+                >
+                  Review & Publish ({catalog.compatibleDrafts.length})
+                </button>
+                {canEdit ? (
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      if (!canSwitchCatalogEditor()) return;
+                      setModeError(null);
+                      setDefinitionsOpen(false);
+                      setUnsavedProduct(null);
+                      navigate('/catalog/products');
+                      setBulkOpen(true);
+                    }}
+                  >
+                    Bulk Edit
+                  </button>
+                ) : null}
+                <label className="admin-select-field">
+                  <span>New product category</span>
+                  <select
+                    aria-label="Mobile new product category"
+                    value={newProductCategoryId}
+                    disabled={!canEdit || !canPrice || activeCategories.length === 0 || busy}
+                    onChange={(event) => setNewProductCategoryId(event.target.value)}
+                  >
+                    {activeCategories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </details>
           </div>
 
           <div className="admin-catalog-layout__editor">
