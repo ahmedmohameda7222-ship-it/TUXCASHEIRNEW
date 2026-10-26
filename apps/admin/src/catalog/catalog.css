@@ -933,6 +933,69 @@
   }
 }
 
+/* C2: one active canonical definitions collection at a time. */
+.admin-catalog-definition-tabs {
+  display: flex;
+  gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px;
+  border-radius: var(--tux-radius-control);
+  background: var(--tux-surface-subtle);
+}
+
+.admin-catalog-definition-tabs > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--tux-radius-control);
+  background: transparent;
+  color: var(--tux-text-secondary);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-catalog-definition-tabs > button.is-active {
+  color: var(--tux-text-primary);
+  background: var(--tux-surface-panel);
+  box-shadow: var(--tux-shadow-sm);
+}
+
+.admin-catalog-definition-tabs > button:focus-visible {
+  outline: 2px solid var(--tux-text-primary);
+  outline-offset: 1px;
+}
+
+.admin-catalog-definition-tabs > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.admin-catalog-definition-tabs > button > span {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--tux-surface-subtle);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 767px) {
+  .admin-catalog-definition-tabs {
+    width: 100%;
+  }
+
+  .admin-catalog-definition-tabs > button {
+    min-width: 0;
+    padding-inline: 8px;
+    font-size: 12px;
+  }
+}
+
 /* C1 approved Catalog hierarchy: only Catalog's primary create action uses
    the selected green, without changing shell or unrelated feature buttons. */
 .admin-catalog-new-product-controls > .admin-catalog-create-button:not(:disabled) {
