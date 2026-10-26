@@ -556,7 +556,6 @@ test('C1 mobile landing exposes the first real product without scrolling past se
   await expect(page.getByLabel('Mobile new product category')).toBeVisible();
 });
 
-
 test('C1 product browse uses authorized image preview for an existing imageKey', async ({
   page,
 }) => {
