@@ -476,7 +476,6 @@ test('version history link and browser Back preserve dirty edits until explicitl
   await expect(name).toHaveValue('Keep through browser navigation');
 });
 
-
 test('C1 products desktop shows approved category shortcuts and factual data columns', async ({
   page,
 }) => {
