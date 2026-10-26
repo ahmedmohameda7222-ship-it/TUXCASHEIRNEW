@@ -590,6 +590,24 @@ test('C1 product browse uses authorized image preview for an existing imageKey',
   expect(requestedImages).toContain('products/classic-smash.png');
 });
 
+test('C1 phone primary management actions span the available page width', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCatalog(page);
+  await page.goto('/catalog/products');
+
+  const manage = page.getByRole('button', { name: 'Manage categories & extras' });
+  const create = page.getByRole('button', { name: 'New product' });
+  await expect(manage).toBeVisible();
+  await expect(create).toBeVisible();
+  const manageBox = await manage.boundingBox();
+  const createBox = await create.boundingBox();
+  if (!manageBox || !createBox) throw new Error('Primary Catalog actions must be laid out');
+
+  expect(manageBox.width).toBeGreaterThanOrEqual(330);
+  expect(createBox.width).toBeGreaterThanOrEqual(330);
+  expect(Math.abs(manageBox.width - createBox.width)).toBeLessThan(3);
+});
+
 test('C1 approved primary Catalog action is green with no redundant eyebrow at desktop and mobile', async ({
   page,
 }) => {
