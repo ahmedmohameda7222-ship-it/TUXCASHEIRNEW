@@ -1,5 +1,5 @@
 import type { CatalogCategorySummary, CatalogJsonObject } from '@tux/admin-contracts';
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { useUnsavedShopDraft } from '../shops/ShopScopeProvider';
 import { formatEgpMinor, parseEgpToMinor } from './ProductEditor';
 import type { CatalogDefinitionCollection } from './catalogDefinitionsDraft';
@@ -71,6 +71,8 @@ export function CatalogDefinitionsEditor({
   }): Promise<void>;
 }) {
   const [editor, setEditor] = useState<EditorState | null>(null);
+  const [activeTab, setActiveTab] = useState<CatalogDefinitionCollection>('categories');
+  const tabIdPrefix = useId();
   const [error, setError] = useState<string | null>(null);
   useUnsavedShopDraft(editor !== null);
   const orderedCategories = [...categories].sort(
@@ -169,9 +171,38 @@ export function CatalogDefinitionsEditor({
           Category and modifier changes remain in Draft until validated and published.
         </strong>
       </div>
+      <nav className="admin-catalog-definition-tabs" role="tablist" aria-label="Manage catalog definitions">
+        <button
+          type="button"
+          role="tab"
+          id={`${tabIdPrefix}-categories-tab`}
+          aria-controls={`${tabIdPrefix}-categories-panel`}
+          aria-selected={activeTab === 'categories'}
+          className={activeTab === 'categories' ? 'is-active' : ''}
+          disabled={pending || editor !== null}
+          onClick={() => setActiveTab('categories')}
+        >
+          Categories <span>{orderedCategories.length}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id={`${tabIdPrefix}-modifiers-tab`}
+          aria-controls={`${tabIdPrefix}-modifiers-panel`}
+          aria-selected={activeTab === 'modifiers'}
+          className={activeTab === 'modifiers' ? 'is-active' : ''}
+          disabled={pending || editor !== null}
+          onClick={() => setActiveTab('modifiers')}
+        >
+          Modifiers / Extras <span>{orderedModifiers.length}</span>
+        </button>
+      </nav>
+      {activeTab === 'categories' ? (
       <section
+        role="tabpanel"
+        id={`${tabIdPrefix}-categories-panel`}
+        aria-labelledby={`${tabIdPrefix}-categories-tab`}
         className="admin-catalog-editor__section"
-        aria-labelledby="catalog-categories-heading"
       >
         <div className="admin-catalog-editor__section-heading">
           <h2 id="catalog-categories-heading">Categories</h2>
@@ -249,9 +280,12 @@ export function CatalogDefinitionsEditor({
           </article>
         ))}
       </section>
+      ) : (
       <section
+        role="tabpanel"
+        id={`${tabIdPrefix}-modifiers-panel`}
+        aria-labelledby={`${tabIdPrefix}-modifiers-tab`}
         className="admin-catalog-editor__section"
-        aria-labelledby="catalog-modifiers-heading"
       >
         <div className="admin-catalog-editor__section-heading">
           <h2 id="catalog-modifiers-heading">Modifiers / extras</h2>
@@ -327,6 +361,7 @@ export function CatalogDefinitionsEditor({
           </article>
         ))}
       </section>
+      )}
       {editor && canEdit ? (
         <form className="admin-form-grid" onSubmit={submit}>
           <h3>{editor.collection === 'categories' ? 'Category details' : 'Modifier details'}</h3>
