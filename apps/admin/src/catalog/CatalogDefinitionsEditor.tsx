@@ -222,14 +222,34 @@ export function CatalogDefinitionsEditor({
           {orderedCategories.length === 0 ? (
             <p>No categories configured. Add a category to start creating products.</p>
           ) : null}
+          <div
+            className="admin-catalog-definition-columns"
+            data-catalog-definition-columns="categories"
+            aria-hidden="true"
+          >
+            <span>Category</span>
+            <span>Status</span>
+            <span>Position</span>
+            <span>Actions</span>
+          </div>
           {orderedCategories.map((category, index) => (
-            <article className="admin-catalog-definition-row" key={category.id}>
+            <article
+              className="admin-catalog-definition-row admin-catalog-definition-row--categories"
+              key={category.id}
+            >
               <div className="admin-catalog-definition-row__main">
                 <strong>{category.name}</strong>
-                <span>
-                  {category.active ? 'Active' : 'Archived'} · Position {category.sortOrder}
+                <span className="admin-catalog-definition-type">Category</span>
+                <span className="admin-catalog-definition-compact-meta">
+                  Position {category.sortOrder} · {category.active ? 'Active' : 'Archived'}
                 </span>
               </div>
+              <span
+                className={`admin-catalog-definition-status ${category.active ? 'is-active' : 'is-archived'}`}
+              >
+                {category.active ? 'Available' : 'Archived'}
+              </span>
+              <span className="admin-catalog-definition-position">{category.sortOrder}</span>
               {canEdit ? (
                 <div
                   className="admin-catalog-definition-actions"
@@ -311,15 +331,37 @@ export function CatalogDefinitionsEditor({
             ) : null}
           </div>
           {orderedModifiers.length === 0 ? <p>No modifiers configured for this draft.</p> : null}
+          <div
+            className="admin-catalog-definition-columns"
+            data-catalog-definition-columns="modifiers"
+            aria-hidden="true"
+          >
+            <span>Modifier</span>
+            <span>Price</span>
+            <span>Status</span>
+            <span>Actions</span>
+          </div>
           {orderedModifiers.map((modifier, index) => (
-            <article className="admin-catalog-definition-row" key={modifier.id}>
+            <article
+              className="admin-catalog-definition-row admin-catalog-definition-row--modifiers"
+              key={modifier.id}
+            >
               <div className="admin-catalog-definition-row__main">
                 <strong>{modifier.name}</strong>
-                <span>
-                  {formatEgpMinor(modifier.priceMinor)} EGP ·{' '}
+                <span className="admin-catalog-definition-type">Modifier</span>
+                <span className="admin-catalog-definition-compact-meta">
+                  EGP {formatEgpMinor(modifier.priceMinor)} ·{' '}
                   {modifier.active ? 'Active' : 'Archived'}
                 </span>
               </div>
+              <span className="admin-catalog-definition-price">
+                EGP {formatEgpMinor(modifier.priceMinor)}
+              </span>
+              <span
+                className={`admin-catalog-definition-status ${modifier.active ? 'is-active' : 'is-archived'}`}
+              >
+                {modifier.active ? 'Available' : 'Archived'}
+              </span>
               {canEdit ? (
                 <div
                   className="admin-catalog-definition-actions"
