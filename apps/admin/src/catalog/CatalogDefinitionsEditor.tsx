@@ -392,7 +392,9 @@ export function CatalogDefinitionsEditor({
                 disabled={pending}
                 onChange={(event) => {
                   const nextValue = event.currentTarget.value;
-                  setEditor((current) => (current ? { ...current, description: nextValue } : current));
+                  setEditor((current) =>
+                    current ? { ...current, description: nextValue } : current,
+                  );
                 }}
               />
             </label>
