@@ -200,6 +200,38 @@ describe('Admin catalog service', () => {
     expect(catalogStore.saveDraftChange).not.toHaveBeenCalled();
   });
 
+  it('denies a modifier price change without catalog.pricing before draft persistence', async () => {
+    const catalogStore = store();
+    const service = createCatalogService(catalogStore);
+    const editorOnly: AdminSessionPrincipal = {
+      ...owner,
+      permissions: ['catalog.edit'],
+    };
+
+    await expect(
+      service.saveCatalogDraftChange(
+        {
+          draftId: 'draft-1',
+          shopId: 'shop-a',
+          expectedDraftRevision: 1,
+          changes: [
+            {
+              kind: 'bundle.replace',
+              bundleJson: {
+                snapshot: {
+                  modifiers: [{ id: 'modifier-1', shopId: 'shop-a', priceMinor: 1575 }],
+                },
+              },
+              changedPaths: ['modifiers', 'modifiers[].priceMinor'],
+            },
+          ],
+        },
+        editorOnly,
+      ),
+    ).rejects.toThrow(/permission_forbidden/);
+    expect(catalogStore.saveDraftChange).not.toHaveBeenCalled();
+  });
+
   it('rejects immediate availability outside the principal shop scope before the RPC', async () => {
     const catalogStore = store();
     const service = createCatalogService(catalogStore);
