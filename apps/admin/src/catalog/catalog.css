@@ -736,6 +736,17 @@
   font-weight: 800;
 }
 
+.admin-product-row__monogram {
+  overflow: hidden;
+}
+
+.admin-product-row__monogram img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .admin-product-row__availability .admin-status-pill {
   border-radius: 7px;
 }
