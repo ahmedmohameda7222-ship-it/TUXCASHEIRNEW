@@ -68,6 +68,7 @@ describe('P02 catalog browse regression', () => {
     expect(html).toContain('Clear filters');
     expect(html).toContain('No products match');
   });
+
   it('matches the approved C1 browse contract with category shortcuts and factual column headings', () => {
     const html = renderToStaticMarkup(
       <ProductList
@@ -90,7 +91,6 @@ describe('P02 catalog browse regression', () => {
     expect(html).toContain('Category');
     expect(html).toContain('Price');
     expect(html).toContain('Availability');
-    expect(html).toContain('2 products');
+    expect(html).toContain('<strong>2</strong><span>products</span>');
   });
-
 });
