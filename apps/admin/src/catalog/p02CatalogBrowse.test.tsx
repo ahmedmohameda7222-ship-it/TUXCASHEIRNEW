@@ -93,6 +93,7 @@ describe('P02 catalog browse regression', () => {
     expect(html).toContain('Availability');
     expect(html).toContain('<strong>2</strong><span>products</span>');
   });
+
   it('C1 search includes the authorized category label without matching product name or slug', () => {
     const dailySpecial = {
       ...product,
@@ -123,5 +124,4 @@ describe('P02 catalog browse regression', () => {
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('Filters');
   });
-
 });
