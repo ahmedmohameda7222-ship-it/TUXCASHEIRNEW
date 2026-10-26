@@ -1,3 +1,37 @@
+## Orders-only resumed implementation: exact-HEAD verification and development SQL audit — 2026-10-26
+
+**Inspected branch:** `feat/admin-eight-tabs-approved-ui-20261025`, Draft PR #165 at **`8fbc33d419c14148d9a882d2e82add45cdced2bd`** before this documentation checkpoint. Compared to `da2c308a604bf8c98329c3581615c57f6e4a587d`: **one ledger-only commit**, no source changes. Prior workforce formatting failure is closed by fresh exact-head Fast CI job `121327409132` SUCCESS; do not reopen frozen Staff work.
+
+**Four actual exact-HEAD workflow results:**
+- [Fast CI 40245934344](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40245934344): changed paths, formatting/lint, unit/integration, typecheck, security contracts, migration chain and required quality gate **SUCCESS** (Edge check skipped by scope).
+- [Orders isolated acceptance 40245934338](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40245934338): Orders real PostgreSQL financial RPC, full source regression/production builds and rendered Admin Chromium **SUCCESS**; screenshot archive artifact [orders-rendered-evidence](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40245934338), ID `12617734803`, SHA-256 `078183249fc109f18eaceb38a335b090286eeb77c59412d972c2befc7030294c`.
+- [Cross-module rendered acceptance 40245934328](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40245934328): six modules' Chromium regression **SUCCESS**; this is not acceptance of frozen later tabs.
+- [Business Day PostgreSQL 40245934346](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40245934346): real RPC **SUCCESS**, unrelated inventory tasks skipped by scope.
+
+**Remote DB, read-only rechecked now:** Connected account `TUX V2 And masjid`, actual TUX V2 project `awpdcsayuwbsruwvaosg` ACTIVE_HEALTHY. Existing migration `20261025221507 orders_authoritative_kpis` recorded exactly once. PostgreSQL `public.admin_orders_kpis_v1(uuid,uuid,timestamptz,timestamptz)`: `anon EXECUTE=false`, `authenticated EXECUTE=false`, `service_role EXECUTE=true`. RLS enabled on `public.orders`, `public.payments`, `public.admin_order_refunds`. **No migration re-applied and no remote writes performed in this checkpoint.** Prior independent development aggregate and disposable 67-order/PostgreSQL refund proof remain recorded below.
+
+**Hosted Preview investigation:** exact-source Admin Vercel Preview deployment `dpl_De5gVbjf6WkRGcLYtFaAWK5fAvLm` for `8fbc33d...` exists; it was still **BUILDING** when inspected (target Preview, never Production). Earlier Preview `dpl_vyVCZC4cXBZukPyNEEfPR1k9j8xc` is READY but belongs to source `dc135ee1...`, and is SSO-protected. No same-SHA authenticated Operations/Menu/Admin/Finance transaction or negative PIN log/storage trace has been observed. Do not bypass SSO or count Vercel READY as hosted business acceptance.
+
+**Strict sequential task ledger — acceptance status, not commit existence:**
+
+| Tab/task | Current disposition | Remaining acceptance |
+| --- | --- | --- |
+| Orders O1 | SOURCE/CI PASS; **NOT FINAL ACCEPTED** | Authenticated hosted filter/deep-link proof; desktop Owner signoff |
+| Orders O2 | SOURCE/DEV DB/PG PASS; **NOT FINAL ACCEPTED** | Same live placed/refunded order reconciliation through Operations/Menu/Admin/Finance/Reports |
+| Orders O3 | SOURCE/PG/Chromium PASS; **NOT FINAL ACCEPTED** | Hosted protected PIN/reason/second-person negative action trace |
+| Orders O4 | Browser responsive/visual captures available; **NOT FINAL ACCEPTED** | Owner 1536 desktop and 360/390 mobile visual acceptance; matching-source hosted cross-app transaction |
+| Catalog C1–C5 | **NOT ACCEPTED / LOCKED** | No new features until all Orders acceptance |
+| Inventory I1–I4 | **PARTIAL PRE-EXISTING / LOCKED** | Full independent functional/backend/security/visual acceptance at its turn |
+| Purchasing P1–P4 | **NOT ACCEPTED / LOCKED** | Full independent acceptance at its turn |
+| Customers/CRM CRM1–CRM4 | **PARTIAL PRE-EXISTING / LOCKED** | Full independent acceptance at its turn |
+| Staff S1–S4 | **PARTIAL PRE-EXISTING / LOCKED** | Full independent acceptance at its turn |
+| Finance F1–F5 | **PARTIAL PRE-EXISTING / LOCKED** | Full independent acceptance at its turn |
+| Reports R1–R5 | **PARTIAL PRE-EXISTING / LOCKED** | Full independent acceptance at its turn |
+
+**Current task:** Orders O4/O10/O11/O12 hosted and Owner acceptance evidence. **Release disposition:** HOLD, Draft PR; no merge, no production deployment, no Production SQL; advance to Catalog **only after** explicit Orders acceptance. The exact-source CI SHA above is not automatically transferable to the documentation commit this entry creates.
+
+---
+
 ## Orders O11 mobile negative-action acceptance — 2026-10-26 (newer checkpoint)
 
 **Exact verified source SHA `da2c308a604bf8c98329c3581615c57f6e4a587d`: All four CI groups SUCCESS.** Orders full build/isolated PG/32 of 32 Chromium tests [40245652024](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40245652024); Fast CI including TypeScript, unit/integration, formatting, security and migration chain [40245652015](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40245652015); Business Day PostgreSQL [40245652009](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40245652009); multi-module Chromium regression [40245652096](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40245652096). All conclusions read directly from exact-commit workflow jobs.
