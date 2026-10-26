@@ -129,7 +129,7 @@ export function ProductList({
   );
 
   return (
-    <section className="admin-catalog-list" aria-label="Products" data-catalog-list>
+    <div className="admin-catalog-products-browse">
       <nav className="admin-catalog-category-tabs" aria-label="Product categories">
         <button
           type="button"
@@ -151,144 +151,146 @@ export function ProductList({
           </button>
         ))}
       </nav>
-      <div className="admin-catalog-list__filters">
-        <label className="admin-search-field">
-          <span className="sr-only">Search products</span>
-          <input
-            type="search"
-            value={search}
-            placeholder="Search products by name…"
-            onChange={(event) => onSearchChange(event.currentTarget.value)}
-          />
-        </label>
-        <button
-          className="admin-catalog-filter-toggle"
-          type="button"
-          aria-expanded={filtersOpen}
-          aria-controls={filterControlsId}
-          onClick={() => setFiltersOpen((current) => !current)}
-        >
-          Filters
-        </button>
-        <div
-          id={filterControlsId}
-          className={
-            filtersOpen
-              ? 'admin-catalog-list__filter-row is-open'
-              : 'admin-catalog-list__filter-row'
-          }
-        >
-          <label className="admin-select-field">
-            <span>Status</span>
-            <select
-              value={status}
-              onChange={(event) => onStatusChange(event.currentTarget.value as CatalogStatusFilter)}
-            >
-              <option value="all">All status</option>
-              <option value="available">Available</option>
-              <option value="sold-out">Sold out</option>
-              <option value="archived">Archived</option>
-            </select>
+      <section className="admin-catalog-list" aria-label="Products" data-catalog-list>
+        <div className="admin-catalog-list__filters">
+          <label className="admin-search-field">
+            <span className="sr-only">Search products</span>
+            <input
+              type="search"
+              value={search}
+              placeholder="Search products by name…"
+              onChange={(event) => onSearchChange(event.currentTarget.value)}
+            />
           </label>
-          <label className="admin-select-field">
-            <span>Category</span>
-            <select
-              value={categoryId}
-              onChange={(event) => onCategoryChange(event.currentTarget.value)}
-            >
-              <option value="">All categories</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <button
-          className="admin-secondary-button admin-catalog-reset"
-          type="button"
-          onClick={() => {
-            onSearchChange('');
-            onStatusChange('all');
-            onCategoryChange('');
-          }}
-        >
-          Reset
-        </button>
-      </div>
-
-      <div className="admin-catalog-list__summary" aria-live="polite">
-        <strong>{visibleProducts.length}</strong>
-        <span>{visibleProducts.length === 1 ? 'product' : 'products'}</span>
-      </div>
-
-      <div className="admin-catalog-list__columns" aria-hidden="true" data-catalog-product-columns>
-        <span>Product</span>
-        <span>Category</span>
-        <span>Price</span>
-        <span>Availability</span>
-        <span />
-      </div>
-      <div className="admin-catalog-list__items">
-        {visibleProducts.map((product) => (
           <button
-            className={
-              product.id === selectedProductId
-                ? 'admin-product-row is-selected'
-                : 'admin-product-row'
-            }
+            className="admin-catalog-filter-toggle"
             type="button"
-            key={product.id}
-            aria-pressed={product.id === selectedProductId}
-            onClick={() => onSelectProduct(product.id)}
+            aria-expanded={filtersOpen}
+            aria-controls={filterControlsId}
+            onClick={() => setFiltersOpen((current) => !current)}
           >
-            <span className="admin-product-row__main">
-              <CatalogProductThumbnail product={product} />
-              <span className="admin-product-row__identity">
-                <strong>{product.name}</strong>
-                <small>
-                  Product · {categoryNames.get(product.categoryId) ?? 'Uncategorized'}
-                  <span className="admin-product-row__mobile-price">
-                    {' · '}EGP {formatEgpMinor(product.priceMinor)}
-                  </span>
-                </small>
-              </span>
-            </span>
-            <span className="admin-product-row__category">
-              {categoryNames.get(product.categoryId) ?? 'Uncategorized'}
-            </span>
-            <span className="admin-product-row__price">
-              EGP {formatEgpMinor(product.priceMinor)}
-            </span>
-            <span className="admin-product-row__availability">
-              <AvailabilityStatus active={product.active} soldOut={product.soldOut} />
-            </span>
-            <span className="admin-product-row__open" aria-hidden="true">
-              ›
-            </span>
+            Filters
           </button>
-        ))}
-        {visibleProducts.length === 0 ? (
-          <div className="admin-empty-state">
-            <strong>No products match these filters.</strong>
-            <span>Change the search or filters to see more products.</span>
-            {search || status !== 'all' || categoryId ? (
-              <button
-                type="button"
-                className="admin-secondary-button"
-                onClick={() => {
-                  onSearchChange('');
-                  onStatusChange('all');
-                  onCategoryChange('');
-                }}
+          <div
+            id={filterControlsId}
+            className={
+              filtersOpen
+                ? 'admin-catalog-list__filter-row is-open'
+                : 'admin-catalog-list__filter-row'
+            }
+          >
+            <label className="admin-select-field">
+              <span>Status</span>
+              <select
+                value={status}
+                onChange={(event) => onStatusChange(event.currentTarget.value as CatalogStatusFilter)}
               >
-                Clear filters
-              </button>
-            ) : null}
+                <option value="all">All status</option>
+                <option value="available">Available</option>
+                <option value="sold-out">Sold out</option>
+                <option value="archived">Archived</option>
+              </select>
+            </label>
+            <label className="admin-select-field">
+              <span>Category</span>
+              <select
+                value={categoryId}
+                onChange={(event) => onCategoryChange(event.currentTarget.value)}
+              >
+                <option value="">All categories</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-        ) : null}
-      </div>
-    </section>
+          <button
+            className="admin-secondary-button admin-catalog-reset"
+            type="button"
+            onClick={() => {
+              onSearchChange('');
+              onStatusChange('all');
+              onCategoryChange('');
+            }}
+          >
+            Reset
+          </button>
+        </div>
+
+        <div className="admin-catalog-list__summary" aria-live="polite">
+          <strong>{visibleProducts.length}</strong>
+          <span>{visibleProducts.length === 1 ? 'product' : 'products'}</span>
+        </div>
+
+        <div className="admin-catalog-list__columns" aria-hidden="true" data-catalog-product-columns>
+          <span>Product</span>
+          <span>Category</span>
+          <span>Price</span>
+          <span>Availability</span>
+          <span />
+        </div>
+        <div className="admin-catalog-list__items">
+          {visibleProducts.map((product) => (
+            <button
+              className={
+                product.id === selectedProductId
+                  ? 'admin-product-row is-selected'
+                  : 'admin-product-row'
+              }
+              type="button"
+              key={product.id}
+              aria-pressed={product.id === selectedProductId}
+              onClick={() => onSelectProduct(product.id)}
+            >
+              <span className="admin-product-row__main">
+                <CatalogProductThumbnail product={product} />
+                <span className="admin-product-row__identity">
+                  <strong>{product.name}</strong>
+                  <small>
+                    Product · {categoryNames.get(product.categoryId) ?? 'Uncategorized'}
+                    <span className="admin-product-row__mobile-price">
+                      {' · '}EGP {formatEgpMinor(product.priceMinor)}
+                    </span>
+                  </small>
+                </span>
+              </span>
+              <span className="admin-product-row__category">
+                {categoryNames.get(product.categoryId) ?? 'Uncategorized'}
+              </span>
+              <span className="admin-product-row__price">
+                EGP {formatEgpMinor(product.priceMinor)}
+              </span>
+              <span className="admin-product-row__availability">
+                <AvailabilityStatus active={product.active} soldOut={product.soldOut} />
+              </span>
+              <span className="admin-product-row__open" aria-hidden="true">
+                ›
+              </span>
+            </button>
+          ))}
+          {visibleProducts.length === 0 ? (
+            <div className="admin-empty-state">
+              <strong>No products match these filters.</strong>
+              <span>Change the search or filters to see more products.</span>
+              {search || status !== 'all' || categoryId ? (
+                <button
+                  type="button"
+                  className="admin-secondary-button"
+                  onClick={() => {
+                    onSearchChange('');
+                    onStatusChange('all');
+                    onCategoryChange('');
+                  }}
+                >
+                  Clear filters
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </section>
+    </div>
   );
 }
