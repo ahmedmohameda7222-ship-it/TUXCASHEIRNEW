@@ -68,4 +68,29 @@ describe('P02 catalog browse regression', () => {
     expect(html).toContain('Clear filters');
     expect(html).toContain('No products match');
   });
+  it('matches the approved C1 browse contract with category shortcuts and factual column headings', () => {
+    const html = renderToStaticMarkup(
+      <ProductList
+        products={[product, { ...product, id: 'p2', name: 'Second Burger', soldOut: true }]}
+        categories={[category]}
+        selectedProductId={null}
+        search=""
+        status="all"
+        categoryId=""
+        onSearchChange={vi.fn()}
+        onStatusChange={vi.fn()}
+        onCategoryChange={vi.fn()}
+        onSelectProduct={vi.fn()}
+      />,
+    );
+    expect(html).toContain('aria-label="Product categories"');
+    expect(html).toContain('All products');
+    expect(html).toContain('data-catalog-product-columns');
+    expect(html).toContain('Product');
+    expect(html).toContain('Category');
+    expect(html).toContain('Price');
+    expect(html).toContain('Availability');
+    expect(html).toContain('2 products');
+  });
+
 });
