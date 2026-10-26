@@ -571,6 +571,13 @@ test('C1 product browse uses authorized image preview for an existing imageKey',
       body: JSON.stringify({ publicUrl: 'https://images.example.test/catalog/classic-smash.png' }),
     });
   });
+  await page.route('https://images.example.test/catalog/classic-smash.png', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"></svg>',
+    });
+  });
   await page.goto('/catalog/products');
 
   const productRow = page.getByRole('button', { name: /Classic Smash/ });
