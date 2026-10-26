@@ -409,8 +409,8 @@ export function CatalogPage() {
             {' · '}Published version {catalog.workspaceQuery.data.currentPublishVersion}
           </strong>
           <span>
-            Save Draft keeps changes private. Review & Publish, with any required approval, updates
-            Operations and the public menu.
+            Save Draft is private. Review & Publish, then Publish Now after any required approval,
+            updates Operations and the public menu.
           </span>
         </div>
         <span className="admin-status-pill">
