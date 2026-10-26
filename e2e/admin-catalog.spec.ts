@@ -555,3 +555,31 @@ test('C1 mobile landing exposes the first real product without scrolling past se
   await expect(page.getByRole('button', { name: /Review & Publish \(/ })).toBeVisible();
   await expect(page.getByLabel('Mobile new product category')).toBeVisible();
 });
+
+
+test('C1 product browse uses authorized image preview for an existing imageKey', async ({
+  page,
+}) => {
+  await mockCatalog(page);
+  const requestedImages: string[] = [];
+  await page.route('**/api/admin/catalog-image?*', async (route) => {
+    const url = new URL(route.request().url());
+    expect(url.searchParams.get('shopId')).toBe(shopId);
+    requestedImages.push(url.searchParams.get('imageKey') ?? '');
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ publicUrl: 'https://images.example.test/catalog/classic-smash.png' }),
+    });
+  });
+  await page.goto('/catalog/products');
+
+  const productRow = page.getByRole('button', { name: /Classic Smash/ });
+  const thumbnail = productRow.locator('img');
+  await expect(thumbnail).toHaveAttribute(
+    'src',
+    'https://images.example.test/catalog/classic-smash.png',
+  );
+  await expect(thumbnail).toHaveAttribute('alt', '');
+  expect(requestedImages).toContain('products/classic-smash.png');
+});
