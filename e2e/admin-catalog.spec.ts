@@ -389,6 +389,11 @@ test('C2 Manage workspace shows one draft notice and no product creation toolbar
   await expect(page.getByRole('button', { name: 'New product' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Bulk Edit' })).toHaveCount(0);
   await expect(page.locator('.admin-catalog-draft-banner')).toHaveCount(1);
+  await expect(page.locator('.admin-catalog-scope')).toHaveCount(0);
+  await expect(page.locator('.admin-catalog-draft-banner')).toHaveCSS(
+    'background-color',
+    'rgb(255, 251, 243)',
+  );
   await expect(page.locator('.admin-catalog-definition-row')).toHaveCount(1);
 });
 
