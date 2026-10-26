@@ -867,6 +867,13 @@
 }
 
 @media (max-width: 767px) {
+  /* PageScaffold normally shrink-wraps its action slot; Catalog's two phone
+     commands must instead fill the available header content width. */
+  .admin-page__primary-action:has(> .admin-catalog-new-product-controls) {
+    align-self: stretch;
+    min-width: 0;
+  }
+
   .admin-catalog-new-product-controls {
     width: 100%;
     max-width: none;
