@@ -1,3 +1,12 @@
+## C1 390px mobile toolbar visual defect — 2026-10-26
+
+- **Actual React browser visual evidence at immutable `cd022d2823efe96268d83db1fe2a9461c75f43ab`:** [Admin E2E 40352161947](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40352161947), artifact `admin-rendered-e2e` ID `12665520467`, `test-results/catalog-c1-products-mobile-390.png` and desktop 1440 / 360 / 768 / 1024. Against the original approved `02-products-mobile-390.png`, the two Catalog header actions were shrink-wrapped to roughly 242px each, leaving unnecessary empty space; the reference stretches both full available content width. This is a C1 actual rendered UI difference, not a mocked feature requirement.
+- **Regression written:** `e2e/admin-catalog.spec.ts` at `1a243749c81481b504921d38f75b8f37b2abad27` requires both rendered 390px action widths >=330px and consistent widths. The previous screenshot establishes the failing visual baseline; **do not claim that this specific new automated test ran RED unless its job log explicitly demonstrates the failure**.
+- **Smallest Catalog-owned production fix:** `apps/admin/src/catalog/catalog.css` at `010d82ba08c06a80c79be42067bad1d158ab848b` overrides the shared PageScaffold `align-self:flex-start` only when its direct child is Catalog's action toolbar, within phone breakpoint. Underlying shared layout, other tabs, shop scopes, permissions and commands are untouched.
+- **Status: C1 ACTIVE, NOT ACCEPTED.** New exact-HEAD Fast CI, Catalog Chromium including width assertion and actual 390 screenshot, Orders/PG, cross-tab and full monorepo regression must all finish green. Compare 1440 and 390 with approved screenshot; do not advance C2 before mandatory evidence. Owner physical/hosted UAT remains deferred until after all tabs, approved squash merge and real-app acceptance; no production deploy, SQL or merge now.
+
+---
+
 ## Catalog C1 visual hierarchy RED→GREEN checkpoint — 2026-10-26
 
 - **Inspected branch HEAD prior to documentation:** `41102914ea80f170303507510691974b44b76a3e`, Draft PR #165. Do not equate this checkpoint with current-head CI acceptance; future commits require fresh checks.
