@@ -198,6 +198,29 @@ async function mockPurchasing(
         return;
       }
     }
+    if (
+      command.type === 'supplier.update' ||
+      command.type === 'supplier.archive' ||
+      command.type === 'supplier.restore'
+    ) {
+      const supplierIdToManage = String(command.supplierId);
+      const action = command.type;
+      const patch = command.payload as Partial<AdminSupplier>;
+      suppliers = suppliers.map((supplier) => {
+        if (supplier.id !== supplierIdToManage) return supplier;
+        return {
+          ...supplier,
+          ...(action === 'supplier.update' ? patch : {}),
+          active:
+            action === 'supplier.archive'
+              ? false
+              : action === 'supplier.restore'
+                ? true
+                : supplier.active,
+          version: (supplier.version ?? 1) + 1,
+        };
+      });
+    }
     if (command.type === 'po.order') {
       status = 'ORDERED';
       version += 1;
@@ -755,6 +778,81 @@ test('P4 duplicate supplier error stays inside 360px sheet', async ({ page }) =>
   await expect(dialog.getByRole('textbox', { name: 'Supplier name' })).toHaveValue('Prime Foods');
   await expect(dialog).toBeVisible();
   expect(fixture.commands.filter((c) => c.type === 'supplier.create')).toHaveLength(1);
+});
+
+test('P4 mobile archived supplier restore and edit preserve trusted versions and PO eligibility', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const archivedId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbe';
+  const fixture = await mockPurchasing(page, {
+    initialSuppliers: [
+      {
+        id: supplierId,
+        businessId: session.principal.businessId,
+        name: 'Prime Foods',
+        contactName: null,
+        phone: null,
+        email: null,
+        active: true,
+        version: 1,
+      },
+      {
+        id: archivedId,
+        businessId: session.principal.businessId,
+        name: 'West Farms',
+        contactName: null,
+        phone: null,
+        email: null,
+        active: false,
+        version: 4,
+      },
+    ],
+  });
+  await page.goto('/purchasing');
+  await openPurchaseOrders(page);
+  await page.getByRole('button', { name: 'New purchase order' }).click();
+  let dialog = page.getByRole('dialog', { name: 'New purchase order' });
+  await expect(dialog.getByLabel('Supplier').locator(`option[value="${archivedId}"]`)).toHaveCount(
+    0,
+  );
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+
+  await openSuppliers(page);
+  await page.getByRole('button', { name: 'West Farms' }).click();
+  const inspector = page.getByRole('complementary', { name: 'Selected supplier detail' });
+  await expect(inspector.getByRole('button', { name: 'Restore West Farms' })).toBeVisible();
+  await inspector.getByRole('button', { name: 'Restore West Farms' }).click();
+  await expect(inspector).toContainText('Active');
+  await expect.poll(() => fixture.commands.filter((c) => c.type === 'supplier.restore').length).toBe(1);
+  expect(fixture.commands.find((c) => c.type === 'supplier.restore')).toMatchObject({
+    supplierId: archivedId,
+    expectedVersion: 4,
+    shopId,
+  });
+
+  await inspector.getByRole('button', { name: 'Edit West Farms' }).click();
+  dialog = page.getByRole('dialog', { name: 'Edit supplier' });
+  await expect(dialog.getByLabel('Supplier name')).toHaveValue('West Farms');
+  await dialog.getByLabel('Email').fill('orders@west.test');
+  await dialog.getByRole('button', { name: 'Save supplier' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(inspector).toContainText('orders@west.test');
+  expect(fixture.commands.find((c) => c.type === 'supplier.update')).toMatchObject({
+    supplierId: archivedId,
+    expectedVersion: 5,
+    payload: expect.objectContaining({ email: 'orders@west.test' }),
+  });
+
+  await openPurchaseOrders(page);
+  await page.getByRole('button', { name: 'New purchase order' }).click();
+  dialog = page.getByRole('dialog', { name: 'New purchase order' });
+  await expect(dialog.getByLabel('Supplier').locator(`option[value="${archivedId}"]`)).toHaveCount(
+    1,
+  );
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByText('PO-100').first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
 test('selected supplier details appear adjacent to compact directory on desktop', async ({
