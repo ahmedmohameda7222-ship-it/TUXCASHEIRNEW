@@ -10,9 +10,7 @@ describe('InventoryItemPage', () => {
     expect(formatInventoryQuantity(999, 'kg')).toBe('0.000999 kg');
     expect(formatInventoryQuantity(1000, 'kg')).toBe('0.001 kg');
     expect(formatInventoryQuantity(0, 'kg')).toBe('0 kg');
-    expect(formatInventoryQuantity(Number.MAX_SAFE_INTEGER, 'kg')).toBe(
-      '9,007,199,254.740991 kg',
-    );
+    expect(formatInventoryQuantity(Number.MAX_SAFE_INTEGER, 'kg')).toBe('9,007,199,254.740991 kg');
     expect(formatInventoryQuantity(-Number.MAX_SAFE_INTEGER, 'kg')).toBe(
       '-9,007,199,254.740991 kg',
     );
