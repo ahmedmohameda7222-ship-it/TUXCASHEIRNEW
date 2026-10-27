@@ -748,6 +748,52 @@ test('inventory adjustment and waste use structured reasons through the trusted 
   });
 });
 
+test('I3 adjust and waste reject fractional micros instead of rounding a stock movement', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page);
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+
+  await page.getByRole('button', { name: 'Adjust stock' }).click();
+  const adjustment = page.getByLabel('Quantity change');
+  await adjustment.fill('0.0000005');
+  await expect(page.getByRole('button', { name: 'Post adjustment' })).toBeDisabled();
+  await adjustment.fill('-0.0000005');
+  await expect(page.getByRole('button', { name: 'Post adjustment' })).toBeDisabled();
+  await adjustment.fill('-0.000001');
+  await expect(page.getByRole('button', { name: 'Post adjustment' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Post adjustment' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'adjust',
+    quantityDeltaMicros: -1,
+    inventoryItemId: itemId,
+    reasonCodeId: adjustmentReasonId,
+  });
+
+  await page.getByRole('button', { name: 'Record waste' }).click();
+  const waste = page.getByLabel('Waste quantity');
+  await waste.fill('0.0000005');
+  await expect(page.getByRole('button', { name: 'Post waste' })).toBeDisabled();
+  await waste.fill('0.0000001');
+  await expect(page.getByRole('button', { name: 'Post waste' })).toBeDisabled();
+  await waste.fill('0.000001');
+  await expect(page.getByRole('button', { name: 'Post waste' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Post waste' }).click();
+  await expect.poll(() => commands.length).toBe(2);
+  expect(commands[1]).toMatchObject({
+    type: 'waste',
+    quantityMicros: 1,
+    inventoryItemId: itemId,
+    reasonCodeId: wasteReasonId,
+  });
+});
+
 test('inventory stocktake shows business quantities and preserves count authority', async ({
   page,
 }) => {
