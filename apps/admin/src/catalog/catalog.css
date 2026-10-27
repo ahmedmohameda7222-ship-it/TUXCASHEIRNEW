@@ -1489,7 +1489,7 @@
   min-width: 0;
 }
 
-.admin-catalog-product-photo .admin-form-grid > .admin-field {
+.admin-catalog-product-photo .admin-form-grid > .admin-catalog-photo-file-field {
   flex: 1 1 180px;
   min-width: 0;
 }
