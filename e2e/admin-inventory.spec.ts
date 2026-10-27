@@ -384,6 +384,44 @@ test('I1 360px inspector keeps all three balance cards on one readable row', asy
   await page.screenshot({ path: 'test-results/inventory-i1-item-detail-mobile-360.png' });
 });
 
+test('I2 mobile create and edit forms are focused above the directory and restore context', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page);
+  await page.goto('/inventory');
+
+  await page.getByRole('button', { name: 'Add inventory item' }).click();
+  const addEditor = page.getByRole('region', { name: 'Add inventory item' });
+  await expect(addEditor.getByLabel('Item name')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeHidden();
+  const addBox = await addEditor.getByLabel('Item name').boundingBox();
+  expect(addBox).not.toBeNull();
+  expect(addBox!.y).toBeLessThan(290);
+  await page.screenshot({ path: 'test-results/inventory-i2-add-mobile-390.png' });
+  await addEditor.getByRole('button', { name: 'Close' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible();
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+  await page.getByRole('button', { name: 'Edit item' }).click();
+
+  const editEditor = page.getByRole('region', { name: 'Edit inventory item' });
+  await expect(editEditor.getByLabel('Item name')).toHaveValue('Beef');
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeHidden();
+  const editBox = await editEditor.getByLabel('Item name').boundingBox();
+  expect(editBox).not.toBeNull();
+  expect(editBox!.y).toBeLessThan(290);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.screenshot({ path: 'test-results/inventory-i2-edit-mobile-390.png' });
+  await editEditor.getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByLabel('Inventory item detail')).toBeVisible();
+});
+
 test('inventory renders on-hand, reserved, available, history, and action entry points', async ({
   page,
 }) => {
