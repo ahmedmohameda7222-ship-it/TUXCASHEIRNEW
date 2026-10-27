@@ -15,11 +15,14 @@ export type InventoryItemPageItem = {
   history?: readonly AdminInventoryMovement[];
 };
 
+export function formatInventoryMicros(micros: number): string {
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: micros % 1_000 === 0 ? 3 : 6,
+  }).format(micros / 1_000_000);
+}
+
 export function formatInventoryQuantity(micros: number, unitLabel: string): string {
-  const value = micros / 1_000_000;
-  return `${new Intl.NumberFormat('en-US', {
-    maximumFractionDigits: 3,
-  }).format(value)} ${unitLabel}`;
+  return `${formatInventoryMicros(micros)} ${unitLabel}`;
 }
 
 function movementLabel(value: string): string {
