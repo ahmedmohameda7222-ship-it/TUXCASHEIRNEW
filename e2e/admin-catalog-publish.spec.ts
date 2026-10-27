@@ -618,9 +618,7 @@ test('publish history restores as a new version and pending schedules can be can
   });
 });
 
-test('advanced controls read without draft and save canonical relations', async ({
-  page,
-}) => {
+test('advanced controls read without draft and save canonical relations', async ({ page }) => {
   const fixture = await mockAdvancedCatalog(page);
   await page.goto('/catalog/products');
 
@@ -640,10 +638,7 @@ test('advanced controls read without draft and save canonical relations', async 
   await expect
     .poll(() => fixture.commands.some((command) => command.type === 'draft.save'))
     .toBe(true);
-  expect(fixture.commands.map((command) => command.type)).toEqual([
-    'draft.create',
-    'draft.save',
-  ]);
+  expect(fixture.commands.map((command) => command.type)).toEqual(['draft.create', 'draft.save']);
   const save = fixture.commands.find((command) => command.type === 'draft.save');
   expect(save).toBeTruthy();
   const changes = save?.changes as Array<Record<string, unknown>>;
