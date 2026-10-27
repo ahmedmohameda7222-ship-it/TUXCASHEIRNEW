@@ -5,6 +5,10 @@ import { AdminDialog } from '../components/overlay/AdminDialog';
 import { formatPurchaseMicros } from './purchaseOrderDraft';
 import { parseReceiptLines, parseReturnLines } from './receivePurchaseValidation';
 
+function movementBalanceLabel(label: string, micros: number, unit: string): string {
+  return `${label}: ${formatPurchaseMicros(micros)} ${unit}`;
+}
+
 export function ReceivePurchasePage({
   order,
   mode,
@@ -103,18 +107,57 @@ export function ReceivePurchasePage({
               )}{' '}
               {line.purchaseUnitLabel}
             </p>
-            <div className="admin-purchasing-line-balance" aria-label={`${line.itemName} movement balances`}>
+            <div
+              className="admin-purchasing-line-balance"
+              aria-label={`${line.itemName} movement balances`}
+            >
               {mode === 'receive' ? (
                 <>
-                  <span>{`Ordered: ${formatPurchaseMicros(line.orderedPurchaseUnitsMicros)} ${line.purchaseUnitLabel}`}</span>
-                  <span>{`Already received: ${formatPurchaseMicros(line.receivedPurchaseUnitsMicros)} ${line.purchaseUnitLabel}`}</span>
-                  <strong>{`Maximum remaining: ${formatPurchaseMicros(line.orderedPurchaseUnitsMicros - line.receivedPurchaseUnitsMicros)} ${line.purchaseUnitLabel}`}</strong>
+                  <span>
+                    {movementBalanceLabel(
+                      'Ordered',
+                      line.orderedPurchaseUnitsMicros,
+                      line.purchaseUnitLabel,
+                    )}
+                  </span>
+                  <span>
+                    {movementBalanceLabel(
+                      'Already received',
+                      line.receivedPurchaseUnitsMicros,
+                      line.purchaseUnitLabel,
+                    )}
+                  </span>
+                  <strong>
+                    {movementBalanceLabel(
+                      'Maximum remaining',
+                      line.orderedPurchaseUnitsMicros - line.receivedPurchaseUnitsMicros,
+                      line.purchaseUnitLabel,
+                    )}
+                  </strong>
                 </>
               ) : (
                 <>
-                  <span>{`Already received: ${formatPurchaseMicros(line.receivedPurchaseUnitsMicros)} ${line.purchaseUnitLabel}`}</span>
-                  <span>{`Already returned: ${formatPurchaseMicros(line.returnedPurchaseUnitsMicros)} ${line.purchaseUnitLabel}`}</span>
-                  <strong>{`Maximum returnable: ${formatPurchaseMicros(line.receivedPurchaseUnitsMicros - line.returnedPurchaseUnitsMicros)} ${line.purchaseUnitLabel}`}</strong>
+                  <span>
+                    {movementBalanceLabel(
+                      'Already received',
+                      line.receivedPurchaseUnitsMicros,
+                      line.purchaseUnitLabel,
+                    )}
+                  </span>
+                  <span>
+                    {movementBalanceLabel(
+                      'Already returned',
+                      line.returnedPurchaseUnitsMicros,
+                      line.purchaseUnitLabel,
+                    )}
+                  </span>
+                  <strong>
+                    {movementBalanceLabel(
+                      'Maximum returnable',
+                      line.receivedPurchaseUnitsMicros - line.returnedPurchaseUnitsMicros,
+                      line.purchaseUnitLabel,
+                    )}
+                  </strong>
                 </>
               )}
             </div>
