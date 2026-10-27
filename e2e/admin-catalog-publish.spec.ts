@@ -474,6 +474,17 @@ async function mockAdvancedCatalog(page: Page) {
 
   await page.route('**/api/admin/catalog**', async (route) => {
     const request = route.request();
+    if (
+      request.method() === 'GET' &&
+      new URL(request.url()).searchParams.get('view') === 'advanced'
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(bundleJson),
+      });
+      return;
+    }
     if (request.method() === 'GET') {
       await route.fulfill({
         status: 200,
@@ -607,18 +618,18 @@ test('publish history restores as a new version and pending schedules can be can
   });
 });
 
-test('advanced product controls load from a version-fenced draft and save canonical relations', async ({
+test('advanced product controls read without creating a draft and save canonical relations with a revision fence', async ({
   page,
 }) => {
   const fixture = await mockAdvancedCatalog(page);
   await page.goto('/catalog/products');
 
   await page.getByRole('button', { name: /Classic Smash/ }).click();
-  await page.getByRole('button', { name: /More/ }).click();
-  await expect
-    .poll(() => fixture.commands.some((command) => command.type === 'draft.create'))
-    .toBe(true);
+  await expect(page.getByRole('heading', { name: 'Inventory usage' })).toBeVisible();
+  await expect(page.getByLabel('Meat quantity in g')).toHaveValue('0.25');
+  await page.getByRole('button', { name: 'More', exact: true }).click();
   await expect(page.getByText('Bacon')).toBeVisible();
+  expect(fixture.commands).toEqual([]);
   await expect(page.locator('form').getByText('Water', { exact: true })).toBeVisible();
   await expect(page.getByText(/Meat/)).toBeVisible();
 
@@ -629,6 +640,10 @@ test('advanced product controls load from a version-fenced draft and save canoni
   await expect
     .poll(() => fixture.commands.some((command) => command.type === 'draft.save'))
     .toBe(true);
+  expect(fixture.commands.map((command) => command.type)).toEqual([
+    'draft.create',
+    'draft.save',
+  ]);
   const save = fixture.commands.find((command) => command.type === 'draft.save');
   expect(save).toBeTruthy();
   const changes = save?.changes as Array<Record<string, unknown>>;
