@@ -3,7 +3,7 @@ import type {
   CatalogJsonObject,
   CatalogProductDetail,
 } from '@tux/admin-contracts';
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useUnsavedShopDraft } from '../shops/ShopScopeProvider';
 
 import {
@@ -30,6 +30,7 @@ export type ProductEditorProps = {
   canPrice: boolean;
   initialAdvancedOpen?: boolean;
   advancedBundle?: CatalogJsonObject | null;
+  advancedLoadError?: boolean;
   busy?: boolean;
   onRequestAdvanced?(): void | Promise<void>;
   onSaveDraft(draft: ProductEditorDraft): void | Promise<void>;
@@ -87,6 +88,7 @@ export function ProductEditor({
   canPrice,
   initialAdvancedOpen = false,
   advancedBundle = null,
+  advancedLoadError = false,
   busy = false,
   onRequestAdvanced,
   onSaveDraft,
@@ -146,8 +148,6 @@ export function ProductEditor({
   >({});
   const [comboState, setComboState] = useState<Record<string, boolean>>({});
   const [recipeState, setRecipeState] = useState<Record<string, string>>({});
-  const inventoryRequested = useRef(false);
-  const [inventoryLoadError, setInventoryLoadError] = useState(false);
 
   const readOnly = !canEdit || busy || imageUploading;
   const priceReadOnly = readOnly || !canPrice;
@@ -158,12 +158,6 @@ export function ProductEditor({
     () => (advancedBundle ? readProductAdvancedModel(advancedBundle, product.id) : null),
     [advancedBundle, product.id],
   );
-
-  useEffect(() => {
-    if (advancedBundle || inventoryRequested.current || !canEdit || !onRequestAdvanced) return;
-    inventoryRequested.current = true;
-    void Promise.resolve(onRequestAdvanced()).catch(() => setInventoryLoadError(true));
-  }, [advancedBundle, canEdit, onRequestAdvanced]);
 
   useEffect(() => {
     if (!advancedModel) return;
@@ -189,7 +183,7 @@ export function ProductEditor({
       Object.fromEntries(
         advancedModel.inventoryItems.map((item) => [
           item.inventoryItemId,
-          item.quantityMicros === null ? '' : formatQuantityMicrosForInput(item.quantityMicros),
+          item.quantityMicros === null ? '0' : formatQuantityMicrosForInput(item.quantityMicros),
         ]),
       ),
     );
@@ -225,7 +219,7 @@ export function ProductEditor({
         return (
           current !== undefined &&
           current !==
-            (item.quantityMicros === null ? '' : formatQuantityMicrosForInput(item.quantityMicros))
+            (item.quantityMicros === null ? '0' : formatQuantityMicrosForInput(item.quantityMicros))
         );
       })
     : false;
@@ -569,20 +563,17 @@ export function ProductEditor({
           />
         ) : (
           <div className="admin-catalog-inventory-usage__loading">
-            {inventoryLoadError ? (
+            {advancedLoadError ? (
               <p role="alert">Inventory usage could not be loaded. No recipe changes were saved.</p>
             ) : (
               <p>Loading authorized inventory definitions…</p>
             )}
-            {inventoryLoadError && onRequestAdvanced ? (
+            {advancedLoadError && onRequestAdvanced ? (
               <button
                 type="button"
                 className="admin-secondary-button"
                 onClick={() => {
-                  setInventoryLoadError(false);
-                  void Promise.resolve(onRequestAdvanced()).catch(() =>
-                    setInventoryLoadError(true),
-                  );
+                  void onRequestAdvanced();
                 }}
               >
                 Retry inventory load
