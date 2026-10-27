@@ -177,7 +177,7 @@ describe('Admin purchasing service', () => {
     expect(receivePurchase).not.toHaveBeenCalled();
   });
 
-  it('P4 supplier archive and restore require shop scope and business-wide OWNER or ADMIN', async () => {
+  it('P4 restricts supplier lifecycle commands by role, shop, and version', async () => {
     const manageSupplier = vi.fn().mockResolvedValue({
       ok: true,
       supplierId: 'supplier-1',
