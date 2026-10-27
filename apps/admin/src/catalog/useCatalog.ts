@@ -183,7 +183,7 @@ async function invalidateCatalogState(queryClient: QueryClient, shopId: string):
   ]);
 }
 
-export function useCatalog(shopId: string | undefined) {
+export function useCatalog(shopId: string | undefined, selectedProductId?: string | null) {
   const session = useAdminSession();
   const queryClient = useQueryClient();
   const [activeDraft, setActiveDraft] = useState<ActiveCatalogDraft | null>(null);
@@ -206,6 +206,20 @@ export function useCatalog(shopId: string | undefined) {
       if (!shopId) throw new CatalogUiError('concrete_shop_required');
       return adminFetch<CatalogWorkspace>(
         `/api/admin/catalog?shopId=${encodeURIComponent(shopId)}`,
+      );
+    },
+  });
+
+  // Read the published, shop-scoped inventory/recipe snapshot without creating a draft.
+  // A revision-fenced draft is created only after Save draft is explicitly submitted.
+  const advancedQuery = useQuery({
+    queryKey: ['admin', 'catalog', shopId, 'advanced'],
+    enabled: Boolean(shopId && selectedProductId && !activeDraft),
+    refetchInterval: CATALOG_REFRESH_INTERVAL_MS,
+    queryFn: async () => {
+      if (!shopId) throw new CatalogUiError('concrete_shop_required');
+      return adminFetch<CatalogJsonObject>(
+        `/api/admin/catalog?shopId=${encodeURIComponent(shopId)}&view=advanced`,
       );
     },
   });
@@ -576,6 +590,7 @@ export function useCatalog(shopId: string | undefined) {
 
   return {
     workspaceQuery,
+    advancedQuery,
     products,
     categories,
     modifiers,
