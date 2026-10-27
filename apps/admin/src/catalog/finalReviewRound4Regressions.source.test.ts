@@ -60,6 +60,8 @@ describe('Plan 2 final Codex review regressions', () => {
 
     expect(editor).toContain('!modifier.active && !linked');
     expect(editor).toContain('!option.active && !selected');
-    expect(editor).toContain("!item.active && quantity === ''");
+    const inventoryUsage = source('./ProductInventoryUsage.tsx');
+    expect(inventoryUsage).toContain('!item.active && !item.used');
+    expect(inventoryUsage).toContain('!item.active && Number(value) > 0');
   });
 });
