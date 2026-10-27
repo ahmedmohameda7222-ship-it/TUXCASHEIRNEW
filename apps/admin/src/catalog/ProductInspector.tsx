@@ -14,6 +14,7 @@ export function ProductInspector({
   busy,
   draftRevision,
   advancedBundle,
+  advancedLoadError = false,
   onClose,
   onRequestAdvanced,
   onSaveDraft,
@@ -29,6 +30,7 @@ export function ProductInspector({
   busy: boolean;
   draftRevision: number | null;
   advancedBundle: CatalogJsonObject | null;
+  advancedLoadError?: boolean;
   onClose(): void;
   onRequestAdvanced(): void | Promise<void>;
   onSaveDraft(draft: ProductEditorDraft): void | Promise<void>;
@@ -64,6 +66,7 @@ export function ProductInspector({
         canPrice={canPrice}
         busy={busy}
         advancedBundle={advancedBundle}
+        advancedLoadError={advancedLoadError}
         onRequestAdvanced={onRequestAdvanced}
         onSaveDraft={onSaveDraft}
         onReviewPublish={onReviewPublish}
