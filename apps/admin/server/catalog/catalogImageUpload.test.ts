@@ -37,7 +37,9 @@ describe('trusted catalog image uploads', () => {
     expect(() => validateCatalogImageBytes('image/png', new Uint8Array(0))).toThrow(
       CatalogImageUploadError,
     );
-    expect(validateCatalogImageBytes('image/png', new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, ...new Uint8Array(2 * 1024 * 1024 - 8)]))).toBe('png');
+    const maximumPng = new Uint8Array(2 * 1024 * 1024);
+    maximumPng.set(png.slice(0, 8));
+    expect(validateCatalogImageBytes('image/png', maximumPng)).toBe('png');
     expect(() =>
       validateCatalogImageBytes('image/png', new Uint8Array(2 * 1024 * 1024 + 1)),
     ).toThrow(CatalogImageUploadError);
