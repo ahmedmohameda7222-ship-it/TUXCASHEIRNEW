@@ -1508,6 +1508,10 @@
   font-size: 12px;
 }
 
+.admin-catalog-image-layout > .admin-catalog-photo-help {
+  grid-column: 2;
+}
+
 .admin-catalog-photo-help,
 .admin-catalog-product-photo .admin-field__help {
   flex: 1 0 100%;
