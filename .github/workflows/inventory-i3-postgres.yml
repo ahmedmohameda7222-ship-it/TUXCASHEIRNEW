@@ -9,6 +9,7 @@ on:
       - 'apps/admin/src/inventory/inventoryQuantityInput.ts'
       - 'scripts/test-inventory-adjust-waste-replay-postgres.mjs'
       - 'scripts/test-inventory-purchasing-consumption-postgres.mjs'
+      - 'supabase/migrations/20261027190000_inventory_purchasing_replay_payload_integrity.sql'
       - 'scripts/test-inventory-isolated-postgres.mjs'
       - 'supabase/migrations/20261027183000_inventory_adjustment_waste_replay_integrity.sql'
       - '.github/workflows/inventory-i3-postgres.yml'
