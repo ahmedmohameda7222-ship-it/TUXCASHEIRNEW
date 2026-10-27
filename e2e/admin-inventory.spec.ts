@@ -493,7 +493,7 @@ test('I2 create submits accurate zero threshold and tracking selection without s
   await page.getByRole('button', { name: 'Add inventory item' }).click();
   const editor = page.getByRole('region', { name: 'Add inventory item' });
   await editor.getByLabel('Item name').fill('Minced beef');
-  await editor.getByLabel('Base unit').fill('kg');
+  await editor.getByLabel('Base unit', { exact: true }).fill('kg');
   await editor.getByLabel('Tracking mode').selectOption('BULK_MANUAL');
   await editor.getByLabel('Low-stock threshold (base units)').fill('0');
   await editor.getByRole('button', { name: 'Create inventory item' }).click();
