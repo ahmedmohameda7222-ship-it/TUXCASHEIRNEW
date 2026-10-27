@@ -261,7 +261,7 @@ describe('ProductEditor', () => {
       />,
     );
 
-    expect(html).toContain('Product image');
+    expect(html).toContain('Product photo');
     expect(html).toContain('Image upload changes remain in Draft until saved and published.');
     expect(html).not.toContain('Image object key');
     expect(html).not.toContain(fixtureProduct.shopId);
