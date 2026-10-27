@@ -687,6 +687,75 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   });
 }
 
+test('P4 mobile supplier filtering must not silently retarget archive actions', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const otherId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbd';
+  const fixture = await mockPurchasing(page, {
+    initialSuppliers: [
+      {
+        id: supplierId,
+        businessId: session.principal.businessId,
+        name: 'Prime Foods',
+        contactName: 'Sara',
+        phone: '01000000000',
+        email: 'orders@prime.test',
+        active: true,
+        version: 2,
+      },
+      {
+        id: otherId,
+        businessId: session.principal.businessId,
+        name: 'Delta Produce',
+        contactName: 'Dalia',
+        phone: null,
+        email: null,
+        active: true,
+        version: 3,
+      },
+    ],
+  });
+  await page.goto('/purchasing');
+  await openSuppliers(page);
+  const inspector = page.getByRole('complementary', { name: 'Selected supplier detail' });
+  await page.getByRole('button', { name: 'Prime Foods' }).click();
+  await expect(inspector).toBeVisible();
+  await expect(inspector.getByRole('heading', { name: 'Prime Foods' })).toBeVisible();
+
+  await page.getByRole('searchbox', { name: 'Search suppliers' }).fill('Delta');
+  await expect(inspector).toBeHidden();
+  expect(fixture.commands).toHaveLength(0);
+  await page.getByRole('button', { name: 'Delta Produce' }).click();
+  await expect(inspector.getByRole('heading', { name: 'Delta Produce' })).toBeVisible();
+  await inspector.getByRole('button', { name: 'Archive Delta Produce' }).click();
+  const confirm = page.getByRole('dialog', { name: 'Archive supplier?' });
+  await expect(confirm).toContainText('Delta Produce');
+  await confirm.getByRole('button', { name: 'Archive supplier' }).click();
+  await expect.poll(() => fixture.commands.filter((c) => c.type === 'supplier.archive').length).toBe(1);
+  expect(fixture.commands.find((c) => c.type === 'supplier.archive')).toMatchObject({
+    supplierId: otherId,
+    expectedVersion: 3,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('P4 duplicate supplier error appears inside mobile form and preserves the entered draft', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  const fixture = await mockPurchasing(page, {
+    failCommandType: 'supplier.create',
+    failureCode: 'duplicate_supplier',
+  });
+  await page.goto('/purchasing');
+  const dialog = await openSupplierDialog(page);
+  await dialog.getByRole('textbox', { name: 'Supplier name' }).fill('Prime Foods');
+  await dialog.getByRole('button', { name: 'Add supplier' }).click();
+  await expect(dialog.getByRole('alert')).toContainText('A supplier with these details already exists.');
+  await expect(dialog.getByRole('textbox', { name: 'Supplier name' })).toHaveValue('Prime Foods');
+  await expect(dialog).toBeVisible();
+  expect(fixture.commands.filter((c) => c.type === 'supplier.create')).toHaveLength(1);
+});
+
 test('selected supplier details appear adjacent to compact directory on desktop', async ({
   page,
 }) => {
