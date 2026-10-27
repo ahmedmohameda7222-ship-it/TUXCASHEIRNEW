@@ -65,12 +65,14 @@ function canonicalBundle(product: FixtureProduct, version: number, withRecipe = 
       productModifierLinks: [],
       comboBeverageOptions: [],
       recipeLines: withRecipe
-        ? [{
-            shopId,
-            productId: product.id,
-            inventoryItemId: '66666666-6666-4666-8666-666666666666',
-            quantityMicros: 250_000,
-          }]
+        ? [
+            {
+              shopId,
+              productId: product.id,
+              inventoryItemId: '66666666-6666-4666-8666-666666666666',
+              quantityMicros: 250_000,
+            },
+          ]
         : [],
       orderTypes: [],
       paymentMethods: [],
@@ -567,11 +569,13 @@ test('C3 direct 390px Inventory usage edits preserve focus and persist recipe on
   await page.getByRole('button', { name: 'Save draft' }).click();
 
   const saved = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
-  const snapshot = saved?.snapshot as { recipeLines?: Array<{
-    productId: string;
-    inventoryItemId: string;
-    quantityMicros: number;
-  }> };
+  const snapshot = saved?.snapshot as {
+    recipeLines?: Array<{
+      productId: string;
+      inventoryItemId: string;
+      quantityMicros: number;
+    }>;
+  };
   expect(snapshot.recipeLines).toEqual([
     expect.objectContaining({
       productId,
