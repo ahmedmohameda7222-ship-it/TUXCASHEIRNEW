@@ -40,7 +40,13 @@ export function ProductInspector({
   imageRequiresSaveFirst?: boolean;
 }) {
   return (
-    <section className="admin-catalog-inspector" data-catalog-inspector>
+    <section
+      className="admin-catalog-inspector"
+      data-catalog-inspector
+      role="dialog"
+      aria-label="Product editor"
+      aria-modal="true"
+    >
       <header className="admin-catalog-inspector__header">
         <button className="admin-catalog-back" type="button" onClick={onClose}>
           <span aria-hidden="true">←</span>
@@ -57,6 +63,15 @@ export function ProductInspector({
         ) : (
           <span className="admin-status-pill">Draft changes</span>
         )}
+        {onReviewPublish ? (
+          <button
+            className="admin-secondary-button admin-catalog-inspector__publish"
+            type="button"
+            onClick={onReviewPublish}
+          >
+            Review & Publish
+          </button>
+        ) : null}
       </header>
       <ProductEditor
         key={`${product.id}:${product.name}:${product.description}:${product.priceMinor}:${product.imageKey}:${product.bestSeller}:${product.soldOut}:${product.active}:${product.categoryId}:${product.isCombo}:${product.sortOrder}`}
