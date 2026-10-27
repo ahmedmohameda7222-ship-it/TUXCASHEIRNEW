@@ -677,7 +677,9 @@ export function CatalogPage() {
                 canPrice={canPrice}
                 busy={busy}
                 draftRevision={catalog.activeDraft?.draftRevision ?? null}
-                advancedBundle={catalog.activeDraft?.bundleJson ?? catalog.advancedQuery.data ?? null}
+                advancedBundle={
+                  catalog.activeDraft?.bundleJson ?? catalog.advancedQuery.data ?? null
+                }
                 advancedLoadError={catalog.advancedQuery.isError}
                 onClose={closeEditor}
                 onRequestAdvanced={async () => {
