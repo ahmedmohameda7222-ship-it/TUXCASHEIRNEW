@@ -1,6 +1,6 @@
 import './purchasing.css';
 import { useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
 
 import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
@@ -70,6 +70,25 @@ export function PurchasingPage() {
     () => workspace?.purchaseOrders.find((order) => order.id === selectedId) ?? null,
     [selectedId, workspace?.purchaseOrders],
   );
+
+  // Match the approved desktop list + selected inspector. Keep phones/tablets
+  // on the list until the operator explicitly chooses a purchase order.
+  useEffect(() => {
+    if (
+      section !== 'orders' ||
+      location !== '/purchasing' ||
+      selectedId !== null ||
+      !workspace?.purchaseOrders.length ||
+      window.innerWidth <= 1150
+    ) {
+      return;
+    }
+    const first = [...workspace.purchaseOrders].sort(
+      (left, right) =>
+        right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id),
+    )[0];
+    if (first) navigate(detailPath('/purchasing', first.id), { replace: true });
+  }, [location, navigate, section, selectedId, workspace?.purchaseOrders]);
 
   function closeActionAndRefreshHistory() {
     if (shopId && selectedId) {
