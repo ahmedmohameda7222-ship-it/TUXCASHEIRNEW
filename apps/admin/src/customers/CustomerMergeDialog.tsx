@@ -5,7 +5,12 @@ import { EmptyState, ErrorState, LoadingState } from '../components/feedback/Adm
 import { AdminDialog } from '../components/overlay/AdminDialog';
 
 function money(minor: number): string {
-  return `${(minor / 100).toFixed(2)} EGP`;
+  if (!Number.isSafeInteger(minor)) return 'Unavailable';
+  const cents = BigInt(minor);
+  const abs = cents < 0n ? -cents : cents;
+  const pounds = abs / 100n;
+  const pennies = String(abs % 100n).padStart(2, '0');
+  return `${cents < 0n ? '-' : ''}${pounds}.${pennies} EGP`;
 }
 
 function CustomerSnapshot({
