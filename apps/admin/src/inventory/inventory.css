@@ -787,3 +787,38 @@
     padding: 0 0.75rem 0.55rem;
   }
 }
+
+/* I1 mobile/tablet selection is a focused detail route. Retain the global
+   shop/shell navigation and the in-detail Back affordance, but do not force
+   users to scroll past the directory header and KPI tiles first. */
+@media (max-width: 1150px) {
+  .admin-page:has(.admin-inventory-master-detail[data-detail-active='true'])
+    > .admin-page__header,
+  .admin-page:has(.admin-inventory-master-detail[data-detail-active='true'])
+    .admin-inventory-summary {
+    display: none;
+  }
+}
+
+/* Match the approved mobile inspector's three adjacent factual balances.
+   Unlike its decorative mock stock bar, these are canonical micros. */
+@media (max-width: 690px) {
+  .admin-inventory-master-detail[data-detail-active='true'] .inventory-balance-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+
+  .admin-inventory-master-detail[data-detail-active='true'] .inventory-balance-grid > div {
+    min-width: 0;
+    padding: 0.65rem 0.4rem;
+  }
+
+  .admin-inventory-master-detail[data-detail-active='true'] .inventory-balance-grid dt {
+    font-size: 0.68rem;
+  }
+
+  .admin-inventory-master-detail[data-detail-active='true'] .inventory-balance-grid dd {
+    font-size: 1.05rem;
+    overflow-wrap: anywhere;
+  }
+}
