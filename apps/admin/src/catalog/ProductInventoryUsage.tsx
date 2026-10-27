@@ -20,9 +20,7 @@ export function ProductInventoryUsage({
   const rows = inventoryItems.map((item) => {
     const raw =
       quantities[item.inventoryItemId] ??
-      (item.quantityMicros === null
-        ? '0'
-        : formatQuantityMicrosForInput(item.quantityMicros));
+      (item.quantityMicros === null ? '0' : formatQuantityMicrosForInput(item.quantityMicros));
     return { ...item, quantity: raw, used: Number(raw) > 0 };
   });
   const usedCount = rows.filter((row) => row.used).length;
@@ -30,7 +28,9 @@ export function ProductInventoryUsage({
   return (
     <>
       <p className="admin-catalog-inventory-usage__intro">
-        <strong>{usedCount} of {rows.length} in use</strong>
+        <strong>
+          {usedCount} of {rows.length} in use
+        </strong>
         {' · '}Quantity consumed when one unit of this product is sold.
       </p>
       <p className="admin-catalog-inventory-usage__hint">
