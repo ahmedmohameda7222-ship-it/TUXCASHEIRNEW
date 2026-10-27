@@ -52,6 +52,7 @@ export function LoyaltyPanel({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving) return;
     const parsed = Number(pointsDelta);
     if (!Number.isSafeInteger(parsed) || parsed === 0 || !reasonCodeId.trim()) {
       return;
@@ -122,6 +123,7 @@ export function LoyaltyPanel({
             <span>Points delta</span>
             <input
               inputMode="numeric"
+              disabled={saving}
               value={pointsDelta}
               onChange={(event) => setPointsDelta(event.target.value)}
             />
@@ -130,6 +132,7 @@ export function LoyaltyPanel({
             <span>Reason</span>
             <select
               value={reasonCodeId}
+              disabled={saving}
               onChange={(event) => setReasonCodeId(event.target.value)}
               required
             >
@@ -143,7 +146,7 @@ export function LoyaltyPanel({
           </label>
           <label className="admin-field">
             <span>Note</span>
-            <textarea value={note} onChange={(event) => setNote(event.target.value)} />
+            <textarea disabled={saving} value={note} onChange={(event) => setNote(event.target.value)} />
           </label>
           <button className="admin-primary-button" type="submit" disabled={saving}>
             {saving ? 'Saving…' : 'Adjust points'}
