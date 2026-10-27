@@ -146,7 +146,11 @@ export function LoyaltyPanel({
           </label>
           <label className="admin-field">
             <span>Note</span>
-            <textarea disabled={saving} value={note} onChange={(event) => setNote(event.target.value)} />
+            <textarea
+              disabled={saving}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+            />
           </label>
           <button className="admin-primary-button" type="submit" disabled={saving}>
             {saving ? 'Saving…' : 'Adjust points'}
