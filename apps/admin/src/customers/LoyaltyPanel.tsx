@@ -15,9 +15,11 @@ function loyaltyEventLabel(eventType: string): string {
   const labels: Record<string, string> = {
     EARN: 'Points earned',
     REDEEM: 'Points redeemed',
-    ADJUSTMENT: 'Manual adjustment',
+    MANUAL_ADJUSTMENT: 'Manual adjustment',
     EXPIRY: 'Points expired',
-    REFUND: 'Refund adjustment',
+    CANCEL_COMPENSATION: 'Cancellation adjustment',
+    REFUND_COMPENSATION: 'Refund adjustment',
+    RETURN_COMPENSATION: 'Return adjustment',
   };
   return labels[eventType] ?? 'Loyalty update';
 }
