@@ -9,7 +9,7 @@ import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDet
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { AdjustStockSheet } from './AdjustStockSheet';
-import { InventoryItemPage } from './InventoryItemPage';
+import { formatInventoryMicros, InventoryItemPage } from './InventoryItemPage';
 import { InventoryDefinitionEditor } from './InventoryDefinitionEditor';
 import { inventoryCsv } from './inventoryCsv';
 import { InventoryMasterBindingPanel } from './InventoryMasterBindingPanel';
@@ -786,10 +786,7 @@ export function InventoryPage() {
                           : status === 'UNCONFIGURED'
                             ? 'Threshold not set'
                             : 'In stock';
-                  const formatted = (micros: number) =>
-                    new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(
-                      micros / 1_000_000,
-                    );
+                  const formatted = formatInventoryMicros;
                   return (
                     <button
                       className={
