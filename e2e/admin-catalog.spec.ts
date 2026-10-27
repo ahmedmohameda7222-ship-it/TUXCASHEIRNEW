@@ -572,6 +572,8 @@ test('C3 direct 390px Inventory usage edits preserve focus and persist recipe on
   await page.getByRole('button', { name: /Classic Smash/ }).click();
 
   await expect(page.getByRole('heading', { name: 'Inventory usage' })).toBeVisible();
+  await page.getByRole('button', { name: 'Jump to inventory usage' }).click();
+  await expect(page.getByRole('heading', { name: 'Inventory usage' })).toBeInViewport();
   const meat = page.getByRole('spinbutton', { name: 'Meat quantity in g' });
   const cheese = page.getByRole('spinbutton', { name: 'Cheese quantity in slice' });
   await expect(meat).toHaveValue('0.25');
@@ -587,8 +589,10 @@ test('C3 direct 390px Inventory usage edits preserve focus and persist recipe on
   await meat.fill('0');
   await expect(meat).toBeFocused();
   await expect(page.getByText('1 of 2 in use')).toBeVisible();
+  await page.getByRole('heading', { name: 'Inventory usage' }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'test-results/catalog-c3-inventory-usage-mobile-390.png' });
   await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Draft saved — not published')).toBeVisible();
 
   const saved = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
   const snapshot = saved?.snapshot as {
@@ -623,7 +627,28 @@ test('C3 desktop Inventory usage exposes direct recipe rows in the product edito
   expect(drawer!.width).toBeLessThanOrEqual(450);
   expect(drawer!.height).toBeGreaterThanOrEqual(850);
   await expect(page.locator('.admin-catalog-layout__list')).toBeVisible();
+  await page.getByRole('button', { name: 'Jump to inventory usage' }).click();
+  await expect(page.getByRole('heading', { name: 'Inventory usage' })).toBeInViewport();
+  await page.getByRole('heading', { name: 'Inventory usage' }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'test-results/catalog-c3-inventory-usage-desktop-1440.png' });
+});
+
+test('C3 invalid recipe quantity cannot create a draft; decimal zero is an unlink sentinel', async ({
+  page,
+}) => {
+  const fixture = await mockCatalog(page, { withRecipe: true });
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  const cheese = page.getByRole('spinbutton', { name: 'Cheese quantity in slice' });
+  await expect(cheese).toHaveValue('0');
+  expect(fixture.commands).toEqual([]);
+  await cheese.fill('-1');
+  await expect(cheese).toHaveAttribute('aria-invalid', 'true');
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByRole('alert')).toContainText('positive quantity');
+  expect(fixture.commands).toEqual([]);
+  await cheese.fill('0.000');
+  await expect(cheese).not.toHaveAttribute('aria-invalid', 'true');
 });
 
 test('catalog search filters the live workspace without mutating authority', async ({ page }) => {
