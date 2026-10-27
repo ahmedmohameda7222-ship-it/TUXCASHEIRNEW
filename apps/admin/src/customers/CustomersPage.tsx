@@ -317,6 +317,7 @@ export function CustomersPage() {
                         <CustomerDetailPage
                           key={detail.id}
                           customer={detail}
+                          program={programQuery.data ?? null}
                           canAdjustPoints={canManageLoyalty}
                           onClose={() => {
                             setDismissedCustomerShop(shopId);
