@@ -621,8 +621,9 @@ export function useCatalog(shopId: string | undefined, selectedProductId?: strin
     modifiers,
     activeDraft,
     compatibleDrafts,
-    pendingExistingDraftResume:
-      Boolean(selectedProductId && compatibleDrafts.length === 1 && !activeDraft),
+    pendingExistingDraftResume: Boolean(
+      selectedProductId && compatibleDrafts.length === 1 && !activeDraft,
+    ),
     draftInvalidatedByLiveChange,
     resumeDraft,
     prepareProductDraft,
