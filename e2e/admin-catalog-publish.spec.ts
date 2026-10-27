@@ -618,7 +618,7 @@ test('publish history restores as a new version and pending schedules can be can
   });
 });
 
-test('advanced product controls read without creating a draft and save canonical relations with a revision fence', async ({
+test('advanced controls read without draft and save canonical relations', async ({
   page,
 }) => {
   const fixture = await mockAdvancedCatalog(page);
