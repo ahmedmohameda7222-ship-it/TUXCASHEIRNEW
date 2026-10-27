@@ -67,6 +67,7 @@ export function ProductInspector({
         onRequestAdvanced={onRequestAdvanced}
         onSaveDraft={onSaveDraft}
         onReviewPublish={onReviewPublish}
+        onCancel={onClose}
         onSetAvailability={onSetAvailability}
         onUploadImage={onUploadImage}
         imageRequiresSaveFirst={imageRequiresSaveFirst}
