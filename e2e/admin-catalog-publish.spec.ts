@@ -33,6 +33,7 @@ async function mockPublishing(
   copyPreviewOverrides: Record<string, unknown> = {},
   startWithoutDraft = false,
   pendingPriceApproval = false,
+  withMediaRecipeChanges = false,
 ) {
   let currentPublishVersion = 48;
   let pendingSchedule = true;
@@ -126,8 +127,23 @@ async function mockPublishing(
               changedRelationCounts: {
                 productModifierLinks: 0,
                 comboBeverageOptions: 0,
-                recipeLines: 0,
+                recipeLines: withMediaRecipeChanges ? 1 : 0,
               },
+              changes: withMediaRecipeChanges
+                ? [
+                    {
+                      kind: 'product',
+                      id: '11111111-1111-4111-8111-111111111111',
+                      status: 'modified',
+                      before: { name: 'Classic Smash', imageKey: null },
+                      after: {
+                        name: 'Classic Smash',
+                        imageKey: 'private/shop-a/images/new.png',
+                      },
+                      changedFields: ['imageKey'],
+                    },
+                  ]
+                : undefined,
             },
           ].filter(() => hasCopyDraft),
           schedules: pendingSchedule
@@ -545,6 +561,37 @@ async function mockAdvancedCatalog(page: Page) {
 
   return { commands, productId, modifierId, beverageId, inventoryItemId };
 }
+
+test('C5 publication review displays photo and recipe changes before version-fenced release', async ({
+  page,
+}) => {
+  const fixture = await mockPublishing(page, false, {}, false, false, true);
+  await page.goto('/catalog/products/publishing');
+  await expect(page.getByRole('heading', { name: 'Before → After review' })).toBeVisible();
+  await expect(page.getByText('Classic Smash')).toBeVisible();
+  await expect(page.getByText('Product image')).toBeVisible();
+  await expect(page.getByText('Photo added')).toBeVisible();
+  await expect(page.getByText('1 recipe line changed')).toBeVisible();
+  await expect(page.getByText('private/shop-a/images/new.png')).toHaveCount(0);
+  expect(fixture.commands).toEqual([]);
+
+  await page
+    .getByRole('checkbox', {
+      name: 'I reviewed the changes and confirm publication for this shop.',
+    })
+    .check();
+  await page.getByRole('button', { name: 'Publish now' }).click();
+  await expect(page.getByText('Catalog published.')).toBeVisible();
+  expect(fixture.commands).toEqual([
+    expect.objectContaining({
+      type: 'draft.publish',
+      draftId,
+      shopId,
+      expectedDraftRevision: 2,
+      expectedVersion: 48,
+    }),
+  ]);
+});
 
 test('publish review shows version-fenced draft diff and prevents unverified scheduling', async ({
   page,
