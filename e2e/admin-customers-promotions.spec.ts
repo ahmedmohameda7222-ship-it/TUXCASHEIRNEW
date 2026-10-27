@@ -389,6 +389,16 @@ test('CRM1 server search and shop switching never reuse customers from the prior
   expect(hasHorizontalOverflow).toBe(false);
 });
 
+test('CRM2 desktop Close preserves intentional empty inspector', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/customers');
+  const close = page.getByRole('button', { name: 'Close customer profile' });
+  await expect(close).toBeVisible();
+  await close.click();
+  await expect(page.getByLabel('Customer detail').getByText('Select a customer')).toBeVisible();
+  await expect(close).toHaveCount(0);
+});
+
 test('renders canonical CRM identity, loyalty history and automatic segments', async ({ page }) => {
   await openCustomer(page);
 
