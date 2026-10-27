@@ -378,7 +378,7 @@ export function ProductEditor({
                   Save this product draft first to enable image upload.
                 </p>
               ) : null}
-              <label className="admin-field">
+              <label className="admin-field admin-catalog-photo-file-field">
                 <span>Choose product image (PNG, JPEG, WebP, AVIF — maximum 2 MB)</span>
                 <input
                   type="file"
