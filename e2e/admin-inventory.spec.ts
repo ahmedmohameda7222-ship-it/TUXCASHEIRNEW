@@ -310,6 +310,25 @@ test('I1 desktop selects the alphabetically first displayed item, not the API ro
   await expect(page.getByLabel('Inventory item detail')).toContainText('Apple');
 });
 
+test('I1 mobile-first phone shows a complete first item above fixed navigation', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page);
+  await page.goto('/inventory');
+
+  const first = page.getByRole('region', { name: 'Inventory items' }).locator('.admin-inventory-row').first();
+  await expect(first).toContainText('Beef');
+  await expect(first).toContainText('kg');
+  await expect(first).toContainText('In stock');
+  const rowBox = await first.boundingBox();
+  expect(rowBox).not.toBeNull();
+  expect(rowBox!.y + rowBox!.height).toBeLessThanOrEqual(844 - 72);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
 test('I1 phone opens the inventory list without forcing an inspector route', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockInventory(page);
