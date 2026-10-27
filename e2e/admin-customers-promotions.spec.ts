@@ -472,6 +472,39 @@ test('renders canonical CRM identity, loyalty history and automatic segments', a
   await expect(page.getByText(/Lunch 10%/)).toBeVisible();
 });
 
+test('CRM3 mobile merge review preserves exact safe-integer customer spend', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const preciseMinor = Number.MAX_SAFE_INTEGER - 1;
+  await page.route('**/api/admin/customers**', async (route) => {
+    const url = new URL(route.request().url());
+    if (
+      route.request().method() !== 'GET' ||
+      url.searchParams.get('view') !== 'customers' ||
+      url.searchParams.get('q') !== 'Nour'
+    ) {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        customers: [{ ...mergeCandidate, lifetimeSpendMinor: preciseMinor }],
+      }),
+    });
+  });
+  await openCustomer(page);
+  await page.getByLabel('Customer detail').getByRole('button', { name: 'Merge customer' }).click();
+  await page.getByLabel('Search merge candidates').fill('Nour');
+  await page.getByLabel('Merge candidates').getByRole('button', { name: /Nour/ }).click();
+  const candidate = page.getByRole('article', { name: 'Customer to merge' });
+  await expect(candidate).toContainText('90071992547409.90 EGP');
+  expect(postedCommands.filter((command) => command.type === 'customer.merge')).toHaveLength(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
 test('exposes controlled merge, loyalty configuration and full promotion editor', async ({
   page,
 }) => {
