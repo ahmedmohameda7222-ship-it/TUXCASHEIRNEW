@@ -293,7 +293,7 @@ describe('Plan 5 CRM and promotion controls', () => {
       ['DETAIL', 'apps/admin/src/customers/CustomerDetailPage.tsx'],
       ['PAGE', 'apps/admin/src/customers/CustomersPage.tsx'],
       ['CSS', 'apps/admin/src/customers/customers.css'],
-    ]) {
+    ] as const) {
       const output = execFileSync('npx', ['prettier', path], { encoding: 'utf8' });
       console.log('CRM2_FORMAT_CAPTURE_' + label + ':' + JSON.stringify(output));
     }
