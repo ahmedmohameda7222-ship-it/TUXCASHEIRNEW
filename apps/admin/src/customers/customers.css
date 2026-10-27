@@ -311,9 +311,7 @@
 .admin-customers-directory__columns,
 .admin-customers-directory .admin-customer-row {
   display: grid;
-  grid-template-columns:
-    minmax(0, 1.75fr) minmax(0, 1.25fr) minmax(0, 0.48fr)
-    minmax(0, 0.94fr) minmax(0, 0.72fr) minmax(0, 1fr) minmax(0, 0.82fr);
+  grid-template-columns: 1.75fr 1.25fr 0.48fr 0.94fr 0.72fr 1fr 0.82fr;
   align-items: center;
   gap: 7px;
 }
