@@ -676,7 +676,12 @@ export function CatalogPage() {
                 categories={categories}
                 canEdit={canEdit}
                 canPrice={canPrice}
-                busy={busy}
+                busy={busy || catalog.pendingExistingDraftResume}
+                resumeError={catalog.resumeDraft.isError}
+                onRetryResume={() => {
+                  const existing = catalog.compatibleDrafts[0];
+                  if (existing) void catalog.resumeDraft.mutateAsync(existing.id);
+                }}
                 draftRevision={catalog.activeDraft?.draftRevision ?? null}
                 advancedBundle={
                   catalog.activeDraft?.bundleJson ?? catalog.advancedQuery.data ?? null
