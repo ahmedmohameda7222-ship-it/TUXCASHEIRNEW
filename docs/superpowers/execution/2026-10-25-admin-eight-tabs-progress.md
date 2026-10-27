@@ -1,3 +1,23 @@
+## 2026-10-28 CRM C2 PRE-MERGE ENGINEERING PASS — CRM C3 exclusively unlocked
+
+**Accepted exact code HEAD:** `3574bebfcfc1591864bac950dd98cc522175a193`, Draft PR #165, no merge/deployment/Production SQL. All eight **exact-SHA GitHub Actions workflow groups completed SUCCESS**:
+- [TUX V2 CI 40595718417](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40595718417) — all changed-file Prettier, TypeScript, related React/server unit suites, security, migrations and required gate.
+- [Eight-tab rendered 40595718510](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40595718510) — six-tab responsive browser with CRM2 restricted role/mobile profile, real loyalty events and 1440px Close tests; screenshot/evidence artifact 12776880452.
+- [Full monorepo regression 40595718297](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40595718297) — Admin, Menu, Windows, Architecture, Edge security, Branch/PIN, quality all success.
+- [Integrated Purchasing, Orders, Inventory PG and Admin/Operations/Menu Chromium 40595718317](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40595718317) — all jobs green.
+- [Purchasing isolated PG 40595718345](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40595718345) — green.
+- [Orders isolated PG 40595718259](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40595718259) — green.
+- [Inventory I3 PG 40595718370](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40595718370) — green.
+- [P0 Business Day PG 40595718272](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40595718272) — green.
+
+**CRM2 RED→GREEN:** two focused `CustomersCrm.test.tsx` RED tests exposed missing factual three-metric and signed loyalty history UI (Fast CI 40586125322 failed as expected); implemented exact minor-unit BigInt spend formatting, shop-scoped persisted loyalty policy, real read-only segment labels, true enum labels for `MANUAL_ADJUSTMENT` and `REFUND_COMPENSATION`, signed selected-customer loyalty activity below the directory/inspector row, Overview/Orders/Addresses/Loyalty/History, restricted merge/adjust quick actions and functional desktop Close without auto-reopen. Added Playwright 390px permission/factual profile, desktop Close, and role isolation. First full Chromium found 2 issues: Close placeholder is intentionally mounted-but-hidden by responsive layout; a legacy generic phone locator became ambiguous after legitimate duplicate phone display in Header/Contact. Corrected both tests to assert desired behavior with exact locators; latest exact-head 8 groups success.
+
+**Known honest limitation:** Customer API provides aggregate order stats, not individual order records; no fabricated recent orders panel, order links or invented membership timestamp. Profile shows supported aggregate Orders tab plus real individual loyalty event ledger. The approved spec explicitly allows omission of individual recent order events until an authorized query exists. Existing data-only contact fields without backend support show em dash. Final screenshot pixel-equivalence and Owner-reserved hosted authenticated physical UAT remain deferred.
+
+**Ruling:** CRM C2 accepted **pre-merge engineering scope**, not production UAT. **CRM C3 exclusively ACTIVE**. C4 and all Staff/Finance/Reports follow-ons remain locked. PR remains Draft/open; no main merge, deployment, Production SQL or real customer mutation.
+
+---
+
 ## 2026-10-28 CRM C1 PRE-MERGE ENGINEERING PASS — CRM C2 exclusively unlocked
 
 **Exact accepted code HEAD:** `5435f4a32fcae5e8381d37aed865d40dbc19148c` on Draft PR #165. All eight exact-head GitHub Actions workflow groups **SUCCESS**:
