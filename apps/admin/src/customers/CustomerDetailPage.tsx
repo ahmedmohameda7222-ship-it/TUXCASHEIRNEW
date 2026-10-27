@@ -234,27 +234,32 @@ export function CustomerDetailPage({
           },
         ]}
       />
-      <section className="admin-customer-detail__activity" aria-label="Recent loyalty activity">
-        <h3>Recent loyalty activity</h3>
-        {customer.loyaltyHistory.length === 0 ? (
-          <p>No loyalty activity yet.</p>
-        ) : (
-          <ul>
-            {customer.loyaltyHistory.slice(0, 5).map((event) => (
-              <li key={event.id}>
-                <span>{event.reason?.label ?? loyaltyLabel(event.eventType)}</span>
-                <strong>
-                  {event.pointsDelta > 0 ? '+' : ''}
-                  {event.pointsDelta} pts
-                </strong>
-                <time dateTime={event.createdAt}>
-                  {new Date(event.createdAt).toLocaleDateString('en-GB')}
-                </time>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </article>
+  );
+}
+
+export function CustomerActivityPanel({ customer }: { customer: AdminCustomerDetail }) {
+  return (
+    <section className="admin-customer-detail__activity" aria-label="Recent loyalty activity">
+      <h3>Recent loyalty activity</h3>
+      {customer.loyaltyHistory.length === 0 ? (
+        <p>No loyalty activity yet.</p>
+      ) : (
+        <ul>
+          {customer.loyaltyHistory.slice(0, 5).map((event) => (
+            <li key={event.id}>
+              <span>{event.reason?.label ?? loyaltyLabel(event.eventType)}</span>
+              <strong>
+                {event.pointsDelta > 0 ? '+' : ''}
+                {event.pointsDelta} pts
+              </strong>
+              <time dateTime={event.createdAt}>
+                {new Date(event.createdAt).toLocaleDateString('en-GB')}
+              </time>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
