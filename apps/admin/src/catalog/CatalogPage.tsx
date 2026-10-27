@@ -494,7 +494,7 @@ export function CatalogPage() {
       ) : null}
 
       {pendingNavigation ? (
-        <div className="modal-backdrop" role="presentation">
+        <div className="modal-backdrop admin-catalog-navigation-confirm" role="presentation">
           <section
             className="switch-dialog"
             role="dialog"
