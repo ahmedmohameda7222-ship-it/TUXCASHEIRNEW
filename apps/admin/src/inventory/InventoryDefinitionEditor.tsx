@@ -114,6 +114,16 @@ export function InventoryDefinitionEditor({
       setError('Enter a valid purchase unit and positive base-unit quantity.');
       return;
     }
+    const duplicate = (item.conversions ?? []).some(
+      (existing) =>
+        existing.id !== conversion.id &&
+        existing.purchaseUnitLabel.trim().toLocaleLowerCase('en') ===
+          conversion.label.trim().toLocaleLowerCase('en'),
+    );
+    if (duplicate) {
+      setError('A purchase unit with this label already exists. Edit or restore the existing unit.');
+      return;
+    }
     setError(null);
     onCommand(
       {
