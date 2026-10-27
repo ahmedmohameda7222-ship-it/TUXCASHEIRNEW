@@ -757,6 +757,29 @@ test('inventory adjustment and waste use structured reasons through the trusted 
   });
 });
 
+test('I3 mobile Adjust and Waste sheets show the current available stock before posting', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page);
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+
+  await page.getByRole('button', { name: 'Adjust stock' }).click();
+  const adjust = page.getByRole('dialog', { name: 'Adjust stock' });
+  await expect(adjust).toContainText('Beef · Available 2.1 kg');
+  await expect(adjust.getByRole('button', { name: 'Post adjustment' })).toBeDisabled();
+  await adjust.getByRole('button', { name: 'Cancel' }).click();
+
+  await page.getByRole('button', { name: 'Record waste' }).click();
+  const waste = page.getByRole('dialog', { name: /Record waste/i });
+  await expect(waste).toContainText('Beef · Available 2.1 kg');
+  await expect(waste.getByRole('button', { name: 'Post waste' })).toBeDisabled();
+});
+
 test('I3 adjust and waste reject fractional micros instead of rounding a stock movement', async ({
   page,
 }) => {
