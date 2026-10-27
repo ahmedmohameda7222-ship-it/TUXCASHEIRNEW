@@ -215,7 +215,8 @@ export function useCatalog(shopId: string | undefined, selectedProductId?: strin
   const advancedQuery = useQuery({
     queryKey: ['admin', 'catalog', shopId, 'advanced'],
     enabled: Boolean(shopId && selectedProductId && !activeDraft),
-    refetchInterval: CATALOG_REFRESH_INTERVAL_MS,
+    staleTime: CATALOG_REFRESH_INTERVAL_MS,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       if (!shopId) throw new CatalogUiError('concrete_shop_required');
       return adminFetch<CatalogJsonObject>(
