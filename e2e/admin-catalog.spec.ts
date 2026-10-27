@@ -297,8 +297,8 @@ for (const viewport of ADMIN_WIDE_TABLET_VIEWPORTS) {
       await expect(list).toBeHidden();
       await expect(inspector).toBeVisible();
       await expect(page.getByRole('button', { name: 'Products' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Inventory usage' })).toBeVisible();
       await page.getByRole('button', { name: 'More' }).click();
-      await expect(page.getByText('Recipe / Inventory')).toBeVisible();
       await expect(page.getByText('Shop Overrides')).toBeVisible();
       await page.reload();
       await expect(inspector).toBeVisible();
@@ -309,8 +309,8 @@ for (const viewport of ADMIN_WIDE_TABLET_VIEWPORTS) {
       await page.getByRole('button', { name: /Classic Smash/ }).click();
       await expect(inspector).toBeVisible();
       await expect(page.getByRole('button', { name: 'Products' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Inventory usage' })).toBeVisible();
       await page.getByRole('button', { name: 'More' }).click();
-      await expect(page.getByText('Recipe / Inventory')).toBeVisible();
       await expect(page.getByText('Shop Overrides')).toBeVisible();
     }
   });
