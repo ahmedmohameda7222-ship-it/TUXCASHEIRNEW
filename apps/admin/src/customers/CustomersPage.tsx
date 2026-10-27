@@ -20,6 +20,7 @@ import { adminFetch } from '../lib/adminApi';
 import { createRetainedCommandIds } from '../lib/retainedCommandIds';
 import { PromotionsPage } from '../promotions/PromotionsPage';
 import { useShopScope } from '../shops/ShopScopeProvider';
+import { CustomerDirectory } from './CustomerDirectory';
 import { CustomerDetailPage } from './CustomerDetailPage';
 import { CustomerMergeDialog } from './CustomerMergeDialog';
 import { requireSuccessfulCrmMutation } from './crmMutationGuard';
@@ -259,14 +260,6 @@ export function CustomersPage() {
             label: 'Customers',
             content: (
               <>
-                <label className="admin-field">
-                  <span>Search customers</span>
-                  <input
-                    value={query}
-                    placeholder="Name or phone"
-                    onChange={(event) => setQuery(event.target.value)}
-                  />
-                </label>
                 <ResponsiveMasterDetail
                   className="admin-customers-master-detail"
                   listLabel="Customers"
@@ -274,50 +267,18 @@ export function CustomersPage() {
                   detailActive={selectedId !== null}
                   backHref="/customers"
                   list={
-                    <div className="admin-customers-list">
-                      {customersQuery.isLoading ? <LoadingState title="Loading customers" /> : null}
-                      {customersQuery.isError ? (
-                        <ErrorState
-                          title="Customers could not be loaded"
-                          action={
-                            <button
-                              className="admin-secondary-button"
-                              type="button"
-                              onClick={() => void customersQuery.refetch()}
-                            >
-                              Retry
-                            </button>
-                          }
-                        />
-                      ) : null}
-                      {!customersQuery.isLoading &&
-                      !customersQuery.isError &&
-                      customers.length === 0 ? (
-                        <EmptyState
-                          title="No matching customers"
-                          description="Try another name or phone number."
-                        />
-                      ) : null}
-                      {customers.map((customer) => (
-                        <button
-                          className={
-                            customer.id === selectedId
-                              ? 'admin-customer-row is-selected'
-                              : 'admin-customer-row'
-                          }
-                          aria-current={customer.id === selectedId ? 'true' : undefined}
-                          key={customer.id}
-                          type="button"
-                          onClick={() => navigate(detailPath('/customers', customer.id))}
-                        >
-                          <span>
-                            <strong>{customer.displayName ?? 'Unnamed customer'}</strong>
-                            <small>{customer.normalizedPhone}</small>
-                          </span>
-                          <span>{customer.orderCount} orders</span>
-                        </button>
-                      ))}
-                    </div>
+                    <CustomerDirectory
+                      key={shopId}
+                      customers={customers}
+                      selectedId={selectedId}
+                      query={query}
+                      onQueryChange={setQuery}
+                      onSelect={(id) => navigate(detailPath('/customers', id))}
+                      loading={customersQuery.isLoading}
+                      fetching={customersQuery.isFetching}
+                      error={customersQuery.isError}
+                      onRetry={() => void customersQuery.refetch()}
+                    />
                   }
                   detail={
                     detailQuery.isLoading ? (
