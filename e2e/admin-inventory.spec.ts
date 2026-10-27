@@ -995,9 +995,7 @@ test('inventory stocktake shows business quantities and preserves count authorit
   });
 });
 
-test('I4 mobile successful transfer send clears the approved draft to prevent repeat sends', async ({
-  page,
-}) => {
+test('I4 clears accepted mobile transfer draft to block repeat sends', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const { commands } = await mockInventory(page);
   await page.goto('/inventory');
