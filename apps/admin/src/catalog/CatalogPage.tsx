@@ -671,6 +671,7 @@ export function CatalogPage() {
             {selectedProduct ? (
               <ProductInspector
                 product={selectedProduct}
+                isNew={scopedUnsavedProduct?.id === selectedProduct.id}
                 imageRequiresSaveFirst={scopedUnsavedProduct !== null}
                 categories={categories}
                 canEdit={canEdit}
