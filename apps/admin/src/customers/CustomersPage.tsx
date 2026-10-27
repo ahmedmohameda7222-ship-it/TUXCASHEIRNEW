@@ -223,6 +223,22 @@ export function CustomersPage() {
     onError: () => toast.error('Loyalty settings could not be saved'),
   });
 
+  // Only auto-open the first real customer on wide desktop. Phones and tablets
+  // remain list-first; never select another shop's cached/customer detail.
+  useEffect(() => {
+    if (
+      !shopId ||
+      section !== 'customers' ||
+      location !== '/customers' ||
+      !customersQuery.isSuccess ||
+      window.innerWidth < 1100
+    ) {
+      return;
+    }
+    const first = customersQuery.data?.customers[0];
+    if (first) navigate(detailPath('/customers', first.id), { replace: true });
+  }, [shopId, section, location, navigate, customersQuery.isSuccess, customersQuery.data]);
+
   if (!shopId) {
     return (
       <PageScaffold
@@ -272,7 +288,10 @@ export function CustomersPage() {
                       customers={customers}
                       selectedId={selectedId}
                       query={query}
-                      onQueryChange={setQuery}
+                      onQueryChange={(nextQuery) => {
+                        setQuery(nextQuery);
+                        if (selectedId !== null) navigate('/customers', { replace: true });
+                      }}
                       onSelect={(id) => navigate(detailPath('/customers', id))}
                       loading={customersQuery.isLoading}
                       fetching={customersQuery.isFetching}
