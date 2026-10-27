@@ -389,6 +389,23 @@ test('CRM1 server search and shop switching never reuse customers from the prior
   expect(hasHorizontalOverflow).toBe(false);
 });
 
+test('CRM2 phone profile has factual metrics and signed loyalty history', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openCustomer(page);
+  const detail = page.getByRole('complementary', { name: 'Customer detail' });
+  await expect(detail.locator('.admin-customer-detail__metrics > div')).toHaveCount(3);
+  await expect(detail.getByText('Contact information')).toBeVisible();
+  await expect(detail.getByText('Loyalty summary')).toBeVisible();
+  await expect(detail.getByText('Customer segments')).toBeVisible();
+  await expect(detail.getByLabel('Recent loyalty activity')).toContainText('+20 pts');
+  await detail.getByRole('button', { name: 'Adjust points' }).click();
+  await expect(detail.getByRole('tab', { name: 'Loyalty' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
 test('CRM2 desktop Close preserves intentional empty inspector', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/customers');
