@@ -441,14 +441,16 @@ test('CRM2 desktop Close preserves intentional empty inspector', async ({ page }
   const close = page.getByRole('button', { name: 'Close customer profile' });
   await expect(close).toBeVisible();
   await close.click();
-  await expect(page.getByLabel('Customer detail').getByText('Select a customer')).toBeVisible();
+  await expect(page.getByLabel('Customer detail').getByText('Select a customer')).toHaveCount(1);
   await expect(close).toHaveCount(0);
 });
 
 test('renders canonical CRM identity, loyalty history and automatic segments', async ({ page }) => {
   await openCustomer(page);
 
-  await expect(page.getByLabel('Customer detail').getByText('+201012345678')).toBeVisible();
+  await expect(
+    page.locator('.admin-customer-detail__header').getByText('+201012345678'),
+  ).toBeVisible();
   await expect(page.getByLabel('Customer detail').getByText('VIP')).toBeVisible();
   await expect(page.getByLabel('Customer detail').getByText('Frequent Delivery')).toBeVisible();
 
