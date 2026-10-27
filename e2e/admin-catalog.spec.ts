@@ -1057,6 +1057,117 @@ test('C4 approved photo workflow precedes product details at 390 and 1440', asyn
   }
 });
 
+test('C4 authenticated image upload changes only versioned draft product imageKey', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const fixture = await mockCatalog(page);
+  const uploads: Array<{ shop: string | undefined; product: string | undefined }> = [];
+  const key = `${shopId}/${productId}/uploaded-catalog-photo.png`;
+  await page.route('**/api/admin/catalog-image*', async (route) => {
+    const request = route.request();
+    if (request.method() === 'POST') {
+      uploads.push({
+        shop: request.headers()['x-tux-catalog-shop-id'],
+        product: request.headers()['x-tux-catalog-product-id'],
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          imageKey: key,
+          publicUrl: 'https://images.example.test/uploaded.png',
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ publicUrl: 'https://images.example.test/existing.png' }),
+    });
+  });
+  await page.route('https://images.example.test/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0xoAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    });
+  });
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'burger.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0xoAAAAASUVORK5CYII=',
+      'base64',
+    ),
+  });
+  await page.getByRole('button', { name: 'Upload image' }).click();
+  await expect(page.getByRole('img', { name: 'Selected image for Classic Smash' })).toBeVisible();
+  expect(uploads).toEqual([{ shop: shopId, product: productId }]);
+  expect(fixture.commands).toEqual([]);
+  await page.screenshot({ path: 'test-results/catalog-c4-upload-mobile-390.png' });
+
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Draft saved — not published')).toBeVisible();
+  const save = fixture.commands.find(({ type }) => type === 'draft.save');
+  expect(save?.changes?.[0]?.bundleJson?.snapshot).toMatchObject({
+    products: [expect.objectContaining({ id: productId, imageKey: key })],
+  });
+  expect(fixture.commands.map(({ type }) => type)).toEqual(['draft.create', 'draft.save']);
+});
+
+test('C4 invalid and unavailable image uploads show local errors without draft writes', async ({
+  page,
+}) => {
+  const fixture = await mockCatalog(page);
+  let postCount = 0;
+  await page.route('**/api/admin/catalog-image*', async (route) => {
+    if (route.request().method() === 'POST') {
+      postCount += 1;
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'image_storage_unavailable' }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ publicUrl: 'https://images.example.test/existing.png' }),
+    });
+  });
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  const input = page.locator('input[type="file"]');
+  await input.setInputFiles({
+    name: 'oversize.png',
+    mimeType: 'image/png',
+    buffer: Buffer.alloc(2 * 1024 * 1024 + 1),
+  });
+  await page.getByRole('button', { name: 'Upload image' }).click();
+  await expect(page.getByRole('alert')).toContainText('at most 2 MB');
+  expect(postCount).toBe(0);
+  await input.setInputFiles({
+    name: 'valid.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0xoAAAAASUVORK5CYII=',
+      'base64',
+    ),
+  });
+  await page.getByRole('button', { name: 'Upload image' }).click();
+  await expect(page.getByRole('alert')).toContainText('Image upload failed');
+  expect(postCount).toBe(1);
+  expect(fixture.commands).toEqual([]);
+});
+
 test('C1 product browse uses authorized image preview for an existing imageKey', async ({
   page,
 }) => {
