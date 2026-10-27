@@ -363,6 +363,29 @@ test('I1 mobile item detail replaces the directory header with a visible single-
   await page.screenshot({ path: 'test-results/inventory-i1-item-detail-mobile-390.png' });
 });
 
+test('I1 360px inspector keeps all three balance cards on one readable row', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await mockInventory(page);
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+
+  const cards = page.locator('.inventory-balance-grid > div');
+  await expect(cards).toHaveCount(3);
+  const topEdges = await cards.evaluateAll((elements) =>
+    elements.map((element) => element.getBoundingClientRect().top),
+  );
+  expect(Math.max(...topEdges) - Math.min(...topEdges)).toBeLessThanOrEqual(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.screenshot({ path: 'test-results/inventory-i1-item-detail-mobile-360.png' });
+});
+
 test('inventory renders on-hand, reserved, available, history, and action entry points', async ({
   page,
 }) => {
