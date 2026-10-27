@@ -239,7 +239,15 @@ export function CustomersPage() {
     }
     const first = customersQuery.data?.customers[0];
     if (first) navigate(detailPath('/customers', first.id), { replace: true });
-  }, [shopId, section, location, navigate, customersQuery.isSuccess, customersQuery.data, dismissedCustomerShop]);
+  }, [
+    shopId,
+    section,
+    location,
+    navigate,
+    customersQuery.isSuccess,
+    customersQuery.data,
+    dismissedCustomerShop,
+  ]);
 
   if (!shopId) {
     return (
