@@ -350,8 +350,9 @@
   outline: 2px solid var(--tux-accent);
   outline-offset: -3px;
 }
-.admin-customer-row__identity {
+.admin-customers-directory .admin-customer-row__identity {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 8px;
   min-width: 0;
