@@ -44,4 +44,34 @@ describe('supplier management', () => {
     expect(html).not.toContain('Archive Bakery');
     expect(html).not.toContain('Edit Bakery');
   });
+
+  it('preserves archived supplier identity and restricts restore to lifecycle managers', () => {
+    const archived = [{ ...suppliers[0]!, active: false, version: 4 }];
+    const authorized = renderToStaticMarkup(
+      <SuppliersPage
+        suppliers={archived}
+        canManage
+        canManageLifecycle
+        pending={false}
+        onCreate={vi.fn()}
+        onManage={vi.fn()}
+      />,
+    );
+    expect(authorized).toContain('Restore Bakery');
+    expect(authorized).not.toContain('Archive Bakery');
+    expect(authorized).toContain('Archived');
+
+    const unauthorized = renderToStaticMarkup(
+      <SuppliersPage
+        suppliers={archived}
+        canManage
+        canManageLifecycle={false}
+        pending={false}
+        onCreate={vi.fn()}
+        onManage={vi.fn()}
+      />,
+    );
+    expect(unauthorized).not.toContain('Restore Bakery');
+    expect(unauthorized).not.toContain('Edit Bakery');
+  });
 });
