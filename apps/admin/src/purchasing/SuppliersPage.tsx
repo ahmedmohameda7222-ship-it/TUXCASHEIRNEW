@@ -83,6 +83,11 @@ export function SuppliersPage({
 
   return (
     <section aria-labelledby="purchasing-suppliers-heading">
+      {supplierError && !open && archiveTarget === null ? (
+        <p className="admin-inventory-note" role="alert">
+          {supplierError}
+        </p>
+      ) : null}
       <div className="admin-section-heading">
         <h2 id="purchasing-suppliers-heading">Suppliers</h2>
         {canManage ? (
