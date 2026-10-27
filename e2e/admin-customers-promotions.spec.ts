@@ -314,6 +314,74 @@ test('CRM1 desktop directory exposes real scoped fact columns and loaded-only fi
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
+test('CRM1 server search and shop switching never reuse customers from the prior shop', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const scopedCalls: URL[] = [];
+  await page.route('**/api/admin/session', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...session,
+        principal: {
+          ...session.principal,
+          shopIds: [shopId, otherShopId],
+          shopSummaries: [
+            ...session.principal.shopSummaries,
+            {
+              id: otherShopId,
+              name: 'TUX Zamalek',
+              active: true,
+              temporaryClosed: false,
+            },
+          ],
+        },
+      }),
+    }),
+  );
+  await page.route('**/api/admin/customers**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() !== 'GET' || url.searchParams.get('view') !== 'customers') {
+      await route.fallback();
+      return;
+    }
+    scopedCalls.push(url);
+    if (url.searchParams.get('shopId') !== otherShopId) {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        customers: [{ ...mergeCandidate, displayName: 'Zamalek Customer' }],
+      }),
+    });
+  });
+  await page.goto('/customers');
+  const list = page.locator('.admin-master-detail__list');
+  const search = list.getByRole('searchbox', { name: 'Search customers' });
+  await expect(list.getByRole('button', { name: /Mona/ })).toBeVisible();
+  await search.fill('Nour');
+  await expect(list.getByRole('button', { name: /Nour/ })).toBeVisible();
+  await expect(list.getByRole('button', { name: /Mona/ })).toHaveCount(0);
+  await search.fill('');
+  await expect(list.getByRole('button', { name: /Mona/ })).toBeVisible();
+
+  await page.locator('.shop-switcher select').selectOption(otherShopId);
+  await expect(list.getByRole('button', { name: /Zamalek Customer/ })).toBeVisible();
+  await expect(list.getByRole('button', { name: /Mona/ })).toHaveCount(0);
+  await expect.poll(
+    () => scopedCalls.some((url) => url.searchParams.get('shopId') === otherShopId),
+  ).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
+    false,
+  );
+});
+
 test('renders canonical CRM identity, loyalty history and automatic segments', async ({ page }) => {
   await openCustomer(page);
 
