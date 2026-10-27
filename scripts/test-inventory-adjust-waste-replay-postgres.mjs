@@ -83,7 +83,7 @@ execute(
       'create table public.admin_reason_codes (id uuid primary key, business_id uuid not null, shop_id uuid, reason_key text not null, label text not null, family text not null, version bigint not null, active boolean not null);',
       "insert into public.admin_reason_codes values ('" + REASON_ADJUST + "','" + BUSINESS + "',null,'COUNT_CORRECTION','Count correction','STOCK_ADJUSTMENT',1,true), ('" + REASON_WASTE + "','" + BUSINESS + "',null,'SPOILAGE','Spoilage','WASTE',1,true);",
       'create or replace function private.inventory_reason_snapshot_v1(p_business_id uuid,p_shop_id uuid,p_reason_code_id uuid,p_family text) returns table(reason_code_key text,reason_label text,reason_family text,reason_version bigint) language plpgsql security definer set search_path=pg_catalog,public as $snapshot$',
-      'begin return query select r.reason_key,r.label,r.family,r.version from public.admin_reason_codes r where r.id=p_reason_code_id and r.business_id=p_business_id and (r.shop_id is null or r.shop_id=p_shop_id) and r.active and r.family=p_family; if not found then raise exception ''inventory_reason_invalid''; end if; end;',
+      "begin return query select r.reason_key,r.label,r.family,r.version from public.admin_reason_codes r where r.id=p_reason_code_id and r.business_id=p_business_id and (r.shop_id is null or r.shop_id=p_shop_id) and r.active and r.family=p_family; if not found then raise exception 'inventory_reason_invalid'; end if; end;",
       '$snapshot$;',
     ].join('\n'),
   ],
