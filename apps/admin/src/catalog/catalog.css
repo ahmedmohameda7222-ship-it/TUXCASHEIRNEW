@@ -1250,7 +1250,9 @@
 
 .admin-catalog-layout.is-editing .admin-catalog-editor {
   max-width: none;
-  padding: 14px 14px 104px;
+  /* Enough trailing scroll range for short recipes to align their heading
+     immediately under the sticky drawer title, above the pinned save bar. */
+  padding: 14px 14px 216px;
   margin: 0;
 }
 
