@@ -266,7 +266,7 @@ test('CRM1 approved mobile directory uses truthful loaded-only selectors and pro
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/customers');
-  const list = page.getByRole('region', { name: 'Customers' });
+  const list = page.locator('.admin-master-detail__list');
   await expect(list.getByRole('searchbox', { name: 'Search customers' })).toBeVisible();
   await expect(list.getByRole('combobox', { name: 'All segments (loaded results)' })).toBeVisible();
   await expect(list.getByRole('combobox', { name: 'All loyalty (loaded results)' })).toBeVisible();
@@ -292,7 +292,7 @@ test('CRM1 desktop directory exposes real scoped fact columns and loaded-only fi
   await expect(directory).toBeVisible();
   await expect(directory.getByText('Total spent')).toBeVisible();
   await expect(directory.getByText('Loyalty', { exact: true })).toBeVisible();
-  await expect(directory.getByText('Last order')).toBeVisible();
+  await expect(directory.locator('.admin-customers-directory__columns').getByText('Last order')).toBeVisible();
   const sort = directory.getByRole('combobox', { name: 'Sort loaded customers' });
   await sort.selectOption('orders');
   await expect(directory.getByRole('button', { name: /Mona/ })).toContainText('12');
@@ -316,8 +316,8 @@ test('renders canonical CRM identity, loyalty history and automatic segments', a
   await openCustomer(page);
 
   await expect(page.getByLabel('Customer detail').getByText('+201012345678')).toBeVisible();
-  await expect(page.getByText('VIP')).toBeVisible();
-  await expect(page.getByText('Frequent Delivery')).toBeVisible();
+  await expect(page.getByLabel('Customer detail').getByText('VIP')).toBeVisible();
+  await expect(page.getByLabel('Customer detail').getByText('Frequent Delivery')).toBeVisible();
 
   await page.getByRole('tab', { name: 'Addresses' }).click();
   await expect(page.getByText('Road 9, Maadi')).toBeVisible();
