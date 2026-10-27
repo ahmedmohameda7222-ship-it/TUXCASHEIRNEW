@@ -2,13 +2,7 @@ import type { AdminInventoryItem, AdminInventoryReasonCode } from '@tux/admin-co
 import { useMemo, useState } from 'react';
 
 import { AdminDialog } from '../components/overlay/AdminDialog';
-
-function toMicros(value: string): number | null {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric === 0) return null;
-  const micros = Math.round(numeric * 1_000_000);
-  return Number.isSafeInteger(micros) && micros !== 0 ? micros : null;
-}
+import { parseInventoryMicros } from './inventoryQuantityInput';
 
 export function AdjustStockSheet({
   item,
@@ -40,7 +34,7 @@ export function AdjustStockSheet({
   const [note, setNote] = useState('');
   const [override, setOverride] = useState(false);
   const [requesterPin, setRequesterPin] = useState('');
-  const micros = toMicros(quantity);
+  const micros = parseInventoryMicros(quantity, true);
 
   return (
     <AdminDialog
