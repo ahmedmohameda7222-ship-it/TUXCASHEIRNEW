@@ -52,6 +52,7 @@ async function mockInventory(
     exactThresholdMicros?: number;
     includeSecondTrackedItem?: boolean;
     allowStaleItemHistory?: boolean;
+    pendingAdjustment?: boolean;
   } = {},
 ) {
   const commands: InventoryCommand[] = [];
@@ -275,6 +276,14 @@ async function mockInventory(
       return;
     }
 
+    if (command.type === 'adjust' && options.pendingAdjustment) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, idempotentReplay: false, state: 'PENDING_APPROVAL' }),
+      });
+      return;
+    }
     if (command.type === 'adjust') {
       onHandMicros += Number(command.quantityDeltaMicros);
     }
@@ -792,6 +801,62 @@ test('I3 adjust and waste reject fractional micros instead of rounding a stock m
     inventoryItemId: itemId,
     reasonCodeId: wasteReasonId,
   });
+});
+
+test('I3 mobile adjustment pending approval does not post stock or change shown balance', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page, { pendingAdjustment: true });
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+  await page.getByRole('button', { name: 'Adjust stock' }).click();
+
+  await expect(page.getByRole('dialog', { name: 'Adjust Beef' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/inventory-i3-adjust-mobile-390.png' });
+  await page.getByLabel('Quantity change').fill('0.25');
+  await page.getByLabel('Adjustment reason').selectOption(adjustmentReasonId);
+  await page.getByRole('button', { name: 'Post adjustment' }).click();
+
+  await expect(page.getByText(/Stock adjustment submitted for approval/)).toBeVisible();
+  await expect(page.getByLabel('Inventory item detail').getByText('3.2 kg')).toBeVisible();
+  expect(commands).toHaveLength(1);
+  expect(commands[0]).toMatchObject({
+    type: 'adjust',
+    quantityDeltaMicros: 250_000,
+    reasonCodeId: adjustmentReasonId,
+  });
+});
+
+test('I3 rejected adjustment retains command ID for exact retry but changes it for new intent', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page, {
+    failCommandType: 'adjust',
+    failureCode: 'inventory_conflict',
+  });
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+  await page.getByRole('button', { name: 'Adjust stock' }).click();
+  await page.getByLabel('Quantity change').fill('0.5');
+  const submit = page.getByRole('button', { name: 'Post adjustment' });
+  await submit.click();
+  await expect.poll(() => commands.length).toBe(1);
+  await submit.click();
+  await expect.poll(() => commands.length).toBe(2);
+  expect(commands[0]?.commandId).toBe(commands[1]?.commandId);
+  await page.getByLabel('Quantity change').fill('0.6');
+  await submit.click();
+  await expect.poll(() => commands.length).toBe(3);
+  expect(commands[2]?.commandId).not.toBe(commands[1]?.commandId);
+  await expect(page.getByLabel('Inventory item detail').getByText('3.2 kg')).toBeVisible();
 });
 
 test('inventory stocktake shows business quantities and preserves count authority', async ({
