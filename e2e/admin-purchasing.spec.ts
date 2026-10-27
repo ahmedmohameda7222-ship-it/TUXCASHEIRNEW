@@ -338,13 +338,17 @@ test('P1 no-reference purchase order is searchable by the PO identifier shown on
   await page.setViewportSize({ width: 390, height: 844 });
   await mockPurchasing(page, { noReference: true });
   await page.goto('/purchasing');
-  const displayedReference = await page.locator('.admin-purchasing-row-reference strong').innerText();
+  const displayedReference = await page
+    .locator('.admin-purchasing-row-reference strong')
+    .innerText();
   expect(displayedReference).toMatch(/^PO-[0-9A-Z]{13}$/);
 
   await page.getByRole('searchbox', { name: 'Search purchase orders' }).fill(displayedReference);
   await expect(page.locator('.admin-purchasing-list-row')).toHaveCount(1);
   await expect(page.getByText('No purchase orders match these filters.')).toHaveCount(0);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+    true,
+  );
 });
 
 test('purchasing renders suppliers and can order a draft PO through the trusted BFF', async ({
