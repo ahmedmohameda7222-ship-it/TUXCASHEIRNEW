@@ -37,6 +37,13 @@ export function formatPurchaseMicros(value: number): string {
   return fractional ? `${whole}.${fractional}` : String(whole);
 }
 
+/** Format minor EGP units exactly, including large safe-integer values. */
+export function formatPurchaseMoneyMinor(minor: number): string {
+  if (!Number.isSafeInteger(minor) || minor < 0) throw new Error('invalid_money_minor');
+  const value = BigInt(minor);
+  return `${value / 100n}.${String(value % 100n).padStart(2, '0')}`;
+}
+
 export function calculatePurchaseOrderSubtotalMinor(
   lines: readonly PurchaseOrderDraftLine[],
 ): number {
