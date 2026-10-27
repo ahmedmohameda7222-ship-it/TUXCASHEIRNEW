@@ -20,7 +20,9 @@ export function ProductInventoryUsage({
   const rows = inventoryItems.map((item) => {
     const raw =
       quantities[item.inventoryItemId] ??
-      (item.quantityMicros === null ? '0' : formatQuantityMicrosForInput(item.quantityMicros));
+      (item.quantityMicros === null
+        ? '0'
+        : formatQuantityMicrosForInput(item.quantityMicros));
     return { ...item, quantity: raw, used: Number(raw) > 0 };
   });
   const usedCount = rows.filter((row) => row.used).length;
