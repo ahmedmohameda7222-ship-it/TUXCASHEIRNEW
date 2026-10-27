@@ -265,13 +265,15 @@ test('I1 desktop inventory defaults to the first authorized item and approved ac
   await expect(page.getByLabel('Inventory item detail')).toBeVisible();
   await expect(page.locator('.admin-inventory-row.is-selected')).toContainText('Beef');
 
-  const actions = await page.locator('.admin-inventory-page-actions').evaluate((container) =>
-    Array.from(container.children, (child) =>
-      child.tagName === 'DETAILS'
-        ? child.querySelector('summary')?.textContent?.trim()
-        : child.textContent?.trim(),
-    ),
-  );
+  const actions = await page
+    .locator('.admin-inventory-page-actions')
+    .evaluate((container) =>
+      Array.from(container.children, (child) =>
+        child.tagName === 'DETAILS'
+          ? child.querySelector('summary')?.textContent?.trim()
+          : child.textContent?.trim(),
+      ),
+    );
   expect(actions).toEqual(['Export CSV', 'Stock count', 'More actions', 'Add inventory item']);
   await page.screenshot({ path: 'test-results/inventory-i1-desktop-1440.png' });
 });
