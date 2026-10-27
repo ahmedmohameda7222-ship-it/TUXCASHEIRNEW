@@ -635,7 +635,10 @@ test('C3 direct 390px Inventory usage edits preserve focus and persist recipe on
   await meat.fill('0');
   await expect(meat).toBeFocused();
   await expect(page.getByText('1 of 2 in use')).toBeVisible();
-  await page.getByRole('heading', { name: 'Inventory usage' }).scrollIntoViewIfNeeded();
+  await page.getByRole('button', { name: 'Jump to inventory usage' }).click();
+  await expect
+    .poll(async () => (await page.getByRole('heading', { name: 'Inventory usage' }).boundingBox())?.y ?? 999)
+    .toBeLessThan(175);
   await page.screenshot({ path: 'test-results/catalog-c3-inventory-usage-mobile-390.png' });
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft saved — not published')).toBeVisible();
@@ -675,7 +678,9 @@ test('C3 desktop Inventory usage exposes direct recipe rows in the product edito
   await expect(page.locator('.admin-catalog-layout__list')).toBeVisible();
   await page.getByRole('button', { name: 'Jump to inventory usage' }).click();
   await expect(page.getByRole('heading', { name: 'Inventory usage' })).toBeInViewport();
-  await page.getByRole('heading', { name: 'Inventory usage' }).scrollIntoViewIfNeeded();
+  await expect
+    .poll(async () => (await page.getByRole('heading', { name: 'Inventory usage' }).boundingBox())?.y ?? 999)
+    .toBeLessThan(175);
   await page.screenshot({ path: 'test-results/catalog-c3-inventory-usage-desktop-1440.png' });
 });
 
