@@ -317,7 +317,10 @@ test('I1 mobile-first phone shows a complete first item above fixed navigation',
   await mockInventory(page);
   await page.goto('/inventory');
 
-  const first = page.getByRole('region', { name: 'Inventory items' }).locator('.admin-inventory-row').first();
+  const first = page
+    .getByRole('region', { name: 'Inventory items' })
+    .locator('.admin-inventory-row')
+    .first();
   await expect(first).toContainText('Beef');
   await expect(first).toContainText('kg');
   await expect(first).toContainText('In stock');
