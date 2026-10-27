@@ -97,7 +97,12 @@ export const catalogCopySchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 
-export const catalogViewSchema = z.enum(['workspace', 'advanced', 'publishing', 'recurring-availability']);
+export const catalogViewSchema = z.enum([
+  'workspace',
+  'advanced',
+  'publishing',
+  'recurring-availability',
+]);
 
 export const catalogCommandSchema = z.discriminatedUnion('type', [
   z
