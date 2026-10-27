@@ -148,6 +148,7 @@ export function ProductEditor({
   >({});
   const [comboState, setComboState] = useState<Record<string, boolean>>({});
   const [recipeState, setRecipeState] = useState<Record<string, string>>({});
+  const [recipeError, setRecipeError] = useState<string | null>(null);
 
   const readOnly = !canEdit || busy || imageUploading;
   const priceReadOnly = readOnly || !canPrice;
@@ -274,16 +275,26 @@ export function ProductEditor({
     if (!next.name) throw new Error('invalid_product_name');
     if (!next.categoryId || !Number.isSafeInteger(next.sortOrder) || next.sortOrder < 0)
       throw new Error('invalid_product_menu_structure');
-    const advanced = advancedModel
-      ? buildProductAdvancedDraft({
-          shopId: product.shopId,
-          productId: product.id,
-          model: comboEnabled ? advancedModel : { ...advancedModel, comboOptions: [] },
-          modifierState,
-          comboState: comboEnabled ? comboState : {},
-          recipeState,
-        })
-      : undefined;
+    let advanced: ProductAdvancedDraft | undefined;
+    try {
+      advanced = advancedModel
+        ? buildProductAdvancedDraft({
+            shopId: product.shopId,
+            productId: product.id,
+            model: comboEnabled ? advancedModel : { ...advancedModel, comboOptions: [] },
+            modifierState,
+            comboState: comboEnabled ? comboState : {},
+            recipeState,
+          })
+        : undefined;
+    } catch (error) {
+      if (error instanceof Error && error.message === 'invalid_recipe_quantity') {
+        setRecipeError('Enter a positive quantity with at most 6 decimal places, or 0 to unlink.');
+        return;
+      }
+      throw error;
+    }
+    setRecipeError(null);
     await onSaveDraft({
       product: next,
       changedPaths: changedPathsFor(product, next),
@@ -557,9 +568,10 @@ export function ProductEditor({
             inventoryItems={advancedModel.inventoryItems}
             quantities={recipeState}
             readOnly={readOnly}
-            onQuantityChange={(itemId, value) =>
-              setRecipeState((state) => ({ ...state, [itemId]: value }))
-            }
+            onQuantityChange={(itemId, value) => {
+              setRecipeError(null);
+              setRecipeState((state) => ({ ...state, [itemId]: value }));
+            }}
           />
         ) : (
           <div className="admin-catalog-inventory-usage__loading">
@@ -581,6 +593,7 @@ export function ProductEditor({
             ) : null}
           </div>
         )}
+        {recipeError ? <p role="alert" className="admin-catalog-inventory-usage__error">{recipeError}</p> : null}
       </section>
 
       <button
