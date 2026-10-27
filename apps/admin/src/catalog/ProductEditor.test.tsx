@@ -191,6 +191,16 @@ describe('ProductEditor', () => {
       recipeState,
     });
     expect(removed.recipeLines).toEqual([]);
+    expect(
+      buildProductAdvancedDraft({
+        shopId: fixtureProduct.shopId,
+        productId: fixtureProduct.id,
+        model,
+        modifierState: {},
+        comboState: {},
+        recipeState: { '66666666-6666-4666-8666-666666666666': '0.000' },
+      }).recipeLines,
+    ).toEqual([]);
 
     const unchanged = buildProductAdvancedDraft({
       shopId: fixtureProduct.shopId,
