@@ -780,9 +780,7 @@ test('P4 duplicate supplier error stays inside 360px sheet', async ({ page }) =>
   expect(fixture.commands.filter((c) => c.type === 'supplier.create')).toHaveLength(1);
 });
 
-test('P4 mobile archived supplier restore and edit preserve trusted versions and PO eligibility', async ({
-  page,
-}) => {
+test('P4 mobile restore and edit enable archived supplier for new PO', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const archivedId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbe';
   const fixture = await mockPurchasing(page, {
@@ -824,8 +822,9 @@ test('P4 mobile archived supplier restore and edit preserve trusted versions and
   await expect(inspector.getByRole('button', { name: 'Restore West Farms' })).toBeVisible();
   await inspector.getByRole('button', { name: 'Restore West Farms' }).click();
   await expect(inspector).toContainText('Active');
-  await expect.poll(() => fixture.commands.filter((c) => c.type === 'supplier.restore').length).toBe(1);
-  expect(fixture.commands.find((c) => c.type === 'supplier.restore')).toMatchObject({
+  const restoreCommands = () => fixture.commands.filter((c) => c.type === 'supplier.restore');
+  await expect.poll(() => restoreCommands().length).toBe(1);
+  expect(restoreCommands()[0]).toMatchObject({
     supplierId: archivedId,
     expectedVersion: 4,
     shopId,
