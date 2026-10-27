@@ -374,12 +374,13 @@ test('CRM1 server search and shop switching never reuse customers from the prior
   await page.locator('.shop-switcher select').selectOption(otherShopId);
   await expect(list.getByRole('button', { name: /Zamalek Customer/ })).toBeVisible();
   await expect(list.getByRole('button', { name: /Mona/ })).toHaveCount(0);
-  await expect.poll(
-    () => scopedCalls.some((url) => url.searchParams.get('shopId') === otherShopId),
-  ).toBe(true);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
-    false,
+  const secondShopWasQueried = () =>
+    scopedCalls.some((url) => url.searchParams.get('shopId') === otherShopId);
+  await expect.poll(secondShopWasQueried).toBe(true);
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > innerWidth,
   );
+  expect(hasHorizontalOverflow).toBe(false);
 });
 
 test('renders canonical CRM identity, loyalty history and automatic segments', async ({ page }) => {
