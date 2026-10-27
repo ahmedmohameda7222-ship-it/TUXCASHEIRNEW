@@ -190,6 +190,7 @@ export function useCatalog(shopId: string | undefined, selectedProductId?: strin
   const activeDraftRef = useRef<ActiveCatalogDraft | null>(null);
   const [draftProducts, setDraftProducts] = useState<Record<string, CatalogProductDetail>>({});
   const [draftInvalidatedByLiveChange, setDraftInvalidatedByLiveChange] = useState(false);
+  const autoResumedDraftKey = useRef<string | null>(null);
 
   useEffect(() => {
     activeDraftRef.current = null;
@@ -357,6 +358,29 @@ export function useCatalog(shopId: string | undefined, selectedProductId?: strin
       setDraftInvalidatedByLiveChange(false);
     },
   });
+
+  useEffect(() => {
+    if (!shopId || !selectedProductId || activeDraft || compatibleDrafts.length !== 1) return;
+    const saved = compatibleDrafts[0];
+    if (!saved) return;
+    const key = `${shopId}:${saved.id}:${workspaceQuery.data?.currentPublishVersion ?? 0}`;
+    if (autoResumedDraftKey.current === key) return;
+    autoResumedDraftKey.current = key;
+    // Resuming the one already-saved versioned draft (never creating a new draft)
+    // prevents editing from a stale published recipe snapshot and overwriting
+    // another previously-saved ingredient link on subsequent draft.save.
+    void resumeDraft.mutateAsync(saved.id).catch(() => {
+      // Fail closed: the product form stays disabled until the existing draft
+      // can be resumed. An explicit later Retry is required to repeat the RPC.
+    });
+  }, [
+    activeDraft,
+    compatibleDrafts,
+    resumeDraft.mutateAsync,
+    selectedProductId,
+    shopId,
+    workspaceQuery.data?.currentPublishVersion,
+  ]);
 
   const prepareProductDraft = useMutation({
     mutationFn: loadOrCreateDraft,
@@ -597,6 +621,8 @@ export function useCatalog(shopId: string | undefined, selectedProductId?: strin
     modifiers,
     activeDraft,
     compatibleDrafts,
+    pendingExistingDraftResume:
+      Boolean(selectedProductId && compatibleDrafts.length === 1 && !activeDraft),
     draftInvalidatedByLiveChange,
     resumeDraft,
     prepareProductDraft,
