@@ -58,6 +58,8 @@ export interface CatalogStore {
   getCurrentPublishVersion(shopId: string): Promise<number>;
   loadWorkspace(shopId: string, businessId: string): Promise<CatalogWorkspace>;
   loadPublishing(shopId: string, businessId: string): Promise<CatalogPublishingWorkspace>;
+  /** Safe read-only canonical inventory/recipe snapshot; never creates or resumes a draft. */
+  loadAdvanced?(shopId: string, businessId: string): Promise<CatalogJsonObject>;
   createDraft(input: {
     employeeId: string;
     shopId: string;
@@ -643,6 +645,15 @@ export function createCatalogService(store: CatalogStore) {
       return store.loadPublishing(shopId, principal.businessId);
     },
 
+    async loadCatalogAdvanced(
+      shopId: string,
+      principal: AdminSessionPrincipal,
+    ): Promise<CatalogJsonObject> {
+      requirePermission(principal, 'catalog.view', shopId);
+      if (!store.loadAdvanced) throw new CatalogServiceError('backend_contract_invalid');
+      return store.loadAdvanced(shopId, principal.businessId);
+    },
+
     async createCatalogDraft(
       input: CatalogCreateDraftInput,
       principal: AdminSessionPrincipal,
@@ -827,6 +838,96 @@ export function createSupabaseCatalogStore(client: AdminSupabaseClient): Catalog
         categories: categories.map(mapCategory),
         products: products.map(mapProduct),
         drafts: drafts.map(mapDraft),
+      };
+    },
+
+    async loadAdvanced(shopId, businessId) {
+      const [published, inventory, recipes] = await Promise.all([
+        client.select<PublishedBundleRow[]>(
+          'catalog_publish_versions',
+          new URLSearchParams({
+            select: 'bundle_json',
+            business_id: `eq.${businessId}`,
+            shop_id: `eq.${shopId}`,
+            order: 'publish_version.desc',
+            limit: '1',
+          }),
+        ),
+        client.select<Array<{
+          id: string;
+          shop_id: string;
+          name: string;
+          unit_label: string;
+          tracking_mode: string;
+          active: boolean;
+        }>>(
+          'inventory_items',
+          new URLSearchParams({
+            select: 'id,shop_id,name,unit_label,tracking_mode,active',
+            shop_id: `eq.${shopId}`,
+            tracking_mode: 'eq.RECIPE_TRACKED',
+            order: 'name.asc,id.asc',
+          }),
+        ),
+        client.select<Array<{
+          shop_id: string;
+          product_id: string;
+          inventory_item_id: string;
+          quantity_micros: number | string;
+        }>>(
+          'recipe_lines',
+          new URLSearchParams({
+            select: 'shop_id,product_id,inventory_item_id,quantity_micros',
+            shop_id: `eq.${shopId}`,
+          }),
+        ),
+      ]);
+      const bundle = published[0]?.bundle_json;
+      if (!isRecord(bundle) || !isRecord(bundle['snapshot'])) {
+        // A never-published shop has no relationships yet; do not create a draft just to view.
+        return {
+          snapshot: {
+            shopId,
+            products: [],
+            modifiers: [],
+            productModifierLinks: [],
+            comboBeverageOptions: [],
+            recipeLines: recipes.map((row) => ({
+              shopId: row.shop_id,
+              productId: row.product_id,
+              inventoryItemId: row.inventory_item_id,
+              quantityMicros: Number(row.quantity_micros),
+            })),
+          },
+          inventoryItems: inventory.map((row) => ({
+            id: row.id,
+            shopId: row.shop_id,
+            name: row.name,
+            unitLabel: row.unit_label,
+            trackingMode: row.tracking_mode,
+            active: row.active,
+          })),
+        };
+      }
+      return {
+        ...bundle,
+        snapshot: {
+          ...bundle['snapshot'],
+          recipeLines: recipes.map((row) => ({
+            shopId: row.shop_id,
+            productId: row.product_id,
+            inventoryItemId: row.inventory_item_id,
+            quantityMicros: Number(row.quantity_micros),
+          })),
+        },
+        inventoryItems: inventory.map((row) => ({
+          id: row.id,
+          shopId: row.shop_id,
+          name: row.name,
+          unitLabel: row.unit_label,
+          trackingMode: row.tracking_mode,
+          active: row.active,
+        })),
       };
     },
 
