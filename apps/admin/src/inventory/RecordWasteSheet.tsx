@@ -2,13 +2,7 @@ import type { AdminInventoryItem, AdminInventoryReasonCode } from '@tux/admin-co
 import { useMemo, useState } from 'react';
 
 import { AdminDialog } from '../components/overlay/AdminDialog';
-
-function toPositiveMicros(value: string): number | null {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) return null;
-  const micros = Math.round(numeric * 1_000_000);
-  return Number.isSafeInteger(micros) && micros > 0 ? micros : null;
-}
+import { parseInventoryMicros } from './inventoryQuantityInput';
 
 export function RecordWasteSheet({
   item,
@@ -35,7 +29,7 @@ export function RecordWasteSheet({
   const [reasonCodeId, setReasonCodeId] = useState(options[0]?.id ?? '');
   const [note, setNote] = useState('');
   const [override, setOverride] = useState(false);
-  const micros = toPositiveMicros(quantity);
+  const micros = parseInventoryMicros(quantity, false);
 
   return (
     <AdminDialog
