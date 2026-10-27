@@ -895,7 +895,9 @@ test('I3 390px adjustment and waste dialogs keep labeled selects and action foot
     expect(footerBox!.y + footerBox!.height).toBeLessThanOrEqual(
       dialogBox!.y + dialogBox!.height + 1,
     );
-    await page.screenshot({ path: 'test-results/inventory-i3-' + filename + '-sheet-mobile-390.png' });
+    await page.screenshot({
+      path: 'test-results/inventory-i3-' + filename + '-sheet-mobile-390.png',
+    });
     await footer.getByRole('button', { name: 'Cancel' }).click();
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
