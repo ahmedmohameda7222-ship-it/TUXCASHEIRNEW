@@ -593,7 +593,11 @@ export function ProductEditor({
             ) : null}
           </div>
         )}
-        {recipeError ? <p role="alert" className="admin-catalog-inventory-usage__error">{recipeError}</p> : null}
+        {recipeError ? (
+          <p role="alert" className="admin-catalog-inventory-usage__error">
+            {recipeError}
+          </p>
+        ) : null}
       </section>
 
       <button
