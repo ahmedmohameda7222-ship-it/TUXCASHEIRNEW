@@ -1,3 +1,19 @@
+## 2026-10-27 Inventory I4 PRE-MERGE ENGINEERING PASS — Purchasing P1 unlocked
+
+**Accepted immutable source HEAD:** `00a568bf9553f2f507fb271fa92f23059fefe672` (Draft PR #165, open; **NOT merged**). Six exact-HEAD GitHub Actions workflow groups **SUCCESS**:
+- [Fast CI 40515960527](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40515960527) — related tests, TypeScript, changed-file Prettier/lint, security, migration checks and quality gate all GREEN.
+- [Inventory isolated real PostgreSQL 40515960694](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40515960694) — Adjust/Waste + Purchasing receive/return bridge GREEN.
+- [Orders real PostgreSQL/browser/build 40515960560](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40515960560) — all three jobs GREEN.
+- [P0 Business Day real PostgreSQL 40515960506](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40515960506) — applicable RPC job GREEN; unrelated conditional Inventory jobs SKIPPED, never claimed executed.
+- [Six-tab responsive Chromium 40515960913](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40515960913) — complete browser acceptance GREEN; screenshot ZIP `admin-eight-tabs-rendered-evidence` artifact `12738909300` on accepted exact SHA.
+- [Full monorepo + Chromium 40515960530](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40515960530) — all 8 jobs GREEN including Admin, Menu, Windows, quality, branch/PIN, architecture, edge security and required gate; Admin screenshots artifact `12738603974`.
+
+**I4 engineering source closure:** After-shift-only physical stocktake control and persisted draft save/resume/stale-block/cancel/post; up-to-500 per-session batching for >500 active items; authoritative stock preservation; master-constrained send/receive/cancel transfer, true micros at six decimals in transfer history, quantity formatting on resuming stocktake, no repeated transfer draft after acknowledged send, mobile 390px reorder policy rejects sub-micro rounding, exact signed variance display and CSV-safe precise values. RED→GREEN regressions included failed screenshot/browser policy at previous HEAD, exact-count assertion after grouped numeric edit, zero-rounded 1-micro transfer, and mobile transfer resend. Tests verify source contract and in-memory mocked browser flows; **not** a claim of exhaustive live PostgreSQL I4 race tests, final hosted physical testing, or pixel-perfect parity. No new SQL or live data change in I4.
+
+**Sequential decision:** Orders O1–O4, Catalog C1–C5 and Inventory I1–I4 now have PRE-MERGE ENGINEERING PASS. **Purchasing P1 exclusively ACTIVE**; P2–P4, CRM, Staff, Finance and Reports remain locked/NOT ACCEPTED. Preserve previously committed partial source changes in those modules. The approved handoff describes Purch #160 already merged to main, so P1 is delta/parity work, not rewrite. Final production/Owner physical UAT remains DEFERRED until all tabs and separately authorized squash merge. No merge, no deployment, no Production migration/data mutation.
+
+---
+
 ## 2026-10-27 Inventory I3 PRE-MERGE ENGINEERING PASS — I4 exclusively unlocked
 
 **Immutable accepted code HEAD:** `71b73993fc32abee93fc89833f7a48faa0d9de2c` on Draft PR #165. Verified all exact-head workflows completed with **SUCCESS**:
