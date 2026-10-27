@@ -1,3 +1,21 @@
+## 2026-10-27 Purchasing P1 PRE-MERGE ENGINEERING PASS — P2 exclusively unlocked
+
+**Immutable accepted code HEAD:** `5bd71f9f7bcc21581c394ede3b09d66143c47fc7` on open Draft PR #165, not merged. Exactly eight workflow groups were verified **SUCCESS on the same SHA**:
+- [Fast CI 40523343586](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40523343586) — TypeScript, changed-file Prettier/lint, unit, security, migration and required gate.
+- [Purchasing PostgreSQL + security + rendered 40523343593](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40523343593) — all three jobs green, 33/33 Purchasing browser tests including new P1 phone fallback-ID search and desktop first PO inspector. Screenshot artifact `12742522584`, generated at exact HEAD.
+- [Integrated Purchasing/mainline 40523343643](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40523343643) — combined full source/build, combined Orders/Inventory/Purchasing real PostgreSQL and combined Admin/Operations/Menu Chromium all SUCCESS.
+- [Orders PostgreSQL/browser/build 40523343735](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40523343735) — SUCCESS.
+- [Inventory I3 real PG 40523343543](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40523343543) — SUCCESS.
+- [P0 Business Day real PG 40523343568](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40523343568) — SUCCESS.
+- [Six-tab responsive browser 40523343561](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40523343561) — SUCCESS.
+- [Full monorepo/Chromium 40523343563](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40523343563) — eight jobs GREEN including Admin (345 passed, 19 skipped), Windows, Operations/Menu, security, architecture and required gate.
+
+**P1 RED→GREEN fixes:** a PO with no supplier reference displayed a deterministic `PO-XXXXXXXXXXXXX` identifier but could not be found by searching that exact displayed reference; verified failing 390px Chromium before adding `purchaseOrderDisplayReference(order)` to scoped search. Desktop `/purchasing` now selects first visible newest shop-authorized PO into adjacent inspector, but 1150px and below remain list-first and require explicit PO choice. Existing status/supplier filters, page of ten **loaded** rows and truthful loaded-only counts retained. Fixed `.github/workflows/purchasing-shadow-integration.yml` ancestry from an obsolete unmerged PR #160 SHA to the actual already squash-merged Purchasing main baseline `99a5694...`, with `git compare` evidence old tip diverged; preserved all real PG and migration verification, integrated source tests succeeded. Source changed only Purchasing UI, its E2E and Purchasing-specific CI; no new SQL or live backend mutation.
+
+**Ruling:** P1 is accepted at **pre-merge engineering scope only**, not final approved pixel-perfect UI, hosted authentication/Owner physical UAT, or a guarantee of exhaustive older cancelled PO history (backend includes latest 500 plus all actionable; UI labels loaded-only counts). **P2 exclusively unlocked**. P3/P4, CRM, Staff, Finance, Reports remain locked; already-valid code preserved. No merge, deployment, Production SQL or seeding.
+
+---
+
 ## 2026-10-27 Inventory I4 PRE-MERGE ENGINEERING PASS — Purchasing P1 unlocked
 
 **Accepted immutable source HEAD:** `00a568bf9553f2f507fb271fa92f23059fefe672` (Draft PR #165, open; **NOT merged**). Six exact-HEAD GitHub Actions workflow groups **SUCCESS**:
