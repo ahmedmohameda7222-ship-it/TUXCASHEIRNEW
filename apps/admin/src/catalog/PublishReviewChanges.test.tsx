@@ -24,6 +24,33 @@ const changes: CatalogPublishEntityChange[] = [
 ];
 
 describe('publish review details', () => {
+  it('C5 describes image additions, replacements and removals without leaking storage keys', () => {
+    const cases = [
+      { before: null, after: 'private/shop-a/images/added.png', expected: 'Photo added' },
+      {
+        before: 'private/shop-a/images/old.png',
+        after: 'private/shop-a/images/new.png',
+        expected: 'Photo replaced',
+      },
+      { before: 'private/shop-a/images/old.png', after: null, expected: 'Photo removed' },
+    ];
+    for (const { before, after, expected } of cases) {
+      const imageChange: CatalogPublishEntityChange = {
+        kind: 'product',
+        id: 'product-1',
+        status: 'modified',
+        before: { name: 'Classic Smash', imageKey: before },
+        after: { name: 'Classic Smash', imageKey: after },
+        changedFields: ['imageKey'],
+      };
+      const markup = renderToStaticMarkup(<PublishReviewChanges changes={[imageChange]} />);
+      expect(markup).toContain('Classic Smash');
+      expect(markup).toContain('Product image');
+      expect(markup).toContain(expected);
+      expect(markup).not.toContain('private/shop-a/images/');
+    }
+  });
+
   it('shows changed before-after field values and unchanged entities', () => {
     const html = renderToStaticMarkup(<PublishReviewChanges changes={changes} />);
     expect(html).toContain('Before → After review');
