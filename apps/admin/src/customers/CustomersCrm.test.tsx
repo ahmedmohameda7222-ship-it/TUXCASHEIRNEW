@@ -262,6 +262,21 @@ describe('Plan 5 CRM and promotion controls', () => {
     expect(html).not.toContain('Choose a reason');
   });
 
+  it('CRM3 financial review preserves safe minor-unit values in loyalty policy', () => {
+    const html = renderToStaticMarkup(
+      <LoyaltyPanel
+        customer={customer}
+        program={{ ...program, redemptionMinorPerPoint: Number.MAX_SAFE_INTEGER - 1 }}
+        reasons={[]}
+        canManage={false}
+        saving={false}
+        onAdjust={vi.fn()}
+      />,
+    );
+    expect(html).toContain('1 point = EGP 90071992547409.90');
+    expect(html).not.toContain('1 point = EGP 90071992547409.91');
+  });
+
   it('renders the complete promotion contract in the editor', () => {
     const html = renderToStaticMarkup(
       <PromotionEditor
