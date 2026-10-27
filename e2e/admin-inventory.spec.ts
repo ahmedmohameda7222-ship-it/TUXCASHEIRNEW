@@ -478,7 +478,9 @@ test('I2 preserves exact six-decimal threshold micros after edit form initializa
   await page.getByRole('button', { name: 'Edit item' }).click();
 
   await expect(
-    page.getByRole('region', { name: 'Edit inventory item' }).getByLabel('Low-stock threshold (base units)'),
+    page
+      .getByRole('region', { name: 'Edit inventory item' })
+      .getByLabel('Low-stock threshold (base units)'),
   ).toHaveValue('9007199254.740991');
 });
 
