@@ -1421,6 +1421,114 @@
   }
 }
 
+/* C4 approved photo-first workflow: compact preview, explicit scoped upload, draft only. */
+.admin-catalog-product-photo .admin-catalog-editor__eyebrow {
+  display: none;
+}
+
+.admin-catalog-product-photo .admin-catalog-editor__section-heading h2 {
+  font-size: 14px;
+}
+
+.admin-catalog-image-layout {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.admin-catalog-product-photo .admin-product-image-state {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 90px;
+  height: 90px;
+  min-height: 0;
+  padding: 8px;
+  border: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #e5eee8;
+}
+
+.admin-catalog-product-photo .admin-product-image-state img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.admin-product-image-placeholder {
+  display: grid;
+  place-items: center;
+  width: 55px;
+  height: 55px;
+  border-radius: 12px;
+  background: #145941;
+  color: #fff;
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.admin-product-image-state__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.admin-catalog-product-photo .admin-form-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-catalog-product-photo .admin-form-grid > .admin-field {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.admin-catalog-product-photo .admin-form-grid input[type='file'] {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 5px;
+  font-size: 11px;
+}
+
+.admin-catalog-product-photo .admin-form-grid > button {
+  min-width: 0;
+  min-height: 36px;
+  font-size: 12px;
+}
+
+.admin-catalog-photo-help,
+.admin-catalog-product-photo .admin-field__help {
+  flex: 1 0 100%;
+  margin: 0;
+  color: var(--tux-text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+@media (max-width: 420px) {
+  .admin-catalog-image-layout {
+    grid-template-columns: 78px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .admin-catalog-product-photo .admin-product-image-state {
+    width: 78px;
+    height: 78px;
+  }
+}
+
 /* C3: direct, always-visible canonical recipe quantities, not a separate picker. */
 .admin-catalog-inventory-usage {
   gap: 12px;
