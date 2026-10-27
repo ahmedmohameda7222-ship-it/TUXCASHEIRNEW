@@ -484,6 +484,80 @@ test('I2 preserves exact six-decimal threshold micros after edit form initializa
   ).toHaveValue('9007199254.740991');
 });
 
+test('I2 create submits accurate zero threshold and tracking selection without stock overwrite', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page);
+  await page.goto('/inventory');
+  await page.getByRole('button', { name: 'Add inventory item' }).click();
+  const editor = page.getByRole('region', { name: 'Add inventory item' });
+  await editor.getByLabel('Item name').fill('Minced beef');
+  await editor.getByLabel('Base unit').fill('kg');
+  await editor.getByLabel('Tracking mode').selectOption('BULK_MANUAL');
+  await editor.getByLabel('Low-stock threshold (base units)').fill('0');
+  await editor.getByRole('button', { name: 'Create inventory item' }).click();
+
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'item.create',
+    entityId: null,
+    expectedVersion: null,
+    payload: {
+      name: 'Minced beef',
+      unitLabel: 'kg',
+      trackingMode: 'BULK_MANUAL',
+      lowStockThresholdMicros: 0,
+    },
+  });
+  expect(JSON.stringify(commands[0])).not.toContain('onHandMicros');
+});
+
+test('I2 edit archive and conversion commands keep independent optimistic versions', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page, { includePurchaseConversion: true });
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+  await page.getByRole('button', { name: 'Edit item' }).click();
+
+  const editor = page.getByRole('region', { name: 'Edit inventory item' });
+  await editor.getByLabel('Low-stock threshold (base units)').fill('0.000001');
+  await editor.getByRole('button', { name: 'Save item' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'item.update',
+    entityId: itemId,
+    expectedVersion: 7,
+    payload: { lowStockThresholdMicros: 1, unitLabel: 'kg', trackingMode: 'RECIPE_TRACKED' },
+  });
+
+  await editor.getByRole('button', { name: 'Edit', exact: true }).click();
+  await editor.getByLabel('Purchase unit label').fill('carton');
+  await editor.getByLabel('Base units per purchase unit').fill('12.5');
+  await editor.getByRole('button', { name: 'Save purchase unit' }).click();
+  await expect.poll(() => commands.length).toBe(2);
+  expect(commands[1]).toMatchObject({
+    type: 'conversion.update',
+    entityId: '66666666-6666-4666-8666-666666666667',
+    expectedVersion: 3,
+    payload: { purchaseUnitLabel: 'carton', baseMicrosPerPurchaseUnit: 12_500_000 },
+  });
+
+  await editor.getByRole('button', { name: 'Archive inventory item' }).click();
+  await expect.poll(() => commands.length).toBe(3);
+  expect(commands[2]).toMatchObject({
+    type: 'item.archive',
+    entityId: itemId,
+    expectedVersion: 7,
+    payload: {},
+  });
+});
+
 test('inventory renders on-hand, reserved, available, history, and action entry points', async ({
   page,
 }) => {
