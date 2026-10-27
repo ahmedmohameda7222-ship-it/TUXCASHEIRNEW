@@ -105,7 +105,7 @@ export function ProductInspector({
           onClick={() =>
             document.getElementById('catalog-inventory-usage-heading')?.scrollIntoView({
               block: 'start',
-              behavior: 'smooth',
+              behavior: 'auto',
             })
           }
         >
