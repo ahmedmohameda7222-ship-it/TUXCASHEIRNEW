@@ -193,15 +193,12 @@ describe('Admin purchasing service', () => {
       commandId: 'supplier-archive-1',
     };
 
-    await expect(
-      service.manageSupplier(input, { ...buyer, role: 'MANAGER' }),
-    ).rejects.toThrow(/permission_forbidden/);
-    await expect(
-      service.manageSupplier(input, { ...buyer, permissions: ['purchasing.view'] }),
-    ).rejects.toThrow(/permission_forbidden/);
-    await expect(
-      service.manageSupplier({ ...input, shopId: 'shop-b' }, buyer),
-    ).rejects.toThrow(/shop_forbidden/);
+    const manager: AdminSessionPrincipal = { ...buyer, role: 'MANAGER' };
+    const viewer: AdminSessionPrincipal = { ...buyer, permissions: ['purchasing.view'] };
+    const otherShop = { ...input, shopId: 'shop-b' };
+    await expect(service.manageSupplier(input, manager)).rejects.toThrow(/permission_forbidden/);
+    await expect(service.manageSupplier(input, viewer)).rejects.toThrow(/permission_forbidden/);
+    await expect(service.manageSupplier(otherShop, buyer)).rejects.toThrow(/shop_forbidden/);
     expect(manageSupplier).not.toHaveBeenCalled();
 
     await expect(service.manageSupplier(input, buyer)).resolves.toMatchObject({
