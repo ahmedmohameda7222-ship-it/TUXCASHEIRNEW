@@ -15,6 +15,8 @@ export function ProductInspector({
   canEdit,
   canPrice,
   busy,
+  resumeError = false,
+  onRetryResume,
   draftRevision,
   advancedBundle,
   advancedLoadError = false,
@@ -32,6 +34,8 @@ export function ProductInspector({
   canEdit: boolean;
   canPrice: boolean;
   busy: boolean;
+  resumeError?: boolean;
+  onRetryResume?(): void;
   draftRevision: number | null;
   advancedBundle: CatalogJsonObject | null;
   advancedLoadError?: boolean;
@@ -90,6 +94,15 @@ export function ProductInspector({
             <span className="admin-status-pill">Draft changes</span>
           )}
         </div>
+        {resumeError ? (
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={onRetryResume}
+          >
+            Retry saved draft
+          </button>
+        ) : null}
         <button
           className="admin-secondary-button admin-catalog-inspector__jump"
           type="button"
