@@ -129,7 +129,7 @@ describe('ProductEditor', () => {
         onSetAvailability={vi.fn()}
       />,
     );
-    expect(expanded).toContain('Recipe / Inventory');
+    expect(expanded).toContain('Inventory usage');
     expect(expanded).toContain('Extras / Modifiers');
     expect(expanded).toContain('Shop Overrides');
     expect(expanded).toContain('History');
