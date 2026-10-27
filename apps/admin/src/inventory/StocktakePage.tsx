@@ -1,7 +1,8 @@
 import type { AdminInventoryItem, AdminStocktakeSnapshot } from '@tux/admin-contracts';
 import { useEffect, useMemo, useState } from 'react';
 
-import { formatInventoryMicros, formatInventoryQuantity } from './InventoryItemPage';
+import { formatInventoryQuantity } from './InventoryItemPage';
+import { formatPurchaseMicros } from '../purchasing/purchaseOrderDraft';
 import { parseStocktakeMicros } from './stocktakeQuantity';
 
 const formatQuantity = formatInventoryQuantity;
@@ -39,7 +40,7 @@ export function StocktakePage({
         initialActualByItem?.[line.inventoryItemId] === null ||
         initialActualByItem?.[line.inventoryItemId] === undefined
           ? ''
-          : formatInventoryMicros(initialActualByItem[line.inventoryItemId] ?? 0),
+          : formatPurchaseMicros(initialActualByItem[line.inventoryItemId] ?? 0),
       ]),
     ) as Record<string, string>;
   const [actualByItem, setActualByItem] = useState<Record<string, string>>(initiallySaved);
