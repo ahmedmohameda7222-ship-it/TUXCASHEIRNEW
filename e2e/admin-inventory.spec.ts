@@ -50,6 +50,7 @@ async function mockInventory(
     includeAlphabeticalFirst?: boolean;
     includePurchaseConversion?: boolean;
     exactThresholdMicros?: number;
+    includeSecondTrackedItem?: boolean;
   } = {},
 ) {
   const commands: InventoryCommand[] = [];
@@ -151,6 +152,23 @@ async function mockInventory(
                   }
                 : {}),
             },
+            ...(options.includeSecondTrackedItem
+              ? [
+                  {
+                    id: '99999999-9999-4999-8999-999999999998',
+                    name: 'Rice',
+                    unitLabel: 'g',
+                    trackingMode: 'RECIPE_TRACKED',
+                    active: true,
+                    definitionVersion: 1,
+                    onHandMicros: 1_000_000,
+                    reservedMicros: 0,
+                    availableMicros: 1_000_000,
+                    weightedUnitCostMinor: 0,
+                    history: [],
+                  },
+                ]
+              : []),
             ...(options.includeAlphabeticalFirst
               ? [
                   {
@@ -872,6 +890,85 @@ for (const viewport of premiumVisualViewports([{ name: 'desktop', width: 1440, h
     },
   );
 }
+
+test('I2 mobile master mapping clears incompatible preview after source-unit switch', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page, { includeSecondTrackedItem: true });
+  await page.route('**/api/admin/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...ownerSession,
+        principal: {
+          ...ownerSession.principal,
+          permissions: [...ownerSession.principal.permissions, 'catalog.edit'],
+        },
+      }),
+    });
+  });
+  const posted: unknown[] = [];
+  await page.route('**/api/admin/inventory**', async (route) => {
+    const request = route.request();
+    if (
+      request.method() === 'GET' &&
+      new URL(request.url()).searchParams.get('view') === 'master-bindings'
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          shopId,
+          masters: [
+            {
+              id: '77777777-7777-4777-8777-777777777771',
+              canonicalName: 'Beef master',
+              baseUnitLabel: 'kg',
+              trackingMode: 'RECIPE_TRACKED',
+              inventoryItemId: null,
+              inventoryItemName: null,
+            },
+            {
+              id: '77777777-7777-4777-8777-777777777772',
+              canonicalName: 'Rice master',
+              baseUnitLabel: 'g',
+              trackingMode: 'RECIPE_TRACKED',
+              inventoryItemId: null,
+              inventoryItemName: null,
+            },
+          ],
+        }),
+      });
+      return;
+    }
+    if (request.method() === 'POST' && request.postDataJSON().type === 'master.bind') {
+      posted.push(request.postDataJSON());
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+      return;
+    }
+    await route.fallback();
+  });
+
+  await page.goto('/inventory');
+  await page.getByText('More actions', { exact: true }).click();
+  await page.getByRole('button', { name: 'Manage recipe master bindings' }).click();
+  await page.getByLabel('Attach to an existing master').check();
+  await page
+    .getByLabel('Existing compatible master')
+    .selectOption('77777777-7777-4777-8777-777777777771');
+  const preview = page.getByRole('region', { name: 'Mapping review' });
+  await expect(preview).toContainText('Beef master (kg)');
+
+  await page.getByLabel('Shop inventory item').selectOption('99999999-9999-4999-8999-999999999998');
+  await expect(preview).toContainText('Rice (g)');
+  await expect(page.getByLabel('Existing compatible master')).toHaveValue('');
+  await expect(preview).toContainText('Select a verified compatible master');
+  await expect(preview).not.toContainText('Beef master (kg)');
+  expect(posted).toHaveLength(0);
+});
 
 for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   test(`inventory master-detail remains usable at ${viewport.name} width`, async ({ page }) => {
