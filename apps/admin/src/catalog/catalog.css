@@ -1208,6 +1208,172 @@
   }
 }
 
+/* C3: direct, always-visible canonical recipe quantities, not a separate picker. */
+.admin-catalog-inventory-usage {
+  gap: 12px;
+}
+
+.admin-catalog-inventory-usage__draft-tag {
+  align-self: center;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #eaf4ed;
+  color: #265a43;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.admin-catalog-inventory-usage__intro,
+.admin-catalog-inventory-usage__footnote {
+  margin: 0;
+  color: var(--tux-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.admin-catalog-inventory-usage__intro strong {
+  color: var(--tux-text-primary);
+}
+
+.admin-catalog-inventory-usage__hint {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #dce8df;
+  border-radius: 9px;
+  background: #f3f7f4;
+  color: #425f4e;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.admin-catalog-inventory-usage__list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.admin-catalog-inventory-usage__labels,
+.admin-catalog-inventory-usage__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 52px;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-catalog-inventory-usage__labels {
+  order: -1;
+  padding: 8px 10px;
+  color: var(--tux-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.admin-catalog-inventory-usage__group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 2px 7px;
+  color: var(--tux-text-secondary);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.admin-catalog-inventory-usage__group-heading span {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.admin-catalog-inventory-usage__group-heading.is-used {
+  order: 0;
+}
+
+.admin-catalog-inventory-usage__group-heading.is-other {
+  order: 2;
+}
+
+.admin-catalog-inventory-usage__row {
+  min-height: 44px;
+  padding: 5px 9px;
+  border: 1px solid var(--tux-border-subtle);
+  border-bottom: 0;
+  background: var(--tux-surface-panel);
+  font-size: 12px;
+  cursor: text;
+}
+
+.admin-catalog-inventory-usage__row[data-inventory-used='true'] {
+  background: #f6faf7;
+}
+
+.admin-catalog-inventory-usage__row:focus-within {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid #165e43;
+  outline-offset: -2px;
+}
+
+.admin-catalog-inventory-usage__name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.admin-catalog-inventory-usage__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #dbe4dc;
+  flex: 0 0 auto;
+}
+
+.admin-catalog-inventory-usage__row[data-inventory-used='true'] .admin-catalog-inventory-usage__dot {
+  background: #1a8b59;
+}
+
+.admin-catalog-inventory-usage__row input {
+  width: 100%;
+  min-width: 0;
+  min-height: 35px;
+  padding: 5px 8px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 8px;
+  background: var(--tux-surface-panel);
+  color: var(--tux-text-primary);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.admin-catalog-inventory-usage__row input:disabled {
+  opacity: 0.6;
+}
+
+.admin-catalog-inventory-usage__unit {
+  overflow-wrap: anywhere;
+  color: var(--tux-text-secondary);
+  font-size: 11px;
+}
+
+.admin-catalog-inventory-usage__loading {
+  padding: 12px;
+  color: var(--tux-text-secondary);
+  font-size: 12px;
+}
+
+@media (max-width: 420px) {
+  .admin-catalog-inventory-usage__labels,
+  .admin-catalog-inventory-usage__row {
+    grid-template-columns: minmax(0, 1fr) 80px 43px;
+    gap: 6px;
+  }
+}
+
 /* C1 approved Catalog hierarchy: only Catalog's primary create action uses
    the selected green, without changing shell or unrelated feature buttons. */
 .admin-catalog-new-product-controls > .admin-catalog-create-button:not(:disabled) {
