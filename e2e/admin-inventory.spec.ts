@@ -995,6 +995,27 @@ test('inventory stocktake shows business quantities and preserves count authorit
   });
 });
 
+test('I4 mobile successful transfer send clears the approved draft to prevent repeat sends', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page);
+  await page.goto('/inventory');
+  await page.getByText('More actions', { exact: true }).click();
+  await page.getByRole('button', { name: 'Transfer stock' }).click();
+  await page.getByLabel('Quantity (base units)').fill('0.000001');
+  await page.getByRole('button', { name: 'Add to transfer' }).click();
+  await page.getByRole('button', { name: 'Review transfer' }).click();
+  await page.getByRole('button', { name: 'Confirm send' }).click();
+
+  await expect.poll(() => commands.filter((command) => command.type === 'transfer.send').length).toBe(1);
+  await expect(page.getByRole('button', { name: 'Confirm send' })).toHaveCount(0);
+  await expect(page.getByText('Draft items (0)')).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+  ).toBe(true);
+});
+
 test('inventory can receive a sent inter-shop transfer without using purchasing receive', async ({
   page,
 }) => {
