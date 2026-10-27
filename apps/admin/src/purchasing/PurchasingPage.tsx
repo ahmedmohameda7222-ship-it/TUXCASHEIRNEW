@@ -156,7 +156,7 @@ export function PurchasingPage() {
       title="Purchasing"
       description="Create purchase orders, receive deliveries and record supplier returns."
     >
-      {mutationErrorText ? (
+      {mutationErrorText && !(section === 'suppliers' && supplierErrorText) ? (
         <p className="admin-inventory-note" role="alert">
           {mutationErrorText}
         </p>
