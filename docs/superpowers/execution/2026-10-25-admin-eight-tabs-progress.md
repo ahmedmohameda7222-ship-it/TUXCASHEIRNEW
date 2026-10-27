@@ -1,3 +1,21 @@
+## 2026-10-28 CRM C1 PRE-MERGE ENGINEERING PASS — CRM C2 exclusively unlocked
+
+**Exact accepted code HEAD:** `5435f4a32fcae5e8381d37aed865d40dbc19148c` on Draft PR #165. All eight exact-head GitHub Actions workflow groups **SUCCESS**:
+- [TUX V2 CI 40583196360](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40583196360) — TypeScript, Prettier, relevant units, security, migrations and quality.
+- [Eight-tab rendered 40583196333](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40583196333) — approved CRM1 list, row/focus/390px and desktop selection E2E included.
+- [Full regression 40583196287](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40583196287) — Admin, Menu, security, Windows, architecture and Branch/PIN regression.
+- [Combined Purchasing integrated mainline 40583220373](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40583220373) — full combined PostgreSQL, source/build and Chromium.
+- [Purchasing isolated PG + Chromium 40583196261](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40583196261) — SUCCESS.
+- [Orders isolated PG 40583196214](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40583196214) — SUCCESS.
+- [Inventory I3 isolated PG 40583196394](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40583196394) — SUCCESS.
+- [P0 Business Day PG 40583196251](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40583196251) — SUCCESS.
+
+**CRM1 scope:** React `CustomerDirectory` binds actual shop-scoped customer results, name/phone search, immutable customer IDs and deep-link, initials not fake photos, exact BigInt minor-unit money, order/spend/points/automatic segments/last-order facts and explicit loaded-only sorting/filter/pagination. Mobile 360/390 list-first/back and accessible focus with no horizontal overflow; desktop selected row and inspector aligned at top. E2E covers mobile/desktop, no stale rows after authorized shop switch, and matching name/initials horizontal alignment. Latest two correction commits corrected CSS-specificity ownership and asserted the browser layout on the accepted SHA. Actual browser evidence originally captured on preceding revision showed the prior vertical avatar defect; the exact-head browser assertion now passes, **but final pixel-equivalence with approved screenshots remains pending**. Do not claim all demo sample rows or unsupported globally complete sort/filter/API pagination; the real backend returns capped results.
+
+**Ruling:** CRM C1 accepted **pre-merge engineering only**. C2 Selected profile/activity exclusively ACTIVE; C3/C4 and Staff/Finance/Reports locked. Owner-reserved hosted authenticated UAT remains deferred. PR still Draft; no merge, deployment, production migration or real customer data mutation.
+
+---
+
 ## 2026-10-27 Purchasing P4 PRE-MERGE ENGINEERING PASS — Purchasing P1–P4 closed; CRM C1 exclusively unlocked
 
 **Immutable accepted code HEAD:** `570aa2a1be3ba65dce33057522f655024042ecf5` on open Draft PR #165, with no merge/deploy/Production SQL. All eight exact-head workflows completed **SUCCESS**:
