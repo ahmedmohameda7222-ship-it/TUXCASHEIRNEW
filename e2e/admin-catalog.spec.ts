@@ -238,16 +238,18 @@ async function mockCatalog(
                 ),
               ],
           drafts: options.persistedRecipeDraft
-            ? [{
-                id: '55555555-5555-4555-8555-555555555555',
-                shopId,
-                title: 'Saved recipe',
-                status: 'DRAFT',
-                basePublishVersion: publishVersion,
-                draftRevision,
-                publishedVersion: null,
-                updatedAt: '2026-10-26T00:00:00.000Z',
-              }]
+            ? [
+                {
+                  id: '55555555-5555-4555-8555-555555555555',
+                  shopId,
+                  title: 'Saved recipe',
+                  status: 'DRAFT',
+                  basePublishVersion: publishVersion,
+                  draftRevision,
+                  publishedVersion: null,
+                  updatedAt: '2026-10-26T00:00:00.000Z',
+                },
+              ]
             : [],
         }),
       });
