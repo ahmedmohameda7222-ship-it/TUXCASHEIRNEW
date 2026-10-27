@@ -424,7 +424,9 @@ test('CRM2 phone profile has factual metrics and signed loyalty history', async 
   await expect(detail.getByText('Contact information')).toBeVisible();
   await expect(detail.getByText('Loyalty summary')).toBeVisible();
   await expect(detail.getByText('Customer segments')).toBeVisible();
-  await expect(detail.getByLabel('Recent loyalty activity')).toContainText('+20 pts');
+  const activity = page.getByLabel('Recent loyalty activity');
+  await expect(activity).toContainText('+20 pts');
+  await expect(detail.getByLabel('Recent loyalty activity')).toHaveCount(0);
   await detail.getByRole('button', { name: 'Adjust points' }).click();
   await expect(detail.getByRole('tab', { name: 'Loyalty' })).toHaveAttribute(
     'aria-selected',
