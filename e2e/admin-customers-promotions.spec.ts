@@ -472,9 +472,7 @@ test('renders canonical CRM identity, loyalty history and automatic segments', a
   await expect(page.getByText(/Lunch 10%/)).toBeVisible();
 });
 
-test('CRM3 mobile merge review preserves exact safe-integer customer spend', async ({
-  page,
-}) => {
+test('CRM3 mobile merge review preserves exact safe-integer customer spend', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const preciseMinor = Number.MAX_SAFE_INTEGER - 1;
   await page.route('**/api/admin/customers**', async (route) => {
@@ -505,9 +503,7 @@ test('CRM3 mobile merge review preserves exact safe-integer customer spend', asy
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
-test('CRM3 one in-flight adjustment cannot submit twice via the active form', async ({
-  page,
-}) => {
+test('CRM3 one in-flight adjustment cannot submit twice via the active form', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   let posts = 0;
   let release!: () => void;
