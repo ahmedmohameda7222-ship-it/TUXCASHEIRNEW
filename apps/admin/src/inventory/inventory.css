@@ -793,7 +793,8 @@
    users to scroll past the directory header and KPI tiles first. */
 @media (max-width: 1150px) {
   .admin-page:has(.admin-inventory-master-detail[data-detail-active='true']) > .admin-page__header,
-  .admin-page:has(.admin-inventory-master-detail[data-detail-active='true']) .admin-inventory-summary {
+  .admin-page:has(.admin-inventory-master-detail[data-detail-active='true'])
+    .admin-inventory-summary {
     display: none;
   }
 }
