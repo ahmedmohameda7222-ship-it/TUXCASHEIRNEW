@@ -281,11 +281,10 @@ export function InventoryDefinitionEditor({
                     maxLength={120}
                     value={conversion.label}
                     disabled={pending}
-                    onChange={(event) =>
-                      setConversion((current) =>
-                        current ? { ...current, label: event.currentTarget.value } : current,
-                      )
-                    }
+                    onChange={(event) => {
+                      const label = event.currentTarget.value;
+                      setConversion((current) => (current ? { ...current, label } : current));
+                    }}
                   />
                 </label>
                 <label>
@@ -295,11 +294,12 @@ export function InventoryDefinitionEditor({
                     inputMode="decimal"
                     value={conversion.baseQuantity}
                     disabled={pending}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      const baseQuantity = event.currentTarget.value;
                       setConversion((current) =>
-                        current ? { ...current, baseQuantity: event.currentTarget.value } : current,
-                      )
-                    }
+                        current ? { ...current, baseQuantity } : current,
+                      );
+                    }}
                   />
                 </label>
                 <button className="admin-primary-button" type="submit" disabled={pending}>
