@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
 // An exclusively disposable, loopback PostgreSQL acceptance. Never connect
@@ -157,4 +157,63 @@ equal(movementCount('i3-adjust-replay') + movementCount('i3-waste-replay'), 2,
   'One ledger event per accepted Adjust/Waste command ID');
 equal(currentBalance(), startingBalance, 'Idempotent and rejected movement attempts do not mutate balance');
 
-console.log('I3 real isolated PostgreSQL: Adjust/Waste replay, changed payload, actor authority, cross-type key, overdraw and exact append-only stock ledger PASS.');
+
+// Concurrent, uncommitted identical replay must wait for the first transaction
+// and return the original movement. A simple sequential retry is insufficient.
+const raceCommandId = 'i3-race-adjust';
+const raceArgs = [
+  ACTOR, SHOP, ITEM, 1, REASON_ADJUST, 'Race replay', raceCommandId, false,
+];
+const raceSql =
+  'select (public.post_inventory_adjustment_v1(' +
+  raceArgs.map(literal).join(',') +
+  '))::text';
+const beforeRace = currentBalance();
+const first = spawn(
+  'psql',
+  [
+    databaseUrl,
+    '-X',
+    '-q',
+    '-At',
+    '-v',
+    'ON_ERROR_STOP=1',
+    '-c',
+    'begin; ' + raceSql + '; select pg_sleep(3); commit;',
+  ],
+  { stdio: ['ignore', 'pipe', 'pipe'] },
+);
+let firstOut = '';
+let firstErr = '';
+first.stdout.on('data', (data) => {
+  firstOut += String(data);
+});
+first.stderr.on('data', (data) => {
+  firstErr += String(data);
+});
+const firstDone = new Promise((resolve, reject) => {
+  first.once('close', (code) => {
+    if (code !== 0) reject(new Error('First concurrent adjustment: ' + firstErr));
+    else resolve();
+  });
+  first.once('error', reject);
+});
+let sawLock = false;
+for (let attempt = 0; attempt < 65; attempt++) {
+  if (
+    Number(sql("select count(*) from pg_locks where locktype='advisory' and granted and pid<>pg_backend_pid()")) > 0
+  ) {
+    sawLock = true;
+    break;
+  }
+  await new Promise((resolve) => setTimeout(resolve, 30));
+}
+verify(sawLock, 'First adjustment must hold its uncommitted PostgreSQL advisory lock');
+const second = JSON.parse(sql(raceSql, 'Second concurrent adjustment replay'));
+await firstDone;
+verify(second.ok && second.idempotentReplay, 'Concurrent retry returns exact idempotent replay');
+verify(firstOut.includes('"idempotentReplay": false'), 'First transaction really posted a new movement');
+equal(movementCount(raceCommandId), 1, 'Concurrent identical adjustments append exactly one ledger row');
+equal(currentBalance(), beforeRace + 1, 'Concurrent identical adjustments credit exactly one micro');
+
+console.log('I3 real isolated PostgreSQL: Adjust/Waste replay, concurrent duplicate, changed payload, actor authority, cross-type key, overdraw and exact append-only stock ledger PASS.');
