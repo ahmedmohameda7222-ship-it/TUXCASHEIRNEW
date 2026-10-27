@@ -691,9 +691,7 @@ export function InventoryPage() {
           receiving={inventory.receiveTransfer.isPending}
           cancelling={inventory.cancelTransfer.isPending}
           onBack={() => setMode('detail')}
-          onSend={(input, onSent) =>
-            inventory.sendTransfer.mutate(input, { onSuccess: onSent })
-          }
+          onSend={(input, onSent) => inventory.sendTransfer.mutate(input, { onSuccess: onSent })}
           onReceive={(transferId) => inventory.receiveTransfer.mutate(transferId)}
           onCancelTransfer={(transferId) => inventory.cancelTransfer.mutate(transferId)}
         />
