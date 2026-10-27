@@ -43,7 +43,7 @@ type CatalogCommandBody = {
   changes?: Array<{ bundleJson?: Record<string, unknown> }>;
 };
 
-function canonicalBundle(product: FixtureProduct, version: number) {
+function canonicalBundle(product: FixtureProduct, version: number, withRecipe = false) {
   return {
     snapshot: {
       shopId,
@@ -64,12 +64,38 @@ function canonicalBundle(product: FixtureProduct, version: number) {
       modifiers: [],
       productModifierLinks: [],
       comboBeverageOptions: [],
-      recipeLines: [],
+      recipeLines: withRecipe
+        ? [{
+            shopId,
+            productId: product.id,
+            inventoryItemId: '66666666-6666-4666-8666-666666666666',
+            quantityMicros: 250_000,
+          }]
+        : [],
       orderTypes: [],
       paymentMethods: [],
       deliveryZones: [],
     },
-    inventoryItems: [],
+    inventoryItems: withRecipe
+      ? [
+          {
+            id: '66666666-6666-4666-8666-666666666666',
+            shopId,
+            name: 'Meat',
+            unitLabel: 'g',
+            trackingMode: 'RECIPE_TRACKED',
+            active: true,
+          },
+          {
+            id: '77777777-7777-4777-8777-777777777777',
+            shopId,
+            name: 'Cheese',
+            unitLabel: 'slice',
+            trackingMode: 'RECIPE_TRACKED',
+            active: true,
+          },
+        ]
+      : [],
   };
 }
 
@@ -80,6 +106,7 @@ async function mockCatalog(
     productCount?: number;
     emptyCatalog?: boolean;
     permissions?: string[];
+    withRecipe?: boolean;
   } = {},
 ) {
   let publishVersion = 48;
@@ -100,7 +127,7 @@ async function mockCatalog(
     isCombo: false,
     sortOrder: 10,
   };
-  let draftBundle = canonicalBundle(liveProduct, publishVersion);
+  let draftBundle = canonicalBundle(liveProduct, publishVersion, options.withRecipe);
   const commands: CatalogCommandBody[] = [];
 
   await page.route('**/api/admin/session', async (route) => {
@@ -191,7 +218,7 @@ async function mockCatalog(
 
     if (body.type === 'draft.create') {
       draftRevision = 1;
-      draftBundle = canonicalBundle(liveProduct, publishVersion);
+      draftBundle = canonicalBundle(liveProduct, publishVersion, options.withRecipe);
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -514,6 +541,57 @@ test('C2 catalog.edit alone permits category drafts but no modifier pricing acti
   await page.getByRole('tab', { name: /Modifiers \/ Extras/ }).click();
   await expect(page.getByRole('button', { name: 'Add modifier' })).toHaveCount(0);
   expect(fixture.commands.map(({ type }) => type)).toEqual(['draft.create']);
+});
+
+test('C3 direct 390px Inventory usage edits preserve focus and persist recipe only to draft', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const fixture = await mockCatalog(page, { withRecipe: true });
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inventory usage' })).toBeVisible();
+  const meat = page.getByRole('spinbutton', { name: 'Meat quantity in g' });
+  const cheese = page.getByRole('spinbutton', { name: 'Cheese quantity in slice' });
+  await expect(meat).toHaveValue('0.25');
+  await expect(cheese).toHaveValue('0');
+  await expect(page.getByText('1 of 2 in use')).toBeVisible();
+
+  await cheese.fill('1');
+  await expect(cheese).toBeFocused();
+  await meat.fill('0');
+  await expect(meat).toBeFocused();
+  await expect(page.getByText('1 of 2 in use')).toBeVisible();
+  await page.screenshot({ path: 'test-results/catalog-c3-inventory-usage-mobile-390.png' });
+  await page.getByRole('button', { name: 'Save draft' }).click();
+
+  const saved = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
+  const snapshot = saved?.snapshot as { recipeLines?: Array<{
+    productId: string;
+    inventoryItemId: string;
+    quantityMicros: number;
+  }> };
+  expect(snapshot.recipeLines).toEqual([
+    expect.objectContaining({
+      productId,
+      inventoryItemId: '77777777-7777-4777-8777-777777777777',
+      quantityMicros: 1_000_000,
+    }),
+  ]);
+  expect(fixture.commands.map(({ type }) => type)).toEqual(['draft.create', 'draft.save']);
+});
+
+test('C3 desktop Inventory usage exposes direct recipe rows in the product editor', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockCatalog(page, { withRecipe: true });
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Meat quantity in g' })).toBeVisible();
+  await expect(page.getByRole('spinbutton', { name: 'Cheese quantity in slice' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/catalog-c3-inventory-usage-desktop-1440.png' });
 });
 
 test('catalog search filters the live workspace without mutating authority', async ({ page }) => {
