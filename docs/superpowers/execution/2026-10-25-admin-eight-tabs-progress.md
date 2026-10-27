@@ -1,3 +1,21 @@
+## 2026-10-27 Purchasing P3 PRE-MERGE ENGINEERING PASS — P4 exclusively unlocked
+
+**Accepted immutable code HEAD:** `cc43f69ad982eebd9d0f85e3d42ee9ef07a96f3b` — PR #165 remains **Draft/open**, no merge/deploy/Production SQL. All eight exact-code-head workflow groups completed **SUCCESS**:
+- [TUX V2 CI 40540036146](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40540036146): 223/223 unit/integration tests, TypeScript, format/lint, security and required gate green.
+- [Purchasing isolated PG + Chromium + security 40540036050](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40540036050): 35/35 Purchasing rendered Playwright including 390px P3 sheets, real PostgreSQL transaction/idempotency and security green.
+- [Combined Orders/Inventory/Purchasing PG + source/build + Chromium 40540036378](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40540036378): all jobs green.
+- [Full monorepo regression 40540036057](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40540036057): Admin, Menu, Edge security, architecture, Windows, Branch/PIN and quality green.
+- [Eight-tab rendered acceptance 40540036159](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40540036159): green.
+- [Orders isolated PG 40540036487](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40540036487): green.
+- [Inventory I3 isolated PG 40540036172](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40540036172): green.
+- [P0 Business Day PG 40540036381](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40540036381): green.
+
+**P3 RED→GREEN:** original authoritative Purchasing PostgreSQL command replay, parallel movement, partial receipts, returns bounded to posted receipts, same-command conflict fingerprint and immediate Inventory invalidation preserved. New failing `ReceivePurchasePage.test.tsx` 2 tests (RED CI 40539435371, 221 passed / 2 failed) proved insufficient supplier receipt and return inspector disclosures. Fixed `ReceivePurchasePage.tsx` to surface PO ordered/received/remaining and received/returned/returnable in purchase-unit micros with exact `formatPurchaseMicros`, and scoped compact 390px CSS. New Playwright 390px E2E proves partial receipt alters next maximum and supplier return never presents original ordered amount. GREEN CI 40540036146 (223/223), Purchasing Playwright 40540036050 (35/35), all eight groups PASS.
+
+**Ruling:** P3 accepted **pre-merge engineering scope only**; final authenticated hosted owner UAT is deferred by Owner. **P4 Supplier Lifecycle exclusively ACTIVE**. All later tabs locked. No migrations applied to Production; PR remains Draft, no squash merge or deployment.
+
+---
+
 ## 2026-10-27 Purchasing P2 PRE-MERGE ENGINEERING PASS — P3 exclusively unlocked
 
 **Accepted immutable code HEAD:** `e56043211fd22b176ba8630ae07b088d6ef0aa10` on open **Draft PR #165** (no merge, deploy, or Production SQL). Eight exact-code-head GitHub Actions workflow groups completed **SUCCESS**:
