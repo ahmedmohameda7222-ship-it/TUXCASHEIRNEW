@@ -173,6 +173,17 @@ async function mockCatalog(
       });
       return;
     }
+    if (
+      request.method() === 'GET' &&
+      new URL(request.url()).searchParams.get('view') === 'advanced'
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(draftBundle),
+      });
+      return;
+    }
     if (request.method() === 'GET') {
       await route.fulfill({
         status: 200,
@@ -296,19 +307,19 @@ for (const viewport of ADMIN_WIDE_TABLET_VIEWPORTS) {
       await expect(page).toHaveURL(new RegExp(`/catalog/products/${productId}$`));
       await expect(list).toBeHidden();
       await expect(inspector).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Products' })).toBeVisible();
+      await expect(page.locator('[data-catalog-inspector]').getByRole('button', { name: 'Products' })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Inventory usage' })).toBeVisible();
       await page.getByRole('button', { name: 'More' }).click();
       await expect(page.getByText('Shop Overrides')).toBeVisible();
       await page.reload();
       await expect(inspector).toBeVisible();
-      await page.getByRole('button', { name: 'Products' }).click();
+      await page.locator('[data-catalog-inspector]').getByRole('button', { name: 'Products' }).click();
       await expect(page).toHaveURL(/\/catalog\/products$/);
     } else {
       await expect(inspector).toBeHidden();
       await page.getByRole('button', { name: /Classic Smash/ }).click();
       await expect(inspector).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Products' })).toBeVisible();
+      await expect(page.locator('[data-catalog-inspector]').getByRole('button', { name: 'Products' })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Inventory usage' })).toBeVisible();
       await page.getByRole('button', { name: 'More' }).click();
       await expect(page.getByText('Shop Overrides')).toBeVisible();
@@ -761,14 +772,14 @@ test('unsaved product edits are guarded at both Review & Publish entry points', 
   await page.getByRole('button', { name: /Classic Smash/ }).click();
   const name = page.locator('input[name="name"]');
   await name.fill('Unsaved review navigation value');
-  await page.getByRole('button', { name: /Review & Publish \(/ }).click();
+  await page.locator('[data-catalog-inspector]').getByRole('button', { name: 'Review & Publish' }).click();
   let dialog = page.getByRole('dialog', { name: 'Discard unsaved product edits?' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Stay and keep editing' }).click();
   await expect(name).toHaveValue('Unsaved review navigation value');
   expect(fixture.commands).toEqual([]);
 
-  await page.getByRole('button', { name: /Review & Publish \(/ }).click();
+  await page.locator('[data-catalog-inspector]').getByRole('button', { name: 'Review & Publish' }).click();
   dialog = page.getByRole('dialog', { name: 'Discard unsaved product edits?' });
   await dialog.getByRole('button', { name: 'Discard changes and navigate' }).click();
   await expect(page.getByRole('heading', { name: 'Review & publish' })).toBeVisible();
@@ -782,7 +793,7 @@ test('saved product draft permits Review & Publish without false warning', async
   await page.locator('input[name="name"]').fill('Saved review navigation');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft saved — not published')).toBeVisible();
-  await page.getByRole('button', { name: 'Review & Publish', exact: true }).click();
+  await page.locator('[data-catalog-inspector]').getByRole('button', { name: 'Review & Publish' }).click();
   await expect(page.getByRole('heading', { name: 'Review & publish' })).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Discard unsaved product edits?' })).toHaveCount(0);
 });
