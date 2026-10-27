@@ -6,7 +6,7 @@ import type {
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { CustomerDetailPage } from './CustomerDetailPage';
+import { CustomerActivityPanel, CustomerDetailPage } from './CustomerDetailPage';
 import { LoyaltyPanel } from './LoyaltyPanel';
 import { PromotionEditor } from '../promotions/PromotionEditor';
 
@@ -145,25 +145,29 @@ describe('Plan 5 CRM and promotion controls', () => {
   });
 
   it('CRM2 renders signed, immutable customer loyalty events without inventing order rows', () => {
+    const scoped: AdminCustomerDetail = {
+      ...customer,
+      loyaltyHistory: [
+        ...customer.loyaltyHistory,
+        {
+          ...customer.loyaltyHistory[0]!,
+          id: '70000000-0000-4000-8000-000000000002',
+          eventType: 'REDEEM',
+          pointsDelta: -7,
+          createdAt: '2026-09-21T12:00:00.000Z',
+        },
+      ],
+    };
     const html = renderToStaticMarkup(
-      <CustomerDetailPage
-        customer={{
-          ...customer,
-          loyaltyHistory: [
-            ...customer.loyaltyHistory,
-            {
-              ...customer.loyaltyHistory[0]!,
-              id: '70000000-0000-4000-8000-000000000002',
-              eventType: 'REDEEM',
-              pointsDelta: -7,
-              createdAt: '2026-09-21T12:00:00.000Z',
-            },
-          ],
-        }}
-        loyalty={<p>Scoped loyalty</p>}
-        canMerge={false}
-        onMerge={vi.fn()}
-      />,
+      <>
+        <CustomerDetailPage
+          customer={scoped}
+          loyalty={<p>Scoped loyalty</p>}
+          canMerge={false}
+          onMerge={vi.fn()}
+        />
+        <CustomerActivityPanel customer={scoped} />
+      </>,
     );
     expect(html).toContain('Recent loyalty activity');
     expect(html).toContain('+20 pts');
