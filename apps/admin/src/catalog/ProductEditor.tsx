@@ -342,26 +342,35 @@ export function ProductEditor({
 
   return (
     <form className="admin-catalog-editor" onSubmit={(event) => void submit(event)}>
-      <section className="admin-catalog-editor__section admin-catalog-product-photo" aria-labelledby="catalog-images-heading">
+      <section
+        className="admin-catalog-editor__section admin-catalog-product-photo"
+        aria-labelledby="catalog-images-heading"
+      >
         <div className="admin-catalog-editor__section-heading">
           <div>
             <p className="admin-catalog-editor__eyebrow">Images</p>
             <h2 id="catalog-images-heading">Product photo</h2>
           </div>
         </div>
-        <div className="admin-product-image-state" role="status">
-          <strong>{imageKey ? 'Image assigned' : 'No image assigned'}</strong>
-          <span>Image upload changes remain in Draft until saved and published.</span>
-          {uploadedImageUrl ? (
-            <img
-              src={uploadedImageUrl}
-              alt={`Selected image for ${product.name}`}
-              loading="lazy"
-              width="200"
-              height="140"
-            />
-          ) : null}
-        </div>
+        <div className="admin-catalog-image-layout">
+          <div className="admin-product-image-state" role="status">
+            {uploadedImageUrl ? (
+              <img
+                src={uploadedImageUrl}
+                alt={`Selected image for ${product.name}`}
+                loading="lazy"
+                width="90"
+                height="90"
+              />
+            ) : (
+              <span className="admin-product-image-placeholder" aria-hidden="true">
+                {product.name.trim().slice(0, 2).toUpperCase() || 'PH'}
+              </span>
+            )}
+            <strong className="admin-product-image-state__status">
+              {imageKey ? 'Image assigned' : 'No image assigned'}
+            </strong>
+          </div>
         {onUploadImage ? (
           <div className="admin-form-grid">
             {imageRequiresSaveFirst ? (
@@ -405,8 +414,12 @@ export function ProductEditor({
               </button>
             ) : null}
             {imageError ? <p role="alert">{imageError}</p> : null}
+            <p className="admin-catalog-photo-help">
+              Image assignment stays in your draft until Save draft and Review & Publish.
+            </p>
           </div>
         ) : null}
+        </div>
       </section>
 
       <section className="admin-catalog-editor__section" aria-labelledby="catalog-general-heading">
