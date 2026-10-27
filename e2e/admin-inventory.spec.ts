@@ -256,6 +256,35 @@ async function mockInventory(
   return { commands };
 }
 
+test('I1 desktop inventory defaults to the first authorized item and approved action order', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 940 });
+  await mockInventory(page);
+  await page.goto('/inventory');
+  await expect(page.getByLabel('Inventory item detail')).toBeVisible();
+  await expect(page.locator('.admin-inventory-row.is-selected')).toContainText('Beef');
+
+  const actions = await page.locator('.admin-inventory-page-actions').evaluate((container) =>
+    Array.from(container.children, (child) =>
+      child.tagName === 'DETAILS'
+        ? child.querySelector('summary')?.textContent?.trim()
+        : child.textContent?.trim(),
+    ),
+  );
+  expect(actions).toEqual(['Export CSV', 'Stock count', 'More actions', 'Add inventory item']);
+  await page.screenshot({ path: 'test-results/inventory-i1-desktop-1440.png' });
+});
+
+test('I1 phone opens the inventory list without forcing an inspector route', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page);
+  await page.goto('/inventory');
+  await expect(page.getByRole('region', { name: 'Inventory items' })).toBeVisible();
+  await expect(page.getByLabel('Inventory item detail')).toBeHidden();
+  await page.screenshot({ path: 'test-results/inventory-i1-mobile-390.png' });
+});
+
 test('inventory renders on-hand, reserved, available, history, and action entry points', async ({
   page,
 }) => {
