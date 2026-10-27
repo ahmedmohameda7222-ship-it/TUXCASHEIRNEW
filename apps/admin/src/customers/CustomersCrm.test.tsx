@@ -116,6 +116,62 @@ describe('Plan 5 CRM and promotion controls', () => {
     expect(html).not.toContain('>Maadi<');
   });
 
+  it('CRM2 approved profile shows three factual KPIs and contact/loyalty details', () => {
+    const html = renderToStaticMarkup(
+      <CustomerDetailPage
+        customer={customer}
+        loyalty={<p>Scoped loyalty</p>}
+        canMerge
+        onMerge={vi.fn()}
+      />,
+    );
+    for (const value of [
+      'Total orders',
+      'Total spent',
+      'Loyalty points',
+      '12',
+      'EGP 1,500.00',
+      '120',
+      'Contact information',
+      'Loyalty summary',
+      'Phone',
+      'Customer segments',
+      '+201012345678',
+    ]) {
+      expect(html).toContain(value);
+    }
+    expect(html).not.toContain('Recent orders #');
+    expect(html).not.toContain('Fake customer activity');
+  });
+
+  it('CRM2 renders signed, immutable customer loyalty events without inventing order rows', () => {
+    const html = renderToStaticMarkup(
+      <CustomerDetailPage
+        customer={{
+          ...customer,
+          loyaltyHistory: [
+            ...customer.loyaltyHistory,
+            {
+              ...customer.loyaltyHistory[0]!,
+              id: '70000000-0000-4000-8000-000000000002',
+              eventType: 'REDEEM',
+              pointsDelta: -7,
+              createdAt: '2026-09-21T12:00:00.000Z',
+            },
+          ],
+        }}
+        loyalty={<p>Scoped loyalty</p>}
+        canMerge={false}
+        onMerge={vi.fn()}
+      />,
+    );
+    expect(html).toContain('Recent loyalty activity');
+    expect(html).toContain('+20 pts');
+    expect(html).toContain('-7 pts');
+    expect(html).not.toContain('Merge customer');
+    expect(html).not.toContain('View all orders');
+  });
+
   it('renders immutable loyalty history and permission-gated manual adjustment controls', () => {
     const html = renderToStaticMarkup(
       <LoyaltyPanel
