@@ -722,3 +722,68 @@
   font-weight: 650;
   overflow-wrap: anywhere;
 }
+
+/* I1: preserve the first list row above the fixed bottom navigation on phones.
+   Scope this compression to Inventory's own header/actions, not AdminShell. */
+@media (max-width: 480px) {
+  .admin-page__header:has(.admin-inventory-page-actions) {
+    gap: 0.6rem;
+    margin-bottom: 0.45rem;
+  }
+
+  .admin-page__header:has(.admin-inventory-page-actions) .admin-page__eyebrow {
+    margin-bottom: 0.2rem;
+    font-size: 0.7rem;
+  }
+
+  .admin-page__header:has(.admin-inventory-page-actions) h1 {
+    margin-block: 0.2rem;
+    line-height: 1.1;
+  }
+
+  .admin-page__header:has(.admin-inventory-page-actions) .admin-page__description {
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    line-height: 1.45;
+  }
+
+  .admin-inventory-page-actions {
+    gap: 6px;
+  }
+
+  .admin-inventory-page-actions > button,
+  .admin-inventory-page-actions > details > summary {
+    min-height: 40px;
+    padding: 0.5rem 0.45rem;
+    font-size: 0.8rem;
+    line-height: 1.2;
+  }
+
+  .admin-inventory-summary {
+    gap: 0.5rem;
+    margin-block: 0 0.65rem;
+  }
+
+  .admin-inventory-summary > div {
+    gap: 0.25rem;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .admin-inventory-summary strong {
+    font-size: 1.15rem;
+  }
+
+  .admin-inventory-filter-pills {
+    padding: 0.55rem 0.75rem 0.4rem;
+  }
+
+  .admin-inventory-filter-pills button {
+    min-height: 30px;
+    padding: 0.25rem 0.55rem;
+  }
+
+  .admin-inventory-list-controls {
+    gap: 0.45rem;
+    padding: 0 0.75rem 0.55rem;
+  }
+}
