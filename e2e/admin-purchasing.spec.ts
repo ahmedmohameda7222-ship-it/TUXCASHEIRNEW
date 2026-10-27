@@ -569,6 +569,41 @@ test('purchase order defaults adopt the first supplier created after an initiall
   });
 });
 
+test('P3 mobile receipt and return sheets distinguish ordered, posted, and still allowable units', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const fixture = await mockPurchasing(page);
+  await page.goto('/purchasing');
+  await selectPurchaseOrder(page);
+  await page.getByRole('button', { name: 'Mark ordered' }).click();
+
+  await page.getByRole('button', { name: 'Receive purchase' }).click();
+  const receipt = page.getByRole('dialog', { name: 'Receive purchase' });
+  await expect(receipt.getByText('Ordered: 5 case')).toBeVisible();
+  await expect(receipt.getByText('Already received: 0 case')).toBeVisible();
+  await expect(receipt.getByText('Maximum remaining: 5 case')).toBeVisible();
+  await receipt.getByLabel('Receive Beef').fill('2');
+  await receipt.getByLabel('Unit cost for Beef').fill('250');
+  await receipt.getByRole('button', { name: 'Post receipt' }).click();
+  await expect(page.locator('.admin-purchasing-order-header')).toContainText('Partially received');
+
+  await page.getByRole('button', { name: 'Receive purchase' }).click();
+  const secondReceipt = page.getByRole('dialog', { name: 'Receive purchase' });
+  await expect(secondReceipt.getByText('Ordered: 5 case')).toBeVisible();
+  await expect(secondReceipt.getByText('Already received: 2 case')).toBeVisible();
+  await expect(secondReceipt.getByText('Maximum remaining: 3 case')).toBeVisible();
+  await secondReceipt.getByRole('button', { name: 'Cancel' }).click();
+
+  await page.getByRole('button', { name: 'Return purchase' }).click();
+  const returned = page.getByRole('dialog', { name: 'Return purchase' });
+  await expect(returned.getByText('Already received: 2 case')).toBeVisible();
+  await expect(returned.getByText('Already returned: 0 case')).toBeVisible();
+  await expect(returned.getByText('Maximum returnable: 2 case')).toBeVisible();
+  expect(fixture.commands.filter((command) => command.type === 'po.receive')).toHaveLength(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
 test('purchasing posts partial receiving and purchase returns without pretending the remainder arrived', async ({
   page,
 }) => {
