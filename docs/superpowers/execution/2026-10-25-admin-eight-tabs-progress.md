@@ -1,3 +1,19 @@
+## 2026-10-27 Inventory I3 PRE-MERGE ENGINEERING PASS — I4 exclusively unlocked
+
+**Immutable accepted code HEAD:** `71b73993fc32abee93fc89833f7a48faa0d9de2c` on Draft PR #165. Verified all exact-head workflows completed with **SUCCESS**:
+- [Fast CI + required quality gate 40508204881](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40508204881).
+- [Real isolated PostgreSQL Adjust/Waste + Purchasing receipt/return bridge 40508204806](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40508204806).
+- [Six-tab rendered Chromium/mobile acceptance 40508204945](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40508204945).
+- [Orders isolated PostgreSQL/Chromium/builds 40508204802](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40508204802).
+- [P0 Business Day PostgreSQL 40508204898](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40508204898).
+- [Full monorepo/Chromium + required quality gate 40508204930](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40508204930), including Admin, Menu, auth/branch+PIN, security, Windows, architecture, quality **ALL SUCCESS**.
+
+**I3 accepted engineering scope:** exact signed 1-micro unit entry and BigInt formatted display, mobile Adjust/Waste with authoritative available stock and scrollable accessible controls, Pending Approval not optimistic posting, retained command ID across retries, append-only one-ledger-event adjustments/waste, changed payload + actor/cross-business/cross-type replay denial, negative stock safeguards, real concurrent-postgres idempotency, and Purchasing-owned `20261025180000_purchasing_command_payload_replay_fence.sql` validated with actual `receive_purchase_order_v1` / `return_purchase_order_v1`, stock balance and weighted cost in disposable PostgreSQL. An initially added duplicate Purchasing RPC migration was deleted; Purchasing's approved authority and SQL remain untouched. Owner UAT/pixel-perfect/production rollout **NOT** accepted.
+
+**Sequential decision:** I3 completed at accepted immutable SHA; **I4 exclusively ACTIVE** (after-shift stocktake begin/save/recover/post, transfer send/receive/cancel and master-bound destinations, reorder, variance, responsive actions, all security and real PostgreSQL tests). Purchasing, CRM, Staff, Finance and Reports implementation locked, preserving valid existing changes. PR #165 remains Draft; no merge, deployment, production migrations or live data mutation. This acceptance note is a later documentation-only HEAD, not a substitute for exact-source testing.
+
+---
+
 ## 2026-10-27 Inventory I2 PRE-MERGE ENGINEERING PASS — I3 exclusively unlocked
 
 **Acceptance on exact prior branch HEAD `0e131ed599e2032dea3b6cffa716a49d277216b4`.** All five workflow groups completed SUCCESS (not merely started):
