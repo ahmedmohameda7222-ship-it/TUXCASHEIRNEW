@@ -347,7 +347,10 @@ test('I1 mobile item detail replaces the directory header with a visible single-
   await page.setViewportSize({ width: 390, height: 844 });
   await mockInventory(page);
   await page.goto('/inventory');
-  await page.getByRole('region', { name: 'Inventory items' }).getByRole('button', { name: /Beef/ }).click();
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
 
   const inspector = page.getByLabel('Inventory item detail');
   const itemHeading = inspector.getByRole('heading', { name: 'Beef' });
