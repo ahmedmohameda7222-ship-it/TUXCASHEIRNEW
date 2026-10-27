@@ -1,3 +1,21 @@
+## 2026-10-27 Purchasing P4 PRE-MERGE ENGINEERING PASS — Purchasing P1–P4 closed; CRM C1 exclusively unlocked
+
+**Immutable accepted code HEAD:** `570aa2a1be3ba65dce33057522f655024042ecf5` on open Draft PR #165, with no merge/deploy/Production SQL. All eight exact-head workflows completed **SUCCESS**:
+- [TUX V2 CI 40559333669](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40559333669) — related unit/integration tests (234/234), TypeScript, Prettier, lint, security, database migrations and required quality gate green.
+- [Purchasing isolated PostgreSQL, security and rendered Chromium 40559333723](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40559333723) — all three jobs green, including 38/38 Purchasing Playwright tests at mobile 360/390 and desktop.
+- [Purchasing integrated mainline 40559333713](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40559333713) — combined real PG, full source/build and Admin/Operations/Menu Chromium green.
+- [Full regression 40559333569](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40559333569) — Admin, Menu, Windows, architecture, edge security, Branch/PIN and required gate green.
+- [Eight-tab rendered 40559333597](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40559333597) — green.
+- [Orders isolated PG 40559333974](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40559333974) — green.
+- [Inventory I3 isolated PG 40559333574](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40559333574) — green.
+- [P0 Business Day PG 40559333632](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40559333632) — green.
+
+**P4 RED→GREEN evidence:** Newly added 360/390px Playwright regressions exposed mobile inspector stale selection on filter (RED 40553858401), duplicate supplier error not inside sheet (RED), and duplicate global/local aria-alert after initial fix (RED 40554644928); fixed supplier selection reset, scoped errors with one accessible active alert and retention of editable supplier draft. Added mock-BFF-backed active/archived supplier restore → edit → PO-eligibility mobile E2E with correct supplier version fences, and unit/server permission checks proving `purchasing.manage` plus Owner/Admin and concrete shop required to archive/restore. New `SuppliersPage.lifecycle.test.tsx` pending regression failed RED 40557995893 (233 green, 1 failed), then Add supplier button disabled during lifecycle mutation (GREEN final CI). Closed independent `scripts/test-admin-ui-css-ownership.mjs` regression that caught Inventory-owned CSS class usage; supplier notices now exclusively use `admin-purchasing-error-note` and own `suppliers.css` (GREEN final Full Regression).
+
+**Ruling:** Purchasing P1–P4 closed **pre-merge engineering acceptance**. The Owner-reserved hosted authenticated UAT is not performed, and approval does not imply pixel-perfect production QA. Existing Orders/Catalog/Inventory changes preserved; no unauthorized SQL, deployment, merge, or work outside the sequential tab. **CRM C1 exclusively ACTIVE**; C2+ and Staff/Finance/Reports LOCKED.
+
+---
+
 ## 2026-10-27 Purchasing P3 PRE-MERGE ENGINEERING PASS — P4 exclusively unlocked
 
 **Accepted immutable code HEAD:** `cc43f69ad982eebd9d0f85e3d42ee9ef07a96f3b` — PR #165 remains **Draft/open**, no merge/deploy/Production SQL. All eight exact-code-head workflow groups completed **SUCCESS**:
