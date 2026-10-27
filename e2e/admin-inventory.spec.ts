@@ -838,7 +838,7 @@ test('I3 mobile adjustment pending approval does not post stock or change shown 
     .click();
   await page.getByRole('button', { name: 'Adjust stock' }).click();
 
-  await expect(page.getByRole('dialog', { name: 'Adjust Beef' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Adjust stock' })).toBeVisible();
   await page.screenshot({ path: 'test-results/inventory-i3-adjust-mobile-390.png' });
   await page.getByLabel('Quantity change').fill('0.25');
   await page.getByLabel('Adjustment reason').selectOption(adjustmentReasonId);
@@ -894,7 +894,7 @@ test('I3 390px adjustment and waste dialogs keep labeled selects and action foot
     .click();
 
   for (const [openLabel, title, selectLabel, submitLabel, filename] of [
-    ['Adjust stock', 'Adjust Beef', 'Adjustment reason', 'Post adjustment', 'adjust'],
+    ['Adjust stock', 'Adjust stock', 'Adjustment reason', 'Post adjustment', 'adjust'],
     ['Record waste', 'Record waste for Beef', 'Waste reason', 'Post waste', 'waste'],
   ] as const) {
     await page.getByRole('button', { name: openLabel }).click();
