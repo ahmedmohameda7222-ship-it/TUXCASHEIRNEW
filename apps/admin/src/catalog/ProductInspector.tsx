@@ -95,11 +95,7 @@ export function ProductInspector({
           )}
         </div>
         {resumeError ? (
-          <button
-            className="admin-secondary-button"
-            type="button"
-            onClick={onRetryResume}
-          >
+          <button className="admin-secondary-button" type="button" onClick={onRetryResume}>
             Retry saved draft
           </button>
         ) : null}
