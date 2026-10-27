@@ -67,36 +67,26 @@ export function CustomerDirectory({
   const [loyalty, setLoyalty] = useState<LoyaltyFilter>('all');
   const [sort, setSort] = useState<DirectorySort>('name');
   const [page, setPage] = useState(0);
-  const segments = useMemo(
-    () =>
-      [...new Set(customers.flatMap((customer) => customer.segments))].sort((a, b) =>
-        a.localeCompare(b),
-      ),
-    [customers],
-  );
-  const filtered = useMemo(
-    () =>
-      customers
-        .filter(
-          (customer) =>
-            (segment === 'all' || customer.segments.includes(segment)) &&
-            (loyalty === 'all' ||
-              (loyalty === 'points'
-                ? customer.loyaltyBalance > 0
-                : customer.loyaltyBalance <= 0)),
-        )
-        .sort((a, b) => {
-          if (sort === 'orders')
-            return b.orderCount - a.orderCount || customerName(a).localeCompare(customerName(b));
-          if (sort === 'recent')
-            return (
-              (b.lastOrderAt ?? '').localeCompare(a.lastOrderAt ?? '') ||
-              customerName(a).localeCompare(customerName(b))
-            );
-          return customerName(a).localeCompare(customerName(b)) || a.id.localeCompare(b.id);
-        }),
-    [customers, segment, loyalty, sort],
-  );
+  const segments = useMemo(() => {
+    const names = customers.flatMap((customer) => customer.segments);
+    return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+  }, [customers]);
+  const filtered = useMemo(() => {
+    const matches = customers.filter((customer) => {
+      if (segment !== 'all' && !customer.segments.includes(segment)) return false;
+      if (loyalty === 'points' && customer.loyaltyBalance <= 0) return false;
+      if (loyalty === 'none' && customer.loyaltyBalance > 0) return false;
+      return true;
+    });
+    return matches.sort((a, b) => {
+      const nameDifference = customerName(a).localeCompare(customerName(b));
+      if (sort === 'orders') return b.orderCount - a.orderCount || nameDifference;
+      if (sort === 'recent') {
+        return (b.lastOrderAt ?? '').localeCompare(a.lastOrderAt ?? '') || nameDifference;
+      }
+      return nameDifference || a.id.localeCompare(b.id);
+    });
+  }, [customers, segment, loyalty, sort]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages - 1);
   const start = currentPage * PAGE_SIZE;
