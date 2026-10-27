@@ -109,6 +109,7 @@ async function mockCatalog(
     emptyCatalog?: boolean;
     permissions?: string[];
     withRecipe?: boolean;
+    persistedRecipeDraft?: boolean;
   } = {},
 ) {
   let publishVersion = 48;
@@ -131,6 +132,23 @@ async function mockCatalog(
   };
   let draftBundle = canonicalBundle(liveProduct, publishVersion, options.withRecipe);
   const commands: CatalogCommandBody[] = [];
+  if (options.persistedRecipeDraft) {
+    draftBundle = canonicalBundle(liveProduct, publishVersion, true);
+    draftBundle.snapshot.recipeLines = [
+      {
+        shopId,
+        productId,
+        inventoryItemId: '66666666-6666-4666-8666-666666666666',
+        quantityMicros: 250_000,
+      },
+      {
+        shopId,
+        productId,
+        inventoryItemId: '77777777-7777-4777-8777-777777777777',
+        quantityMicros: 500_000,
+      },
+    ];
+  }
 
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
@@ -219,7 +237,18 @@ async function mockCatalog(
                   }),
                 ),
               ],
-          drafts: [],
+          drafts: options.persistedRecipeDraft
+            ? [{
+                id: '55555555-5555-4555-8555-555555555555',
+                shopId,
+                title: 'Saved recipe',
+                status: 'DRAFT',
+                basePublishVersion: publishVersion,
+                draftRevision,
+                publishedVersion: null,
+                updatedAt: '2026-10-26T00:00:00.000Z',
+              }]
+            : [],
         }),
       });
       return;
@@ -228,6 +257,21 @@ async function mockCatalog(
     expect(request.headers()['x-tux-admin-csrf']).toBe(ownerSession.csrfToken);
     const body = request.postDataJSON() as CatalogCommandBody;
     commands.push(body);
+
+    if (body.type === 'draft.resume') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          draftId: '55555555-5555-4555-8555-555555555555',
+          draftRevision,
+          basePublishVersion: publishVersion,
+          bundleJson: draftBundle,
+        }),
+      });
+      return;
+    }
 
     if (body.type === 'draft.create') {
       draftRevision = 1;
@@ -631,6 +675,38 @@ test('C3 desktop Inventory usage exposes direct recipe rows in the product edito
   await expect(page.getByRole('heading', { name: 'Inventory usage' })).toBeInViewport();
   await page.getByRole('heading', { name: 'Inventory usage' }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'test-results/catalog-c3-inventory-usage-desktop-1440.png' });
+});
+
+test('C3 resumes persisted shop recipes before editing and preserves other draft ingredients', async ({
+  page,
+}) => {
+  const fixture = await mockCatalog(page, { withRecipe: true, persistedRecipeDraft: true });
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  const meat = page.getByRole('spinbutton', { name: 'Meat quantity in g' });
+  const cheese = page.getByRole('spinbutton', { name: 'Cheese quantity in slice' });
+  await expect(cheese).toHaveValue('0.5');
+  expect(fixture.commands.map(({ type }) => type)).toEqual(['draft.resume']);
+  await meat.fill('0.3');
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Draft saved — not published')).toBeVisible();
+  const saved = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
+  const snapshot = saved?.snapshot as {
+    recipeLines?: Array<{ inventoryItemId: string; quantityMicros: number }>;
+  };
+  expect(snapshot.recipeLines).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        inventoryItemId: '66666666-6666-4666-8666-666666666666',
+        quantityMicros: 300_000,
+      }),
+      expect.objectContaining({
+        inventoryItemId: '77777777-7777-4777-8777-777777777777',
+        quantityMicros: 500_000,
+      }),
+    ]),
+  );
+  expect(fixture.commands.map(({ type }) => type)).toEqual(['draft.resume', 'draft.save']);
 });
 
 test('C3 invalid recipe quantity cannot create a draft; decimal zero is an unlink sentinel', async ({
