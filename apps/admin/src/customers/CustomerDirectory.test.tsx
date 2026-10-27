@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import type { AdminCustomerSummary } from '@tux/admin-contracts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -61,14 +60,5 @@ describe('CRM1 authoritative customer directory', () => {
     expect(html).toContain('No matching customers');
     expect(html).toContain('0 loaded customers');
     expect(html).not.toContain('Mona Saleh');
-  });
-  it('temporary exact Prettier diagnostics', () => {
-    for (const [name, path] of [
-      ['TSX', 'apps/admin/src/customers/CustomerDirectory.tsx'],
-      ['CSS', 'apps/admin/src/customers/customers.css'],
-    ]) {
-      const output = execFileSync('npx', ['prettier', path], { encoding: 'utf8' });
-      console.log('CRM_FORMAT_CAPTURE_' + name + ':' + JSON.stringify(output));
-    }
   });
 });
