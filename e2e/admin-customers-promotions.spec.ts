@@ -505,6 +505,53 @@ test('CRM3 mobile merge review preserves exact safe-integer customer spend', asy
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
+test('CRM3 one in-flight adjustment cannot submit twice via the active form', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  let posts = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/admin/customers**', async (route) => {
+    const request = route.request();
+    const command = request.method() === 'POST' ? request.postDataJSON() : null;
+    if (command?.type !== 'loyalty.adjust') {
+      await route.fallback();
+      return;
+    }
+    posts += 1;
+    await gate;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        ledgerEventId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        balance: 130,
+        replayed: posts > 1,
+      }),
+    });
+  });
+  await openCustomer(page);
+  await page.getByRole('tab', { name: 'Loyalty' }).click();
+  const loyalty = page.getByLabel('Customer loyalty');
+  await loyalty.getByLabel('Points delta').fill('10');
+  await loyalty.getByLabel('Reason').selectOption('55555555-5555-4555-8555-555555555555');
+  await loyalty.getByRole('button', { name: 'Adjust points' }).click();
+  await expect(loyalty.getByRole('button', { name: 'Saving…' })).toBeDisabled();
+  try {
+    await loyalty.locator('form').evaluate((form) => {
+      (form as HTMLFormElement).requestSubmit();
+    });
+    await page.waitForTimeout(200);
+    expect(posts).toBe(1);
+  } finally {
+    release();
+  }
+});
+
 test('exposes controlled merge, loyalty configuration and full promotion editor', async ({
   page,
 }) => {
