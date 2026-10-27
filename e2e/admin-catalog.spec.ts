@@ -1021,6 +1021,42 @@ test('C1 mobile landing exposes the first real product without scrolling past se
   await expect(page.getByLabel('Mobile new product category')).toBeVisible();
 });
 
+test('C4 changing clean selected products remounts the editor and never carries old photo or name', async ({
+  page,
+}) => {
+  await mockCatalog(page, { productCount: 2 });
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  await expect(page.locator('input[name="name"]')).toHaveValue('Classic Smash');
+  await page
+    .locator('[data-catalog-inspector]')
+    .getByRole('button', { name: 'Products' })
+    .click();
+  await page.getByRole('button', { name: /Catalog item 02/ }).click();
+  await expect(page.locator('input[name="name"]')).toHaveValue(
+    'Catalog item 02 · long product name',
+  );
+});
+
+test('C4 approved photo workflow precedes product details at 390 and 1440', async ({
+  page,
+}) => {
+  await mockCatalog(page);
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await page.goto('/catalog/products');
+    await page.getByRole('button', { name: /Classic Smash/ }).click();
+    const order = await page.locator('form.admin-catalog-editor').evaluate((form) => {
+      const photo = form.querySelector('#catalog-images-heading');
+      const details = form.querySelector('#catalog-general-heading');
+      if (!photo || !details) return false;
+      return Boolean(photo.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    expect(order).toBe(true);
+    await expect(page.getByRole('heading', { name: 'Product photo' })).toBeVisible();
+  }
+});
+
 test('C1 product browse uses authorized image preview for an existing imageKey', async ({
   page,
 }) => {
