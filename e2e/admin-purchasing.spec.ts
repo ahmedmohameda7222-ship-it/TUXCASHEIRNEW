@@ -687,7 +687,7 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   });
 }
 
-test('P4 mobile supplier filtering must not silently retarget archive actions', async ({ page }) => {
+test('P4 mobile filter clears supplier inspector before different archive', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const otherId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbd';
   const fixture = await mockPurchasing(page, {
@@ -730,17 +730,16 @@ test('P4 mobile supplier filtering must not silently retarget archive actions', 
   const confirm = page.getByRole('dialog', { name: 'Archive supplier?' });
   await expect(confirm).toContainText('Delta Produce');
   await confirm.getByRole('button', { name: 'Archive supplier' }).click();
-  await expect.poll(() => fixture.commands.filter((c) => c.type === 'supplier.archive').length).toBe(1);
-  expect(fixture.commands.find((c) => c.type === 'supplier.archive')).toMatchObject({
+  const archiveCommands = () => fixture.commands.filter((c) => c.type === 'supplier.archive');
+  await expect.poll(() => archiveCommands().length).toBe(1);
+  expect(archiveCommands()[0]).toMatchObject({
     supplierId: otherId,
     expectedVersion: 3,
   });
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
-test('P4 duplicate supplier error appears inside mobile form and preserves the entered draft', async ({
-  page,
-}) => {
+test('P4 duplicate supplier error stays inside 360px sheet', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   const fixture = await mockPurchasing(page, {
     failCommandType: 'supplier.create',
@@ -750,7 +749,9 @@ test('P4 duplicate supplier error appears inside mobile form and preserves the e
   const dialog = await openSupplierDialog(page);
   await dialog.getByRole('textbox', { name: 'Supplier name' }).fill('Prime Foods');
   await dialog.getByRole('button', { name: 'Add supplier' }).click();
-  await expect(dialog.getByRole('alert')).toContainText('A supplier with these details already exists.');
+  await expect(dialog.getByRole('alert')).toContainText(
+    'A supplier with these details already exists.',
+  );
   await expect(dialog.getByRole('textbox', { name: 'Supplier name' })).toHaveValue('Prime Foods');
   await expect(dialog).toBeVisible();
   expect(fixture.commands.filter((c) => c.type === 'supplier.create')).toHaveLength(1);
