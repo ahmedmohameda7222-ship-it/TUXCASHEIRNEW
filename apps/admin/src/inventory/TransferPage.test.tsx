@@ -128,15 +128,3 @@ describe('I4 transfer quantity precision', () => {
     expect(html).not.toContain('0 kg Beef');
   });
 });
-
-it('TEMP_PRETTIER_I4 diagnostics (remove before acceptance)', async () => {
-  const { readFileSync } = await import('node:fs');
-  const prettier = await import('prettier');
-  const filename = 'e2e/admin-inventory.spec.ts';
-  const source = readFileSync(filename, 'utf8');
-  const config = (await prettier.resolveConfig(filename)) ?? {};
-  const formatted = await prettier.format(source, { ...config, filepath: filename });
-  const start = formatted.indexOf("test('I4 clears accepted mobile transfer");
-  const end = formatted.indexOf("test('inventory can receive", start);
-  console.log('TEMP_PRETTIER_I4_RESULT\\n' + formatted.slice(start, end));
-});
