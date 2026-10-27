@@ -342,6 +342,73 @@ export function ProductEditor({
 
   return (
     <form className="admin-catalog-editor" onSubmit={(event) => void submit(event)}>
+      <section className="admin-catalog-editor__section admin-catalog-product-photo" aria-labelledby="catalog-images-heading">
+        <div className="admin-catalog-editor__section-heading">
+          <div>
+            <p className="admin-catalog-editor__eyebrow">Images</p>
+            <h2 id="catalog-images-heading">Product photo</h2>
+          </div>
+        </div>
+        <div className="admin-product-image-state" role="status">
+          <strong>{imageKey ? 'Image assigned' : 'No image assigned'}</strong>
+          <span>Image upload changes remain in Draft until saved and published.</span>
+          {uploadedImageUrl ? (
+            <img
+              src={uploadedImageUrl}
+              alt={`Selected image for ${product.name}`}
+              loading="lazy"
+              width="200"
+              height="140"
+            />
+          ) : null}
+        </div>
+        {onUploadImage ? (
+          <div className="admin-form-grid">
+            {imageRequiresSaveFirst ? (
+              <p className="admin-field__help" role="status">
+                Save this product draft first to enable image upload.
+              </p>
+            ) : null}
+            <label className="admin-field">
+              <span>Choose product image (PNG, JPEG, WebP, AVIF — maximum 2 MB)</span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/avif"
+                disabled={readOnly || imageRequiresSaveFirst}
+                onChange={(event) => {
+                  setSelectedImageFile(event.currentTarget.files?.[0] ?? null);
+                  setImageError(null);
+                }}
+              />
+            </label>
+            <button
+              className="admin-secondary-button"
+              type="button"
+              disabled={readOnly || imageRequiresSaveFirst || selectedImageFile === null}
+              onClick={() => void uploadSelectedImage()}
+            >
+              {imageUploading ? 'Uploading image…' : 'Upload image'}
+            </button>
+            {imageKey ? (
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={readOnly}
+                onClick={() => {
+                  setImageKey(null);
+                  setUploadedImageUrl(null);
+                  setSelectedImageFile(null);
+                  setImageError(null);
+                }}
+              >
+                Remove image from draft
+              </button>
+            ) : null}
+            {imageError ? <p role="alert">{imageError}</p> : null}
+          </div>
+        ) : null}
+      </section>
+
       <section className="admin-catalog-editor__section" aria-labelledby="catalog-general-heading">
         <div className="admin-catalog-editor__section-heading">
           <div>
@@ -416,6 +483,15 @@ export function ProductEditor({
             onChange={(event) => setSortOrder(event.currentTarget.value)}
           />
         </label>
+        <label className="admin-check-field">
+          <input
+            type="checkbox"
+            checked={bestSeller}
+            disabled={readOnly}
+            onChange={(event) => setBestSeller(event.currentTarget.checked)}
+          />
+          <span>Best seller</span>
+        </label>
       </section>
 
       <section className="admin-catalog-editor__section" aria-labelledby="catalog-pricing-heading">
@@ -477,82 +553,6 @@ export function ProductEditor({
         >
           {statusCopy}
         </button>
-      </section>
-
-      <section className="admin-catalog-editor__section" aria-labelledby="catalog-images-heading">
-        <div className="admin-catalog-editor__section-heading">
-          <div>
-            <p className="admin-catalog-editor__eyebrow">Images</p>
-            <h2 id="catalog-images-heading">Product image</h2>
-          </div>
-        </div>
-        <div className="admin-product-image-state" role="status">
-          <strong>{imageKey ? 'Image assigned' : 'No image assigned'}</strong>
-          <span>Image upload changes remain in Draft until saved and published.</span>
-          {uploadedImageUrl ? (
-            <img
-              src={uploadedImageUrl}
-              alt={`Selected image for ${product.name}`}
-              loading="lazy"
-              width="200"
-              height="140"
-            />
-          ) : null}
-        </div>
-        {onUploadImage ? (
-          <div className="admin-form-grid">
-            {imageRequiresSaveFirst ? (
-              <p className="admin-field__help" role="status">
-                Save this product draft first to enable image upload.
-              </p>
-            ) : null}
-            <label className="admin-field">
-              <span>Choose product image (PNG, JPEG, WebP, AVIF — maximum 2 MB)</span>
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/avif"
-                disabled={readOnly || imageRequiresSaveFirst}
-                onChange={(event) => {
-                  setSelectedImageFile(event.currentTarget.files?.[0] ?? null);
-                  setImageError(null);
-                }}
-              />
-            </label>
-            <button
-              className="admin-secondary-button"
-              type="button"
-              disabled={readOnly || imageRequiresSaveFirst || selectedImageFile === null}
-              onClick={() => void uploadSelectedImage()}
-            >
-              {imageUploading ? 'Uploading image…' : 'Upload image'}
-            </button>
-            {imageKey ? (
-              <button
-                className="admin-secondary-button"
-                type="button"
-                disabled={readOnly}
-                onClick={() => {
-                  setImageKey(null);
-                  setUploadedImageUrl(null);
-                  setSelectedImageFile(null);
-                  setImageError(null);
-                }}
-              >
-                Remove image from draft
-              </button>
-            ) : null}
-            {imageError ? <p role="alert">{imageError}</p> : null}
-          </div>
-        ) : null}
-        <label className="admin-check-field">
-          <input
-            type="checkbox"
-            checked={bestSeller}
-            disabled={readOnly}
-            onChange={(event) => setBestSeller(event.currentTarget.checked)}
-          />
-          <span>Best seller</span>
-        </label>
       </section>
 
       <section
