@@ -853,14 +853,16 @@ export function createSupabaseCatalogStore(client: AdminSupabaseClient): Catalog
             limit: '1',
           }),
         ),
-        client.select<Array<{
-          id: string;
-          shop_id: string;
-          name: string;
-          unit_label: string;
-          tracking_mode: string;
-          active: boolean;
-        }>>(
+        client.select<
+          Array<{
+            id: string;
+            shop_id: string;
+            name: string;
+            unit_label: string;
+            tracking_mode: string;
+            active: boolean;
+          }>
+        >(
           'inventory_items',
           new URLSearchParams({
             select: 'id,shop_id,name,unit_label,tracking_mode,active',
@@ -869,12 +871,14 @@ export function createSupabaseCatalogStore(client: AdminSupabaseClient): Catalog
             order: 'name.asc,id.asc',
           }),
         ),
-        client.select<Array<{
-          shop_id: string;
-          product_id: string;
-          inventory_item_id: string;
-          quantity_micros: number | string;
-        }>>(
+        client.select<
+          Array<{
+            shop_id: string;
+            product_id: string;
+            inventory_item_id: string;
+            quantity_micros: number | string;
+          }>
+        >(
           'recipe_lines',
           new URLSearchParams({
             select: 'shop_id,product_id,inventory_item_id,quantity_micros',
