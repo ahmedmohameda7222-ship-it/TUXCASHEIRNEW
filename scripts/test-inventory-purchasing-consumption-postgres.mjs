@@ -84,6 +84,11 @@ for (const name of [
     'Real Purchasing RPC ' + name);
 }
 
+// Execute the new additive replay remediation AFTER the original Purchasing
+// functions are installed; RED on original SQL, GREEN on the exact migration.
+command(['-f', 'supabase/migrations/20261027190000_inventory_purchasing_replay_payload_integrity.sql'],
+  'Apply I3 Purchasing replay integrity migration to disposable PostgreSQL');
+
 const business = '10000000-0000-4000-8000-000000000001';
 const shop = '20000000-0000-4000-8000-000000000001';
 const foreign = '20000000-0000-4000-8000-000000000003';
