@@ -121,7 +121,9 @@ export function InventoryDefinitionEditor({
           conversion.label.trim().toLocaleLowerCase('en'),
     );
     if (duplicate) {
-      setError('A purchase unit with this label already exists. Edit or restore the existing unit.');
+      setError(
+        'A purchase unit with this label already exists. Edit or restore the existing unit.',
+      );
       return;
     }
     setError(null);
