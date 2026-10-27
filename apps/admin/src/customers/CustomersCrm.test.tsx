@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import type {
   AdminCustomerDetail,
   AdminLoyaltyProgram,
@@ -304,6 +305,15 @@ describe('Plan 5 CRM and promotion controls', () => {
       'Can combine with other promotions?',
     ]) {
       expect(html).toContain(value);
+    }
+  });
+  it('temporary CRM3 exact Prettier diagnostics', () => {
+    for (const [label, path] of [
+      ['LOYALTY', 'apps/admin/src/customers/LoyaltyPanel.tsx'],
+      ['E2E', 'e2e/admin-customers-promotions.spec.ts'],
+    ] as const) {
+      const output = execFileSync('npx', ['prettier', path], { encoding: 'utf8' });
+      console.log('CRM3_FORMAT_CAPTURE_' + label + ':' + JSON.stringify(output));
     }
   });
 });
