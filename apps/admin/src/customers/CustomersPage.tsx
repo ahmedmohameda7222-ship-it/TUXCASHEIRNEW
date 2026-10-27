@@ -51,6 +51,7 @@ export function CustomersPage() {
   const section: CrmSection = location === '/customers/settings' ? 'settings' : 'customers';
   const selectedId = section === 'settings' ? null : detailIdFromPath(location, '/customers');
   const [query, setQuery] = useState('');
+  const [dismissedCustomerShop, setDismissedCustomerShop] = useState<string | null>(null);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [mergeSearch, setMergeSearch] = useState('');
   const [programDraft, setProgramDraft] = useState({ ...EMPTY_PROGRAM_DRAFT });
@@ -231,13 +232,14 @@ export function CustomersPage() {
       section !== 'customers' ||
       location !== '/customers' ||
       !customersQuery.isSuccess ||
+      dismissedCustomerShop === shopId ||
       window.innerWidth < 1100
     ) {
       return;
     }
     const first = customersQuery.data?.customers[0];
     if (first) navigate(detailPath('/customers', first.id), { replace: true });
-  }, [shopId, section, location, navigate, customersQuery.isSuccess, customersQuery.data]);
+  }, [shopId, section, location, navigate, customersQuery.isSuccess, customersQuery.data, dismissedCustomerShop]);
 
   if (!shopId) {
     return (
@@ -292,7 +294,10 @@ export function CustomersPage() {
                         setQuery(nextQuery);
                         if (selectedId !== null) navigate('/customers', { replace: true });
                       }}
-                      onSelect={(id) => navigate(detailPath('/customers', id))}
+                      onSelect={(id) => {
+                        setDismissedCustomerShop(null);
+                        navigate(detailPath('/customers', id));
+                      }}
                       loading={customersQuery.isLoading}
                       fetching={customersQuery.isFetching}
                       error={customersQuery.isError}
@@ -310,7 +315,13 @@ export function CustomersPage() {
                     ) : detail ? (
                       <>
                         <CustomerDetailPage
+                          key={detail.id}
                           customer={detail}
+                          canAdjustPoints={canManageLoyalty}
+                          onClose={() => {
+                            setDismissedCustomerShop(shopId);
+                            navigate('/customers', { replace: true });
+                          }}
                           loyalty={
                             <LoyaltyPanel
                               customer={detail}
