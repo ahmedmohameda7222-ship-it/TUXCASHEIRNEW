@@ -2,10 +2,9 @@ import type { AdminInventoryItem, AdminInventoryTransfer } from '@tux/admin-cont
 import { useMemo, useState } from 'react';
 
 import { parsePurchaseDecimalMicros } from '../purchasing/purchaseOrderDraft';
+import { formatInventoryQuantity } from './InventoryItemPage';
 
-function formatQuantity(micros: number, unitLabel: string): string {
-  return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(micros / 1_000_000)} ${unitLabel}`;
-}
+const formatQuantity = formatInventoryQuantity;
 
 type TransferDraftLine = { inventoryItemId: string; quantityMicros: number };
 
