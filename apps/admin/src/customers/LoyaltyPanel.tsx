@@ -5,6 +5,13 @@ import type {
 } from '@tux/admin-contracts';
 import { useState, type FormEvent } from 'react';
 
+function exactEgp(minor: number): string {
+  if (!Number.isSafeInteger(minor)) return 'Unavailable';
+  const cents = BigInt(minor);
+  const abs = cents < 0n ? -cents : cents;
+  return `${cents < 0n ? '-' : ''}${abs / 100n}.${String(abs % 100n).padStart(2, '0')}`;
+}
+
 export type LoyaltyAdjustmentInput = {
   pointsDelta: number;
   reasonCodeId: string;
@@ -75,7 +82,7 @@ export function LoyaltyPanel({
           </div>
           <div>
             <dt>Redemption value</dt>
-            <dd>1 point = EGP {(program.redemptionMinorPerPoint / 100).toFixed(2)}</dd>
+            <dd>1 point = EGP {exactEgp(program.redemptionMinorPerPoint)}</dd>
           </div>
           <div>
             <dt>Minimum redemption</dt>
