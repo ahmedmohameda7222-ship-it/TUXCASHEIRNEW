@@ -332,7 +332,7 @@ for (const viewport of [
   });
 }
 
-test('P1 desktop starts with first loaded PO selected and phone stays on list', async ({ page }) => {
+test('P1 desktop selects first PO while phone opens directory', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockPurchasing(page);
   await page.goto('/purchasing');
@@ -345,7 +345,8 @@ test('P1 desktop starts with first loaded PO selected and phone stays on list', 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/purchasing');
   await expect(page.getByRole('heading', { name: 'Purchase orders' })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+  expect(overflow).toBe(false);
 });
 
 test('P1 mobile finds a PO using its displayed fallback reference', async ({ page }) => {
