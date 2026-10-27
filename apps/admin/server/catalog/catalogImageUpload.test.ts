@@ -15,6 +15,11 @@ const png = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]);
 describe('trusted catalog image uploads', () => {
   it('accepts real PNG/WebP/JPEG signatures and rejects spoofed SVG and mismatched formats', () => {
     expect(validateCatalogImageBytes('image/png', png)).toBe('png');
+    const avif = new Uint8Array([
+      0, 0, 0, 12, 102, 116, 121, 112, 97, 118, 105, 102,
+    ]);
+    expect(validateCatalogImageBytes('image/avif', avif)).toBe('avif');
+    expect(() => validateCatalogImageBytes('image/avif', png)).toThrow(CatalogImageUploadError);
     expect(validateCatalogImageBytes('image/jpeg', Uint8Array.from([255, 216, 255, 0]))).toBe(
       'jpg',
     );
@@ -32,6 +37,7 @@ describe('trusted catalog image uploads', () => {
     expect(() => validateCatalogImageBytes('image/png', new Uint8Array(0))).toThrow(
       CatalogImageUploadError,
     );
+    expect(validateCatalogImageBytes('image/png', new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, ...new Uint8Array(2 * 1024 * 1024 - 8)]))).toBe('png');
     expect(() =>
       validateCatalogImageBytes('image/png', new Uint8Array(2 * 1024 * 1024 + 1)),
     ).toThrow(CatalogImageUploadError);
