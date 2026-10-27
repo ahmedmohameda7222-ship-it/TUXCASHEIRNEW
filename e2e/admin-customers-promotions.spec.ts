@@ -272,7 +272,13 @@ test('CRM1 approved mobile directory uses truthful loaded-only selectors and pro
   await expect(list.getByRole('combobox', { name: 'All loyalty (loaded results)' })).toBeVisible();
   await expect(list.getByRole('combobox', { name: 'Sort loaded customers' })).toBeVisible();
   await expect(list).toContainText('loaded');
-  await expect(list.getByRole('button', { name: /Mona/ })).toBeVisible();
+  const customerRow = list.getByRole('button', { name: /Mona/ });
+  await expect(customerRow).toBeVisible();
+  const initials = await customerRow.locator('.admin-customer-row__initials').boundingBox();
+  const name = await customerRow.locator('.admin-customer-row__name').boundingBox();
+  expect(initials).not.toBeNull();
+  expect(name).not.toBeNull();
+  expect(name!.x).toBeGreaterThan(initials!.x + initials!.width - 2);
   await expect(page.getByRole('complementary', { name: 'Customer detail' })).toBeHidden();
   await list.getByRole('button', { name: /Mona/ }).click();
   await expect(page).toHaveURL(new RegExp(`/customers/${customerId}$`));
