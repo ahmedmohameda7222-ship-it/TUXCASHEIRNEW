@@ -62,7 +62,7 @@ export function InventoryDefinitionEditor({
     setThreshold(
       item?.lowStockThresholdMicros === null || item?.lowStockThresholdMicros === undefined
         ? ''
-        : String(item.lowStockThresholdMicros / 1_000_000),
+        : formatPurchaseMicros(item.lowStockThresholdMicros),
     );
     setConversion(null);
     setError(null);
