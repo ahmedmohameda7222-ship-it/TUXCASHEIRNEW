@@ -1287,6 +1287,92 @@
   }
 }
 
+/* Approved C3 editor heading remains on screen while navigating dense recipes. */
+.admin-catalog-layout.is-editing .admin-catalog-inspector__header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 64px;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--tux-surface-panel);
+}
+
+.admin-catalog-inspector__header > strong {
+  color: var(--tux-text-primary);
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+.admin-catalog-inspector__close {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 36px;
+  width: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.admin-catalog-inspector__preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--tux-border-subtle);
+}
+
+.admin-catalog-inspector__preview > .admin-catalog-back {
+  grid-column: 1 / -1;
+}
+
+.admin-catalog-inspector__summary {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.admin-catalog-inspector__summary > strong {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+
+.admin-catalog-inspector__summary > span:not(.admin-status-pill) {
+  color: var(--tux-text-secondary);
+}
+
+.admin-catalog-inspector__summary > .admin-status-pill {
+  justify-self: start;
+}
+
+.admin-catalog-inspector__jump,
+.admin-catalog-inspector__publish {
+  min-width: 0;
+  min-height: 36px;
+  font-size: 11px;
+}
+
+#catalog-inventory-usage-heading {
+  scroll-margin-top: 90px;
+}
+
+@media (max-width: 767px) {
+  .admin-catalog-layout.is-editing .admin-catalog-inspector__header {
+    padding: 13px 16px;
+  }
+  .admin-catalog-inspector__preview {
+    padding: 12px 16px;
+  }
+}
+
 /* C3: direct, always-visible canonical recipe quantities, not a separate picker. */
 .admin-catalog-inventory-usage {
   gap: 12px;
