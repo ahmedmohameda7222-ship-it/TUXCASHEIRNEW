@@ -136,7 +136,9 @@ export function CustomerDetailPage({
                       <div>
                         <dt>Earn rate</dt>
                         <dd>
-                          {program ? `${program.earnPointsPer100Minor} points / EGP 1` : 'Not configured'}
+                          {program
+                            ? `${program.earnPointsPer100Minor} points / EGP 1`
+                            : 'Not configured'}
                         </dd>
                       </div>
                       <div>
