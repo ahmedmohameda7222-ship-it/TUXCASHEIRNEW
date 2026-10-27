@@ -258,7 +258,6 @@
   overflow-wrap: anywhere;
 }
 
-
 /* CRM1: approved compact customer directory. All labels reflect scoped server facts;
    local filters, sorting and pagination are intentionally limited to loaded results. */
 .admin-customers-master-detail {
