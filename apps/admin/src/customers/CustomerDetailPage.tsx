@@ -93,7 +93,7 @@ export function CustomerDetailPage({
             content: (
               <>
                 <dl className="admin-customer-detail__metrics">
-                  <div>
+                  <div aria-label={`Total orders: ${customer.orderCount} orders`}>
                     <dt>Total orders</dt>
                     <dd>{customer.orderCount}</dd>
                   </div>
