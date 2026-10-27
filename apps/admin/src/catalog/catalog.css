@@ -1332,7 +1332,8 @@
   flex: 0 0 auto;
 }
 
-.admin-catalog-inventory-usage__row[data-inventory-used='true'] .admin-catalog-inventory-usage__dot {
+.admin-catalog-inventory-usage__row[data-inventory-used='true']
+  .admin-catalog-inventory-usage__dot {
   background: #1a8b59;
 }
 
