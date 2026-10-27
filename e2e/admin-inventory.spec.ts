@@ -1010,9 +1010,9 @@ test('I4 clears accepted mobile transfer draft to block repeat sends', async ({ 
   expect(commands[0]).toMatchObject({ type: 'transfer.send' });
   await expect(page.getByRole('button', { name: 'Confirm send' })).toHaveCount(0);
   await expect(page.getByText('Draft items (0)')).toBeVisible();
-  expect(
-    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-  ).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
 });
 
 test('inventory can receive a sent inter-shop transfer without using purchasing receive', async ({
