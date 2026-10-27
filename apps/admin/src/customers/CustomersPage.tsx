@@ -21,7 +21,7 @@ import { createRetainedCommandIds } from '../lib/retainedCommandIds';
 import { PromotionsPage } from '../promotions/PromotionsPage';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { CustomerDirectory } from './CustomerDirectory';
-import { CustomerDetailPage } from './CustomerDetailPage';
+import { CustomerActivityPanel, CustomerDetailPage } from './CustomerDetailPage';
 import { CustomerMergeDialog } from './CustomerMergeDialog';
 import { requireSuccessfulCrmMutation } from './crmMutationGuard';
 import { LoyaltyPanel, type LoyaltyAdjustmentInput } from './LoyaltyPanel';
@@ -362,6 +362,11 @@ export function CustomersPage() {
                     />
                   }
                 />
+                {selectedId && detail ? (
+                  <div className="admin-customers-activity-row">
+                    <CustomerActivityPanel customer={detail} />
+                  </div>
+                ) : null}
               </>
             ),
           },
