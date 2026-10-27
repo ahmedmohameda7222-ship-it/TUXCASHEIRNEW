@@ -84,7 +84,7 @@ export function SuppliersPage({
   return (
     <section aria-labelledby="purchasing-suppliers-heading">
       {supplierError && !open && archiveTarget === null ? (
-        <p className="admin-inventory-note" role="alert">
+        <p className="admin-purchasing-error-note" role="alert">
           {supplierError}
         </p>
       ) : null}
@@ -347,7 +347,7 @@ export function SuppliersPage({
           orders.
         </p>
         {supplierError ? (
-          <p className="admin-inventory-note" role="alert">
+          <p className="admin-purchasing-error-note" role="alert">
             {supplierError}
           </p>
         ) : null}
@@ -403,7 +403,7 @@ export function SuppliersPage({
             }}
           >
             {supplierError ? (
-              <p className="admin-inventory-note" role="alert">
+              <p className="admin-purchasing-error-note" role="alert">
                 {supplierError}
               </p>
             ) : null}
