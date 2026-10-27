@@ -1054,6 +1054,7 @@ test('C4 approved photo workflow precedes product details at 390 and 1440', asyn
     });
     expect(order).toBe(true);
     await expect(page.getByRole('heading', { name: 'Product photo' })).toBeVisible();
+    await page.screenshot({ path: `test-results/catalog-c4-editor-photo-${width}.png` });
   }
 });
 
@@ -1120,6 +1121,18 @@ test('C4 authenticated image upload changes only versioned draft product imageKe
     products: [expect.objectContaining({ id: productId, imageKey: key })],
   });
   expect(fixture.commands.map(({ type }) => type)).toEqual(['draft.create', 'draft.save']);
+  await page.getByRole('button', { name: 'Remove image from draft' }).click();
+  expect(fixture.commands).toHaveLength(2);
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  const removal = fixture.commands.at(-1)?.changes?.[0]?.bundleJson?.snapshot;
+  expect(removal).toMatchObject({
+    products: [expect.objectContaining({ id: productId, imageKey: null })],
+  });
+  expect(fixture.commands.map(({ type }) => type)).toEqual([
+    'draft.create',
+    'draft.save',
+    'draft.save',
+  ]);
 });
 
 test('C4 invalid and unavailable image uploads show local errors without draft writes', async ({
