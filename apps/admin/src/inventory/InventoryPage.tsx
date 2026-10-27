@@ -169,14 +169,14 @@ export function InventoryPage() {
       definitionOpen ||
       location !== '/inventory' ||
       selectedItemId !== null ||
-      items.length === 0 ||
+      display.rows.length === 0 ||
       window.innerWidth <= 1150
     ) {
       return;
     }
-    const firstItem = items[0];
+    const firstItem = display.rows[0];
     if (firstItem) navigate(detailPath('/inventory', firstItem.id), { replace: true });
-  }, [definitionOpen, items, location, mode, navigate, selectedItemId]);
+  }, [definitionOpen, display.rows, location, mode, navigate, selectedItemId]);
 
   const stocktakeItems = useMemo(() => items.filter((item) => item.active), [items]);
 
