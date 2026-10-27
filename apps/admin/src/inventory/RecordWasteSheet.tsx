@@ -40,6 +40,36 @@ export function RecordWasteSheet({
       onOpenChange={(open) => {
         if (!open && !pending) onCancel();
       }}
+      footer={
+        <>
+          <button
+            className="admin-primary-button"
+            type="button"
+            disabled={
+              pending || micros === null || reasonCodeId.length === 0 || (override && !note.trim())
+            }
+            onClick={() => {
+              if (micros === null) return;
+              onSubmit({
+                quantityMicros: micros,
+                reasonCodeId,
+                note: note.trim() || null,
+                emergencyNegativeOverride: override,
+              });
+            }}
+          >
+            Post waste
+          </button>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={pending}
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+        </>
+      }
     >
       <label className="admin-field">
         <span>Waste quantity ({item.unitLabel})</span>
@@ -79,32 +109,6 @@ export function RecordWasteSheet({
           <span>Allow stock to go below zero</span>
         </label>
       ) : null}
-      <button
-        className="admin-primary-button"
-        type="button"
-        disabled={
-          pending || micros === null || reasonCodeId.length === 0 || (override && !note.trim())
-        }
-        onClick={() => {
-          if (micros === null) return;
-          onSubmit({
-            quantityMicros: micros,
-            reasonCodeId,
-            note: note.trim() || null,
-            emergencyNegativeOverride: override,
-          });
-        }}
-      >
-        Post waste
-      </button>
-      <button
-        className="admin-secondary-button"
-        type="button"
-        disabled={pending}
-        onClick={onCancel}
-      >
-        Cancel
-      </button>
     </AdminDialog>
   );
 }
