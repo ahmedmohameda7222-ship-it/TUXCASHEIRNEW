@@ -208,12 +208,8 @@ export function CustomerDirectory({
               <span className="admin-customer-row__spend">
                 {moneyFromMinor(customer.lifetimeSpendMinor)}
               </span>
-              <span className="admin-customer-row__loyalty">
-                {customer.loyaltyBalance} pts
-              </span>
-              <span className="admin-customer-row__segment">
-                {customer.segments[0] ?? '—'}
-              </span>
+              <span className="admin-customer-row__loyalty">{customer.loyaltyBalance} pts</span>
+              <span className="admin-customer-row__segment">{customer.segments[0] ?? '—'}</span>
               <span className="admin-customer-row__last">{dateText(customer.lastOrderAt)}</span>
             </button>
           ))
