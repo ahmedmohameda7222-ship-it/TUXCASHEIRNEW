@@ -41,6 +41,7 @@ async function mockPurchasing(
     failureCodesByCommand?: Readonly<Record<string, string>>;
     supplierCreateResponseLossOnce?: boolean;
     noReference?: boolean;
+    expectedCostMinor?: number;
   } = {},
 ) {
   const commands: Command[] = [];
@@ -144,7 +145,7 @@ async function mockPurchasing(
                   remainingBaseMicros:
                     10_000_000 -
                     (receivedPurchaseUnitsMicros * baseMicrosPerPurchaseUnit) / 1_000_000,
-                  expectedPurchaseUnitCostMinor: 24000,
+                  expectedPurchaseUnitCostMinor: options.expectedCostMinor ?? 24000,
                   expectedUnitCostMinor: 12000,
                 },
               ],
@@ -365,6 +366,18 @@ test('P1 mobile finds a PO using its displayed fallback reference', async ({ pag
   await expect(empty).toHaveCount(0);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
   expect(overflow).toBe(false);
+});
+
+test('P2 mobile item cost retains every persisted safe-integer EGP minor unit', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockPurchasing(page, { expectedCostMinor: Number.MAX_SAFE_INTEGER - 1 });
+  await page.goto('/purchasing');
+  await selectPurchaseOrder(page);
+  await page.getByRole('tab', { name: 'Items', exact: true }).click();
+  await expect(page.getByText('90071992547409.90 EGP')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
 test('purchasing renders suppliers and can order a draft PO through the trusted BFF', async ({
