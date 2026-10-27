@@ -332,6 +332,22 @@ for (const viewport of [
   });
 }
 
+test('P1 desktop starts with first loaded PO selected and phone stays on list', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockPurchasing(page);
+  await page.goto('/purchasing');
+
+  const detail = page.getByRole('region', { name: 'Purchase order detail' });
+  await expect(detail).toBeVisible();
+  await expect(detail).toContainText('PO-100');
+  await expect(page.locator('.admin-purchasing-list-row.is-selected')).toHaveCount(1);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/purchasing');
+  await expect(page.getByRole('heading', { name: 'Purchase orders' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
 test('P1 mobile finds a PO using its displayed fallback reference', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockPurchasing(page, { noReference: true });
