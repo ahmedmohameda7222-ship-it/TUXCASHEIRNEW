@@ -699,6 +699,31 @@ test('inventory clears an older mutation error after a later action succeeds', a
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
+test('I4 mobile replenishment rejects sub-micro policy values instead of silently rounding', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page);
+  await page.goto('/inventory');
+  await page.getByText('More actions', { exact: true }).click();
+  await page.getByRole('button', { name: 'Reorder suggestions' }).click();
+  await page.getByRole('button', { name: 'Edit policy for Beef' }).click();
+
+  await page.getByLabel('Par level (kg)').fill('0.0000004');
+  await page.getByRole('button', { name: 'Save policy' }).click();
+  await expect(page.getByRole('alert')).toContainText('valid non-negative quantities');
+  expect(commands).toHaveLength(0);
+
+  await page.getByLabel('Par level (kg)').fill('0.000001');
+  await page.getByRole('button', { name: 'Save policy' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'replenishment.update',
+    inventoryItemId: itemId,
+    parLevelMicros: 1,
+  });
+});
+
 test('replenishment save submits the workspace version the admin actually edited', async ({
   page,
 }) => {
