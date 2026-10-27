@@ -1028,19 +1028,14 @@ test('C4 changing clean selected products remounts the editor and never carries 
   await page.goto('/catalog/products');
   await page.getByRole('button', { name: /Classic Smash/ }).click();
   await expect(page.locator('input[name="name"]')).toHaveValue('Classic Smash');
-  await page
-    .locator('[data-catalog-inspector]')
-    .getByRole('button', { name: 'Products' })
-    .click();
+  await page.locator('[data-catalog-inspector]').getByRole('button', { name: 'Products' }).click();
   await page.getByRole('button', { name: /Catalog item 02/ }).click();
   await expect(page.locator('input[name="name"]')).toHaveValue(
     'Catalog item 02 · long product name',
   );
 });
 
-test('C4 approved photo workflow precedes product details at 390 and 1440', async ({
-  page,
-}) => {
+test('C4 approved photo workflow precedes product details at 390 and 1440', async ({ page }) => {
   await mockCatalog(page);
   for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
