@@ -29,7 +29,10 @@ export function TransferPage({
   receiving: boolean;
   cancelling: boolean;
   onBack(): void;
-  onSend(input: { destinationShopId: string; lines: readonly TransferDraftLine[] }, onSent: () => void): void;
+  onSend(
+    input: { destinationShopId: string; lines: readonly TransferDraftLine[] },
+    onSent: () => void,
+  ): void;
   onReceive(transferId: string): void;
   onCancelTransfer(transferId: string): void;
 }) {
