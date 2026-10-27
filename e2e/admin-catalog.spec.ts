@@ -559,6 +559,10 @@ test('C3 direct 390px Inventory usage edits preserve focus and persist recipe on
   await expect(meat).toHaveValue('0.25');
   await expect(cheese).toHaveValue('0');
   await expect(page.getByText('1 of 2 in use')).toBeVisible();
+  const mobileDrawer = await page.locator('[data-catalog-inspector]').boundingBox();
+  expect(mobileDrawer).not.toBeNull();
+  expect(mobileDrawer!.x).toBeLessThanOrEqual(1);
+  expect(mobileDrawer!.width).toBeGreaterThanOrEqual(386);
 
   await cheese.fill('1');
   await expect(cheese).toBeFocused();
@@ -595,6 +599,12 @@ test('C3 desktop Inventory usage exposes direct recipe rows in the product edito
   await page.getByRole('button', { name: /Classic Smash/ }).click();
   await expect(page.getByRole('spinbutton', { name: 'Meat quantity in g' })).toBeVisible();
   await expect(page.getByRole('spinbutton', { name: 'Cheese quantity in slice' })).toBeVisible();
+  const drawer = await page.locator('[data-catalog-inspector]').boundingBox();
+  expect(drawer).not.toBeNull();
+  expect(drawer!.x).toBeGreaterThanOrEqual(990);
+  expect(drawer!.width).toBeLessThanOrEqual(450);
+  expect(drawer!.height).toBeGreaterThanOrEqual(850);
+  await expect(page.locator('.admin-catalog-layout__list')).toBeVisible();
   await page.screenshot({ path: 'test-results/catalog-c3-inventory-usage-desktop-1440.png' });
 });
 
