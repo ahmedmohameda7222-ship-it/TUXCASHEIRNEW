@@ -48,4 +48,29 @@ describe('VarianceReport', () => {
     expect(html).toContain('36% food cost');
     expect(html).toContain('Beef');
   });
+
+  it('does not display a signed one-micro stock variance as zero', () => {
+    const html = renderToStaticMarkup(
+      <VarianceReport
+        periodLabel="Current period"
+        variances={[
+          {
+            inventoryItemId: 'item-micro',
+            itemName: 'Ingredient',
+            unitLabel: 'kg',
+            actualUsageMicros: 1,
+            theoreticalUsageMicros: 0,
+            varianceMicros: 1,
+            variancePercent: null,
+          },
+        ]}
+        marginAlerts={[]}
+        onBack={() => undefined}
+      />,
+    );
+
+    expect(html).toContain('0.000001 kg');
+    expect(html).toContain('+0.000001 kg');
+    expect(html).not.toContain('+0 kg');
+  });
 });
