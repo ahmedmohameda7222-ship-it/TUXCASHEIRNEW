@@ -51,6 +51,7 @@ async function mockInventory(
     includePurchaseConversion?: boolean;
     exactThresholdMicros?: number;
     includeSecondTrackedItem?: boolean;
+    allowStaleItemHistory?: boolean;
   } = {},
 ) {
   const commands: InventoryCommand[] = [];
@@ -89,6 +90,14 @@ async function mockInventory(
       }
       const requestedInventoryItemId = url.searchParams.get('inventoryItemId');
       if (requestedInventoryItemId !== null) {
+        if (options.allowStaleItemHistory && requestedInventoryItemId !== itemId) {
+          await route.fulfill({
+            status: 404,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: 'inventory_item_not_found' }),
+          });
+          return;
+        }
         if (requestedInventoryItemId !== itemId) {
           expect(options.includeAlphabeticalFirst).toBe(true);
           expect(requestedInventoryItemId).toBe(alphabeticalFirstItemId);
@@ -890,6 +899,95 @@ for (const viewport of premiumVisualViewports([{ name: 'desktop', width: 1440, h
     },
   );
 }
+
+test('I2 restores an archived definition through the trusted versioned command', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page, {
+    itemActive: false,
+    includePurchaseConversion: true,
+  });
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+  await page.getByRole('button', { name: 'Edit item' }).click();
+  await page.getByRole('button', { name: 'Restore inventory item' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'item.restore',
+    entityId: itemId,
+    expectedVersion: 7,
+    payload: {},
+  });
+});
+
+test('I2 creates exact micro conversion through trusted inventory definition command', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page);
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+  await page.getByRole('button', { name: 'Edit item' }).click();
+  const editor = page.getByRole('region', { name: 'Edit inventory item' });
+  await editor.getByRole('button', { name: 'Add purchase unit' }).click();
+  await editor.getByLabel('Purchase unit label').fill('box');
+  await editor.getByLabel('Base units per purchase unit').fill('12.000001');
+  await editor.getByRole('button', { name: 'Save purchase unit' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'conversion.create',
+    entityId: null,
+    expectedVersion: null,
+    payload: {
+      inventoryItemId: itemId,
+      purchaseUnitLabel: 'box',
+      baseMicrosPerPurchaseUnit: 12_000_001,
+    },
+  });
+});
+
+test('I2 recipe master controls stay hidden for Manager even with composite permissions', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page);
+  await page.route('**/api/admin/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...ownerSession,
+        principal: {
+          ...ownerSession.principal,
+          role: 'MANAGER',
+          permissions: [...ownerSession.principal.permissions, 'catalog.edit'],
+        },
+      }),
+    });
+  });
+  await page.goto('/inventory');
+  await page.getByText('More actions', { exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Manage recipe master bindings' })).toHaveCount(0);
+});
+
+test('I2 stale item detail link cannot expose a foreign inventory record or edit actions', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page, { allowStaleItemHistory: true });
+  await page.goto('/inventory/ffffffff-ffff-4fff-8fff-ffffffffffff');
+  const detail = page.getByLabel('Inventory item detail');
+  await expect(detail).toContainText('Inventory item unavailable');
+  await expect(detail.getByRole('button', { name: 'Edit item' })).toHaveCount(0);
+  await expect(detail.getByRole('button', { name: 'Adjust stock' })).toHaveCount(0);
+});
 
 test('I2 mobile master mapping clears incompatible preview after source-unit switch', async ({
   page,
