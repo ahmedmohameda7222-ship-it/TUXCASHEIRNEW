@@ -34,6 +34,7 @@ export type ProductEditorProps = {
   onRequestAdvanced?(): void | Promise<void>;
   onSaveDraft(draft: ProductEditorDraft): void | Promise<void>;
   onReviewPublish?: (() => void) | undefined;
+  onCancel?: (() => void) | undefined;
   onSetAvailability(soldOut: boolean): void | Promise<void>;
   onUploadImage?: ((file: File) => Promise<{ imageKey: string; publicUrl: string }>) | undefined;
   imageRequiresSaveFirst?: boolean;
@@ -90,6 +91,7 @@ export function ProductEditor({
   onRequestAdvanced,
   onSaveDraft,
   onReviewPublish,
+  onCancel,
   onSetAvailability,
   onUploadImage,
   imageRequiresSaveFirst = false,
@@ -730,11 +732,6 @@ export function ProductEditor({
         </div>
       ) : null}
 
-      <footer className="admin-catalog-editor__actions">
-        <button className="admin-primary-button" type="submit" disabled={readOnly}>
-          Save draft
-        </button>
-      </footer>
       <section className="admin-catalog-danger-zone" aria-label="Product danger zone">
         <div>
           <strong>Danger zone</strong>
@@ -774,6 +771,16 @@ export function ProductEditor({
           </div>
         )}
       </section>
+      <footer className="admin-catalog-editor__actions">
+        {onCancel ? (
+          <button className="admin-secondary-button" type="button" onClick={onCancel}>
+            Cancel
+          </button>
+        ) : null}
+        <button className="admin-primary-button" type="submit" disabled={readOnly}>
+          Save draft
+        </button>
+      </footer>
     </form>
   );
 }
