@@ -15,11 +15,11 @@ on:
 permissions:
   contents: read
 
-# Exact source ancestry is verified before execution. Avoid overlaying stale
-# Catalog, Orders or Inventory PR tips over the already-merged main branch.
+# Verify the merged Purchasing squash commit, not the unmerged PR tip.
+# Requiring the old PR tip rejects the legitimate mainline after squash merge.
 env:
   CATALOG_ORDERS_INVENTORY_MAIN_SHA: af4603c2571c700397f70018f0bdbf14681eaff7
-  PURCHASING_APPROVED_SOURCE_SHA: 9c3faf5e4fb7002acf47796353125c62ed555f19
+  PURCHASING_MERGED_MAIN_SHA: 99a56940503deaed656ab211e1309203dbff708d
   ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
 jobs:
@@ -37,14 +37,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for sha in "$CATALOG_ORDERS_INVENTORY_MAIN_SHA" "$PURCHASING_APPROVED_SOURCE_SHA"; do
+          for sha in "$CATALOG_ORDERS_INVENTORY_MAIN_SHA" "$PURCHASING_MERGED_MAIN_SHA"; do
             git cat-file -e "$sha^{commit}"
             git merge-base --is-ancestor "$sha" HEAD
           done
           test -z "$(git status --porcelain)"
           echo "Combined checkout: $(git rev-parse HEAD)"
           echo "Catalog + Orders + Inventory baseline: $CATALOG_ORDERS_INVENTORY_MAIN_SHA"
-          echo "Purchasing approved source: $PURCHASING_APPROVED_SOURCE_SHA"
+          echo "Purchasing merged main baseline: $PURCHASING_MERGED_MAIN_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -101,7 +101,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for sha in "$CATALOG_ORDERS_INVENTORY_MAIN_SHA" "$PURCHASING_APPROVED_SOURCE_SHA"; do
+          for sha in "$CATALOG_ORDERS_INVENTORY_MAIN_SHA" "$PURCHASING_MERGED_MAIN_SHA"; do
             git merge-base --is-ancestor "$sha" HEAD
           done
           node --input-type=module -e "
