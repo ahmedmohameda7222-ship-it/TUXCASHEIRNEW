@@ -1,5 +1,4 @@
-import type { ProductAdvancedModel } from './catalogAdvancedDraft';
-import { formatQuantityMicrosForInput } from './catalogAdvancedDraft';
+import { formatQuantityMicrosForInput, type ProductAdvancedModel } from './catalogAdvancedDraft';
 
 type ProductInventoryUsageProps = {
   inventoryItems: ProductAdvancedModel['inventoryItems'];
