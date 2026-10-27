@@ -1,3 +1,18 @@
+## 2026-10-27 Inventory I2 PRE-MERGE ENGINEERING PASS — I3 exclusively unlocked
+
+**Acceptance on exact prior branch HEAD `0e131ed599e2032dea3b6cffa716a49d277216b4`.** All five workflow groups completed SUCCESS (not merely started):
+- [Fast CI 40492376652](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40492376652)
+- [Six-tab rendered/mobile Chromium 40492376699](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40492376699)
+- [Orders isolated PostgreSQL, rendered and production builds 40492376639](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40492376639)
+- [P0 Business Day real PostgreSQL 40492376621](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40492376621) (RPC green, conditional irrelevant jobs legitimately skipped)
+- [Full monorepo/Chromium + quality gate 40492376657](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40492376657): ALL jobs green including Menu, Admin, quality, Branch/PIN, architecture, security and Windows.
+
+I2 acceptance scope: mobile Add/Edit focus and Close, item create/update/archive/restore, exact micros and zero thresholds, recipe-tracked/manual command payloads, conversion create/update with versioning, duplicate normalized labels denied before POST, stale direct item link read-only, master binding source-unit compatibility across shop-item switches, Owner/Admin composite authority and Manager denial, required shop-local BFF and business-wide master identity boundary. All source edits were confined to Inventory and its E2E. This is **source/CI pre-merge engineering acceptance** and deliberately NOT pixel-perfect or Owner-hosted/physical Production UAT.
+
+**I3 is exclusively ACTIVE**: signed quantity micros, reason codes, approvals, authoritative append-only/idempotent inventory ledger, replay/cross-shop denial, Purchasing consumption and real mobile sheets. I4 and later tabs remain LOCKED. PR #165 stays Draft/open; **no merge, deploy, Production SQL, or mock-data injection**. Source HEAD on which the five CI groups passed is immutable; this ledger-only commit is a later HEAD and does not retroactively change those test results.
+
+---
+
 ## 2026-10-27 Inventory I2 continuation — mobile definitions + master integrity, final monorepo gate pending
 
 **Source HEAD for evidence: `035c756a33945e5f17ce7f7def54b08bc7056ac4` (PR #165, Draft). I1 already engineering-accepted. I2 alone is ACTIVE and is NOT yet engineering-accepted; I3/I4 and all later tabs LOCKED.** Owner-authorized hosted / physical acceptance remains deferred until all eight tabs, subsequent separately authorized squash merge, and final testing. No merge, deployment, Production SQL or seeding performed.
