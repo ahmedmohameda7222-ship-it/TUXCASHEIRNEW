@@ -11,6 +11,7 @@ import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const otherShopId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const itemId = '11111111-1111-4111-8111-111111111111';
+const alphabeticalFirstItemId = '88888888-8888-4888-8888-888888888888';
 const adjustmentReasonId = '22222222-2222-4222-8222-222222222222';
 const wasteReasonId = '33333333-3333-4333-8333-333333333333';
 const csrfToken = 'i'.repeat(64);
@@ -46,6 +47,7 @@ async function mockInventory(
     failureCode?: string;
     failureCodesByCommand?: Readonly<Record<string, string>>;
     itemActive?: boolean;
+    includeAlphabeticalFirst?: boolean;
   } = {},
 ) {
   const commands: InventoryCommand[] = [];
@@ -84,12 +86,15 @@ async function mockInventory(
       }
       const requestedInventoryItemId = url.searchParams.get('inventoryItemId');
       if (requestedInventoryItemId !== null) {
-        expect(requestedInventoryItemId).toBe(itemId);
+        if (requestedInventoryItemId !== itemId) {
+          expect(options.includeAlphabeticalFirst).toBe(true);
+          expect(requestedInventoryItemId).toBe(alphabeticalFirstItemId);
+        }
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            inventoryItemId: itemId,
+            inventoryItemId: requestedInventoryItemId,
             history: [
               {
                 id: '66666666-6666-4666-8666-666666666666',
@@ -126,6 +131,22 @@ async function mockInventory(
               weightedUnitCostMinor: 12000,
               history: [],
             },
+            ...(options.includeAlphabeticalFirst
+              ? [
+                  {
+                    id: alphabeticalFirstItemId,
+                    name: 'Apple',
+                    unitLabel: 'kg',
+                    trackingMode: 'RECIPE_TRACKED',
+                    active: true,
+                    onHandMicros: 2_000_000,
+                    reservedMicros: 0,
+                    availableMicros: 2_000_000,
+                    weightedUnitCostMinor: 12000,
+                    history: [],
+                  },
+                ]
+              : []),
           ],
           reasonCodes: [
             {
@@ -276,6 +297,17 @@ test('I1 desktop inventory defaults to the first authorized item and approved ac
     );
   expect(actions).toEqual(['Export CSV', 'Stock count', 'More actions', 'Add inventory item']);
   await page.screenshot({ path: 'test-results/inventory-i1-desktop-1440.png' });
+});
+
+test('I1 desktop selects the alphabetically first displayed item, not the API row order', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 940 });
+  await mockInventory(page, { includeAlphabeticalFirst: true });
+  await page.goto('/inventory');
+  await expect(page.locator('.admin-inventory-row').first()).toContainText('Apple');
+  await expect(page.locator('.admin-inventory-row.is-selected')).toContainText('Apple');
+  await expect(page.getByLabel('Inventory item detail')).toContainText('Apple');
 });
 
 test('I1 phone opens the inventory list without forcing an inspector route', async ({ page }) => {
