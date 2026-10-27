@@ -363,9 +363,7 @@ test('I1 mobile item detail replaces the directory header with a visible single-
   await page.screenshot({ path: 'test-results/inventory-i1-item-detail-mobile-390.png' });
 });
 
-test('I1 360px inspector keeps all three balance cards on one readable row', async ({
-  page,
-}) => {
+test('I1 360px inspector keeps all three balance cards on one readable row', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await mockInventory(page);
   await page.goto('/inventory');
