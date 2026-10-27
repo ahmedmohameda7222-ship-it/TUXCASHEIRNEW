@@ -374,7 +374,7 @@ export function ProductEditor({
           {onUploadImage ? (
             <div className="admin-form-grid">
               {imageRequiresSaveFirst ? (
-                <p className="admin-field__help" role="status">
+                <p className="admin-field__help admin-catalog-photo-save-first" role="status">
                   Save this product draft first to enable image upload.
                 </p>
               ) : null}
