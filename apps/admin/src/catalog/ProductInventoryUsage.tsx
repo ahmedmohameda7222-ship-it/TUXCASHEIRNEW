@@ -1,4 +1,8 @@
-import { formatQuantityMicrosForInput, type ProductAdvancedModel } from './catalogAdvancedDraft';
+import {
+  formatQuantityMicrosForInput,
+  parseQuantityToMicros,
+  type ProductAdvancedModel,
+} from './catalogAdvancedDraft';
 
 type ProductInventoryUsageProps = {
   inventoryItems: ProductAdvancedModel['inventoryItems'];
@@ -21,7 +25,15 @@ export function ProductInventoryUsage({
     const raw =
       quantities[item.inventoryItemId] ??
       (item.quantityMicros === null ? '0' : formatQuantityMicrosForInput(item.quantityMicros));
-    return { ...item, quantity: raw, used: Number(raw) > 0 };
+    let invalid = false;
+    if (raw.trim() !== '' && !/^0(?:\\.0{1,6})?$/.test(raw.trim())) {
+      try {
+        parseQuantityToMicros(raw);
+      } catch {
+        invalid = true;
+      }
+    }
+    return { ...item, quantity: raw, used: Number(raw) > 0, invalid };
   });
   const usedCount = rows.filter((row) => row.used).length;
 
@@ -66,8 +78,8 @@ export function ProductInventoryUsage({
               </span>
               <input
                 type="number"
-                min="0"
-                step="0.000001"
+                step="any"
+                aria-invalid={item.invalid ? true : undefined}
                 inputMode="decimal"
                 value={item.quantity}
                 disabled={readOnly || (!item.active && !item.used)}
