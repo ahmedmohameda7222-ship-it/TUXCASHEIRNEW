@@ -1,3 +1,27 @@
+## 2026-10-27 Inventory I1 PRE-MERGE ENGINEERING PASS — I2 exclusively unlocked
+
+**Decision at immutable production-source HEAD `78dc195073861d5976d8b239c31e902d0942a892`: I1 source/CI/rendered engineering PASS, not Owner-hosted/physical or exact pixel-perfect release acceptance.** Previous Orders O1–O4 and Catalog C1–C5 premerge source gates preserved. **I2 is the sole ACTIVE implementation task.** I3/I4, Purchasing, CRM, Staff, Finance and Reports LOCKED. The valid historical partial code in later tabs stays untouched. Existing PR #165 remains Draft/open; no merge, force-push, Production migration/deploy, data seeding or real Owner UAT.
+
+**Five exact-source-HEAD workflow groups all SUCCESS:**
+- [TUX V2 Fast CI 40477212521](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40477212521): changed-file Prettier/lint, related unit/integration, all impacted typechecks, security contracts, migration chain and required quality gate green.
+- [Orders real PostgreSQL/Chromium/build acceptance 40477212526](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40477212526): all three jobs green.
+- [P0 Business Day real PostgreSQL acceptance 40477212554](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40477212554): authoritative RPC green; unrelated conditional jobs deliberately skipped, never claimed run.
+- [Six-tab rendered Chromium 40477212487](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40477212487): passed all rendered regression including I1 default desktop alphabetical selected row, visible mobile first row, tablet/phone Back, and 390/360 selected inspector/balance arrangement.
+- [Full monorepo/Chromium 40477212577](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40477212577): Windows package, architecture, authenticated Branch/PIN, Menu, Admin, edge-security, full quality/browser and required gate all SUCCESS.
+
+**I1 regression and visual evidence:**
+- RED 390 list geometry on `5fd7f43`: first list row ended at **815.015625px**, while fixed mobile navigation exclusion began at **772px** in 390×844; screenshot visually concealed stock row. GREEN Inventory-scoped compact heading/actions/tiles/filter CSS at `5fbdb98`, proven at `78dc195` with the same first-row geometry assertion. No global shell changes.
+- RED 390 selected inspector on `5ef7cbb`: directory `Inventory` heading still visible above detail; GREEN scoped responsive detail route hides only the Inventory directory header and KPI strip when a mobile/tablet item is active, retaining fixed shop chrome and Back navigation.
+- RED 360 mobile balance cards at `37167fb`: three card top coordinates spread **184.75px** vertically. GREEN scoped `inventory-balance-grid` 3-column layout at `78dc195`: top-coordinate delta ≤2px, no body horizontal overflow. All contents still use original authoritative micros/unit and no fake stock meter.
+- Artifact `admin-eight-tabs-rendered-evidence` ID **12720309433**, run `40477212487`, includes `test-results/inventory-i1-mobile-390.png`, `inventory-i1-item-detail-mobile-390.png`, `inventory-i1-item-detail-mobile-360.png`, desktop `inventory-i1-desktop-1440.png` and responsive viewport captures. Actual React screenshots inspected against approved inventory 1440/390 list and 390 selected detail references. **Not pixel-perfect**: existing original light Admin shell differs from standalone sample in font/spacing; sample numbers differ from genuine fixtures; item-level action buttons remain above the tabbed facts, while prototype positions them at the bottom. Preserve functional actions, revisit their presentation in I2/I3/I4, and include Owner final mobile visual signoff post-merge; do not counterfeit counts/photos.
+- Previous I1 protections remain: real shop-scoped balances/KPIs, archived/unconfigured statuses, exact 6-decimal nonzero quantities, CSV safe labels, desktop sorted row selection, mobile single pane, existing backend history/permissions and off-shift stocktake eligibility; I1 does not change schema, stock or reservation ledgers. Temp formatter diagnostic **deleted**.
+
+**Ruling:** I1 source-engineering acceptance is justified by five exact-HEAD green groups and browser visual/functional evidence, while final authenticated Production and Owner physical acceptance remains expressly deferred until ALL eight tabs are complete and owner separately authorizes squash merge. This ledger-only commit does not retrospectively change evidence at the immutable source HEAD; recheck the branch HEAD for future work.
+
+**Next strict task I2:** Test-first item create/edit/archive/restore + conversion versioning, recipe-master uniqueness and used-in-recipe unit/tracking locks, shop/role denial and stale item editor, 360/390 mobile item editor layout against approved reference. No new I3/I4 work until I2 green.
+
+---
+
 ## 2026-10-27 Inventory I1 implementation continuation — selection + micro precision (engineering gate pending)
 
 **Exclusive task:** Inventory **I1**. Orders O1–O4 and Catalog C1–C5 prior pre-merge engineering gates remain unchanged. I2–I4, Purchasing, Customers/CRM, Staff, Finance, Reports LOCKED until I1 is independently accepted. Existing Draft PR #165 / branch `feat/admin-eight-tabs-approved-ui-20261025`. No merge, deployment, Production SQL, or Owner-hosted/physical UAT.
