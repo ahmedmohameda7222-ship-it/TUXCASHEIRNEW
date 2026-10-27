@@ -1008,9 +1008,8 @@ test('I4 mobile successful transfer send clears the approved draft to prevent re
   await page.getByRole('button', { name: 'Review transfer' }).click();
   await page.getByRole('button', { name: 'Confirm send' }).click();
 
-  await expect
-    .poll(() => commands.filter((command) => command.type === 'transfer.send').length)
-    .toBe(1);
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({ type: 'transfer.send' });
   await expect(page.getByRole('button', { name: 'Confirm send' })).toHaveCount(0);
   await expect(page.getByText('Draft items (0)')).toBeVisible();
   expect(
