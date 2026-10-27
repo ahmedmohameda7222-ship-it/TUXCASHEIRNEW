@@ -1,3 +1,13 @@
+## 2026-10-27 Catalog C4 pre-merge engineering acceptance / C5 opening
+
+**Verdict: Catalog C4 PRE-MERGE ENGINEERING PASS at immutable `c1448d06109cf4dcab2654599ac9fa41dc17e81f`; only Catalog C5 now ACTIVE.** PR #165 remains open/Draft; no squash merge, deployment or Production SQL. Owner hosted/physical UAT remains expressly deferred to the end after all eight tabs and separately authorized merge; this is not a claim of pixel-perfect production UI or Catalog C1–C5 completion.
+
+**Exact five independent C4 workflows SUCCESS:** Fast CI [40465489573](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40465489573), real P0 PostgreSQL [40465489579](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40465489579), isolated Orders PG/Browser [40465489568](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40465489568), cross-tab rendered acceptance [40465489667](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40465489667), full monorepo/Chromium [40465489605](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40465489605). Admin Chromium job: **319 passed, 19 skipped, 0 failed**. Browser C4 photo-first 390/1440 layout, authenticated file upload, versioned unpublished `imageKey` save/removal, cross-product state isolation and storage failures all green, with existing server signature, MIME, size and shop-scope enforcement tests. Rendered artifact `admin-rendered-e2e` ID 12714347223: `test-results/catalog-c4-editor-photo-1440.png`, `catalog-c4-editor-photo-390.png`, `catalog-c4-upload-mobile-390.png` inspected and compared with approved Catalog reference screenshots 03–06. Remaining native-file-input and overall shared-shell visual styling differences are recorded for final Owner product-wide UI review, not described as a pixel-perfect match.
+
+**C5 next:** independently test all versioned Review & Publish operations (including photo/image and recipe relation diffs), stale draft and approval gating, restore/scheduled semantics and downstream Menu + Operations publication boundary. C1–C4 source-level premerge gates accepted; C5 ACTIVE/NOT ACCEPTED. Inventory, Purchasing, Customers/CRM, Staff, Finance, Reports LOCKED; partial valid work preserved.
+
+---
+
 ## 2026-10-27 Catalog C3 — exact-HEAD premerge engineering acceptance
 
 **Decision:** PASS, Catalog **C3 premerge engineering gate** at immutable exact source HEAD `67072d4660583aced9cd35529d7bf98150e6774e`. This does **not** authorize production deploy, migrate, merge, or claim Owner-hosted physical UAT. **Next sequential task C4 ACTIVE only**; C5 + subsequent tabs LOCKED. C1 and C2 prior premerge gates and Orders O1–O4 preserved.
