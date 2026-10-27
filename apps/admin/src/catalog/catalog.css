@@ -1209,8 +1209,10 @@
 }
 
 /* C3 approved editor: keep the Product Directory visible behind a 440px right drawer. */
-.admin-catalog-layout.is-editing .admin-catalog-layout__list {
-  display: block;
+@media (min-width: 768px) {
+  .admin-catalog-layout.is-editing .admin-catalog-layout__list {
+    display: block;
+  }
 }
 
 .admin-catalog-layout.is-editing::before {
