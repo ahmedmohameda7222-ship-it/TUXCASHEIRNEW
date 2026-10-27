@@ -66,7 +66,6 @@ export function CatalogPage() {
   const { principal, scope, hasUnsavedDrafts } = useShopScope();
   const session = useAdminSession();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
-  const catalog = useCatalog(shopId);
   const [location, navigate] = useLocation();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<CatalogStatusFilter>('all');
@@ -91,6 +90,7 @@ export function CatalogPage() {
   const selectedProductId =
     scopedUnsavedProduct?.id ?? detailIdFromPath(effectiveLocation, '/catalog/products');
   const mobileEditing = selectedProductId !== null;
+  const catalog = useCatalog(shopId, selectedProductId);
 
   if (!unapprovedRouteChange) routeRef.current = location;
 
@@ -677,10 +677,12 @@ export function CatalogPage() {
                 canPrice={canPrice}
                 busy={busy}
                 draftRevision={catalog.activeDraft?.draftRevision ?? null}
-                advancedBundle={catalog.activeDraft?.bundleJson ?? null}
+                advancedBundle={catalog.activeDraft?.bundleJson ?? catalog.advancedQuery.data ?? null}
+                advancedLoadError={catalog.advancedQuery.isError}
                 onClose={closeEditor}
                 onRequestAdvanced={async () => {
-                  await catalog.prepareProductDraft.mutateAsync(selectedProduct);
+                  const result = await catalog.advancedQuery.refetch();
+                  if (result.isError) throw result.error;
                 }}
                 onReviewPublish={() => requestCatalogNavigation('/catalog/products/publishing')}
                 onSaveDraft={async (draft) => {
