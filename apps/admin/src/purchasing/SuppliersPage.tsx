@@ -94,6 +94,7 @@ export function SuppliersPage({
           <button
             className="admin-secondary-button"
             type="button"
+            disabled={pending}
             onClick={() => {
               onClearSupplierError?.();
               clearDraft();
