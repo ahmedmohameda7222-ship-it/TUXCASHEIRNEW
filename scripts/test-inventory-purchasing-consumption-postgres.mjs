@@ -84,9 +84,10 @@ for (const name of [
     'Real Purchasing RPC ' + name);
 }
 
-// Execute the new additive replay remediation AFTER the original Purchasing
-// functions are installed; RED on original SQL, GREEN on the exact migration.
-command(['-f', 'supabase/migrations/20261027190000_inventory_purchasing_replay_payload_integrity.sql'],
+// Execute the existing Purchasing-owned approved payload-fingerprint migration
+// after original RPC definitions. RED proves the missing replay guard; GREEN
+// verifies the independently owned Purchasing correction without duplicating SQL.
+command(['-f', 'supabase/migrations/20261025180000_purchasing_command_payload_replay_fence.sql'],
   'Apply I3 Purchasing replay integrity migration to disposable PostgreSQL');
 
 const business = '10000000-0000-4000-8000-000000000001';
