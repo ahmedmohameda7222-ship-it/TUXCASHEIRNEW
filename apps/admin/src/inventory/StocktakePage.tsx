@@ -1,13 +1,10 @@
 import type { AdminInventoryItem, AdminStocktakeSnapshot } from '@tux/admin-contracts';
 import { useEffect, useMemo, useState } from 'react';
 
+import { formatInventoryMicros, formatInventoryQuantity } from './InventoryItemPage';
 import { parseStocktakeMicros } from './stocktakeQuantity';
 
-function formatQuantity(micros: number, unitLabel: string): string {
-  return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(
-    micros / 1_000_000,
-  )} ${unitLabel}`;
-}
+const formatQuantity = formatInventoryQuantity;
 
 type CountLine = { inventoryItemId: string; actualCountMicros: number | null };
 
@@ -42,7 +39,7 @@ export function StocktakePage({
         initialActualByItem?.[line.inventoryItemId] === null ||
         initialActualByItem?.[line.inventoryItemId] === undefined
           ? ''
-          : String((initialActualByItem[line.inventoryItemId] ?? 0) / 1_000_000),
+          : formatInventoryMicros(initialActualByItem[line.inventoryItemId] ?? 0),
       ]),
     ) as Record<string, string>;
   const [actualByItem, setActualByItem] = useState<Record<string, string>>(initiallySaved);
