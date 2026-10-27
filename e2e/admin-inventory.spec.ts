@@ -859,6 +859,50 @@ test('I3 rejected adjustment retains command ID for exact retry but changes it f
   await expect(page.getByLabel('Inventory item detail').getByText('3.2 kg')).toBeVisible();
 });
 
+test('I3 390px adjustment and waste dialogs keep labeled selects and action footers accessible', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page);
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+
+  for (const [openLabel, title, selectLabel, submitLabel, filename] of [
+    ['Adjust stock', 'Adjust Beef', 'Adjustment reason', 'Post adjustment', 'adjust'],
+    ['Record waste', 'Record waste for Beef', 'Waste reason', 'Post waste', 'waste'],
+  ] as const) {
+    await page.getByRole('button', { name: openLabel }).click();
+    const dialog = page.getByRole('dialog', { name: title });
+    await expect(dialog).toBeVisible();
+    const reasonText = dialog.getByText(selectLabel, { exact: true });
+    const reasonInput = dialog.getByLabel(selectLabel);
+    const labelBox = await reasonText.boundingBox();
+    const inputBox = await reasonInput.boundingBox();
+    expect(labelBox).not.toBeNull();
+    expect(inputBox).not.toBeNull();
+    expect(inputBox!.y).toBeGreaterThanOrEqual(labelBox!.y + labelBox!.height + 4);
+
+    const footer = dialog.locator('.admin-dialog__footer');
+    await expect(footer.getByRole('button', { name: submitLabel })).toBeVisible();
+    await expect(footer.getByRole('button', { name: 'Cancel' })).toBeVisible();
+    const dialogBox = await dialog.boundingBox();
+    const footerBox = await footer.boundingBox();
+    expect(dialogBox).not.toBeNull();
+    expect(footerBox).not.toBeNull();
+    expect(footerBox!.y + footerBox!.height).toBeLessThanOrEqual(
+      dialogBox!.y + dialogBox!.height + 1,
+    );
+    await page.screenshot({ path: 'test-results/inventory-i3-' + filename + '-sheet-mobile-390.png' });
+    await footer.getByRole('button', { name: 'Cancel' }).click();
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
 test('inventory stocktake shows business quantities and preserves count authority', async ({
   page,
 }) => {
