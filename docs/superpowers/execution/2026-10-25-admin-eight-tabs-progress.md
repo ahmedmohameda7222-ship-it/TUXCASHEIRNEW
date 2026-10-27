@@ -1,3 +1,21 @@
+## 2026-10-27 Purchasing P2 PRE-MERGE ENGINEERING PASS — P3 exclusively unlocked
+
+**Accepted immutable code HEAD:** `e56043211fd22b176ba8630ae07b088d6ef0aa10` on open **Draft PR #165** (no merge, deploy, or Production SQL). Eight exact-code-head GitHub Actions workflow groups completed **SUCCESS**:
+- [Fast CI 40528187280](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40528187280): changed-file formatting/lint, admin TypeScript, 221/221 focused unit/integration tests, security, migrations, required gate GREEN.
+- [Purchasing isolated real PG + security + 390/360 responsive Chromium 40528187902](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40528187902): all three jobs GREEN.
+- [Combined mainline real PG, source/build and Admin/Operations/Menu Chromium 40528187699](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40528187699): all three GREEN, enforcing the already squash-merged Purchasing ancestor.
+- [Full monorepo regression 40528187762](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40528187762): all Admin, Menu, Windows, security, architecture, Branch/PIN and required gate jobs GREEN.
+- [Orders isolated PG 40528187774](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40528187774): GREEN.
+- [Inventory isolated real PG 40528187630](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40528187630): GREEN.
+- [P0 Business Day real PG 40528187693](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40528187693): GREEN.
+- [Six-tab responsive browser 40528187277](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40528187277): GREEN.
+
+**P2 RED→GREEN corrections:** Previously approved PO editor and creation retain real draft/ordered/partially received/received/cancelled lifecycle, canonical display/reference, zero inventing, source/API/RPC permission and version fences. New failing regression `DraftPurchaseOrderLinesEditor.test.tsx` proved existing `formatPurchaseMicros(expectedPurchaseUnitCostMinor * 10000)` throws `invalid_micros` on still valid safe integer minor costs (RED fast CI 40525536330); fixed with `formatPurchaseMoneyMinor` using BigInt on minor units (GREEN at exact accepted SHA). Mobile 390px E2E `P2 mobile item cost retains every persisted safe-integer EGP minor unit` required `90071992547409.90 EGP`, which was rendered `...91` by `toFixed`/floating math (RED prior source), fixed by exact formatter for expected item costs and actual historic receipt costs. Purchase order totals still use existing validated BigInt integer minor calculations, no client fake transaction/posted payment substitution. Newly built components and browser tests preserve mobile layouts; no unrelated tabs or SQL touched.
+
+**Ruling:** P2 accepted **pre-merge engineering scope only**, not final exact pixel-perfect Owner QA, hosted authenticated real-production testing or merge. **P3 exclusively ACTIVE**, P4 + all later tabs locked; existing work preserved. Production migrations/data and deployments unchanged.
+
+---
+
 ## 2026-10-27 Purchasing P1 PRE-MERGE ENGINEERING PASS — P2 exclusively unlocked
 
 **Immutable accepted code HEAD:** `5bd71f9f7bcc21581c394ede3b09d66143c47fc7` on open Draft PR #165, not merged. Exactly eight workflow groups were verified **SUCCESS on the same SHA**:
