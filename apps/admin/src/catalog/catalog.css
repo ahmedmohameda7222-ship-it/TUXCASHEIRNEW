@@ -1513,7 +1513,7 @@
 }
 
 .admin-catalog-photo-help,
-.admin-catalog-product-photo .admin-field__help {
+.admin-catalog-photo-save-first {
   flex: 1 0 100%;
   margin: 0;
   color: var(--tux-text-secondary);
