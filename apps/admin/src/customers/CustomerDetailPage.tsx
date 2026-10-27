@@ -5,7 +5,37 @@ import { AdminTabs } from '../components/navigation/AdminTabs';
 import { SegmentsPage } from './SegmentsPage';
 
 function money(minor: number): string {
-  return `${(minor / 100).toFixed(2)} EGP`;
+  if (!Number.isSafeInteger(minor)) return 'Unavailable';
+  const value = BigInt(minor);
+  const abs = value < 0n ? -value : value;
+  const pounds = new Intl.NumberFormat('en-EG').format(abs / 100n);
+  return `EGP ${value < 0n ? '-' : ''}${pounds}.${String(abs % 100n).padStart(2, '0')}`;
+}
+
+function customerInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]!.toLocaleUpperCase())
+    .join('');
+}
+
+function loyaltyLabel(type: string): string {
+  const labels: Record<string, string> = {
+    EARN: 'Points earned',
+    REDEEM: 'Points redeemed',
+    MANUAL_ADJUSTMENT: 'Manual adjustment',
+    EXPIRY: 'Points expired',
+    CANCEL_COMPENSATION: 'Cancellation adjustment',
+    REFUND_COMPENSATION: 'Refund adjustment',
+    RETURN_COMPENSATION: 'Return adjustment',
+  };
+  return labels[type] ?? 'Loyalty update';
+}
+
+function orderDate(date: string | null): string {
+  return date ? new Date(date).toLocaleDateString('en-GB') : 'No orders yet';
 }
 
 type CustomerDetailSection = 'overview' | 'orders' | 'addresses' | 'loyalty' | 'history';
@@ -14,11 +44,15 @@ export function CustomerDetailPage({
   customer,
   loyalty,
   canMerge,
+  canAdjustPoints = false,
+  onClose,
   onMerge,
 }: {
   customer: AdminCustomerDetail;
   loyalty: ReactNode;
   canMerge: boolean;
+  canAdjustPoints?: boolean;
+  onClose?(): void;
   onMerge(): void;
 }) {
   const [section, setSection] = useState<CustomerDetailSection>('overview');
@@ -28,12 +62,26 @@ export function CustomerDetailPage({
       className="admin-customer-detail"
       aria-label={`Customer ${customer.displayName ?? customer.normalizedPhone}`}
     >
-      <header>
-        <p className="admin-entry__eyebrow">Customer profile</p>
-        <h2>{customer.displayName ?? 'Unnamed customer'}</h2>
-        <p>{customer.normalizedPhone}</p>
+      <header className="admin-customer-detail__header">
+        <span className="admin-customer-detail__avatar" aria-hidden="true">
+          {customerInitials(customer.displayName ?? customer.normalizedPhone)}
+        </span>
+        <div className="admin-customer-detail__identity">
+          <p className="admin-entry__eyebrow">Customer profile</p>
+          <h2>{customer.displayName ?? 'Unnamed customer'}</h2>
+          <p>{customer.normalizedPhone}</p>
+        </div>
+        {onClose ? (
+          <button
+            className="admin-customer-detail__close"
+            type="button"
+            aria-label="Close customer profile"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        ) : null}
       </header>
-
       <AdminTabs<CustomerDetailSection>
         label="Customer detail sections"
         value={section}
@@ -46,29 +94,68 @@ export function CustomerDetailPage({
               <>
                 <dl className="admin-customer-detail__metrics">
                   <div>
-                    <dt>Order history</dt>
-                    <dd>
-                      {customer.orderCount} orders · {money(customer.lifetimeSpendMinor)}
-                    </dd>
+                    <dt>Total orders</dt>
+                    <dd>{customer.orderCount}</dd>
                   </div>
                   <div>
-                    <dt>Delivery orders</dt>
-                    <dd>{customer.deliveryOrderCount}</dd>
+                    <dt>Total spent</dt>
+                    <dd>{money(customer.lifetimeSpendMinor)}</dd>
                   </div>
                   <div>
-                    <dt>Loyalty balance</dt>
-                    <dd>{customer.loyaltyBalance} points</dd>
-                  </div>
-                  <div>
-                    <dt>Last order</dt>
-                    <dd>
-                      {customer.lastOrderAt
-                        ? new Date(customer.lastOrderAt).toLocaleDateString()
-                        : 'No orders yet'}
-                    </dd>
+                    <dt>Loyalty points</dt>
+                    <dd>{customer.loyaltyBalance}</dd>
                   </div>
                 </dl>
+                <div className="admin-customer-detail__facts">
+                  <section>
+                    <h3>Contact information</h3>
+                    <dl>
+                      <div>
+                        <dt>Phone</dt>
+                        <dd>{customer.normalizedPhone}</dd>
+                      </div>
+                      <div>
+                        <dt>Last order</dt>
+                        <dd>{orderDate(customer.lastOrderAt)}</dd>
+                      </div>
+                    </dl>
+                  </section>
+                  <section>
+                    <h3>Loyalty summary</h3>
+                    <dl>
+                      <div>
+                        <dt>Points balance</dt>
+                        <dd>{customer.loyaltyBalance} points</dd>
+                      </div>
+                      <div>
+                        <dt>Delivery orders</dt>
+                        <dd>{customer.deliveryOrderCount}</dd>
+                      </div>
+                    </dl>
+                  </section>
+                </div>
                 <SegmentsPage segments={customer.segments} />
+                {canMerge || canAdjustPoints ? (
+                  <section className="admin-customer-detail__actions" aria-label="Quick actions">
+                    <h3>Quick actions</h3>
+                    <div>
+                      {canAdjustPoints ? (
+                        <button
+                          className="admin-secondary-button"
+                          type="button"
+                          onClick={() => setSection('loyalty')}
+                        >
+                          Adjust points
+                        </button>
+                      ) : null}
+                      {canMerge ? (
+                        <button className="admin-secondary-button" type="button" onClick={onMerge}>
+                          Merge customer
+                        </button>
+                      ) : null}
+                    </div>
+                  </section>
+                ) : null}
               </>
             ),
           },
@@ -79,7 +166,7 @@ export function CustomerDetailPage({
               <dl className="admin-customer-detail__metrics">
                 <div>
                   <dt>All orders</dt>
-                  <dd>{customer.orderCount}</dd>
+                  <dd>{customer.orderCount} orders</dd>
                 </div>
                 <div>
                   <dt>Delivery orders</dt>
@@ -91,11 +178,7 @@ export function CustomerDetailPage({
                 </div>
                 <div>
                   <dt>Last order</dt>
-                  <dd>
-                    {customer.lastOrderAt
-                      ? new Date(customer.lastOrderAt).toLocaleDateString()
-                      : 'No orders yet'}
-                  </dd>
+                  <dd>{orderDate(customer.lastOrderAt)}</dd>
                 </div>
               </dl>
             ),
@@ -135,12 +218,27 @@ export function CustomerDetailPage({
           },
         ]}
       />
-
-      {canMerge ? (
-        <button className="admin-secondary-button" type="button" onClick={onMerge}>
-          Merge customer
-        </button>
-      ) : null}
+      <section className="admin-customer-detail__activity" aria-label="Recent loyalty activity">
+        <h3>Recent loyalty activity</h3>
+        {customer.loyaltyHistory.length === 0 ? (
+          <p>No loyalty activity yet.</p>
+        ) : (
+          <ul>
+            {customer.loyaltyHistory.slice(0, 5).map((event) => (
+              <li key={event.id}>
+                <span>{event.reason?.label ?? loyaltyLabel(event.eventType)}</span>
+                <strong>
+                  {event.pointsDelta > 0 ? '+' : ''}
+                  {event.pointsDelta} pts
+                </strong>
+                <time dateTime={event.createdAt}>
+                  {new Date(event.createdAt).toLocaleDateString('en-GB')}
+                </time>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </article>
   );
 }
