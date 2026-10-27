@@ -1248,8 +1248,30 @@
 
 .admin-catalog-layout.is-editing .admin-catalog-editor {
   max-width: none;
-  padding: 14px 14px 96px;
+  padding: 14px 14px 104px;
   margin: 0;
+}
+
+.admin-catalog-layout.is-editing .admin-catalog-editor__actions {
+  position: fixed;
+  z-index: 802;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  width: min(440px, 100vw);
+  gap: 10px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--tux-border-subtle);
+  background: var(--tux-surface-panel);
+  box-shadow: 0 -5px 20px rgb(0 0 0 / 7%);
+}
+
+.admin-catalog-layout.is-editing .admin-catalog-editor__actions > button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
 }
 
 @media (max-width: 767px) {
