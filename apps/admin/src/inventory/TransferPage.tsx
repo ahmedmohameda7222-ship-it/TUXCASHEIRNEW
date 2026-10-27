@@ -29,7 +29,7 @@ export function TransferPage({
   receiving: boolean;
   cancelling: boolean;
   onBack(): void;
-  onSend(input: { destinationShopId: string; lines: readonly TransferDraftLine[] }): void;
+  onSend(input: { destinationShopId: string; lines: readonly TransferDraftLine[] }, onSent: () => void): void;
   onReceive(transferId: string): void;
   onCancelTransfer(transferId: string): void;
 }) {
@@ -329,7 +329,15 @@ export function TransferPage({
                   disabled={sending}
                   onClick={() => {
                     if (!selectedDestinationShopId || draftLines.length === 0) return;
-                    onSend({ destinationShopId: selectedDestinationShopId, lines: draftLines });
+                    onSend(
+                      { destinationShopId: selectedDestinationShopId, lines: draftLines },
+                      () => {
+                        setDraftLines([]);
+                        setQuantity('');
+                        setReviewing(false);
+                        setError(null);
+                      },
+                    );
                   }}
                 >
                   Confirm send
