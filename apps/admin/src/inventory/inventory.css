@@ -821,3 +821,13 @@
     overflow-wrap: anywhere;
   }
 }
+
+/* I2: on phone/tablet, Add/Edit definitions are a focused single-pane
+   workspace. Keep global navigation, but remove the directory heading and
+   KPI tiles while its editor is active. Close restores the previous context. */
+@media (max-width: 1150px) {
+  .admin-page:has(.admin-card[aria-label$='inventory item']) > .admin-page__header,
+  .admin-page:has(.admin-card[aria-label$='inventory item']) .admin-inventory-summary {
+    display: none;
+  }
+}
