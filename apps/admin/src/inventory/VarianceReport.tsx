@@ -1,9 +1,10 @@
 import type { AdminInventoryMarginAlert, AdminInventoryVariance } from '@tux/admin-contracts';
 
+import { formatInventoryQuantity } from './InventoryItemPage';
+
 function quantity(micros: number, unitLabel: string, signed = false): string {
-  const value = micros / 1_000_000;
-  const prefix = signed && value > 0 ? '+' : '';
-  return `${prefix}${new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(value)} ${unitLabel}`;
+  const prefix = signed && micros > 0 ? '+' : '';
+  return `${prefix}${formatInventoryQuantity(micros, unitLabel)}`;
 }
 
 function percent(value: number | null): string {
