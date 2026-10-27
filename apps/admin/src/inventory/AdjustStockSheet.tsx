@@ -2,6 +2,7 @@ import type { AdminInventoryItem, AdminInventoryReasonCode } from '@tux/admin-co
 import { useMemo, useState } from 'react';
 
 import { AdminDialog } from '../components/overlay/AdminDialog';
+import { formatInventoryQuantity } from './InventoryItemPage';
 import { parseInventoryMicros } from './inventoryQuantityInput';
 
 export function AdjustStockSheet({
@@ -40,8 +41,8 @@ export function AdjustStockSheet({
     <AdminDialog
       open
       variant="sheet"
-      title={`Adjust ${item.name}`}
-      description="Record the quantity change and why it is needed."
+      title="Adjust stock"
+      description={`${item.name} · Available ${formatInventoryQuantity(item.availableMicros, item.unitLabel)}`}
       onOpenChange={(open) => {
         if (!open && !pending) onCancel();
       }}
