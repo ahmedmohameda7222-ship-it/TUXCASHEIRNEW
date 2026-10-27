@@ -670,6 +670,7 @@ export function CatalogPage() {
           <div className="admin-catalog-layout__editor">
             {selectedProduct ? (
               <ProductInspector
+                key={selectedProduct.id}
                 product={selectedProduct}
                 isNew={scopedUnsavedProduct?.id === selectedProduct.id}
                 imageRequiresSaveFirst={scopedUnsavedProduct !== null}
