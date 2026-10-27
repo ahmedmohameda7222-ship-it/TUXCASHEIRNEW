@@ -97,7 +97,7 @@ export const catalogCopySchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 
-export const catalogViewSchema = z.enum(['workspace', 'publishing', 'recurring-availability']);
+export const catalogViewSchema = z.enum(['workspace', 'advanced', 'publishing', 'recurring-availability']);
 
 export const catalogCommandSchema = z.discriminatedUnion('type', [
   z
@@ -273,6 +273,11 @@ export default async function handler(
       if (view.data === 'publishing') {
         const publishing = await service.loadCatalogPublishing(shopId.data, principal);
         sendJson(response, 200, { ...publishing });
+        return;
+      }
+      if (view.data === 'advanced') {
+        const bundle = await service.loadCatalogAdvanced(shopId.data, principal);
+        sendJson(response, 200, bundle);
         return;
       }
       if (view.data === 'recurring-availability') {
