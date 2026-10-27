@@ -49,6 +49,7 @@ async function mockInventory(
     itemActive?: boolean;
     includeAlphabeticalFirst?: boolean;
     includePurchaseConversion?: boolean;
+    exactThresholdMicros?: number;
   } = {},
 ) {
   const commands: InventoryCommand[] = [];
@@ -131,6 +132,9 @@ async function mockInventory(
               availableMicros: onHandMicros - reservedMicros,
               weightedUnitCostMinor: 12000,
               history: [],
+              ...(options.exactThresholdMicros === undefined
+                ? {}
+                : { lowStockThresholdMicros: options.exactThresholdMicros }),
               ...(options.includePurchaseConversion
                 ? {
                     definitionVersion: 7,
@@ -459,6 +463,23 @@ test('I2 rejects case-insensitive duplicate purchase-unit labels before any comm
 
   await expect(editor.getByRole('alert')).toContainText(/already exists/i);
   expect(commands).toHaveLength(0);
+});
+
+test('I2 preserves exact six-decimal threshold micros after edit form initialization', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page, { exactThresholdMicros: Number.MAX_SAFE_INTEGER });
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+  await page.getByRole('button', { name: 'Edit item' }).click();
+
+  await expect(
+    page.getByRole('region', { name: 'Edit inventory item' }).getByLabel('Low-stock threshold (base units)'),
+  ).toHaveValue('9007199254.740991');
 });
 
 test('inventory renders on-hand, reserved, available, history, and action entry points', async ({
