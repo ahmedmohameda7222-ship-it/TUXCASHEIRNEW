@@ -209,6 +209,36 @@ describe('Plan 5 CRM and promotion controls', () => {
     }
   });
 
+  it('CRM2 labels real loyalty event types and retains signed points', () => {
+    const base = customer.loyaltyHistory[0]!;
+    const html = renderToStaticMarkup(
+      <LoyaltyPanel
+        customer={{
+          ...customer,
+          loyaltyHistory: [
+            { ...base, eventType: 'MANUAL_ADJUSTMENT', pointsDelta: -7 },
+            {
+              ...base,
+              id: '70000000-0000-4000-8000-000000000002',
+              eventType: 'REFUND_COMPENSATION',
+              pointsDelta: 3,
+            },
+          ],
+        }}
+        program={program}
+        reasons={[]}
+        canManage={false}
+        saving={false}
+        onAdjust={vi.fn()}
+      />,
+    );
+    expect(html).toContain('Manual adjustment');
+    expect(html).toContain('Refund adjustment');
+    expect(html).toContain('-7');
+    expect(html).toContain('+3');
+    expect(html).not.toContain('Choose a reason');
+  });
+
   it('renders the complete promotion contract in the editor', () => {
     const html = renderToStaticMarkup(
       <PromotionEditor
