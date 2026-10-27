@@ -341,6 +341,25 @@ test('I1 phone opens the inventory list without forcing an inspector route', asy
   await page.screenshot({ path: 'test-results/inventory-i1-mobile-390.png' });
 });
 
+test('I1 mobile item detail replaces the directory header with a visible single-pane inspector', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page);
+  await page.goto('/inventory');
+  await page.getByRole('region', { name: 'Inventory items' }).getByRole('button', { name: /Beef/ }).click();
+
+  const inspector = page.getByLabel('Inventory item detail');
+  const itemHeading = inspector.getByRole('heading', { name: 'Beef' });
+  await expect(itemHeading).toBeVisible();
+  await expect(page.getByRole('link', { name: /back to inventory items/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeHidden();
+  const headingBox = await itemHeading.boundingBox();
+  expect(headingBox).not.toBeNull();
+  expect(headingBox!.y).toBeLessThan(240);
+  await page.screenshot({ path: 'test-results/inventory-i1-item-detail-mobile-390.png' });
+});
+
 test('inventory renders on-hand, reserved, available, history, and action entry points', async ({
   page,
 }) => {
