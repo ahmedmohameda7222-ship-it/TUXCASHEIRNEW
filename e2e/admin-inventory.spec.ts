@@ -48,6 +48,7 @@ async function mockInventory(
     failureCodesByCommand?: Readonly<Record<string, string>>;
     itemActive?: boolean;
     includeAlphabeticalFirst?: boolean;
+    includePurchaseConversion?: boolean;
   } = {},
 ) {
   const commands: InventoryCommand[] = [];
@@ -130,6 +131,21 @@ async function mockInventory(
               availableMicros: onHandMicros - reservedMicros,
               weightedUnitCostMinor: 12000,
               history: [],
+              ...(options.includePurchaseConversion
+                ? {
+                    definitionVersion: 7,
+                    conversions: [
+                      {
+                        id: '66666666-6666-4666-8666-666666666667',
+                        inventoryItemId: itemId,
+                        purchaseUnitLabel: 'case',
+                        baseMicrosPerPurchaseUnit: 12_000_000,
+                        active: true,
+                        definitionVersion: 3,
+                      },
+                    ],
+                  }
+                : {}),
             },
             ...(options.includeAlphabeticalFirst
               ? [
@@ -420,6 +436,29 @@ test('I2 mobile create and edit forms are focused above the directory and restor
   await page.screenshot({ path: 'test-results/inventory-i2-edit-mobile-390.png' });
   await editEditor.getByRole('button', { name: 'Close' }).click();
   await expect(page.getByLabel('Inventory item detail')).toBeVisible();
+});
+
+test('I2 rejects case-insensitive duplicate purchase-unit labels before any command', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page, { includePurchaseConversion: true });
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+  await page.getByRole('button', { name: 'Edit item' }).click();
+
+  const editor = page.getByRole('region', { name: 'Edit inventory item' });
+  await expect(editor).toContainText('case');
+  await editor.getByRole('button', { name: 'Add purchase unit' }).click();
+  await editor.getByLabel('Purchase unit label').fill('CASE');
+  await editor.getByLabel('Base units per purchase unit').fill('12');
+  await editor.getByRole('button', { name: 'Save purchase unit' }).click();
+
+  await expect(editor.getByRole('alert')).toContainText(/already exists/i);
+  expect(commands).toHaveLength(0);
 });
 
 test('inventory renders on-hand, reserved, available, history, and action entry points', async ({
