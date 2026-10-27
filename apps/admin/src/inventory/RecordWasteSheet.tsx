@@ -2,6 +2,7 @@ import type { AdminInventoryItem, AdminInventoryReasonCode } from '@tux/admin-co
 import { useMemo, useState } from 'react';
 
 import { AdminDialog } from '../components/overlay/AdminDialog';
+import { formatInventoryQuantity } from './InventoryItemPage';
 import { parseInventoryMicros } from './inventoryQuantityInput';
 
 export function RecordWasteSheet({
@@ -36,7 +37,7 @@ export function RecordWasteSheet({
       open
       variant="sheet"
       title={`Record waste for ${item.name}`}
-      description="Enter the wasted quantity and choose the reason."
+      description={`${item.name} · Available ${formatInventoryQuantity(item.availableMicros, item.unitLabel)}`}
       onOpenChange={(open) => {
         if (!open && !pending) onCancel();
       }}
