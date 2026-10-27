@@ -63,6 +63,9 @@ export function PurchasingPage() {
     purchasing.returnPurchase,
   ]);
   const mutationErrorText = mutationErrorMessage(mutationError);
+  const supplierErrorText = mutationErrorMessage(
+    latestMutationError([purchasing.createSupplier, purchasing.manageSupplier]),
+  );
   const [action, setAction] = useState<ActionMode>(null);
   const [section, setSection] = useState<PurchasingSection>('orders');
 
@@ -206,6 +209,11 @@ export function PurchasingPage() {
                 label: 'Suppliers',
                 content: (
                   <SuppliersPage
+                    supplierError={supplierErrorText}
+                    onClearSupplierError={() => {
+                      purchasing.createSupplier.reset();
+                      purchasing.manageSupplier.reset();
+                    }}
                     suppliers={workspace.suppliers}
                     canManage={canManage}
                     canManageLifecycle={canManageLifecycle}
