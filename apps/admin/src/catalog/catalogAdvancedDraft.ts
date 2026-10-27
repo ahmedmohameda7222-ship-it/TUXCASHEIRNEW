@@ -307,7 +307,7 @@ export function buildProductAdvancedDraft(
     const rawQuantity =
       input.recipeState[item.inventoryItemId] ??
       (item.quantityMicros === null ? '' : formatQuantityMicrosForInput(item.quantityMicros));
-    if (/^0(?:\\.0{1,6})?$/.test(rawQuantity.trim()) || rawQuantity.trim() === '') return [];
+    if (/^0(?:\.0{1,6})?$/.test(rawQuantity.trim()) || rawQuantity.trim() === '') return [];
     return [
       {
         shopId: input.shopId,
