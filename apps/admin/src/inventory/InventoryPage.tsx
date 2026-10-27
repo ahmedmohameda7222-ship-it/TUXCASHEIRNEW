@@ -161,6 +161,23 @@ export function InventoryPage() {
     setStocktakeSavedValues({});
     setMode('detail');
   }, [shopId]);
+  // Desktop uses a master-detail workspace by default. Phones/tablets start in
+  // the list to preserve the single-pane workflow and back navigation.
+  useEffect(() => {
+    if (
+      mode !== 'detail' ||
+      definitionOpen ||
+      location !== '/inventory' ||
+      selectedItemId !== null ||
+      items.length === 0 ||
+      window.innerWidth <= 1150
+    ) {
+      return;
+    }
+    const firstItem = items[0];
+    if (firstItem) navigate(detailPath('/inventory', firstItem.id), { replace: true });
+  }, [definitionOpen, items, location, mode, navigate, selectedItemId]);
+
   const stocktakeItems = useMemo(() => items.filter((item) => item.active), [items]);
 
   const selectedItem = useMemo(() => {
@@ -324,20 +341,6 @@ export function InventoryPage() {
           >
             Export CSV
           </button>
-          {canManageDefinitions ? (
-            <button
-              className="admin-primary-button"
-              type="button"
-              onClick={() => {
-                setDefinitionItemId(null);
-                setDefinitionOpen(true);
-                setMode('detail');
-                navigate('/inventory');
-              }}
-            >
-              Add inventory item
-            </button>
-          ) : null}
           {canStocktake ? (
             <button
               className="admin-primary-button"
@@ -412,6 +415,20 @@ export function InventoryPage() {
               ) : null}
             </div>
           </details>
+          {canManageDefinitions ? (
+            <button
+              className="admin-primary-button admin-inventory-add-item"
+              type="button"
+              onClick={() => {
+                setDefinitionItemId(null);
+                setDefinitionOpen(true);
+                setMode('detail');
+                navigate('/inventory');
+              }}
+            >
+              Add inventory item
+            </button>
+          ) : null}
         </div>
       }
     >
@@ -790,7 +807,10 @@ export function InventoryPage() {
                     >
                       <span>
                         <strong>{item.name}</strong>
-                        <small>{trackingModeLabel(item.trackingMode)}</small>
+                        <small>
+                          <span className="admin-inventory-mobile-unit">{item.unitLabel} · </span>
+                          {trackingModeLabel(item.trackingMode)}
+                        </small>
                       </span>
                       <span>{item.unitLabel}</span>
                       <span>{formatted(item.onHandMicros)}</span>
