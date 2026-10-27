@@ -1287,6 +1287,52 @@
   }
 }
 
+/* The unsaved-navigation confirmation must be operable above the C3 drawer.
+   Keep the overlay modal scoped to Catalog rather than elevating every app dialog. */
+.admin-catalog-navigation-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgb(16 30 24 / 58%);
+}
+
+.admin-catalog-navigation-confirm > .switch-dialog {
+  width: min(100%, 480px);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 12px;
+  background: var(--tux-surface-panel);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 25%);
+}
+
+.admin-catalog-navigation-confirm .drawer-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.admin-catalog-navigation-confirm .drawer-footer > button {
+  min-height: 44px;
+}
+
+@media (max-width: 480px) {
+  .admin-catalog-navigation-confirm > .switch-dialog {
+    padding: 16px;
+  }
+
+  .admin-catalog-navigation-confirm .drawer-footer > button {
+    flex: 1 1 100%;
+  }
+}
+
 /* Approved C3 editor heading remains on screen while navigating dense recipes. */
 .admin-catalog-layout.is-editing .admin-catalog-inspector__header {
   position: sticky;
