@@ -1,4 +1,4 @@
-import type { AdminCustomerDetail } from '@tux/admin-contracts';
+import type { AdminCustomerDetail, AdminLoyaltyProgram } from '@tux/admin-contracts';
 import { useState, type ReactNode } from 'react';
 
 import { AdminTabs } from '../components/navigation/AdminTabs';
@@ -43,6 +43,7 @@ type CustomerDetailSection = 'overview' | 'orders' | 'addresses' | 'loyalty' | '
 export function CustomerDetailPage({
   customer,
   loyalty,
+  program = null,
   canMerge,
   canAdjustPoints = false,
   onClose,
@@ -50,6 +51,7 @@ export function CustomerDetailPage({
 }: {
   customer: AdminCustomerDetail;
   loyalty: ReactNode;
+  program?: AdminLoyaltyProgram | null;
   canMerge: boolean;
   canAdjustPoints?: boolean;
   onClose?(): void;
@@ -115,8 +117,12 @@ export function CustomerDetailPage({
                         <dd>{customer.normalizedPhone}</dd>
                       </div>
                       <div>
-                        <dt>Last order</dt>
-                        <dd>{orderDate(customer.lastOrderAt)}</dd>
+                        <dt>Email</dt>
+                        <dd>—</dd>
+                      </div>
+                      <div>
+                        <dt>Notes</dt>
+                        <dd>—</dd>
                       </div>
                     </dl>
                   </section>
@@ -128,8 +134,16 @@ export function CustomerDetailPage({
                         <dd>{customer.loyaltyBalance} points</dd>
                       </div>
                       <div>
-                        <dt>Delivery orders</dt>
-                        <dd>{customer.deliveryOrderCount}</dd>
+                        <dt>Earn rate</dt>
+                        <dd>
+                          {program ? `${program.earnPointsPer100Minor} points / EGP 1` : 'Not configured'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Point value</dt>
+                        <dd>
+                          {program ? money(program.redemptionMinorPerPoint) : 'Not configured'}
+                        </dd>
                       </div>
                     </dl>
                   </section>
