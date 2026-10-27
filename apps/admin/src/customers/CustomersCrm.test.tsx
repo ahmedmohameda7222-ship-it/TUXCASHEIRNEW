@@ -172,6 +172,25 @@ describe('Plan 5 CRM and promotion controls', () => {
     expect(html).not.toContain('View all orders');
   });
 
+  it('CRM2 loyalty summary uses persisted program values, not speculative defaults', () => {
+    const html = renderToStaticMarkup(
+      <CustomerDetailPage
+        customer={customer}
+        loyalty={<p>Scoped loyalty</p>}
+        program={program}
+        canMerge={false}
+        onMerge={vi.fn()}
+      />,
+    );
+    expect(html).toContain('Earn rate');
+    expect(html).toContain('Point value');
+    expect(html).toContain('1 points / EGP 1');
+    expect(html).toContain('EGP 0.10');
+    expect(html).toContain('Contact information');
+    expect(html).toContain('Email');
+    expect(html).toContain('Notes');
+  });
+
   it('renders immutable loyalty history and permission-gated manual adjustment controls', () => {
     const html = renderToStaticMarkup(
       <LoyaltyPanel
