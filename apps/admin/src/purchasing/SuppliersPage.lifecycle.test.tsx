@@ -45,6 +45,21 @@ describe('supplier management', () => {
     expect(html).not.toContain('Edit Bakery');
   });
 
+  it('blocks new supplier forms while lifecycle commands are pending', () => {
+    const html = renderToStaticMarkup(
+      <SuppliersPage
+        suppliers={suppliers}
+        canManage
+        canManageLifecycle
+        pending
+        onCreate={vi.fn()}
+        onManage={vi.fn()}
+      />,
+    );
+    const addButton = html.match(/<button[^>]*>Add supplier<\/button>/)?.[0];
+    expect(addButton).toContain('disabled=""');
+  });
+
   it('preserves archived supplier identity and restricts restore to lifecycle managers', () => {
     const archived = [{ ...suppliers[0]!, active: false, version: 4 }];
     const authorized = renderToStaticMarkup(
