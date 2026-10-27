@@ -45,6 +45,37 @@ export function AdjustStockSheet({
       onOpenChange={(open) => {
         if (!open && !pending) onCancel();
       }}
+      footer={
+        <>
+          <button
+            className="admin-primary-button"
+            type="button"
+            disabled={
+              pending || micros === null || reasonCodeId.length === 0 || (override && !note.trim())
+            }
+            onClick={() => {
+              if (micros === null) return;
+              onSubmit({
+                quantityDeltaMicros: micros,
+                reasonCodeId,
+                note: note.trim() || null,
+                emergencyNegativeOverride: override,
+                ...(requesterPin ? { requesterPin } : {}),
+              });
+            }}
+          >
+            Post adjustment
+          </button>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={pending}
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+        </>
+      }
     >
       <label className="admin-field">
         <span>Quantity change ({item.unitLabel})</span>
@@ -95,33 +126,6 @@ export function AdjustStockSheet({
         />
         <small>The PIN is submitted only to verify your approval request.</small>
       </label>
-      <button
-        className="admin-primary-button"
-        type="button"
-        disabled={
-          pending || micros === null || reasonCodeId.length === 0 || (override && !note.trim())
-        }
-        onClick={() => {
-          if (micros === null) return;
-          onSubmit({
-            quantityDeltaMicros: micros,
-            reasonCodeId,
-            note: note.trim() || null,
-            emergencyNegativeOverride: override,
-            ...(requesterPin ? { requesterPin } : {}),
-          });
-        }}
-      >
-        Post adjustment
-      </button>
-      <button
-        className="admin-secondary-button"
-        type="button"
-        disabled={pending}
-        onClick={onCancel}
-      >
-        Cancel
-      </button>
     </AdminDialog>
   );
 }
