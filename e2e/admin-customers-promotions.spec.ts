@@ -389,6 +389,33 @@ test('CRM1 server search and shop switching never reuse customers from the prior
   expect(hasHorizontalOverflow).toBe(false);
 });
 
+test('CRM2 restricted profile shows facts but no merge or point-adjustment actions', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/api/admin/session', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...session,
+        principal: {
+          ...session.principal,
+          role: 'MANAGER',
+          permissions: ['customers.view'],
+        },
+      }),
+    }),
+  );
+  await openCustomer(page);
+  const detail = page.getByRole('complementary', { name: 'Customer detail' });
+  await expect(detail.getByText('Contact information')).toBeVisible();
+  await expect(detail.getByRole('button', { name: 'Merge customer' })).toHaveCount(0);
+  await expect(detail.getByRole('button', { name: 'Adjust points' })).toHaveCount(0);
+  await expect(detail.getByRole('tab', { name: 'Loyalty' })).toBeVisible();
+  expect(postedCommands).toHaveLength(0);
+});
+
 test('CRM2 phone profile has factual metrics and signed loyalty history', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openCustomer(page);
