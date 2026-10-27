@@ -292,7 +292,9 @@ test('CRM1 desktop directory exposes real scoped fact columns and loaded-only fi
   await expect(directory).toBeVisible();
   await expect(directory.getByText('Total spent')).toBeVisible();
   await expect(directory.getByText('Loyalty', { exact: true })).toBeVisible();
-  await expect(directory.locator('.admin-customers-directory__columns').getByText('Last order')).toBeVisible();
+  await expect(
+    directory.locator('.admin-customers-directory__columns').getByText('Last order'),
+  ).toBeVisible();
   const sort = directory.getByRole('combobox', { name: 'Sort loaded customers' });
   await sort.selectOption('orders');
   await expect(directory.getByRole('button', { name: /Mona/ })).toContainText('12');
