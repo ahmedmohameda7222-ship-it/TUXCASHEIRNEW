@@ -371,54 +371,54 @@ export function ProductEditor({
               {imageKey ? 'Image assigned' : 'No image assigned'}
             </strong>
           </div>
-        {onUploadImage ? (
-          <div className="admin-form-grid">
-            {imageRequiresSaveFirst ? (
-              <p className="admin-field__help" role="status">
-                Save this product draft first to enable image upload.
-              </p>
-            ) : null}
-            <label className="admin-field">
-              <span>Choose product image (PNG, JPEG, WebP, AVIF — maximum 2 MB)</span>
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/avif"
-                disabled={readOnly || imageRequiresSaveFirst}
-                onChange={(event) => {
-                  setSelectedImageFile(event.currentTarget.files?.[0] ?? null);
-                  setImageError(null);
-                }}
-              />
-            </label>
-            <button
-              className="admin-secondary-button"
-              type="button"
-              disabled={readOnly || imageRequiresSaveFirst || selectedImageFile === null}
-              onClick={() => void uploadSelectedImage()}
-            >
-              {imageUploading ? 'Uploading image…' : 'Upload image'}
-            </button>
-            {imageKey ? (
+          {onUploadImage ? (
+            <div className="admin-form-grid">
+              {imageRequiresSaveFirst ? (
+                <p className="admin-field__help" role="status">
+                  Save this product draft first to enable image upload.
+                </p>
+              ) : null}
+              <label className="admin-field">
+                <span>Choose product image (PNG, JPEG, WebP, AVIF — maximum 2 MB)</span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/avif"
+                  disabled={readOnly || imageRequiresSaveFirst}
+                  onChange={(event) => {
+                    setSelectedImageFile(event.currentTarget.files?.[0] ?? null);
+                    setImageError(null);
+                  }}
+                />
+              </label>
               <button
                 className="admin-secondary-button"
                 type="button"
-                disabled={readOnly}
-                onClick={() => {
-                  setImageKey(null);
-                  setUploadedImageUrl(null);
-                  setSelectedImageFile(null);
-                  setImageError(null);
-                }}
+                disabled={readOnly || imageRequiresSaveFirst || selectedImageFile === null}
+                onClick={() => void uploadSelectedImage()}
               >
-                Remove image from draft
+                {imageUploading ? 'Uploading image…' : 'Upload image'}
               </button>
-            ) : null}
-            {imageError ? <p role="alert">{imageError}</p> : null}
-            <p className="admin-catalog-photo-help">
-              Image assignment stays in your draft until Save draft and Review & Publish.
-            </p>
-          </div>
-        ) : null}
+              {imageKey ? (
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  disabled={readOnly}
+                  onClick={() => {
+                    setImageKey(null);
+                    setUploadedImageUrl(null);
+                    setSelectedImageFile(null);
+                    setImageError(null);
+                  }}
+                >
+                  Remove image from draft
+                </button>
+              ) : null}
+              {imageError ? <p role="alert">{imageError}</p> : null}
+            </div>
+          ) : null}
+          <p className="admin-catalog-photo-help">
+            Image upload changes remain in Draft until saved and published.
+          </p>
         </div>
       </section>
 
