@@ -253,6 +253,44 @@
   }
 }
 
+/* I1: only the phone list displays the unit inline with its tracking type. */
+.admin-inventory-mobile-unit {
+  display: none;
+}
+
+@media (max-width: 690px) {
+  .admin-inventory-mobile-unit {
+    display: inline;
+  }
+}
+
+/* Match the approved Inventory two-column phone commands; the create action
+   is visually separated and full-width without changing permission checks. */
+@media (max-width: 767px) {
+  .admin-page__primary-action:has(> .admin-inventory-page-actions) {
+    align-self: stretch;
+    min-width: 0;
+  }
+
+  .admin-inventory-page-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 8px;
+  }
+
+  .admin-inventory-page-actions > button,
+  .admin-inventory-page-actions > details,
+  .admin-inventory-more-actions > summary {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .admin-inventory-page-actions > .admin-inventory-add-item {
+    grid-column: 1 / -1;
+  }
+}
+
 .admin-inventory-more-actions {
   position: relative;
 }
