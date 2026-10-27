@@ -3,7 +3,7 @@ import type {
   CatalogJsonObject,
   CatalogProductDetail,
 } from '@tux/admin-contracts';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useUnsavedShopDraft } from '../shops/ShopScopeProvider';
 
 import {
@@ -12,6 +12,8 @@ import {
   readProductAdvancedModel,
   type ProductAdvancedDraft,
 } from './catalogAdvancedDraft';
+
+import { ProductInventoryUsage } from './ProductInventoryUsage';
 
 export { formatQuantityMicrosForInput, parseQuantityToMicros } from './catalogAdvancedDraft';
 
@@ -142,6 +144,8 @@ export function ProductEditor({
   >({});
   const [comboState, setComboState] = useState<Record<string, boolean>>({});
   const [recipeState, setRecipeState] = useState<Record<string, string>>({});
+  const inventoryRequested = useRef(false);
+  const [inventoryLoadError, setInventoryLoadError] = useState(false);
 
   const readOnly = !canEdit || busy || imageUploading;
   const priceReadOnly = readOnly || !canPrice;
@@ -152,6 +156,12 @@ export function ProductEditor({
     () => (advancedBundle ? readProductAdvancedModel(advancedBundle, product.id) : null),
     [advancedBundle, product.id],
   );
+
+  useEffect(() => {
+    if (advancedBundle || inventoryRequested.current || !canEdit || !onRequestAdvanced) return;
+    inventoryRequested.current = true;
+    void Promise.resolve(onRequestAdvanced()).catch(() => setInventoryLoadError(true));
+  }, [advancedBundle, canEdit, onRequestAdvanced]);
 
   useEffect(() => {
     if (!advancedModel) return;
@@ -538,6 +548,48 @@ export function ProductEditor({
         </label>
       </section>
 
+      <section
+        className="admin-catalog-editor__section admin-catalog-inventory-usage"
+        aria-labelledby="catalog-inventory-usage-heading"
+      >
+        <div className="admin-catalog-editor__section-heading">
+          <h2 id="catalog-inventory-usage-heading">Inventory usage</h2>
+          <span className="admin-catalog-inventory-usage__draft-tag">DRAFT ONLY</span>
+        </div>
+        {advancedModel ? (
+          <ProductInventoryUsage
+            inventoryItems={advancedModel.inventoryItems}
+            quantities={recipeState}
+            readOnly={readOnly}
+            onQuantityChange={(itemId, value) =>
+              setRecipeState((state) => ({ ...state, [itemId]: value }))
+            }
+          />
+        ) : (
+          <div className="admin-catalog-inventory-usage__loading">
+            {inventoryLoadError ? (
+              <p role="alert">Inventory usage could not be loaded. No recipe changes were saved.</p>
+            ) : (
+              <p>Loading authorized inventory definitions…</p>
+            )}
+            {inventoryLoadError && onRequestAdvanced ? (
+              <button
+                type="button"
+                className="admin-secondary-button"
+                onClick={() => {
+                  setInventoryLoadError(false);
+                  void Promise.resolve(onRequestAdvanced()).catch(() =>
+                    setInventoryLoadError(true),
+                  );
+                }}
+              >
+                Retry inventory load
+              </button>
+            ) : null}
+          </div>
+        )}
+      </section>
+
       <button
         className="admin-disclosure-button"
         type="button"
@@ -645,54 +697,6 @@ export function ProductEditor({
               )}
             </section>
           ) : null}
-
-          <section className="admin-catalog-editor__section is-compact">
-            <h2>Recipe / Inventory</h2>
-            {advancedModel ? (
-              advancedModel.inventoryItems.length === 0 ? (
-                <p className="admin-field__help">
-                  No recipe-tracked inventory items are available.
-                </p>
-              ) : (
-                <div className="admin-catalog-advanced-list">
-                  {advancedModel.inventoryItems.map((item) => {
-                    const quantity =
-                      recipeState[item.inventoryItemId] ??
-                      (item.quantityMicros === null
-                        ? ''
-                        : formatQuantityMicrosForInput(item.quantityMicros));
-                    return (
-                      <label className="admin-field" key={item.inventoryItemId}>
-                        <span>
-                          {item.name} · {item.unitLabel}
-                        </span>
-                        <input
-                          type="number"
-                          min="0.000001"
-                          step="0.000001"
-                          inputMode="decimal"
-                          value={quantity}
-                          placeholder="Not in recipe"
-                          disabled={readOnly || (!item.active && quantity === '')}
-                          aria-label={`${item.name} quantity in ${item.unitLabel}`}
-                          onChange={(event) => {
-                            const value = event.currentTarget.value;
-                            if (!item.active && value !== '') return;
-                            setRecipeState((state) => ({
-                              ...state,
-                              [item.inventoryItemId]: value,
-                            }));
-                          }}
-                        />
-                      </label>
-                    );
-                  })}
-                </div>
-              )
-            ) : (
-              <p className="admin-field__help">Loading recipe inventory…</p>
-            )}
-          </section>
 
           <section className="admin-catalog-editor__section is-compact">
             <h2>Shop Overrides</h2>
