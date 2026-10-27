@@ -1208,6 +1208,61 @@
   }
 }
 
+/* C3 approved editor: keep the Product Directory visible behind a 440px right drawer. */
+.admin-catalog-layout.is-editing .admin-catalog-layout__list {
+  display: block;
+}
+
+.admin-catalog-layout.is-editing::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  background: rgb(16 30 24 / 42%);
+}
+
+.admin-catalog-layout.is-editing .admin-catalog-layout__editor {
+  display: block;
+  position: fixed;
+  z-index: 801;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(440px, 100vw);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.admin-catalog-layout.is-editing .admin-catalog-inspector {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-radius: 0;
+  border-top: 0;
+  border-bottom: 0;
+  border-right: 0;
+  box-shadow: -12px 0 42px rgb(0 0 0 / 14%);
+}
+
+.admin-catalog-layout.is-editing .admin-catalog-editor {
+  max-width: none;
+  padding: 14px 14px 96px;
+  margin: 0;
+}
+
+@media (max-width: 767px) {
+  .admin-catalog-layout.is-editing .admin-catalog-layout__editor {
+    left: 0;
+    width: 100vw;
+  }
+
+  .admin-catalog-layout.is-editing .admin-catalog-inspector {
+    border: 0;
+  }
+}
+
 /* C3: direct, always-visible canonical recipe quantities, not a separate picker. */
 .admin-catalog-inventory-usage {
   gap: 12px;
