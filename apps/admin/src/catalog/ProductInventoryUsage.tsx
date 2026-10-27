@@ -26,7 +26,7 @@ export function ProductInventoryUsage({
       quantities[item.inventoryItemId] ??
       (item.quantityMicros === null ? '0' : formatQuantityMicrosForInput(item.quantityMicros));
     let invalid = false;
-    if (raw.trim() !== '' && !/^0(?:\\.0{1,6})?$/.test(raw.trim())) {
+    if (raw.trim() !== '' && !/^0(?:\.0{1,6})?$/.test(raw.trim())) {
       try {
         parseQuantityToMicros(raw);
       } catch {
