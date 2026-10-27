@@ -16,9 +16,13 @@ export type InventoryItemPageItem = {
 };
 
 export function formatInventoryMicros(micros: number): string {
-  return new Intl.NumberFormat('en-US', {
-    maximumFractionDigits: micros % 1_000 === 0 ? 3 : 6,
-  }).format(micros / 1_000_000);
+  if (!Number.isSafeInteger(micros)) throw new Error('invalid_inventory_micros');
+  const magnitude = BigInt(Math.abs(micros));
+  const whole = (magnitude / 1_000_000n).toLocaleString('en-US');
+  const fraction = String(magnitude % 1_000_000n)
+    .padStart(6, '0')
+    .replace(/0+$/, '');
+  return `${micros < 0 ? '-' : ''}${whole}${fraction ? `.${fraction}` : ''}`;
 }
 
 export function formatInventoryQuantity(micros: number, unitLabel: string): string {
