@@ -13,10 +13,10 @@ export function staffSummaryMetrics(
   employees: readonly Pick<EmployeeSummary, 'active' | 'operationsSetupRequiredShopIds'>[],
   selectedShopId: string,
   complete: boolean,
+  pendingLeaveCount: number | null = null,
 ): readonly AdminSummaryMetric[] {
   const total = complete ? employees.length : null;
   const active = complete ? employees.filter((employee) => employee.active).length : null;
-  const suspended = complete ? employees.filter((employee) => !employee.active).length : null;
   const unconfigured = complete
     ? employees.filter((employee) =>
         employee.operationsSetupRequiredShopIds.includes(selectedShopId),
@@ -32,6 +32,6 @@ export function staffSummaryMetrics(
       value: unconfigured,
       tone: unconfigured !== null && unconfigured > 0 ? 'warning' : 'default',
     },
-    { id: 'suspended', label: 'Suspended staff', value: suspended },
+    { id: 'leave', label: 'Pending leave', value: pendingLeaveCount },
   ];
 }
