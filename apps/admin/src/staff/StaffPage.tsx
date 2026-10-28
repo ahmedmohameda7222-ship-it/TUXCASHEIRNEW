@@ -644,7 +644,9 @@ export function StaffPage() {
                     secure verifier. Your Admin PIN confirms this sensitive action.
                   </p>
                   {pinApplied ? (
-                    <p role="status">Employee PIN applied. Remaining worker setup can resume safely.</p>
+                    <p role="status">
+                      Employee PIN applied. Remaining worker setup can resume safely.
+                    </p>
                   ) : (
                     <>
                       <label className="admin-field">
