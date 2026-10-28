@@ -543,6 +543,94 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
   }
 }
 
+test('S2 onboarding reviews authorized shops before creating and assigning employee', async ({
+  page,
+}) => {
+  const otherShopId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands: Record<string, unknown>[] = [];
+  await mockWorkforce(page);
+  await page.route('**/api/admin/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...session,
+        principal: {
+          ...session.principal,
+          shopIds: [shopId, otherShopId],
+          shopSummaries: [
+            ...session.principal.shopSummaries,
+            { id: otherShopId, name: 'TUX Mall', active: true, temporaryClosed: false },
+          ],
+        },
+      }),
+    });
+  });
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === 'GET' && !url.searchParams.has('employeeId')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...workspace(),
+          shops: [
+            { id: shopId, name: 'Downtown' },
+            { id: otherShopId, name: 'Mall' },
+          ],
+        }),
+      });
+      return;
+    }
+    if (request.method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const command = request.postDataJSON() as Record<string, unknown>;
+    commands.push(command);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        replayed: false,
+        ...(command.type === 'employee.create'
+          ? { employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }
+          : {}),
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  const steps = sheet.getByRole('navigation', { name: 'Employee onboarding steps' });
+  await expect(steps).toContainText('Identity');
+  await expect(steps).toContainText('Shops');
+  await expect(steps).toContainText('Employment');
+  await expect(steps).toContainText('Review');
+  await sheet.getByLabel('Name').fill('Amira Onboarding');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByText('Select assigned shops')).toBeVisible();
+  await sheet.getByRole('checkbox', { name: 'Mall' }).check();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByText('Employment setup')).toBeVisible();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByText('Review employee setup')).toBeVisible();
+  expect(commands).toHaveLength(0);
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await expect.poll(() => commands.length).toBe(2);
+  expect(commands[0]).toMatchObject({ type: 'employee.create', shopId, displayName: 'Amira Onboarding' });
+  expect(commands[1]).toMatchObject({
+    type: 'employee.assign-shop',
+    employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    shopId: otherShopId,
+  });
+  await expect(sheet).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
 test('S2 rejected employee creation retries the same idempotency intent on phone', async ({
   page,
 }) => {
