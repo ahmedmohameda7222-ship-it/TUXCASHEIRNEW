@@ -34,6 +34,7 @@ export function PromotionEditor({
   products,
   categories,
   saving,
+  error = false,
   onCancel,
   onSave,
 }: {
@@ -42,6 +43,7 @@ export function PromotionEditor({
   products: readonly NamedOption[];
   categories: readonly NamedOption[];
   saving: boolean;
+  error?: boolean;
   onCancel(): void;
   onSave(input: AdminPromotionUpsertInput): void;
 }) {
@@ -328,6 +330,7 @@ export function PromotionEditor({
           />{' '}
           Active
         </label>
+        {error ? <p role="alert">Promotion could not be saved.</p> : null}
         <div className="admin-dialog__actions">
           <button className="admin-secondary-button" type="button" onClick={onCancel}>
             Cancel
