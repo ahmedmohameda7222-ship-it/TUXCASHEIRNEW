@@ -34,7 +34,7 @@ export function SchedulePage({
   shopId: string;
   canManage: boolean;
   onCommand(command: StaffCommandDraft): void;
-  onVerifiedCommand?(command: StaffCommandDraft): Promise<unknown>;
+  onVerifiedCommand?: ((command: StaffCommandDraft) => Promise<unknown>) | undefined;
 }) {
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
