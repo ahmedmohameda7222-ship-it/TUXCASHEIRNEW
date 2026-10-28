@@ -634,7 +634,11 @@ test('S2 onboarding reviews authorized shops before creating and assigning emplo
   expect(commands).toHaveLength(0);
   await sheet.getByRole('button', { name: 'Create employee' }).click();
   await expect.poll(() => commands.length).toBe(2);
-  expect(commands[0]).toMatchObject({ type: 'employee.create', shopId, displayName: 'Amira Onboarding' });
+  expect(commands[0]).toMatchObject({
+    type: 'employee.create',
+    shopId,
+    displayName: 'Amira Onboarding',
+  });
   expect(commands[1]).toMatchObject({
     type: 'employee.assign-shop',
     employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
