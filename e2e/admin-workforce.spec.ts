@@ -302,7 +302,7 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
   await expect(page.getByRole('heading', { name: 'Staff' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
   await selectEmployee(page, 'Mona Ali');
-  await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+  await page.getByRole('tab', { name: 'Access & permissions' }).click();
   await expect(page.getByRole('heading', { name: 'Operations access' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Sensitive access actions' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Permissions' })).toBeVisible();
@@ -315,7 +315,7 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
     0,
   );
 
-  await page.getByRole('tab', { name: 'Pay / Compensation' }).click();
+  await page.getByRole('tab', { name: 'Pay' }).click();
   await expect(page.getByLabel('Payment account')).toHaveValue(accountId);
   await expect(page.getByRole('option', { name: /Payroll Cash/ })).toHaveCount(1);
   await page.getByLabel('Pay period start').fill('2026-09-01');
@@ -394,7 +394,7 @@ test('S4 payroll requires successful Admin PIN reauth before protected payment c
   });
   await page.goto('/staff');
   await selectEmployee(page, 'Mona Ali');
-  await page.getByRole('tab', { name: 'Pay / Compensation' }).click();
+  await page.getByRole('tab', { name: 'Pay' }).click();
   await page.getByLabel('Pay period start').fill('2026-10-01');
   await page.getByLabel('Pay period end').fill('2026-10-31');
   await page.getByLabel('Expected amount (EGP)').fill('500.00');
@@ -422,7 +422,7 @@ test('S3 payment records exact safe minor units without floating-point rounding 
   const commands = await mockWorkforce(page);
   await page.goto('/staff');
   await selectEmployee(page, 'Mona Ali');
-  await page.getByRole('tab', { name: 'Pay / Compensation' }).click();
+  await page.getByRole('tab', { name: 'Pay' }).click();
   await page.getByLabel('Pay period start').fill('2026-10-01');
   await page.getByLabel('Pay period end').fill('2026-10-31');
   await page.getByLabel('Expected amount (EGP)').fill('90071992547409.90');
@@ -445,7 +445,7 @@ test('staff payment shows a clear no-account state instead of inventing an accou
   await mockWorkforce(page, false);
   await page.goto('/staff');
   await selectEmployee(page, 'Mona Ali');
-  await page.getByRole('tab', { name: 'Pay / Compensation' }).click();
+  await page.getByRole('tab', { name: 'Pay' }).click();
 
   await expect(page.getByText('No active payment account')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Record payment' })).toHaveCount(0);
@@ -495,7 +495,7 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
       await page.keyboard.press('Escape');
       await expect(page.getByRole('dialog', { name: 'Add shift' })).toBeHidden();
       await capturePremiumScreenshot(page, 'workforce');
-      await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+      await page.getByRole('tab', { name: 'Access & permissions' }).click();
       await capturePremiumScreenshot(page, 'workforce-permissions');
       await page.goto('/staff');
       await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
@@ -528,7 +528,7 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     });
     await page.goto('/staff');
     await selectEmployee(page, 'Mona Ali');
-    await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+    await page.getByRole('tab', { name: 'Access & permissions' }).click();
     const tasks = page.getByRole('navigation', { name: 'Employee access workspaces' });
     await expect(tasks.getByRole('link')).toHaveCount(2);
     await expect(page.getByRole('region', { name: 'Permissions' })).toBeVisible();
@@ -647,7 +647,7 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
             });
             if (scene === 'permissions') {
               await selectEmployee(page, 'Mona Ali');
-              await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+              await page.getByRole('tab', { name: 'Access & permissions' }).click();
               await expect(page.getByRole('region', { name: 'Permissions' })).toBeVisible();
             }
             await captureTargetedAcceptance(page, 'p06', scene, theme, entry);
@@ -735,7 +735,7 @@ test('S1 selected employee inspector uses approved non-overlapping cards on mobi
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/staff');
     await selectEmployee(page, 'Mona Ali');
-    await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+    await page.getByRole('tab', { name: 'Access & permissions' }).click();
     const inspector = page.locator('.admin-staff-employee');
     await expect(inspector).toBeVisible();
     await capturePremiumScreenshot(page, 'staff-selected-access');
