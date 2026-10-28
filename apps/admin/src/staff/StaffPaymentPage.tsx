@@ -2,6 +2,7 @@ import type { EmployeeDetail, StaffFinanceAccountChoice } from '@tux/admin-contr
 import { useState } from 'react';
 
 import type { StaffCommandDraft } from './SchedulePage';
+import { formatStaffMoney, parseStaffMoneyMinor } from './staffMoney';
 
 export function StaffPaymentPage({
   employee,
@@ -27,6 +28,8 @@ export function StaffPaymentPage({
   const [expected, setExpected] = useState('');
   const [paid, setPaid] = useState('');
   const [paymentDate, setPaymentDate] = useState('');
+  const expectedAmountMinor = parseStaffMoneyMinor(expected.trim() || paid);
+  const paidAmountMinor = parseStaffMoneyMinor(paid);
   const accountTypeLabel = (type: string) =>
     type === 'BANK'
       ? 'Bank account'
@@ -42,7 +45,7 @@ export function StaffPaymentPage({
       {employee.payments.map((payment) => (
         <article className="admin-staff-record-row" key={payment.id}>
           <span>
-            <strong>{(payment.paidAmountMinor / 100).toFixed(2)} EGP</strong>
+            <strong>{formatStaffMoney(payment.paidAmountMinor)} EGP</strong>
             <small>
               {payment.payPeriodStart} → {payment.payPeriodEnd}
             </small>
@@ -112,16 +115,24 @@ export function StaffPaymentPage({
           <button
             className="admin-primary-button"
             type="button"
-            disabled={!accountId || !periodStart || !periodEnd || !paid || !paymentDate}
+            disabled={
+              !accountId ||
+              !periodStart ||
+              !periodEnd ||
+              paidAmountMinor === null ||
+              expectedAmountMinor === null ||
+              !paymentDate
+            }
             onClick={() => {
+              if (expectedAmountMinor === null || paidAmountMinor === null) return;
               const command: StaffCommandDraft = {
                 type: 'payment.record',
                 employeeId: employee.id,
                 shopId,
                 payPeriodStart: periodStart,
                 payPeriodEnd: periodEnd,
-                expectedAmountMinor: Math.round(Number(expected || paid) * 100),
-                paidAmountMinor: Math.round(Number(paid) * 100),
+                expectedAmountMinor,
+                paidAmountMinor,
                 financeAccountId: accountId,
                 paymentDate,
                 note: null,
