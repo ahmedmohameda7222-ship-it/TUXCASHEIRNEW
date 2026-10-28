@@ -14,6 +14,7 @@ import { adminFetch } from '../lib/adminApi';
 import { EmployeeDetailPage, type StaffDetailSection } from './EmployeeDetailPage';
 import { staffSummaryMetrics } from './staffSummaryMetrics';
 import { parseStaffMoneyMinor } from './staffMoney';
+import { businessLocalDateTimeToIso } from './businessTime';
 import { useStaff, type StaffApiCommandDraft } from './useStaff';
 import './staff.css';
 
@@ -65,6 +66,27 @@ function optionalCompensationMinor(raw: string): number | null {
   return minor;
 }
 
+function validateInitialShift(
+  starts: string,
+  ends: string,
+  breaks: string,
+): { startsAt: string; endsAt: string; plannedBreakMinutes: number } | null {
+  if (!starts && !ends) return null;
+  if (!starts || !ends) throw new Error('Both initial shift times are required');
+  const startsAt = businessLocalDateTimeToIso(starts);
+  const endsAt = businessLocalDateTimeToIso(ends);
+  const minutes = Number(breaks);
+  if (
+    !/^\\d+$/.test(breaks) ||
+    !Number.isSafeInteger(minutes) ||
+    Date.parse(endsAt) <= Date.parse(startsAt) ||
+    minutes >= (Date.parse(endsAt) - Date.parse(startsAt)) / 60000
+  ) {
+    throw new Error('Invalid initial shift times or break minutes');
+  }
+  return { startsAt, endsAt, plannedBreakMinutes: minutes };
+}
+
 function readPendingOnboarding(search: string, shopId: string | undefined): string | null {
   const params = new URLSearchParams(search);
   const employeeId = params.get('pendingEmployee');
@@ -106,6 +128,10 @@ export function StaffPage() {
   >('MONTHLY');
   const [newEmployeeRate, setNewEmployeeRate] = useState('');
   const [newEmployeeEffectiveFrom, setNewEmployeeEffectiveFrom] = useState('');
+  const [initialShiftStartsAt, setInitialShiftStartsAt] = useState('');
+  const [initialShiftEndsAt, setInitialShiftEndsAt] = useState('');
+  const [initialShiftBreakMinutes, setInitialShiftBreakMinutes] = useState('0');
+  const [initialShiftCreated, setInitialShiftCreated] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -188,6 +214,11 @@ export function StaffPage() {
     setOnboardingError(null);
     try {
       const rateMinor = optionalCompensationMinor(newEmployeeRate);
+      const initialShift = validateInitialShift(
+        initialShiftStartsAt,
+        initialShiftEndsAt,
+        initialShiftBreakMinutes,
+      );
       if (rateMinor !== null && !newEmployeeEffectiveFrom) {
         throw new Error('compensation_effective_date_required');
       }
@@ -344,6 +375,32 @@ export function StaffPage() {
         }
       }
 
+      if (initialShift && !initialShiftCreated) {
+        const detail = await adminFetch<{ employee: EmployeeDetail }>(
+          `/api/admin/staff?shopId=${encodeURIComponent(shopId)}&employeeId=${encodeURIComponent(employeeId)}`,
+        );
+        const alreadyScheduled = detail.employee.shifts.some(
+          (shift) =>
+            shift.shopId === shopId &&
+            shift.status !== 'CANCELLED' &&
+            shift.startsAt === initialShift.startsAt &&
+            shift.endsAt === initialShift.endsAt &&
+            shift.plannedBreakMinutes === initialShift.plannedBreakMinutes,
+        );
+        if (!alreadyScheduled) {
+          const result = await staff.command.mutateAsync({
+            type: 'shift.create',
+            employeeId,
+            shopId,
+            ...initialShift,
+          });
+          if (!result.ok || isPendingApprovalResult(result)) {
+            throw new Error('Initial shift setup unconfirmed');
+          }
+        }
+        setInitialShiftCreated(true);
+      }
+
       setCreateOpen(false);
       setOnboardingStep('identity');
       setCreatedEmployeeId(null);
@@ -363,6 +420,10 @@ export function StaffPage() {
       setNewEmployeeNotes('');
       setNewEmployeeRate('');
       setNewEmployeeEffectiveFrom('');
+      setInitialShiftStartsAt('');
+      setInitialShiftEndsAt('');
+      setInitialShiftBreakMinutes('0');
+      setInitialShiftCreated(false);
       // Clear the incomplete-onboarding marker only after every trusted setup
       // command succeeds. Back navigation must not resurrect a completed draft.
       window.history.replaceState(window.history.state, '', '/staff');
@@ -388,6 +449,7 @@ export function StaffPage() {
     } else if (onboardingStep === 'employment') {
       try {
         const rate = optionalCompensationMinor(newEmployeeRate);
+        validateInitialShift(initialShiftStartsAt, initialShiftEndsAt, initialShiftBreakMinutes);
         if (rate !== null && !newEmployeeEffectiveFrom) {
           throw new Error('compensation_effective_date_required');
         }
@@ -452,6 +514,10 @@ export function StaffPage() {
                 setCompensationConfigured(pending.compensation.length > 0);
                 setNewEmployeeRate('');
                 setNewEmployeeEffectiveFrom('');
+                setInitialShiftStartsAt('');
+                setInitialShiftEndsAt('');
+                setInitialShiftBreakMinutes('0');
+                setInitialShiftCreated(false);
                 setEmployeePinApplied(false);
                 setSetupAdminPin('');
                 setNewEmployeePin('');
@@ -473,6 +539,10 @@ export function StaffPage() {
               setNewEmployeePermissionOverrides({});
               setOnboardingShopIds([shopId]);
               setAssignedShopIds([]);
+              setInitialShiftStartsAt('');
+              setInitialShiftEndsAt('');
+              setInitialShiftBreakMinutes('0');
+              setInitialShiftCreated(false);
               setOnboardingError(null);
               setCreateOpen(true);
             }}
@@ -799,6 +869,39 @@ export function StaffPage() {
                     onChange={(event) => setNewEmployeeEffectiveFrom(event.target.value)}
                   />
                 </label>
+                <fieldset className="admin-staff-onboarding-shops">
+                  <legend>Initial shift (optional)</legend>
+                  <p>Schedule the first shift in Cairo local time during Add employee.</p>
+                  <label className="admin-field">
+                    <span>Initial shift starts</span>
+                    <input
+                      type="datetime-local"
+                      value={initialShiftStartsAt}
+                      disabled={Boolean(createdEmployeeId && initialShiftCreated)}
+                      onChange={(event) => setInitialShiftStartsAt(event.currentTarget.value)}
+                    />
+                  </label>
+                  <label className="admin-field">
+                    <span>Initial shift ends</span>
+                    <input
+                      type="datetime-local"
+                      value={initialShiftEndsAt}
+                      disabled={Boolean(createdEmployeeId && initialShiftCreated)}
+                      onChange={(event) => setInitialShiftEndsAt(event.currentTarget.value)}
+                    />
+                  </label>
+                  <label className="admin-field">
+                    <span>Initial shift break minutes</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={initialShiftBreakMinutes}
+                      disabled={Boolean(createdEmployeeId && initialShiftCreated)}
+                      onChange={(event) => setInitialShiftBreakMinutes(event.currentTarget.value)}
+                    />
+                  </label>
+                </fieldset>
                 <section
                   className="admin-staff-onboarding-security"
                   aria-label="Operations access setup"
@@ -943,6 +1046,11 @@ export function StaffPage() {
                   {newEmployeeRate.trim()
                     ? 'Compensation will be recorded using the selected rate and effective date.'
                     : 'Compensation will be configured later.'}
+                </p>
+                <p>
+                  Initial shift: {initialShiftStartsAt && initialShiftEndsAt
+                    ? 'Scheduled within this Save'
+                    : 'No initial shift requested'}.
                 </p>
                 <p>
                   Operations access will be ready in all selected shops after the employee PIN is
