@@ -56,9 +56,7 @@ function optionalCompensationMinor(raw: string): number | null {
 function readPendingOnboarding(search: string, shopId: string | undefined): string | null {
   const params = new URLSearchParams(search);
   const employeeId = params.get('pendingEmployee');
-  return employeeId &&
-    params.get('pendingShop') === shopId &&
-    /^[0-9a-f-]{36}$/i.test(employeeId)
+  return employeeId && params.get('pendingShop') === shopId && /^[0-9a-f-]{36}$/i.test(employeeId)
     ? employeeId
     : null;
 }

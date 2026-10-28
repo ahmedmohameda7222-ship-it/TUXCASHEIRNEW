@@ -432,7 +432,8 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
                 client,
                 'business_employees',
                 new URLSearchParams({
-                  select: 'id,business_id,display_name,phone,hire_date,notes,role,active,profile_version,credential_version',
+                  select:
+                    'id,business_id,display_name,phone,hire_date,notes,role,active,profile_version,credential_version',
                   business_id: `eq.${businessId}`,
                   id: inFilter(ids),
                   order: 'display_name.asc,id.asc',
@@ -466,8 +467,8 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
         employees = batchResults.flatMap(([batchEmployees]) => batchEmployees);
         allAssignments = batchResults.flatMap(([, batchAssignments]) => batchAssignments);
         links = batchResults.flatMap(([, , batchLinks]) => batchLinks);
-        employees.sort((a, b) =>
-          a.display_name.localeCompare(b.display_name) || a.id.localeCompare(b.id),
+        employees.sort(
+          (a, b) => a.display_name.localeCompare(b.display_name) || a.id.localeCompare(b.id),
         );
       }
 
