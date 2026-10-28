@@ -261,8 +261,15 @@ export function StaffPage() {
           employeeId,
           shopId: assignedShopId,
         });
-        if (!result.ok || isPendingApprovalResult(result)) {
-          throw new Error('Operations worker setup is not confirmed for every assigned shop.');
+        if (
+          !result.ok ||
+          isPendingApprovalResult(result) ||
+          !result.workerId ||
+          result.shopId !== assignedShopId
+        ) {
+          throw new Error(
+            'Operations worker identity not confirmed for every assigned shop. Retry setup.',
+          );
         }
         provisioned.add(assignedShopId);
         setProvisionedShopIds([...provisioned]);
