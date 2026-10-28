@@ -1358,6 +1358,6 @@ test('S2 shop manager cannot promise immediate Operations readiness without prov
   await expect(sheet.getByRole('alert')).toContainText('Owner or Admin');
   await fillEmployeeOperationsSetup(page);
   await sheet.getByRole('button', { name: 'Continue' }).click();
-  await expect(sheet.getByRole('alert')).toContainText('Owner or Admin');
+  await expect(sheet.getByRole('alert').last()).toContainText('Owner or Admin');
   expect(commands).toHaveLength(0);
 });
