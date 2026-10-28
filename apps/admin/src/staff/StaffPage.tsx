@@ -51,6 +51,7 @@ export function StaffPage() {
   const selectedSection = staffSectionFromSearch(search);
   const selectedId = detailIdFromPath(location, '/staff');
   const [createOpen, setCreateOpen] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState('');
   const [newEmployeeName, setNewEmployeeName] = useState('');
   const [newEmployeePhone, setNewEmployeePhone] = useState('');
   const [newEmployeeHireDate, setNewEmployeeHireDate] = useState('');
@@ -65,6 +66,16 @@ export function StaffPage() {
     () => staff.workspaceQuery.data?.employees.rows ?? [],
     [staff.workspaceQuery.data],
   );
+  const visibleRows = useMemo(() => {
+    const term = employeeSearch.trim().toLocaleLowerCase();
+    if (!term) return rows;
+    return rows.filter((employee) =>
+      [employee.displayName, employee.phone ?? '', roleLabel(employee.role)].some((value) =>
+        value.toLocaleLowerCase().includes(term),
+      ),
+    );
+  }, [rows, employeeSearch]);
+  const hasMoreStaff = staff.workspaceQuery.data?.employees.nextCursor != null;
 
   if (!shopId) {
     return (
@@ -151,6 +162,18 @@ export function StaffPage() {
           backHref="/staff"
           list={
             <div className="admin-record-list">
+              <div className="admin-staff-directory__toolbar">
+                <strong>Team directory</strong>
+                <span>Select an employee to view their workspace</span>
+                <input
+                  type="search"
+                  aria-label="Search employees (loaded results)"
+                  placeholder="Search name, role or phone..."
+                  value={employeeSearch}
+                  onChange={(event) => setEmployeeSearch(event.currentTarget.value)}
+                />
+                {hasMoreStaff ? <p>Loaded results only</p> : null}
+              </div>
               {staff.workspaceQuery.isLoading ? <LoadingState title="Loading staff" /> : null}
               {staff.workspaceQuery.isError ? (
                 <ErrorState
@@ -174,7 +197,13 @@ export function StaffPage() {
                   description="Add or assign a staff profile to begin."
                 />
               ) : null}
-              {rows.map((employee) => (
+              {visibleRows.length === 0 && rows.length > 0 && !staff.workspaceQuery.isLoading ? (
+                <EmptyState
+                  title="No employees match search"
+                  description="Try another name, role or phone from the loaded staff."
+                />
+              ) : null}
+              {visibleRows.map((employee) => (
                 <button
                   className={
                     employee.id === selectedId
