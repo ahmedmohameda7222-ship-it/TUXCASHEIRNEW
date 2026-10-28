@@ -123,7 +123,10 @@ export function StaffPaymentPage({
               onChange={(event) => setActorPin(event.target.value)}
             />
           </label>
-          <p>Payment posting requires Admin PIN reauthentication. Any configured second-person approval remains enforced by the server.</p>
+          <p>
+            Payment posting requires Admin PIN reauthentication. Any configured second-person
+            approval remains enforced by the server.
+          </p>
           <button
             className="admin-primary-button"
             type="button"
