@@ -500,13 +500,14 @@ export function StaffPage() {
                       type="checkbox"
                       checked={onboardingShopIds.includes(shop.id)}
                       disabled={onboardingBusy || shop.id === shopId || Boolean(createdEmployeeId)}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const checked = event.currentTarget.checked;
                         setOnboardingShopIds((current) =>
-                          event.currentTarget.checked
+                          checked
                             ? [...new Set([...current, shop.id])]
                             : current.filter((id) => id !== shop.id),
-                        )
-                      }
+                        );
+                      }}
                     />
                     {shop.name}
                   </label>
