@@ -36,6 +36,7 @@ jobs:
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       TUX_ADMIN_EIGHT_TABS_CAPTURE: '1'
+      P04_P07_CAPTURE: '1'
     steps:
       - uses: actions/checkout@v7
         with:
