@@ -1391,3 +1391,32 @@ test('S2 shop manager cannot promise immediate Operations readiness without prov
   await expect(sheet.getByRole('alert').last()).toContainText('Owner or Admin');
   expect(commands).toHaveLength(0);
 });
+
+
+test('S2 employee Save does not claim Operations ready without a confirmed provisioned worker id', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  await page.route('**/api/admin/staff**', async (route) => {
+    const command = route.request().method() === 'POST'
+      ? (route.request().postDataJSON() as { type?: string })
+      : null;
+    if (command?.type !== 'employee.provision-worker') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, replayed: false }),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Unconfirmed Worker');
+  await advanceStaffOnboardingToReview(page);
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect(sheet.getByRole('alert')).toContainText('worker identity not confirmed');
+  await expect(sheet).toBeVisible();
+  expect(commands.filter((command) => command.type === 'employee.create')).toHaveLength(1);
+});
