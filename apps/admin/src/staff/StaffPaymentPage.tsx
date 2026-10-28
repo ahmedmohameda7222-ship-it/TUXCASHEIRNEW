@@ -17,7 +17,7 @@ export function StaffPaymentPage({
   accounts?: readonly StaffFinanceAccountChoice[];
   financeAccounts?: readonly StaffFinanceAccountChoice[];
   canPay: boolean;
-  onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
+  onSensitiveCommand(command: StaffCommandDraft, pin: string): Promise<unknown> | void;
 }) {
   const available = (accounts ?? financeAccounts ?? []).filter(
     (account) => account.shopId === null || account.shopId === shopId,
@@ -29,6 +29,8 @@ export function StaffPaymentPage({
   const [paid, setPaid] = useState('');
   const [paymentDate, setPaymentDate] = useState('');
   const [actorPin, setActorPin] = useState('');
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const expectedAmountMinor = parseStaffMoneyMinor(expected.trim() || paid);
   const paidAmountMinor = parseStaffMoneyMinor(paid);
   const accountTypeLabel = (type: string) =>
@@ -127,10 +129,12 @@ export function StaffPaymentPage({
             Payment posting requires Admin PIN reauthentication. Any configured second-person
             approval remains enforced by the server.
           </p>
+          {paymentError ? <p role="alert">{paymentError}</p> : null}
           <button
             className="admin-primary-button"
             type="button"
             disabled={
+              savingPayment ||
               !accountId ||
               !periodStart ||
               !periodEnd ||
@@ -139,23 +143,35 @@ export function StaffPaymentPage({
               !/^\d{4,12}$/.test(actorPin) ||
               !paymentDate
             }
-            onClick={() => {
-              if (expectedAmountMinor === null || paidAmountMinor === null) return;
-              const command: StaffCommandDraft = {
-                type: 'payment.record',
-                employeeId: employee.id,
-                shopId,
-                payPeriodStart: periodStart,
-                payPeriodEnd: periodEnd,
-                expectedAmountMinor,
-                paidAmountMinor,
-                financeAccountId: accountId,
-                paymentDate,
-                note: null,
-                reference: null,
-              };
-              onSensitiveCommand(command, actorPin);
-              setActorPin('');
+            onClick={async () => {
+              if (expectedAmountMinor === null || paidAmountMinor === null || savingPayment) return;
+              setPaymentError(null);
+              setSavingPayment(true);
+              try {
+                const command: StaffCommandDraft = {
+                  type: 'payment.record',
+                  employeeId: employee.id,
+                  shopId,
+                  payPeriodStart: periodStart,
+                  payPeriodEnd: periodEnd,
+                  expectedAmountMinor,
+                  paidAmountMinor,
+                  financeAccountId: accountId,
+                  paymentDate,
+                  note: null,
+                  reference: null,
+                };
+                await onSensitiveCommand(command, actorPin);
+                setActorPin('');
+                setPaid('');
+                setExpected('');
+              } catch (error) {
+                setPaymentError(
+                  error instanceof Error ? error.message.replaceAll('_', ' ') : 'Payment posting failed',
+                );
+              } finally {
+                setSavingPayment(false);
+              }
             }}
           >
             Record payment
