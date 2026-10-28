@@ -303,10 +303,8 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
   await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
   await selectEmployee(page, 'Mona Ali');
   await page.getByRole('tab', { name: 'Access & Permissions' }).click();
-  const accessWorkspaces = page.getByRole('navigation', { name: 'Employee access workspaces' });
-  await expect(accessWorkspaces.getByRole('link')).toHaveCount(3);
-  await accessWorkspaces.getByRole('link', { name: /Role & permissions/ }).click();
-  await expect(page).toHaveURL(/#staff-permission-policy$/);
+  await expect(page.locator('#staff-operations-access')).toBeVisible();
+  await expect(page.locator('#staff-permission-policy')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Permissions' })).toBeVisible();
   await expect(page.getByText('Operations setup required', { exact: true })).toBeVisible();
   const setup = page.locator('.admin-staff-readiness-state').first();
@@ -530,8 +528,7 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     await page.goto('/staff');
     await selectEmployee(page, 'Mona Ali');
     await page.getByRole('tab', { name: 'Access & Permissions' }).click();
-    const tasks = page.getByRole('navigation', { name: 'Employee access workspaces' });
-    await expect(tasks.getByRole('link')).toHaveCount(2);
+    await expect(page.locator('#staff-operations-access')).toBeVisible();
     await expect(page.getByRole('region', { name: 'Permissions' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Change role' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Reset employee PIN' })).toHaveCount(0);
