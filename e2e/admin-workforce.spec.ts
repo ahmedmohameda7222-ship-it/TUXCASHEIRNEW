@@ -584,6 +584,37 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   });
 }
 
+for (const width of [390, 1440] as const) {
+  test(`S4 selected Staff inspector keeps approved focused navigation at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await mockWorkforce(page);
+    await page.goto('/staff');
+    const pageTitle = page.getByRole('heading', { name: 'Staff', exact: true });
+    const summary = page.locator('.admin-staff-summary');
+    await expect(pageTitle).toBeVisible();
+    await expect(summary).toBeVisible();
+
+    await selectEmployee(page, 'Mona Ali');
+    await expect(page.getByRole('article', { name: 'Employee Mona Ali' })).toBeVisible();
+    if (width === 390) {
+      await expect(pageTitle).toBeHidden();
+      await expect(summary).toBeHidden();
+      await expect(page.getByRole('link', { name: /back to employees/i })).toBeVisible();
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+        .toBe(true);
+      await page.getByRole('link', { name: /back to employees/i }).click();
+      await expect(pageTitle).toBeVisible();
+      await expect(summary).toBeVisible();
+    } else {
+      await expect(pageTitle).toBeVisible();
+      await expect(summary).toBeVisible();
+    }
+  });
+}
+
 test('switching employees resets local profile editor state to the selected employee', async ({
   page,
 }) => {

@@ -774,3 +774,13 @@
     padding: 0.5rem;
   }
 }
+
+/* The approved 390px Staff detail is a focused employee inspector.
+   The Staff list page retains its heading and four summary metrics.
+   Desktop continues to show the full directory and overview chrome. */
+@media (max-width: 1099px) {
+  .admin-page:has(.admin-staff-workspace--inspecting) > .admin-page__header,
+  .admin-page:has(.admin-staff-workspace--inspecting) .admin-staff-summary {
+    display: none;
+  }
+}

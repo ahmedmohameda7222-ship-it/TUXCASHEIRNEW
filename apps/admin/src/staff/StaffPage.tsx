@@ -415,6 +415,7 @@ export function StaffPage() {
 
       {staff.workspaceQuery.isSuccess ? (
         <AdminMetricStrip
+          className="admin-staff-summary"
           label="Staff summary"
           metrics={staffSummaryMetrics(
             rows,
@@ -425,7 +426,11 @@ export function StaffPage() {
         />
       ) : null}
 
-      <div className="admin-staff-workspace">
+      <div
+        className={
+          selectedId ? 'admin-staff-workspace admin-staff-workspace--inspecting' : 'admin-staff-workspace'
+        }
+      >
         <ResponsiveMasterDetail
           listLabel="Employees"
           detailLabel="Employee detail"
