@@ -142,7 +142,13 @@ async function mockWorkforce(page: Page, withAccount = true) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ ok: true, replayed: false }),
+      body: JSON.stringify({
+        ok: true,
+        replayed: false,
+        ...(command.type === 'employee.create'
+          ? { employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }
+          : {}),
+      }),
     });
   });
 
@@ -543,6 +549,13 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
   }
 }
 
+async function advanceStaffOnboardingToReview(page: Page) {
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  for (let step = 0; step < 3; step += 1) {
+    await sheet.getByRole('button', { name: 'Continue' }).click();
+  }
+}
+
 test('S2 onboarding reviews authorized shops before creating and assigning employee', async ({
   page,
 }) => {
@@ -669,10 +682,11 @@ test('S2 rejected employee creation retries the same idempotency intent on phone
   await page.getByRole('button', { name: 'Add employee' }).click();
   const sheet = page.getByRole('dialog', { name: 'Add employee' });
   await sheet.getByLabel('Name').fill('Amira Retries');
-  await sheet.getByRole('button', { name: 'Add employee' }).click();
+  await advanceStaffOnboardingToReview(page);
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
   await expect(page.getByRole('alert')).toContainText('staff store temporarily unavailable');
   await expect(sheet).toBeVisible();
-  await sheet.getByRole('button', { name: 'Add employee' }).click();
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
   await expect.poll(() => attempts.length).toBe(2);
   expect(attempts[0]).toBeTruthy();
   expect(attempts[1]).toBe(attempts[0]);
@@ -703,9 +717,10 @@ test('rejected employee creation preserves the Add employee sheet and does not c
   await page.getByRole('button', { name: 'Add employee' }).click();
   const sheet = page.getByRole('dialog', { name: 'Add employee' });
   await sheet.getByLabel('Name').fill('Existing Employee');
-  await sheet.getByRole('button', { name: 'Add employee' }).click();
+  await advanceStaffOnboardingToReview(page);
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
   await expect(sheet).toBeVisible();
-  await expect(sheet.getByLabel('Name')).toHaveValue('Existing Employee');
+  await expect(sheet.getByText('Existing Employee')).toBeVisible();
   await expect(page.getByRole('alert')).toContainText('employee already exists');
 });
 
@@ -720,7 +735,8 @@ test('new employee sheet persists actual hire date and notes through the trusted
   await sheet.getByLabel('Phone').fill('+201098765432');
   await sheet.getByLabel('Hire date').fill('2026-10-01');
   await sheet.getByLabel('Internal notes').fill('Cross-trained at counter');
-  await sheet.getByRole('button', { name: 'Add employee' }).click();
+  await advanceStaffOnboardingToReview(page);
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
   await expect
     .poll(() => commands.some((command) => command['type'] === 'employee.create'))
     .toBe(true);
