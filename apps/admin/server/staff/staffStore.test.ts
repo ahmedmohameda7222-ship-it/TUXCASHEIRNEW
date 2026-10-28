@@ -25,6 +25,26 @@ function employeeRow() {
 }
 
 describe('staffStore', () => {
+  it('counts every pending leave request for the selected shop and business-wide leave', async () => {
+    const select = vi.fn(async (table: string, params: URLSearchParams) => {
+      if (table === 'business_employees') return [employeeRow()];
+      if (table === 'employee_shop_assignments') return [{ employee_id: EMPLOYEE_ID, shop_id: SHOP_ID }];
+      if (table === 'employee_worker_links' || table === 'workers') return [];
+      if (table === 'finance_accounts') return [];
+      if (table === 'shops') return [{ id: SHOP_ID, name: 'Downtown' }];
+      if (table === 'leave_requests') {
+        expect(params.get('business_id')).toBe(`eq.${BUSINESS_ID}`);
+        expect(params.get('status')).toBe('eq.PENDING');
+        expect(params.get('or')).toBe(`(shop_id.eq.${SHOP_ID},shop_id.is.null)`);
+        return [{ id: 'pending-shop' }, { id: 'pending-business' }];
+      }
+      throw new Error(`unexpected_table:${table}`);
+    });
+    const workspace = await createSupabaseStaffStore({ select } as unknown as AdminSupabaseClient)
+      .loadWorkspace(SHOP_ID, BUSINESS_ID, [SHOP_ID]);
+    expect(workspace.pendingLeaveCount).toBe(2);
+  });
+
   it('creates the worker and link only through the trusted provisioning RPC', async () => {
     const rpc = vi.fn(async () => ({ ok: true, workerId: WORKER_ID, replayed: false }));
     const store = createSupabaseStaffStore({ rpc } as unknown as AdminSupabaseClient);
