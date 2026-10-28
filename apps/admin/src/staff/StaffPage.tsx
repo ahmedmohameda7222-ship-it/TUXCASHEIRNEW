@@ -853,11 +853,9 @@ export function StaffPage() {
                 }
               >
                 {onboardingStep === 'review'
-                  ? createdEmployeeId
-                    ? 'Resume onboarding'
-                    : onboardingBusy
-                      ? 'Creating…'
-                      : 'Save employee & enable Operations'
+                  ? onboardingBusy
+                    ? 'Saving…'
+                    : 'Save employee & enable Operations'
                   : 'Continue'}
               </button>
             </div>
