@@ -1,0 +1,31 @@
+name: Temporary Staff exact prettier
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/staff-prettier-diff-temporary.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  print:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Exact staff formatter diff
+        run: |
+          for f in apps/admin/src/staff/StaffPage.tsx apps/admin/src/staff/EmployeeDetailPage.tsx apps/admin/src/staff/StaffPaymentPage.tsx apps/admin/src/staff/staffMoney.ts apps/admin/src/staff/staffMoney.test.ts e2e/admin-workforce.spec.ts; do
+            echo "=== $f ==="
+            npx prettier "$f" | diff -u "$f" - || true
+          done
