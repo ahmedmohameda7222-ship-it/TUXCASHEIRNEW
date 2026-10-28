@@ -60,6 +60,7 @@ export function EmployeeDetailPage({
   workers,
   shops,
   onCommand,
+  onVerifiedScheduleCommand,
   onSensitiveCommand,
 }: {
   employee: EmployeeDetail;
@@ -73,6 +74,7 @@ export function EmployeeDetailPage({
   workers: readonly StaffWorkerChoice[];
   shops: readonly StaffShopChoice[];
   onCommand(command: StaffCommandDraft): void;
+  onVerifiedScheduleCommand?(command: StaffCommandDraft): Promise<unknown>;
   onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
 }) {
   const [sensitiveAction, setSensitiveAction] = useState<SensitiveAction>(null);
@@ -473,6 +475,7 @@ export function EmployeeDetailPage({
                 shopId={shopId}
                 canManage={canManage}
                 onCommand={onCommand}
+                onVerifiedCommand={onVerifiedScheduleCommand}
               />
             ),
           },
