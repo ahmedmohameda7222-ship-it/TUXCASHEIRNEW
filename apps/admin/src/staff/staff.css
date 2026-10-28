@@ -2,6 +2,33 @@
 .admin-staff-workspace {
   min-width: 0;
 }
+.admin-staff-directory__toolbar {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--tux-border-subtle);
+}
+.admin-staff-directory__toolbar > span,
+.admin-staff-directory__toolbar > p {
+  margin: 0;
+  color: var(--tux-text-secondary);
+  font-size: 0.8125rem;
+}
+.admin-staff-directory__toolbar > input {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-md);
+  background: var(--tux-surface-panel);
+  color: var(--tux-text-primary);
+}
+.admin-staff-directory__toolbar > input:focus-visible {
+  outline: 2px solid var(--tux-accent);
+  outline-offset: 2px;
+}
 .admin-staff-workspace .admin-master-detail {
   display: block;
   min-width: 0;
