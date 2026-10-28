@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import * as loyaltyModule from './loyaltyService';
 import {
   applyFixedDiscount,
+  evaluatePromotionReward,
   validatePromotion,
   validateRedemption,
   type PromotionRule,
@@ -108,6 +109,31 @@ describe('loyalty and promotion rules', () => {
         { stackingPolicy: 'ONE_ORDER_LEVEL' },
       ]),
     ).toEqual({ ok: false, code: 'promotion_stacking_not_allowed' });
+  });
+
+  it('CRM4 percent reward retains exact safe minor-unit arithmetic at maximum subtotal', () => {
+    const subtotalMinor = Number.MAX_SAFE_INTEGER;
+    expect(
+      evaluatePromotionReward(
+        {
+          ...basePromotion,
+          kind: 'PERCENT',
+          percentBasisPoints: 6667,
+          fixedDiscountMinor: null,
+          freeProductId: null,
+        },
+        {
+          now: '2026-09-15T00:00:00.000Z',
+          shopId: 'shop-1',
+          channel: 'POS',
+          subtotalMinor,
+          priorTotalUses: 0,
+          priorCustomerUses: 0,
+          productIds: [],
+          categoryIds: [],
+        },
+      ),
+    ).toEqual({ ok: true, discountMinor: 6005099743135818, freeProductId: null });
   });
 
   it('derives the approved automatic segments from canonical customer facts and configured thresholds', () => {
