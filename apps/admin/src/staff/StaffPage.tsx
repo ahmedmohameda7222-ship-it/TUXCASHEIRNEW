@@ -284,6 +284,9 @@ export function StaffPage() {
       setNewEmployeeNotes('');
       setNewEmployeeRate('');
       setNewEmployeeEffectiveFrom('');
+      // Clear the incomplete-onboarding marker only after every trusted setup
+      // command succeeds. Back navigation must not resurrect a completed draft.
+      window.history.replaceState(window.history.state, '', '/staff');
       navigate(`${detailPath('/staff', employeeId)}?section=permissions`);
     } catch (error) {
       setOnboardingError(readableError(error) ?? 'Employee onboarding could not be completed');
