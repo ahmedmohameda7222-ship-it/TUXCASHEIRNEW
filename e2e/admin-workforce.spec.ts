@@ -1270,3 +1270,29 @@ test('S2 Add employee rejects missing and mismatching Operations PIN before writ
   await expect(sheet.getByRole('alert')).toContainText('PINs do not match');
   expect(commands).toHaveLength(0);
 });
+
+
+for (const width of [390, 1024, 1440]) {
+  test(`S4 employee permission controls fit their card without colliding at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await mockWorkforce(page);
+    await page.goto('/staff');
+    await selectEmployee(page, 'Mona Ali');
+    await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+    const permissions = page.getByRole('region', { name: 'Permissions' });
+    const group = permissions.locator('.admin-permission-group').first();
+    await group.locator('summary').click();
+    const summary = await group.locator('summary').boundingBox();
+    const firstField = await group.locator('.admin-field').first().boundingBox();
+    const card = await group.boundingBox();
+    expect(summary).not.toBeNull();
+    expect(firstField).not.toBeNull();
+    expect(card).not.toBeNull();
+    expect(firstField!.y).toBeGreaterThanOrEqual(summary!.y + summary!.height - 2);
+    expect(firstField!.x).toBeGreaterThanOrEqual(card!.x - 2);
+    expect(firstField!.x + firstField!.width).toBeLessThanOrEqual(card!.x + card!.width + 2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  });
+}
