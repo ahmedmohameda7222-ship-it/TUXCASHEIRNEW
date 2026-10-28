@@ -65,6 +65,13 @@ export function StaffPage() {
   const [onboardingShopIds, setOnboardingShopIds] = useState<string[]>(shopId ? [shopId] : []);
   const [createdEmployeeId, setCreatedEmployeeId] = useState<string | null>(null);
   const [assignedShopIds, setAssignedShopIds] = useState<string[]>([]);
+  const [newEmployeePin, setNewEmployeePin] = useState('');
+  const [confirmEmployeePin, setConfirmEmployeePin] = useState('');
+  const [setupAdminPin, setSetupAdminPin] = useState('');
+  const [pinCommandId, setPinCommandId] = useState(() => crypto.randomUUID());
+  const [onboardingPinApplied, setOnboardingPinApplied] = useState(false);
+  const [provisionedShopIds, setProvisionedShopIds] = useState<string[]>([]);
+  const [onboardingApprovalPending, setOnboardingApprovalPending] = useState(false);
   const [onboardingBusy, setOnboardingBusy] = useState(false);
   const [onboardingError, setOnboardingError] = useState<string | null>(null);
   const [newEmployeeCompensationType, setNewEmployeeCompensationType] = useState<
@@ -119,6 +126,7 @@ export function StaffPage() {
 
   const canManage = principal.permissions.includes('staff.manage');
   const canPay = principal.permissions.includes('staff.payments');
+  const canProvisionWorker = canManage && (principal.role === 'OWNER' || principal.role === 'ADMIN');
   const detail = staff.detailQuery.data;
   const actionError =
     readableError(staff.sensitiveCommand.error) ?? readableError(staff.command.error);
@@ -131,6 +139,7 @@ export function StaffPage() {
   async function createEmployee() {
     const displayName = newEmployeeName.trim();
     if (!displayName || onboardingBusy || !shopId) return;
+    if (onboardingApprovalPending) return;
     setOnboardingBusy(true);
     setOnboardingError(null);
     try {
@@ -171,6 +180,54 @@ export function StaffPage() {
         setAssignedShopIds([...completed]);
       }
 
+      const requestedPinSetup = Boolean(newEmployeePin) || onboardingPinApplied;
+      if (newEmployeePin && !onboardingPinApplied) {
+        if (!canProvisionWorker) throw new Error('owner_admin_required_for_operations_setup');
+        if (!/^\\d{4,12}$/.test(newEmployeePin) || newEmployeePin !== confirmEmployeePin) {
+          throw new Error('invalid_or_mismatched_employee_pin');
+        }
+        if (!setupAdminPin) throw new Error('admin_pin_required');
+        const result = await staff.sensitiveCommand.mutateAsync({
+          draft: {
+            type: 'employee.pin',
+            employeeId,
+            shopId,
+            newPin: newEmployeePin,
+            commandId: pinCommandId,
+          },
+          pin: setupAdminPin,
+        });
+        if (result.state === 'PENDING_APPROVAL') {
+          setOnboardingApprovalPending(true);
+          setNewEmployeePin('');
+          setConfirmEmployeePin('');
+          setSetupAdminPin('');
+          throw new Error('employee_pin_awaiting_second_person_approval');
+        }
+        if (!result.ok) throw new Error('employee_pin_setup_unconfirmed');
+        setOnboardingPinApplied(true);
+        setNewEmployeePin('');
+        setConfirmEmployeePin('');
+        setSetupAdminPin('');
+      }
+
+      if (requestedPinSetup) {
+        const readyShops = new Set(provisionedShopIds);
+        for (const targetShopId of onboardingShopIds) {
+          if (readyShops.has(targetShopId)) continue;
+          const result = await staff.command.mutateAsync({
+            type: 'employee.provision-worker',
+            employeeId,
+            shopId: targetShopId,
+          });
+          if (!result.ok || result.state === 'PENDING_APPROVAL') {
+            throw new Error('operations_worker_setup_unconfirmed');
+          }
+          readyShops.add(targetShopId);
+          setProvisionedShopIds([...readyShops]);
+        }
+      }
+
       if (rateMinor !== null) {
         const result = await staff.command.mutateAsync({
           type: 'compensation.set',
@@ -188,6 +245,13 @@ export function StaffPage() {
       setOnboardingStep('identity');
       setCreatedEmployeeId(null);
       setAssignedShopIds([]);
+      setProvisionedShopIds([]);
+      setOnboardingPinApplied(false);
+      setOnboardingApprovalPending(false);
+      setPinCommandId(crypto.randomUUID());
+      setNewEmployeePin('');
+      setConfirmEmployeePin('');
+      setSetupAdminPin('');
       setNewEmployeeName('');
       setNewEmployeePhone('');
       setNewEmployeeHireDate('');
@@ -219,6 +283,12 @@ export function StaffPage() {
         if (rate !== null && !newEmployeeEffectiveFrom) {
           throw new Error('compensation_effective_date_required');
         }
+        if (newEmployeePin || confirmEmployeePin || setupAdminPin) {
+          if (!canProvisionWorker) throw new Error('owner_admin_required_for_operations_setup');
+          if (!/^\\d{4,12}$/.test(newEmployeePin)) throw new Error('invalid_employee_pin_format');
+          if (newEmployeePin !== confirmEmployeePin) throw new Error('employee_pin_mismatch');
+          if (!setupAdminPin) throw new Error('admin_pin_required');
+        }
         setOnboardingStep('review');
       } catch (error) {
         setOnboardingError(readableError(error) ?? 'Invalid compensation details');
@@ -248,6 +318,13 @@ export function StaffPage() {
               setOnboardingStep('identity');
               setOnboardingShopIds([shopId]);
               setAssignedShopIds([]);
+              setProvisionedShopIds([]);
+              setOnboardingPinApplied(false);
+              setOnboardingApprovalPending(false);
+              setNewEmployeePin('');
+              setConfirmEmployeePin('');
+              setSetupAdminPin('');
+              setPinCommandId(crypto.randomUUID());
               setOnboardingError(null);
               setCreateOpen(true);
             }}
@@ -433,7 +510,7 @@ export function StaffPage() {
           open={createOpen}
           variant="sheet"
           title="Add employee"
-          description="Create the employee profile, assign authorized shops and review employment details. Operations worker and PIN setup follow in the employee access workspace."
+          description="Add identity, shops, compensation and secure Operations PIN here. Authorized worker setup happens during this same flow."
           onOpenChange={(open) => {
             if (!onboardingBusy && !staff.command.isPending) setCreateOpen(open);
           }}
@@ -556,10 +633,56 @@ export function StaffPage() {
                     onChange={(event) => setNewEmployeeEffectiveFrom(event.target.value)}
                   />
                 </label>
-                <p>
-                  Operations worker and PIN setup must be completed through the protected employee
-                  access workflow.
-                </p>
+                {canProvisionWorker ? (
+                  <fieldset className="admin-staff-onboarding-pin">
+                    <legend>Operations PIN and worker setup</legend>
+                    <p>
+                      Set the employee PIN here to provision an Operations worker for every selected
+                      shop. The server verifies uniqueness and securely hashes the PIN.
+                    </p>
+                    <label className="admin-field">
+                      <span>New employee Operations PIN</span>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        minLength={4}
+                        maxLength={12}
+                        value={newEmployeePin}
+                        disabled={onboardingPinApplied || onboardingApprovalPending}
+                        onChange={(event) => {
+                          setNewEmployeePin(event.currentTarget.value);
+                          setPinCommandId(crypto.randomUUID());
+                        }}
+                      />
+                    </label>
+                    <label className="admin-field">
+                      <span>Confirm employee Operations PIN</span>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        value={confirmEmployeePin}
+                        disabled={onboardingPinApplied || onboardingApprovalPending}
+                        onChange={(event) => setConfirmEmployeePin(event.currentTarget.value)}
+                      />
+                    </label>
+                    <label className="admin-field">
+                      <span>Your Admin PIN to authorize setup</span>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        value={setupAdminPin}
+                        disabled={onboardingPinApplied || onboardingApprovalPending}
+                        onChange={(event) => setSetupAdminPin(event.currentTarget.value)}
+                      />
+                    </label>
+                    <p>Leave the fields empty only if Operations access will be set up later.</p>
+                  </fieldset>
+                ) : (
+                  <p>Operations PIN and worker provisioning require an Owner or Administrator.</p>
+                )}
               </>
             ) : null}
             {onboardingStep === 'review' ? (
@@ -588,8 +711,14 @@ export function StaffPage() {
                     : 'Compensation will be configured later.'}
                 </p>
                 <p>
-                  After creation, complete Operations worker/PIN readiness and any elevated
-                  permissions in the employee profile.
+                  Operations PIN and worker access
+                  {newEmployeePin || onboardingPinApplied
+                    ? ': secure PIN and a worker for each assigned shop'
+                    : ': not requested (setup remains required)'}
+                </p>
+                <p>
+                  Elevated roles and permission changes still require their separate server-side
+                  approval. No access is granted until the server confirms it.
                 </p>
                 {createdEmployeeId ? (
                   <p>
@@ -598,15 +727,20 @@ export function StaffPage() {
                 ) : null}
               </section>
             ) : null}
-            {onboardingError || staff.command.isError ? (
-              <p role="alert">{onboardingError ?? readableError(staff.command.error)}</p>
+            {onboardingError || staff.command.isError || staff.sensitiveCommand.isError ? (
+              <p role="alert">{onboardingError ?? readableError(staff.sensitiveCommand.error) ?? readableError(staff.command.error)}</p>
             ) : null}
             <div className="admin-inline-actions">
               <button
                 className="admin-secondary-button"
                 type="button"
                 disabled={onboardingBusy}
-                onClick={() => setCreateOpen(false)}
+                onClick={() => {
+                  setCreateOpen(false);
+                  setNewEmployeePin('');
+                  setConfirmEmployeePin('');
+                  setSetupAdminPin('');
+                }
               >
                 Cancel
               </button>
@@ -614,7 +748,7 @@ export function StaffPage() {
                 <button
                   className="admin-secondary-button"
                   type="button"
-                  disabled={onboardingBusy || Boolean(createdEmployeeId)}
+                  disabled={onboardingBusy}
                   onClick={() =>
                     setOnboardingStep(
                       onboardingStep === 'review'
@@ -632,7 +766,7 @@ export function StaffPage() {
                 className="admin-primary-button"
                 type="submit"
                 disabled={
-                  onboardingBusy || (onboardingStep === 'identity' && !newEmployeeName.trim())
+                  onboardingBusy || onboardingApprovalPending || (onboardingStep === 'identity' && !newEmployeeName.trim())
                 }
               >
                 {onboardingStep === 'review'
