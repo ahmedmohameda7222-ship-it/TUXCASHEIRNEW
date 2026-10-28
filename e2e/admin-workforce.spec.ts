@@ -543,6 +543,54 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
   }
 }
 
+test('S2 rejected employee creation retries the same idempotency intent on phone', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  const attempts: string[] = [];
+  await page.route('**/api/admin/staff**', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const command = route.request().postDataJSON() as {
+      type?: string;
+      commandId?: string;
+    };
+    if (command.type !== 'employee.create') {
+      await route.fallback();
+      return;
+    }
+    attempts.push(command.commandId ?? '');
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        attempts.length === 1
+          ? { ok: false, code: 'staff_store_temporarily_unavailable' }
+          : {
+              ok: true,
+              employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              replayed: false,
+            },
+      ),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Amira Retries');
+  await sheet.getByRole('button', { name: 'Add employee' }).click();
+  await expect(page.getByRole('alert')).toContainText('staff store temporarily unavailable');
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole('button', { name: 'Add employee' }).click();
+  await expect.poll(() => attempts.length).toBe(2);
+  expect(attempts[0]).toBeTruthy();
+  expect(attempts[1]).toBe(attempts[0]);
+  await expect(sheet).toHaveCount(0);
+});
+
 test('rejected employee creation preserves the Add employee sheet and does not claim success', async ({
   page,
 }) => {
