@@ -289,24 +289,6 @@ export function EmployeeDetailPage({
 
   const accessContent = (
     <>
-      <nav className="admin-staff-access-tasks" aria-label="Employee access workspaces">
-        <a href="#staff-operations-access">
-          <strong>Operations readiness</strong>
-          <span>
-            {operationsHealthy ? 'Ready to use' : 'Review worker setup or disabled access'}
-          </span>
-        </a>
-        <a href="#staff-permission-policy">
-          <strong>Role & permissions</strong>
-          <span>Review role defaults and per-employee exceptions</span>
-        </a>
-        {canManage ? (
-          <a href="#staff-sensitive-actions">
-            <strong>Sensitive actions</strong>
-            <span>PIN-confirmed role, PIN and status changes</span>
-          </a>
-        ) : null}
-      </nav>
       <section className="admin-staff-section" aria-labelledby="staff-operations-access">
         <h3 id="staff-operations-access">Operations access</h3>
         {setupRequired.length > 0 ? (
@@ -402,8 +384,6 @@ export function EmployeeDetailPage({
         {operationsHealthy ? <p>Operations access: Ready</p> : null}
       </section>
 
-      <StaffMetricsPanel employee={employee} />
-
       {canManage ? (
         <section
           className="admin-staff-section is-compact"
@@ -445,18 +425,33 @@ export function EmployeeDetailPage({
           onSensitiveCommand={onSensitiveCommand}
         />
       </div>
+      <div className="admin-staff-activity">
+        <StaffMetricsPanel employee={employee} />
+      </div>
     </>
   );
 
   return (
-    <article aria-label={`Employee ${employee.displayName}`}>
-      <header className="admin-page__header">
-        <div>
-          <p className="admin-page__eyebrow">Staff profile</p>
+    <article className="admin-staff-employee" aria-label={`Employee ${employee.displayName}`}>
+      <header className="admin-staff-profile-header">
+        <span className="admin-staff-profile-avatar" aria-hidden="true">
+          {employee.displayName.trim().charAt(0).toUpperCase() || '?'}
+        </span>
+        <div className="admin-staff-profile-meta">
           <h2>{employee.displayName}</h2>
-          <p className="admin-page__description">
-            {roleLabel(employee.role)} · {employee.active ? 'Active' : 'Suspended'}
+          <p>
+            {employee.phone ?? 'No phone'} · {employee.assignments.length} assigned shop
+            {employee.assignments.length === 1 ? '' : 's'}
           </p>
+          <div className="admin-staff-profile-status">
+            <span>{roleLabel(employee.role)}</span>
+            <span data-status={employee.active ? 'active' : 'suspended'}>
+              {employee.active ? 'Active' : 'Suspended'}
+            </span>
+            <span data-status={operationsHealthy ? 'ready' : 'setup'}>
+              {operationsHealthy ? 'Operations ready' : 'Setup required'}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -465,7 +460,7 @@ export function EmployeeDetailPage({
         value={section}
         onChange={onSectionChange}
         tabs={[
-          { id: 'profile', label: 'Profile', content: profileContent },
+          { id: 'profile', label: 'Overview', content: profileContent },
           {
             id: 'schedule',
             label: 'Schedule',
@@ -505,12 +500,12 @@ export function EmployeeDetailPage({
           },
           {
             id: 'pay',
-            label: 'Pay / Compensation',
+            label: 'Pay',
             content: compensationContent,
           },
           {
             id: 'permissions',
-            label: 'Access & Permissions',
+            label: 'Access & permissions',
             content: accessContent,
           },
         ]}

@@ -68,7 +68,7 @@ describe('EmployeeDetailPage', () => {
     const html = render(employee());
     expect(html).toContain('Mona Ali');
     expect(html).toContain('Current shop');
-    expect(html).toContain('Access &amp; Permissions');
+    expect(html).toContain('Access &amp; permissions');
     expect(html).not.toContain('Operations setup required');
     expect(html).not.toContain(SHOP_ID);
   });
@@ -88,7 +88,7 @@ describe('EmployeeDetailPage', () => {
         ],
       }),
     );
-    expect(html).toContain('Access &amp; Permissions');
+    expect(html).toContain('Access &amp; permissions');
     expect(html).not.toContain('Operations access disabled');
     expect(html).not.toContain('Operations access: Ready');
   });
@@ -109,7 +109,7 @@ describe('EmployeeDetailPage', () => {
       }),
       false,
     );
-    expect(html).toContain('Access &amp; Permissions');
+    expect(html).toContain('Access &amp; permissions');
     expect(html).not.toContain('Restore Operations access');
   });
 
@@ -144,7 +144,7 @@ describe('EmployeeDetailPage', () => {
     );
 
     expect(html).toContain('Other shop');
-    expect(html).toContain('Access &amp; Permissions');
+    expect(html).toContain('Access &amp; permissions');
     expect(html).not.toContain('Complete Operations setup');
   });
   it('exposes first-worker provisioning only to authorized administrators when no eligible worker exists', () => {

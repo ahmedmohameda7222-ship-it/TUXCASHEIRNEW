@@ -1,72 +1,32 @@
 import type { EmployeeDetail } from '@tux/admin-contracts';
 
-function formatDuration(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return hours > 0 ? `${hours}h ${remainder}m` : `${remainder}m`;
-}
-
 export function StaffMetricsPanel({ employee }: { employee: EmployeeDetail }) {
   const scheduledShifts = employee.shifts.filter((shift) => shift.status === 'SCHEDULED').length;
-  const attendanceSessions = new Set(
-    employee.attendanceEvents.map((event) => event.workerSessionId),
-  ).size;
   const approvedLeave = employee.leaveRequests.filter(
     (request) => request.status === 'APPROVED',
   ).length;
-  const workedMinutes = employee.attendanceSummaries.reduce(
-    (total, summary) => total + summary.workedMinutes,
-    0,
-  );
-  const overtimeMinutes = employee.attendanceSummaries.reduce(
-    (total, summary) => total + summary.overtimeMinutes,
-    0,
-  );
-  const lateShifts = employee.attendanceSummaries.filter(
-    (summary) => summary.lateMinutes > 0,
-  ).length;
-  const absentShifts = employee.attendanceSummaries.filter((summary) => summary.absent).length;
+  const metrics = [
+    { label: 'Shifts', value: scheduledShifts },
+    { label: 'Clock events', value: employee.attendanceEvents.length },
+    { label: 'Corrections', value: employee.attendanceCorrections.length },
+    { label: 'Approved leave', value: approvedLeave },
+    { label: 'Payments', value: employee.payments.length },
+    {
+      label: 'Overrides',
+      value: employee.customPermissions.length + (employee.customDeniedPermissions?.length ?? 0),
+    },
+  ];
 
   return (
-    <section aria-label="Staff factual metrics">
+    <section className="admin-staff-activity-facts" aria-label="Staff factual metrics">
       <h3>Activity facts</h3>
-      <div className="admin-more-grid">
-        <div className="admin-more-card">
-          <strong>{formatDuration(workedMinutes)}</strong>
-          <span>Worked</span>
-        </div>
-        <div className="admin-more-card">
-          <strong>{formatDuration(overtimeMinutes)}</strong>
-          <span>Overtime</span>
-        </div>
-        <div className="admin-more-card">
-          <strong>{lateShifts}</strong>
-          <span>Late shifts</span>
-        </div>
-        <div className="admin-more-card">
-          <strong>{absentShifts}</strong>
-          <span>Absent shifts</span>
-        </div>
-        <div className="admin-more-card">
-          <strong>{scheduledShifts}</strong>
-          <span>Scheduled shifts</span>
-        </div>
-        <div className="admin-more-card">
-          <strong>{attendanceSessions}</strong>
-          <span>Attendance sessions</span>
-        </div>
-        <div className="admin-more-card">
-          <strong>{employee.attendanceCorrections.length}</strong>
-          <span>Attendance corrections</span>
-        </div>
-        <div className="admin-more-card">
-          <strong>{approvedLeave}</strong>
-          <span>Approved leave requests</span>
-        </div>
-        <div className="admin-more-card">
-          <strong>{employee.payments.length}</strong>
-          <span>Recorded staff payments</span>
-        </div>
+      <div className="admin-staff-activity-grid">
+        {metrics.map((metric) => (
+          <div className="admin-staff-activity-item" key={metric.label}>
+            <span>{metric.label}</span>
+            <strong>{metric.value}</strong>
+          </div>
+        ))}
       </div>
     </section>
   );

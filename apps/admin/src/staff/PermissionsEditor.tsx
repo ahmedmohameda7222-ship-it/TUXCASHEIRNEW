@@ -90,8 +90,14 @@ export function PermissionsEditor({
   }
 
   return (
-    <section aria-label="Permissions">
-      <h3>Access &amp; Permissions</h3>
+    <section className="admin-staff-permissions-card" aria-label="Permissions">
+      <div className="admin-staff-permissions-heading">
+        <h3>Permission overrides</h3>
+        <span>
+          {employee.customPermissions.length + (employee.customDeniedPermissions?.length ?? 0)}{' '}
+          customized
+        </span>
+      </div>
       <p>
         Role defaults provide the normal access level. Use an override only when this employee needs
         an exception.
@@ -101,7 +107,7 @@ export function PermissionsEditor({
         {employee.customDeniedPermissions?.length ?? 0} explicit denial(s). Other capabilities
         follow the assigned role default for this shop.
       </p>
-      <div className="admin-more-grid">
+      <div className="admin-staff-permissions-grid">
         {permissionGroups.map(([group, permissions]) => {
           const overrideCount = permissions.filter(
             (permission) =>

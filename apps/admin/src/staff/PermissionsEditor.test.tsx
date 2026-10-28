@@ -38,7 +38,8 @@ describe('PermissionsEditor', () => {
         onSensitiveCommand={() => undefined}
       />,
     );
-    expect(html).toContain('Access &amp; Permissions');
+    expect(html).toContain('Permission overrides');
+    expect(html).toContain('admin-staff-permissions-grid');
     expect(html).toContain('1 explicit allowance(s)');
     expect(html).toContain('override(s)');
     expect(html).toContain('<details');
