@@ -118,7 +118,12 @@ export function EmployeeDetailPage({
   const inactiveOperationsIdentities = employee.operationsIdentities.filter(
     isInactiveLinkedOperationsIdentity,
   );
-  const operationsHealthy = setupRequired.length === 0 && inactiveOperationsIdentities.length === 0;
+  // The readiness chip describes this shop; other shops retain independent setup notices.
+  const currentShopIdentity = employee.operationsIdentities.find(
+    (identity) => identity.shopId === shopId,
+  );
+  const operationsHealthy =
+    employee.active && currentShopIdentity?.kind === 'LINKED' && currentShopIdentity.workerActive;
   const shopName = (id: string) => shops.find((shop) => shop.id === id)?.name ?? 'Authorized shop';
   const initials = employee.displayName
     .trim()
