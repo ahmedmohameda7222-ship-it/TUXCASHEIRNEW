@@ -52,6 +52,8 @@ export function StaffPage() {
   const selectedId = detailIdFromPath(location, '/staff');
   const [createOpen, setCreateOpen] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [newEmployeeName, setNewEmployeeName] = useState('');
   const [newEmployeePhone, setNewEmployeePhone] = useState('');
   const [newEmployeeHireDate, setNewEmployeeHireDate] = useState('');
@@ -68,13 +70,18 @@ export function StaffPage() {
   );
   const visibleRows = useMemo(() => {
     const term = employeeSearch.trim().toLocaleLowerCase();
-    if (!term) return rows;
-    return rows.filter((employee) =>
-      [employee.displayName, employee.phone ?? '', roleLabel(employee.role)].some((value) =>
-        value.toLocaleLowerCase().includes(term),
-      ),
-    );
-  }, [rows, employeeSearch]);
+    return rows.filter((employee) => {
+      if (roleFilter !== 'all' && employee.role !== roleFilter) return false;
+      if (statusFilter === 'active' && !employee.active) return false;
+      if (statusFilter === 'suspended' && employee.active) return false;
+      return (
+        !term ||
+        [employee.displayName, employee.phone ?? '', roleLabel(employee.role)].some((value) =>
+          value.toLocaleLowerCase().includes(term),
+        )
+      );
+    });
+  }, [rows, employeeSearch, roleFilter, statusFilter]);
   const hasMoreStaff = staff.workspaceQuery.data?.employees.nextCursor != null;
 
   if (!shopId) {
@@ -172,6 +179,34 @@ export function StaffPage() {
                   value={employeeSearch}
                   onChange={(event) => setEmployeeSearch(event.currentTarget.value)}
                 />
+                <div className="admin-staff-directory__filters">
+                  <label>
+                    <span>Role</span>
+                    <select
+                      aria-label="Role (loaded results)"
+                      value={roleFilter}
+                      onChange={(event) => setRoleFilter(event.currentTarget.value)}
+                    >
+                      <option value="all">All roles</option>
+                      <option value="OWNER">Owner</option>
+                      <option value="ADMIN">Administrator</option>
+                      <option value="MANAGER">Manager</option>
+                      <option value="STAFF">Staff</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Status</span>
+                    <select
+                      aria-label="Status (loaded results)"
+                      value={statusFilter}
+                      onChange={(event) => setStatusFilter(event.currentTarget.value)}
+                    >
+                      <option value="all">All statuses</option>
+                      <option value="active">Active</option>
+                      <option value="suspended">Suspended</option>
+                    </select>
+                  </label>
+                </div>
                 {hasMoreStaff ? <p>Loaded results only</p> : null}
               </div>
               {staff.workspaceQuery.isLoading ? <LoadingState title="Loading staff" /> : null}
