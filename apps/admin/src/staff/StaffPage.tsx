@@ -366,9 +366,10 @@ export function StaffPage() {
             throw new Error('Permission change awaiting second-person approval');
           }
           actual = await readAccess();
-          const confirmed = effect === 'ALLOW'
-            ? actual.customPermissions.includes(permissionKey)
-            : actual.customDeniedPermissions?.includes(permissionKey);
+          const confirmed =
+            effect === 'ALLOW'
+              ? actual.customPermissions.includes(permissionKey)
+              : actual.customDeniedPermissions?.includes(permissionKey);
           if (!confirmed) {
             throw new Error('Employee permission is not yet confirmed by the server');
           }
@@ -1048,9 +1049,11 @@ export function StaffPage() {
                     : 'Compensation will be configured later.'}
                 </p>
                 <p>
-                  Initial shift: {initialShiftStartsAt && initialShiftEndsAt
+                  Initial shift:{' '}
+                  {initialShiftStartsAt && initialShiftEndsAt
                     ? 'Scheduled within this Save'
-                    : 'No initial shift requested'}.
+                    : 'No initial shift requested'}
+                  .
                 </p>
                 <p>
                   Operations access will be ready in all selected shops after the employee PIN is
@@ -1059,8 +1062,8 @@ export function StaffPage() {
                 </p>
                 <p>
                   Requested role: {newEmployeeRole}. Explicit module permissions:{' '}
-                  {Object.keys(newEmployeePermissionOverrides).length}. These changes are
-                  confirmed against the server before Save finishes.
+                  {Object.keys(newEmployeePermissionOverrides).length}. These changes are confirmed
+                  against the server before Save finishes.
                 </p>
                 {createdEmployeeId ? (
                   <p>

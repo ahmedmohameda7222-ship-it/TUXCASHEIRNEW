@@ -1580,8 +1580,11 @@ test('S2 Add employee applies requested role and permission before reporting sav
   await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect(sheet).toHaveCount(0);
   expect(commands.map((command) => command.type)).toEqual([
-    'employee.create', 'employee.pin', 'employee.provision-worker',
-    'employee.role', 'employee.permission',
+    'employee.create',
+    'employee.pin',
+    'employee.provision-worker',
+    'employee.role',
+    'employee.permission',
   ]);
   for (const sensitive of commands.filter((command) =>
     ['employee.pin', 'employee.role', 'employee.permission'].includes(String(command.type)),
@@ -1651,7 +1654,10 @@ test('S2 initial shift is included in Add employee before Operations-ready save'
   await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect(sheet).toHaveCount(0);
   expect(commands.map((command) => command.type)).toEqual([
-    'employee.create', 'employee.pin', 'employee.provision-worker', 'shift.create',
+    'employee.create',
+    'employee.pin',
+    'employee.provision-worker',
+    'shift.create',
   ]);
   expect(commands[3]).toMatchObject({
     startsAt: '2026-10-29T06:00:00.000Z',
