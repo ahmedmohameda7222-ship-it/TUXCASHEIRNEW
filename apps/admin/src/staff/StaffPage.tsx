@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
 
 import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
@@ -53,22 +53,14 @@ function optionalCompensationMinor(raw: string): number | null {
   return minor;
 }
 
-function readPendingOnboarding(key: string): string | null {
-  try {
-    const employeeId = sessionStorage.getItem(key);
-    return employeeId && /^[0-9a-f-]{36}$/i.test(employeeId) ? employeeId : null;
-  } catch {
-    return null;
-  }
-}
-
-function writePendingOnboarding(key: string, employeeId: string | null): void {
-  try {
-    if (employeeId) sessionStorage.setItem(key, employeeId);
-    else sessionStorage.removeItem(key);
-  } catch {
-    // In-memory state continues protecting this session when storage is unavailable.
-  }
+function readPendingOnboarding(search: string, shopId: string | undefined): string | null {
+  const params = new URLSearchParams(search);
+  const employeeId = params.get('pendingEmployee');
+  return employeeId &&
+    params.get('pendingShop') === shopId &&
+    /^[0-9a-f-]{36}$/i.test(employeeId)
+    ? employeeId
+    : null;
 }
 
 export function StaffPage() {
@@ -81,9 +73,8 @@ export function StaffPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState<EmployeeOnboardingStep>('identity');
   const [onboardingShopIds, setOnboardingShopIds] = useState<string[]>(shopId ? [shopId] : []);
-  const onboardingRecoveryKey = `tux.staff.pending-onboarding.v1:${principal.businessId}:${principal.employeeId}:${shopId ?? 'none'}`;
   const [createdEmployeeId, setCreatedEmployeeId] = useState<string | null>(() =>
-    readPendingOnboarding(onboardingRecoveryKey),
+    readPendingOnboarding(search, shopId),
   );
   const [assignedShopIds, setAssignedShopIds] = useState<string[]>([]);
   const [onboardingBusy, setOnboardingBusy] = useState(false);
@@ -101,11 +92,6 @@ export function StaffPage() {
   const [newEmployeeHireDate, setNewEmployeeHireDate] = useState('');
   const [newEmployeeNotes, setNewEmployeeNotes] = useState('');
   const staff = useStaff(shopId, selectedId);
-  useEffect(() => {
-    setCreatedEmployeeId(readPendingOnboarding(onboardingRecoveryKey));
-    setAssignedShopIds([]);
-    setOnboardingStep('identity');
-  }, [onboardingRecoveryKey]);
   const shopChoices = useMemo(
     () => staff.workspaceQuery.data?.shops ?? [],
     [staff.workspaceQuery.data?.shops],
@@ -179,7 +165,11 @@ export function StaffPage() {
         }
         employeeId = result.employeeId;
         setCreatedEmployeeId(employeeId);
-        writePendingOnboarding(onboardingRecoveryKey, employeeId);
+        window.history.replaceState(
+          window.history.state,
+          '',
+          `/staff?pendingEmployee=${encodeURIComponent(employeeId)}&pendingShop=${encodeURIComponent(shopId)}`,
+        );
       }
 
       const completed = new Set(assignedShopIds);
@@ -213,7 +203,6 @@ export function StaffPage() {
       setCreateOpen(false);
       setOnboardingStep('identity');
       setCreatedEmployeeId(null);
-      writePendingOnboarding(onboardingRecoveryKey, null);
       setAssignedShopIds([]);
       setNewEmployeeName('');
       setNewEmployeePhone('');
@@ -268,6 +257,7 @@ export function StaffPage() {
             onClick={() => {
               if (createdEmployeeId && !newEmployeeName.trim()) {
                 navigate(`${detailPath('/staff', createdEmployeeId)}?section=permissions`);
+                setCreatedEmployeeId(null);
                 return;
               }
               if (createdEmployeeId) {
