@@ -73,6 +73,16 @@ describe('EmployeeDetailPage', () => {
     expect(html).not.toContain(SHOP_ID);
   });
 
+  it('uses the approved clean Access inspector hierarchy without decorative shortcut cards', () => {
+    const html = render(employee(), true, [], 'permissions', true);
+    expect(html).toContain('Access &amp; permissions');
+    expect(html).toContain('Operations access');
+    expect(html).toContain('Sensitive access actions');
+    expect(html).toContain('Permission overrides');
+    expect(html).toContain('Activity facts');
+    expect(html).not.toContain('admin-staff-access-tasks');
+  });
+
   it('renders an inactive preserved link as disabled rather than healthy setup', () => {
     const html = render(
       employee({
@@ -147,6 +157,35 @@ describe('EmployeeDetailPage', () => {
     expect(html).toContain('Access &amp; Permissions');
     expect(html).not.toContain('Complete Operations setup');
   });
+  it('reports readiness for the selected shop without hiding other-shop setup gaps', () => {
+    const html = render(
+      employee({
+        assignments: [
+          { shopId: SHOP_ID, assigned: true },
+          { shopId: OTHER_SHOP_ID, assigned: true },
+        ],
+        operationsIdentities: [
+          {
+            kind: 'LINKED',
+            shopId: SHOP_ID,
+            workerId: WORKER_ID,
+            workerName: 'Mona Ops',
+            workerActive: true,
+            credentialVersion: 8,
+          },
+          { kind: 'SETUP_REQUIRED', shopId: OTHER_SHOP_ID },
+        ],
+      }),
+      true,
+      [],
+      'permissions',
+      true,
+    );
+    expect(html).toContain('Operations ready');
+    expect(html).toContain('Other shop');
+    expect(html).not.toContain('Operations setup needed');
+  });
+
   it('exposes first-worker provisioning only to authorized administrators when no eligible worker exists', () => {
     const enabled = render(employee(), true, [], 'permissions', true);
     expect(enabled).toContain('Provision and link Operations worker');

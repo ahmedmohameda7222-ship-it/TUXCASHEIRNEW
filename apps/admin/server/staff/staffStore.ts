@@ -353,6 +353,54 @@ export interface StaffStore {
   ): Promise<StaffCommandResult>;
 }
 
+async function countPendingLeaveRequests(
+  client: AdminSupabaseClient,
+  businessId: string,
+  shopId: string,
+): Promise<number> {
+  let count = 0;
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await client.select<Array<{ id: string }>>(
+      'leave_requests',
+      new URLSearchParams({
+        select: 'id',
+        business_id: `eq.${businessId}`,
+        status: 'eq.PENDING',
+        or: `(shop_id.eq.${shopId},shop_id.is.null)`,
+        order: 'id.asc',
+        limit: String(pageSize),
+        offset: String(offset),
+      }),
+    );
+    count += page.length;
+    if (page.length < pageSize) return count;
+  }
+}
+
+async function selectAllStaffRows<Row>(
+  client: AdminSupabaseClient,
+  table: string,
+  params: URLSearchParams,
+): Promise<Row[]> {
+  const rows: Row[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const query = new URLSearchParams(params);
+    query.set('limit', String(pageSize));
+    query.set('offset', String(offset));
+    const page = await client.select<Row[]>(table, query);
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+}
+
+function staffIdBatches(ids: readonly string[]): string[][] {
+  const result: string[][] = [];
+  for (let i = 0; i < ids.length; i += 100) result.push(ids.slice(i, i + 100));
+  return result;
+}
+
 export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStore {
   return {
     async loadWorkspace(shopId, businessId, visibleShopIds): Promise<StaffWorkspace> {
@@ -361,7 +409,8 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
         throw new Error('staff_shop_scope_invalid');
       }
 
-      const shopAssignments = await client.select<AssignmentRow[]>(
+      const shopAssignments = await selectAllStaffRows<AssignmentRow>(
+        client,
         'employee_shop_assignments',
         new URLSearchParams({
           select: 'employee_id,shop_id',
@@ -376,51 +425,71 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
       let links: WorkerLinkRow[] = [];
 
       if (employeeIds.length > 0) {
-        [employees, allAssignments, links] = await Promise.all([
-          client.select<EmployeeRow[]>(
-            'business_employees',
-            new URLSearchParams({
-              select:
-                'id,business_id,display_name,phone,hire_date,notes,role,active,profile_version,credential_version',
-              business_id: `eq.${businessId}`,
-              id: inFilter(employeeIds),
-              order: 'display_name.asc,id.asc',
-            }),
+        const batchResults = await Promise.all(
+          staffIdBatches(employeeIds).map(async (ids) =>
+            Promise.all([
+              selectAllStaffRows<EmployeeRow>(
+                client,
+                'business_employees',
+                new URLSearchParams({
+                  select:
+                    'id,business_id,display_name,phone,hire_date,notes,role,active,profile_version,credential_version',
+                  business_id: `eq.${businessId}`,
+                  id: inFilter(ids),
+                  order: 'display_name.asc,id.asc',
+                }),
+              ),
+              selectAllStaffRows<AssignmentRow>(
+                client,
+                'employee_shop_assignments',
+                new URLSearchParams({
+                  select: 'employee_id,shop_id',
+                  business_id: `eq.${businessId}`,
+                  employee_id: inFilter(ids),
+                  shop_id: inFilter(authorizedShopIds),
+                  order: 'employee_id.asc,shop_id.asc',
+                }),
+              ),
+              selectAllStaffRows<WorkerLinkRow>(
+                client,
+                'employee_worker_links',
+                new URLSearchParams({
+                  select: 'employee_id,shop_id,worker_id,active',
+                  business_id: `eq.${businessId}`,
+                  employee_id: inFilter(ids),
+                  shop_id: inFilter(authorizedShopIds),
+                  active: 'eq.true',
+                }),
+              ),
+            ]),
           ),
-          client.select<AssignmentRow[]>(
-            'employee_shop_assignments',
-            new URLSearchParams({
-              select: 'employee_id,shop_id',
-              business_id: `eq.${businessId}`,
-              employee_id: inFilter(employeeIds),
-              shop_id: inFilter(authorizedShopIds),
-              order: 'employee_id.asc,shop_id.asc',
-            }),
-          ),
-          client.select<WorkerLinkRow[]>(
-            'employee_worker_links',
-            new URLSearchParams({
-              select: 'employee_id,shop_id,worker_id,active',
-              business_id: `eq.${businessId}`,
-              employee_id: inFilter(employeeIds),
-              shop_id: inFilter(authorizedShopIds),
-              active: 'eq.true',
-            }),
-          ),
-        ]);
+        );
+        employees = batchResults.flatMap(([batchEmployees]) => batchEmployees);
+        allAssignments = batchResults.flatMap(([, batchAssignments]) => batchAssignments);
+        links = batchResults.flatMap(([, , batchLinks]) => batchLinks);
+        employees.sort(
+          (a, b) => a.display_name.localeCompare(b.display_name) || a.id.localeCompare(b.id),
+        );
       }
 
       const linkedWorkerIds = [...new Set(links.map((link) => link.worker_id))];
       const linkedWorkers =
         linkedWorkerIds.length === 0
           ? []
-          : await client.select<WorkerRow[]>(
-              'workers',
-              new URLSearchParams({
-                select: 'id,shop_id,display_name,active,credential_version',
-                id: inFilter(linkedWorkerIds),
-              }),
-            );
+          : (
+              await Promise.all(
+                staffIdBatches(linkedWorkerIds).map((ids) =>
+                  selectAllStaffRows<WorkerRow>(
+                    client,
+                    'workers',
+                    new URLSearchParams({
+                      select: 'id,shop_id,display_name,active,credential_version',
+                      id: inFilter(ids),
+                    }),
+                  ),
+                ),
+              )
+            ).flat();
       const linkedWorkersById = new Map(linkedWorkers.map((worker) => [worker.id, worker]));
 
       const shopIdsByEmployee = new Map<string, string[]>();
@@ -450,7 +519,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
         };
       });
 
-      const [financeAccounts, workerChoices, shops] = await Promise.all([
+      const [financeAccounts, workerChoices, shops, pendingLeaveCount] = await Promise.all([
         client.select<FinanceAccountRow[]>(
           'finance_accounts',
           new URLSearchParams({
@@ -479,6 +548,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
             order: 'name.asc,id.asc',
           }),
         ),
+        countPendingLeaveRequests(client, businessId, shopId),
       ]);
 
       const linkedEmployeeByWorker = new Map(
@@ -496,6 +566,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
       const employeesResult: StaffListResult = { rows, nextCursor: null };
       return {
         employees: employeesResult,
+        pendingLeaveCount,
         shops,
         financeAccounts: financeAccounts.map((account) => ({
           id: account.id,

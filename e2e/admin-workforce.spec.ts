@@ -156,6 +156,12 @@ async function mockWorkforce(page: Page, withAccount = true) {
         ...(command.type === 'employee.create'
           ? { employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }
           : {}),
+        ...(command.type === 'employee.provision-worker'
+          ? {
+              workerId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              shopId: command.shopId,
+            }
+          : {}),
       }),
     });
   });
@@ -167,6 +173,42 @@ async function selectEmployee(page: Page, name: string) {
   await page.getByRole('button', { name: new RegExp(name) }).click();
   await expect(page.getByRole('heading', { name })).toBeVisible();
 }
+
+test('S1 directory setup badge uses the current shop, not another assigned shop', async ({
+  page,
+}) => {
+  const otherShopId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  await mockWorkforce(page);
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() !== 'GET' || url.searchParams.has('employeeId')) {
+      await route.fallback();
+      return;
+    }
+    const current = workspace();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...current,
+        employees: {
+          ...current.employees,
+          rows: [
+            {
+              ...current.employees.rows[0],
+              operationsSetupRequiredShopIds: [otherShopId],
+            },
+          ],
+        },
+      }),
+    });
+  });
+  await page.goto('/staff');
+  const employeeRow = page.getByRole('button', { name: /Mona Ali/ });
+  await expect(employeeRow).toBeVisible();
+  await expect(employeeRow).not.toContainText('Setup needed');
+});
 
 test('S1 mobile directory searches name and phone within explicitly loaded staff', async ({
   page,
@@ -303,10 +345,8 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
   await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
   await selectEmployee(page, 'Mona Ali');
   await page.getByRole('tab', { name: 'Access & Permissions' }).click();
-  const accessWorkspaces = page.getByRole('navigation', { name: 'Employee access workspaces' });
-  await expect(accessWorkspaces.getByRole('link')).toHaveCount(3);
-  await accessWorkspaces.getByRole('link', { name: /Role & permissions/ }).click();
-  await expect(page).toHaveURL(/#staff-permission-policy$/);
+  await expect(page.locator('#staff-operations-access')).toBeVisible();
+  await expect(page.locator('#staff-permission-policy')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Permissions' })).toBeVisible();
   await expect(page.getByText('Operations setup required', { exact: true })).toBeVisible();
   const setup = page.locator('.admin-staff-readiness-state').first();
@@ -530,8 +570,7 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     await page.goto('/staff');
     await selectEmployee(page, 'Mona Ali');
     await page.getByRole('tab', { name: 'Access & Permissions' }).click();
-    const tasks = page.getByRole('navigation', { name: 'Employee access workspaces' });
-    await expect(tasks.getByRole('link')).toHaveCount(2);
+    await expect(page.locator('#staff-operations-access')).toBeVisible();
     await expect(page.getByRole('region', { name: 'Permissions' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Change role' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Reset employee PIN' })).toHaveCount(0);
@@ -542,6 +581,37 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     );
     expect(commands).toHaveLength(0);
     await capturePremiumScreenshot(page, 'workforce-readonly');
+  });
+}
+
+for (const width of [390, 1440] as const) {
+  test(`S4 selected Staff inspector keeps approved focused navigation at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await mockWorkforce(page);
+    await page.goto('/staff');
+    const pageTitle = page.getByRole('heading', { name: 'Staff', exact: true });
+    const summary = page.locator('.admin-staff-summary');
+    await expect(pageTitle).toBeVisible();
+    await expect(summary).toBeVisible();
+
+    await selectEmployee(page, 'Mona Ali');
+    await expect(page.getByRole('article', { name: 'Employee Mona Ali' })).toBeVisible();
+    if (width === 390) {
+      await expect(pageTitle).toBeHidden();
+      await expect(summary).toBeHidden();
+      await expect(page.getByRole('link', { name: /back to employees/i })).toBeVisible();
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+        .toBe(true);
+      await page.getByRole('link', { name: /back to employees/i }).click();
+      await expect(pageTitle).toBeVisible();
+      await expect(summary).toBeVisible();
+    } else {
+      await expect(pageTitle).toBeVisible();
+      await expect(summary).toBeVisible();
+    }
   });
 }
 
@@ -622,9 +692,10 @@ test('switching employees resets local profile editor state to the selected empl
   const monaProfile = page.getByRole('article', { name: 'Employee Mona Ali' });
   await expect(monaProfile.getByLabel('Name')).toHaveValue('Mona Ali');
 
-  // Workforce detail is a full-width task surface; navigate back before
-  // changing employees, then verify the replacement editor state is clean.
-  await page.getByRole('link', { name: /back to employees/i }).click();
+  // Desktop keeps directory and inspector adjacent; narrow screens use Back.
+  if ((page.viewportSize()?.width ?? 0) < 1100) {
+    await page.getByRole('link', { name: /back to employees/i }).click();
+  }
   await selectEmployee(page, 'Youssef Hassan');
 
   const youssefProfile = page.getByRole('article', { name: 'Employee Youssef Hassan' });
@@ -659,11 +730,19 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
   }
 }
 
+async function fillEmployeeOperationsSetup(page: Page) {
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Employee Operations PIN').fill('246810');
+  await sheet.getByLabel('Confirm Operations PIN').fill('246810');
+  await sheet.getByLabel('Admin PIN for employee setup').fill('1234');
+}
+
 async function advanceStaffOnboardingToReview(page: Page) {
   const sheet = page.getByRole('dialog', { name: 'Add employee' });
-  for (let step = 0; step < 3; step += 1) {
-    await sheet.getByRole('button', { name: 'Continue' }).click();
-  }
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await fillEmployeeOperationsSetup(page);
+  await sheet.getByRole('button', { name: 'Continue' }).click();
 }
 
 test('S2 onboarding reviews authorized shops before creating and assigning employee', async ({
@@ -722,6 +801,12 @@ test('S2 onboarding reviews authorized shops before creating and assigning emplo
         ...(command.type === 'employee.create'
           ? { employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }
           : {}),
+        ...(command.type === 'employee.provision-worker'
+          ? {
+              workerId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              shopId: command.shopId,
+            }
+          : {}),
       }),
     });
   });
@@ -739,11 +824,12 @@ test('S2 onboarding reviews authorized shops before creating and assigning emplo
   await sheet.getByRole('checkbox', { name: 'Mall' }).check();
   await sheet.getByRole('button', { name: 'Continue' }).click();
   await expect(sheet.getByText('Employment setup')).toBeVisible();
+  await fillEmployeeOperationsSetup(page);
   await sheet.getByRole('button', { name: 'Continue' }).click();
   await expect(sheet.getByText('Review employee setup')).toBeVisible();
   expect(commands).toHaveLength(0);
-  await sheet.getByRole('button', { name: 'Create employee' }).click();
-  await expect.poll(() => commands.length).toBe(2);
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect.poll(() => commands.length).toBe(5);
   expect(commands[0]).toMatchObject({
     type: 'employee.create',
     shopId,
@@ -754,6 +840,12 @@ test('S2 onboarding reviews authorized shops before creating and assigning emplo
     employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     shopId: otherShopId,
   });
+  expect(commands.slice(2).map((command) => command.type)).toEqual([
+    'employee.pin',
+    'employee.provision-worker',
+    'employee.provision-worker',
+  ]);
+  expect(commands.slice(3).map((command) => command.shopId)).toEqual([shopId, otherShopId]);
   await expect(sheet).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
@@ -804,8 +896,9 @@ test('S2 partial compensation failure resumes after closing without duplicate em
   await sheet.getByRole('button', { name: 'Continue' }).click();
   await sheet.getByLabel('Rate (EGP, optional)').fill('100.00');
   await sheet.getByLabel('Effective from').fill('2026-10-01');
+  await fillEmployeeOperationsSetup(page);
   await sheet.getByRole('button', { name: 'Continue' }).click();
-  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect(sheet.getByRole('alert')).toContainText('compensation temporarily unavailable');
   await expect.poll(() => commands.length).toBe(2);
   await sheet.getByRole('button', { name: 'Cancel' }).click();
@@ -813,8 +906,10 @@ test('S2 partial compensation failure resumes after closing without duplicate em
   await page.getByRole('button', { name: 'Add employee' }).click();
   sheet = page.getByRole('dialog', { name: 'Add employee' });
   await expect(sheet.getByText('Review employee setup')).toBeVisible();
-  await expect(sheet.getByRole('button', { name: 'Resume onboarding' })).toBeVisible();
-  await sheet.getByRole('button', { name: 'Resume onboarding' }).click();
+  await expect(
+    sheet.getByRole('button', { name: 'Save employee & enable Operations' }),
+  ).toBeVisible();
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect.poll(() => commands.length).toBe(3);
   expect(commands.map((command) => command.type)).toEqual([
     'employee.create',
@@ -864,10 +959,10 @@ test('S2 rejected employee creation retries the same idempotency intent on phone
   const sheet = page.getByRole('dialog', { name: 'Add employee' });
   await sheet.getByLabel('Name').fill('Amira Retries');
   await advanceStaffOnboardingToReview(page);
-  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect(page.getByRole('alert')).toContainText('staff store temporarily unavailable');
   await expect(sheet).toBeVisible();
-  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect.poll(() => attempts.length).toBe(2);
   expect(attempts[0]).toBeTruthy();
   expect(attempts[1]).toBe(attempts[0]);
@@ -899,7 +994,7 @@ test('rejected employee creation preserves the Add employee sheet and does not c
   const sheet = page.getByRole('dialog', { name: 'Add employee' });
   await sheet.getByLabel('Name').fill('Existing Employee');
   await advanceStaffOnboardingToReview(page);
-  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect(sheet).toBeVisible();
   await expect(sheet.getByText('Existing Employee')).toBeVisible();
   await expect(page.getByRole('alert')).toContainText('employee already exists');
@@ -917,7 +1012,7 @@ test('new employee sheet persists actual hire date and notes through the trusted
   await sheet.getByLabel('Hire date').fill('2026-10-01');
   await sheet.getByLabel('Internal notes').fill('Cross-trained at counter');
   await advanceStaffOnboardingToReview(page);
-  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect
     .poll(() => commands.some((command) => command['type'] === 'employee.create'))
     .toBe(true);
@@ -929,4 +1024,482 @@ test('new employee sheet persists actual hire date and notes through the trusted
     notes: 'Cross-trained at counter',
     role: 'STAFF',
   });
+});
+
+test('S3 leave rejection preserves the request sheet, values and retry identity on phone', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  let attempts = 0;
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'POST' || request.postDataJSON()?.type !== 'leave.create') {
+      await route.fallback();
+      return;
+    }
+    attempts += 1;
+    if (attempts === 1) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: false, code: 'leave_temporarily_unavailable' }),
+      });
+      return;
+    }
+    await route.fallback();
+  });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Leave' }).click();
+  await page.getByRole('button', { name: 'New leave request' }).click();
+  const sheet = page.getByRole('dialog', { name: 'New leave request' });
+  await sheet.getByLabel('Start date').fill('2026-11-03');
+  await sheet.getByLabel('End date').fill('2026-11-05');
+  await sheet.getByLabel('Note').fill('Family event');
+  await sheet.getByRole('button', { name: 'Request leave' }).click();
+  await expect.poll(() => attempts).toBe(1);
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByLabel('Note')).toHaveValue('Family event');
+  await sheet.getByRole('button', { name: 'Request leave' }).click();
+  await expect.poll(() => attempts).toBe(2);
+  await expect(sheet).toHaveCount(0);
+  expect(commands.filter((command) => command.type === 'leave.create')).toHaveLength(1);
+});
+
+test('S4 refused role change keeps PIN confirmation open and never claims success', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  let attempts = 0;
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'POST' || request.postDataJSON()?.type !== 'employee.role') {
+      await route.fallback();
+      return;
+    }
+    attempts += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        attempts === 1
+          ? { ok: false, code: 'role_approval_denied' }
+          : { ok: true, replayed: false },
+      ),
+    });
+  });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+  await page.getByRole('button', { name: 'Change role' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Change role' });
+  await sheet.getByLabel('New role').selectOption('MANAGER');
+  await sheet.getByLabel('Admin PIN for staff changes').fill('1234');
+  await sheet.getByRole('button', { name: 'Confirm change' }).click();
+  await expect.poll(() => attempts).toBe(1);
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByLabel('New role')).toHaveValue('MANAGER');
+  await sheet.getByRole('button', { name: 'Confirm change' }).click();
+  await expect.poll(() => attempts).toBe(2);
+  await expect(sheet).toHaveCount(0);
+});
+
+test('S3 leave list hides requests scoped to other shops but keeps business-wide leave', async ({
+  page,
+}) => {
+  const otherShopId = '99999999-9999-4999-8999-999999999999';
+  await mockWorkforce(page);
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'GET' || !new URL(request.url()).searchParams.has('employeeId')) {
+      await route.fallback();
+      return;
+    }
+    const current = employee();
+    const leave = (id: string, requestedShopId: string | null, note: string) => ({
+      id,
+      employeeId,
+      shopId: requestedShopId,
+      leaveType: 'VACATION',
+      startsOn: '2026-11-01',
+      endsOn: '2026-11-02',
+      note,
+      status: 'PENDING',
+      requesterEmployeeId: employeeId,
+      decidedByEmployeeId: null,
+      decisionReason: null,
+      decidedAt: null,
+      version: 1,
+      createdAt: '2026-10-28T00:00:00Z',
+      updatedAt: '2026-10-28T00:00:00Z',
+    });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        employee: {
+          ...current,
+          leaveRequests: [
+            leave('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', shopId, 'Local leave'),
+            leave('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', otherShopId, 'Other shop leave'),
+            leave('cccccccc-cccc-4ccc-8ccc-cccccccccccc', null, 'Business-wide leave'),
+          ],
+        },
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Leave' }).click();
+  await expect(page.getByText('Local leave')).toBeVisible();
+  await expect(page.getByText('Business-wide leave')).toBeVisible();
+  await expect(page.getByText('Other shop leave')).toHaveCount(0);
+});
+
+test('S2 interrupted onboarding survives reload without creating a duplicate employee', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  let creates = 0;
+  let compensationAttempts = 0;
+  await page.route('**/api/admin/staff**', async (route) => {
+    if (route.request().method() === 'GET') {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get('employeeId') === 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            employee: {
+              ...employee(),
+              id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              displayName: 'Amira Resumable',
+              credentialVersion: 1,
+            },
+          }),
+        });
+        return;
+      }
+      await route.fallback();
+      return;
+    }
+    const command = route.request().postDataJSON() as { type?: string };
+    if (command.type === 'employee.create') {
+      creates += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          replayed: false,
+          employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        }),
+      });
+      return;
+    }
+    if (command.type === 'compensation.set') {
+      compensationAttempts += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          compensationAttempts === 1
+            ? { ok: false, code: 'compensation_temporarily_unavailable' }
+            : { ok: true, replayed: false },
+        ),
+      });
+      return;
+    }
+    await route.fallback();
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Amira Resumable');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByLabel('Rate (EGP, optional)').fill('100.00');
+  await sheet.getByLabel('Effective from').fill('2026-10-01');
+  await fillEmployeeOperationsSetup(page);
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect(sheet.getByRole('alert')).toContainText('compensation temporarily unavailable');
+  expect(creates).toBe(1);
+  await page.reload();
+  const resume = page.getByRole('button', { name: 'Complete employee setup' });
+  await expect(resume).toBeVisible();
+  await resume.click();
+  const resumedSheet = page.getByRole('dialog', { name: 'Add employee' });
+  await expect(resumedSheet.getByLabel('Rate (EGP, optional)')).toBeVisible();
+  await resumedSheet.getByLabel('Rate (EGP, optional)').fill('100.00');
+  await resumedSheet.getByLabel('Effective from').fill('2026-10-01');
+  await fillEmployeeOperationsSetup(page);
+  await resumedSheet.getByRole('button', { name: 'Continue' }).click();
+  await resumedSheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect(resumedSheet).toHaveCount(0);
+  expect(compensationAttempts).toBe(2);
+  expect(creates).toBe(1);
+  await page.goBack();
+  await expect.poll(() => new URL(page.url()).pathname + new URL(page.url()).search).toBe('/staff');
+  await expect(page.getByRole('button', { name: 'Complete employee setup' })).toHaveCount(0);
+});
+
+test('S4 payroll pending second-person approval does not claim a posted staff payment', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  let attempts = 0;
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'POST' || request.postDataJSON()?.type !== 'payment.record') {
+      await route.fallback();
+      return;
+    }
+    attempts += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        state: 'PENDING_APPROVAL',
+        approvalRequestId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        replayed: attempts > 1,
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Pay / Compensation' }).click();
+  await page.getByLabel('Pay period start').fill('2026-10-01');
+  await page.getByLabel('Pay period end').fill('2026-10-31');
+  await page.getByLabel('Expected amount (EGP)').fill('500.00');
+  await page.getByLabel('Paid amount (EGP)').fill('500.00');
+  await page.getByLabel('Payment date').fill('2026-10-31');
+  await page.getByLabel('Admin PIN for staff payment').fill('1234');
+  await page.getByRole('button', { name: 'Record payment' }).click();
+  await expect.poll(() => attempts).toBe(1);
+  await expect(page.getByRole('status')).toContainText('Pending second-person approval');
+  await expect(page.getByLabel('Paid amount (EGP)')).toHaveValue('500.00');
+  await expect(page.getByLabel('Admin PIN for staff payment')).toHaveValue('');
+});
+
+test('S4 role change pending approval is shown as not applied', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  let requests = 0;
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'POST' || request.postDataJSON()?.type !== 'employee.role') {
+      await route.fallback();
+      return;
+    }
+    requests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        state: 'PENDING_APPROVAL',
+        approvalRequestId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+  await page.getByRole('button', { name: 'Change role' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Change role' });
+  await sheet.getByLabel('New role').selectOption('MANAGER');
+  await sheet.getByLabel('Admin PIN for staff changes').fill('1234');
+  await sheet.getByRole('button', { name: 'Confirm change' }).click();
+  await expect.poll(() => requests).toBe(1);
+  await expect(
+    page
+      .getByRole('status')
+      .filter({ hasText: 'Pending second-person approval; the change has not been applied' }),
+  ).toHaveCount(1);
+  await expect(page.getByRole('article', { name: 'Employee Mona Ali' })).toContainText('Staff');
+});
+
+test('S2 new employee saves worker PIN and provisions Operations before closing Add employee', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('New Operations User');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByLabel('Employee Operations PIN').fill('246810');
+  await sheet.getByLabel('Confirm Operations PIN').fill('246810');
+  await sheet.getByLabel('Admin PIN for employee setup').fill('1234');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet).toContainText('Operations access will be ready');
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect(sheet).toHaveCount(0);
+  expect(commands.map((item) => item.type)).toEqual([
+    'employee.create',
+    'employee.pin',
+    'employee.provision-worker',
+  ]);
+  expect(commands[1]).toMatchObject({
+    employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    newPin: '246810',
+    requesterPin: '1234',
+  });
+  expect(commands[2]).toMatchObject({
+    employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    shopId,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('S2 Add employee rejects missing and mismatching Operations PIN before writing anything', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Secure New Employee');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByLabel('Employee Operations PIN')).toBeVisible();
+  await sheet.getByLabel('Employee Operations PIN').fill('2468');
+  await sheet.getByLabel('Confirm Operations PIN').fill('9999');
+  await sheet.getByLabel('Admin PIN for employee setup').fill('1234');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByRole('alert')).toContainText('PINs do not match');
+  expect(commands).toHaveLength(0);
+});
+
+for (const width of [390, 1024, 1440]) {
+  test(`S4 employee permission controls fit their card without colliding at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await mockWorkforce(page);
+    await page.goto('/staff');
+    await selectEmployee(page, 'Mona Ali');
+    await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+    const permissions = page.getByRole('region', { name: 'Permissions' });
+    const group = permissions.locator('.admin-permission-group').first();
+    await group.locator('summary').click();
+    const summary = await group.locator('summary').boundingBox();
+    const firstField = await group.locator('.admin-field').first().boundingBox();
+    const card = await group.boundingBox();
+    expect(summary).not.toBeNull();
+    expect(firstField).not.toBeNull();
+    expect(card).not.toBeNull();
+    expect(firstField!.y).toBeGreaterThanOrEqual(summary!.y + summary!.height - 2);
+    expect(firstField!.x).toBeGreaterThanOrEqual(card!.x - 2);
+    expect(firstField!.x + firstField!.width).toBeLessThanOrEqual(card!.x + card!.width + 2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  });
+}
+
+test('S2 employee setup waits for PIN approval and never provisions Operations prematurely', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'POST' || request.postDataJSON()?.type !== 'employee.pin') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        state: 'PENDING_APPROVAL',
+        approvalRequestId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Awaiting Approval');
+  await advanceStaffOnboardingToReview(page);
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect(sheet.getByRole('alert')).toContainText('pending approval');
+  await expect(sheet).toBeVisible();
+  expect(commands.filter((command) => command.type === 'employee.provision-worker')).toHaveLength(
+    0,
+  );
+  expect(commands.filter((command) => command.type === 'employee.create')).toHaveLength(1);
+});
+
+test('S2 shop manager cannot promise immediate Operations readiness without provision rights', async ({
+  page,
+}) => {
+  const commands = await mockWorkforce(page);
+  await page.route('**/api/admin/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...session,
+        principal: {
+          ...session.principal,
+          role: 'MANAGER',
+          permissions: ['staff.view', 'staff.manage'],
+        },
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Unprovisionable Employee');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByRole('alert')).toContainText('Owner or Admin');
+  await fillEmployeeOperationsSetup(page);
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByRole('alert').last()).toContainText('Owner or Admin');
+  expect(commands).toHaveLength(0);
+});
+
+test('S2 employee Save does not claim Operations ready without a confirmed provisioned worker id', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  await page.route('**/api/admin/staff**', async (route) => {
+    const command =
+      route.request().method() === 'POST'
+        ? (route.request().postDataJSON() as { type?: string })
+        : null;
+    if (command?.type !== 'employee.provision-worker') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, replayed: false }),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Unconfirmed Worker');
+  await advanceStaffOnboardingToReview(page);
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect(sheet.getByRole('alert')).toContainText('worker identity not confirmed');
+  await expect(sheet).toBeVisible();
+  expect(commands.filter((command) => command.type === 'employee.create')).toHaveLength(1);
 });

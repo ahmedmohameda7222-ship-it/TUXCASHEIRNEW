@@ -61,6 +61,7 @@ export function EmployeeDetailPage({
   shops,
   onCommand,
   onVerifiedScheduleCommand,
+  onVerifiedStaffCommand,
   onSensitiveCommand,
 }: {
   employee: EmployeeDetail;
@@ -75,10 +76,13 @@ export function EmployeeDetailPage({
   shops: readonly StaffShopChoice[];
   onCommand(command: StaffCommandDraft): void;
   onVerifiedScheduleCommand?(command: StaffCommandDraft): Promise<unknown>;
-  onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
+  onVerifiedStaffCommand?(command: StaffCommandDraft): Promise<unknown>;
+  onSensitiveCommand(command: StaffCommandDraft, pin: string): Promise<unknown> | void;
 }) {
   const [sensitiveAction, setSensitiveAction] = useState<SensitiveAction>(null);
   const [actorPin, setActorPin] = useState('');
+  const [sensitiveBusy, setSensitiveBusy] = useState(false);
+  const [sensitiveError, setSensitiveError] = useState<string | null>(null);
   const [newPin, setNewPin] = useState('');
   const [pinCommandId, setPinCommandId] = useState(() => crypto.randomUUID());
   const [roleDraft, setRoleDraft] = useState<AdminRole>(employee.role);
@@ -114,8 +118,19 @@ export function EmployeeDetailPage({
   const inactiveOperationsIdentities = employee.operationsIdentities.filter(
     isInactiveLinkedOperationsIdentity,
   );
-  const operationsHealthy = setupRequired.length === 0 && inactiveOperationsIdentities.length === 0;
+  // The readiness chip describes this shop; other shops retain independent setup notices.
+  const currentShopIdentity = employee.operationsIdentities.find(
+    (identity) => identity.shopId === shopId,
+  );
+  const operationsHealthy =
+    employee.active && currentShopIdentity?.kind === 'LINKED' && currentShopIdentity.workerActive;
   const shopName = (id: string) => shops.find((shop) => shop.id === id)?.name ?? 'Authorized shop';
+  const initials = employee.displayName
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toLocaleUpperCase())
+    .join('');
 
   const profileContent = (
     <>
@@ -289,24 +304,10 @@ export function EmployeeDetailPage({
 
   const accessContent = (
     <>
-      <nav className="admin-staff-access-tasks" aria-label="Employee access workspaces">
-        <a href="#staff-operations-access">
-          <strong>Operations readiness</strong>
-          <span>
-            {operationsHealthy ? 'Ready to use' : 'Review worker setup or disabled access'}
-          </span>
-        </a>
-        <a href="#staff-permission-policy">
-          <strong>Role & permissions</strong>
-          <span>Review role defaults and per-employee exceptions</span>
-        </a>
-        {canManage ? (
-          <a href="#staff-sensitive-actions">
-            <strong>Sensitive actions</strong>
-            <span>PIN-confirmed role, PIN and status changes</span>
-          </a>
-        ) : null}
-      </nav>
+      <header className="admin-staff-access-heading">
+        <h3>Access &amp; permissions</h3>
+        <p>Operations readiness, role defaults and explicit permission overrides</p>
+      </header>
       <section className="admin-staff-section" aria-labelledby="staff-operations-access">
         <h3 id="staff-operations-access">Operations access</h3>
         {setupRequired.length > 0 ? (
@@ -402,8 +403,6 @@ export function EmployeeDetailPage({
         {operationsHealthy ? <p>Operations access: Ready</p> : null}
       </section>
 
-      <StaffMetricsPanel employee={employee} />
-
       {canManage ? (
         <section
           className="admin-staff-section is-compact"
@@ -436,7 +435,10 @@ export function EmployeeDetailPage({
           </div>
         </section>
       ) : null}
-      <div id="staff-permission-policy" className="admin-staff-access-policy">
+      <section
+        id="staff-permission-policy"
+        className="admin-staff-section admin-staff-access-policy"
+      >
         <PermissionsEditor
           employee={employee}
           shopId={shopId}
@@ -444,19 +446,36 @@ export function EmployeeDetailPage({
           onCommand={onCommand}
           onSensitiveCommand={onSensitiveCommand}
         />
-      </div>
+      </section>
+      <StaffMetricsPanel employee={employee} />
     </>
   );
 
   return (
-    <article aria-label={`Employee ${employee.displayName}`}>
-      <header className="admin-page__header">
-        <div>
-          <p className="admin-page__eyebrow">Staff profile</p>
+    <article className="admin-staff-inspector" aria-label={`Employee ${employee.displayName}`}>
+      <header className="admin-staff-inspector__header">
+        <span className="admin-staff-inspector__avatar" aria-hidden="true">
+          {initials}
+        </span>
+        <div className="admin-staff-inspector__identity">
           <h2>{employee.displayName}</h2>
-          <p className="admin-page__description">
-            {roleLabel(employee.role)} · {employee.active ? 'Active' : 'Suspended'}
+          <p>
+            {employee.phone || 'No phone'} · {employee.assignments.length} assigned shop(s)
           </p>
+          <div className="admin-staff-inspector__badges">
+            <span className="admin-staff-status-chip">{roleLabel(employee.role)}</span>
+            <span className="admin-staff-status-chip" data-active={employee.active}>
+              {employee.active ? 'Active' : 'Suspended'}
+            </span>
+            <span
+              className="admin-staff-status-chip"
+              data-ready={operationsHealthy && employee.active}
+            >
+              {operationsHealthy && employee.active
+                ? 'Operations ready'
+                : 'Operations setup needed'}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -465,7 +484,7 @@ export function EmployeeDetailPage({
         value={section}
         onChange={onSectionChange}
         tabs={[
-          { id: 'profile', label: 'Profile', content: profileContent },
+          { id: 'profile', label: 'Overview', content: profileContent },
           {
             id: 'schedule',
             label: 'Schedule',
@@ -488,6 +507,7 @@ export function EmployeeDetailPage({
                 shopId={shopId}
                 canManage={canManage}
                 onCommand={onCommand}
+                onVerifiedCommand={onVerifiedStaffCommand}
               />
             ),
           },
@@ -500,6 +520,7 @@ export function EmployeeDetailPage({
                 shopId={shopId}
                 canManage={canManage}
                 onCommand={onCommand}
+                onVerifiedCommand={onVerifiedStaffCommand}
               />
             ),
           },
@@ -532,9 +553,10 @@ export function EmployeeDetailPage({
         }
         description="Confirm this access change with your own Admin PIN."
         onOpenChange={(open) => {
-          if (!open) {
+          if (!open && !sensitiveBusy) {
             setSensitiveAction(null);
             setActorPin('');
+            setSensitiveError(null);
           }
         }}
       >
@@ -576,6 +598,7 @@ export function EmployeeDetailPage({
             onChange={(event) => setActorPin(event.target.value)}
           />
         </label>
+        {sensitiveError ? <p role="alert">{sensitiveError}</p> : null}
         <div className="admin-dialog__actions">
           <button
             className="admin-secondary-button"
@@ -592,66 +615,79 @@ export function EmployeeDetailPage({
             }
             type="button"
             disabled={
+              sensitiveBusy ||
               !actorPin ||
               (sensitiveAction?.kind === 'role' && roleDraft === employee.role) ||
               (sensitiveAction?.kind === 'pin' && !/^\d{4,12}$/.test(newPin))
             }
-            onClick={() => {
-              if (!sensitiveAction) return;
-              if (sensitiveAction.kind === 'role')
-                onSensitiveCommand(
-                  {
-                    type: 'employee.role',
-                    employeeId: employee.id,
-                    shopId,
-                    role: roleDraft,
-                    expectedVersion: employee.profileVersion,
-                  },
-                  actorPin,
+            onClick={async () => {
+              if (!sensitiveAction || sensitiveBusy) return;
+              setSensitiveError(null);
+              setSensitiveBusy(true);
+              try {
+                if (sensitiveAction.kind === 'role')
+                  await onSensitiveCommand(
+                    {
+                      type: 'employee.role',
+                      employeeId: employee.id,
+                      shopId,
+                      role: roleDraft,
+                      expectedVersion: employee.profileVersion,
+                    },
+                    actorPin,
+                  );
+                if (sensitiveAction.kind === 'pin')
+                  await onSensitiveCommand(
+                    {
+                      type: 'employee.pin',
+                      employeeId: employee.id,
+                      shopId,
+                      newPin,
+                      commandId: pinCommandId,
+                    },
+                    actorPin,
+                  );
+                if (sensitiveAction.kind === 'status')
+                  await onSensitiveCommand(
+                    employee.active
+                      ? {
+                          type: 'employee.suspend',
+                          employeeId: employee.id,
+                          shopId,
+                          expectedVersion: employee.profileVersion,
+                        }
+                      : {
+                          type: 'employee.reactivate',
+                          employeeId: employee.id,
+                          shopId,
+                          expectedVersion: employee.profileVersion,
+                        },
+                    actorPin,
+                  );
+                if (sensitiveAction.kind === 'restore')
+                  await onSensitiveCommand(
+                    {
+                      type: 'employee.reactivate-worker',
+                      employeeId: employee.id,
+                      shopId: sensitiveAction.identity.shopId,
+                      workerId: sensitiveAction.identity.workerId,
+                      expectedEmployeeCredentialVersion: employee.credentialVersion,
+                      expectedWorkerCredentialVersion: sensitiveAction.identity.credentialVersion,
+                    },
+                    actorPin,
+                  );
+                setSensitiveAction(null);
+                setActorPin('');
+                setNewPin('');
+              } catch (error) {
+                setSensitiveError(
+                  error instanceof Error
+                    ? error.message.replaceAll('_', ' ')
+                    : 'Access change failed',
                 );
-              if (sensitiveAction.kind === 'pin')
-                onSensitiveCommand(
-                  {
-                    type: 'employee.pin',
-                    employeeId: employee.id,
-                    shopId,
-                    newPin,
-                    commandId: pinCommandId,
-                  },
-                  actorPin,
-                );
-              if (sensitiveAction.kind === 'status')
-                onSensitiveCommand(
-                  employee.active
-                    ? {
-                        type: 'employee.suspend',
-                        employeeId: employee.id,
-                        shopId,
-                        expectedVersion: employee.profileVersion,
-                      }
-                    : {
-                        type: 'employee.reactivate',
-                        employeeId: employee.id,
-                        shopId,
-                        expectedVersion: employee.profileVersion,
-                      },
-                  actorPin,
-                );
-              if (sensitiveAction.kind === 'restore')
-                onSensitiveCommand(
-                  {
-                    type: 'employee.reactivate-worker',
-                    employeeId: employee.id,
-                    shopId: sensitiveAction.identity.shopId,
-                    workerId: sensitiveAction.identity.workerId,
-                    expectedEmployeeCredentialVersion: employee.credentialVersion,
-                    expectedWorkerCredentialVersion: sensitiveAction.identity.credentialVersion,
-                  },
-                  actorPin,
-                );
-              setSensitiveAction(null);
-              setActorPin('');
-              setNewPin('');
+              } finally {
+                setSensitiveBusy(false);
+              }
             }}
           >
             Confirm change

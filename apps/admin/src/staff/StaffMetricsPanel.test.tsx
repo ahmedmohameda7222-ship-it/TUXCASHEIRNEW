@@ -59,6 +59,17 @@ const employee: EmployeeDetail = {
 };
 
 describe('StaffMetricsPanel', () => {
+  it('presents the six approved primary activity facts with extended detail collapsed', () => {
+    const html = renderToStaticMarkup(<StaffMetricsPanel employee={employee} />);
+    expect(html).toContain('class="admin-staff-activity-grid"');
+    expect(html).toContain('Clock events');
+    expect(html).toContain('Corrections');
+    expect(html).toContain('Approved leave');
+    expect(html).toContain('Payments');
+    expect(html).toContain('Overrides');
+    expect(html).toContain('More attendance facts');
+  });
+
   it('shows factual attendance totals without scoring or ranking employees', () => {
     const html = renderToStaticMarkup(<StaffMetricsPanel employee={employee} />);
 
