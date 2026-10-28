@@ -93,7 +93,7 @@ export function PermissionsEditor({
 
   return (
     <section aria-label="Permissions">
-      <h3>Access &amp; Permissions</h3>
+      <h3>Permission overrides</h3>
       <p>
         Role defaults provide the normal access level. Use an override only when this employee needs
         an exception.
