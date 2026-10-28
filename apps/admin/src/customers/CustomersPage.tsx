@@ -290,6 +290,9 @@ export function CustomersPage() {
   const canMerge = principal.permissions.includes('customers.merge');
   const canManageLoyalty = principal.permissions.includes('loyalty.manage');
   const canManagePromotions = principal.permissions.includes('promotions.manage');
+  const savedPointValueEgp = programQuery.data
+    ? formatPointValueEgp(programQuery.data.redemptionMinorPerPoint)
+    : null;
   const mergeCandidates = (mergeCandidatesQuery.data?.customers ?? []).filter(
     (customer) => customer.id !== selectedId,
   );
@@ -451,7 +454,7 @@ export function CustomersPage() {
                           <div>
                             <dt>Redemption value</dt>
                             <dd>
-                              EGP {formatPointValueEgp(programQuery.data.redemptionMinorPerPoint)} per
+                              EGP {savedPointValueEgp} per
                               point
                             </dd>
                           </div>
