@@ -439,7 +439,8 @@ export function EmployeeDetailPage({
         </span>
         <div className="admin-staff-profile-meta">
           <h2>{employee.displayName}</h2>
-          <p>{employee.phone ?? 'No phone'} · {employee.assignments.length} assigned shop
+          <p>
+            {employee.phone ?? 'No phone'} · {employee.assignments.length} assigned shop
             {employee.assignments.length === 1 ? '' : 's'}
           </p>
           <div className="admin-staff-profile-status">
