@@ -1,3 +1,21 @@
+## 2026-10-28 CRM C4 PRE-MERGE ENGINEERING PASS — Staff S1 exclusively unlocked
+
+**Accepted immutable implementation SHA:** `42f72bc9db324a26648aa0674bb0020ad3c23925`, Draft PR #165, **all nine same-HEAD GitHub workflow groups completed SUCCESS**:
+- [Fast CI / TypeScript / unit / migration / security / formatter 40661444623](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40661444623)
+- [CRM isolated real PostgreSQL 40661444738](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40661444738)
+- [Six-tab desktop/phone rendered Chromium 40661444819](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40661444819), **149/149 passed**, including Cairo scheduling and promotion rejection/retry/monetary precision.
+- [Full monorepo + quality, Admin/Menu/Windows/Edge/Branch-PIN 40661444790](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40661444790)
+- [Purchasing/Orders/Inventory real PG + Admin/Operations/Menu Chromium integrated 40661444610](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40661444610)
+- [Purchasing isolated PG 40661444658](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40661444658), [Orders isolated PG 40661444917](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40661444917), [Inventory isolated PG 40661444641](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40661444641), [P0 Business Day PG 40661444754](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40661444754).
+
+**CRM4 RED→GREEN:** saved vs draft loyalty policy and exact safe minor-unit point redemption; real promotion lifecycle editor rejects HTTP-200 application-level `ok:false`, retains command id/draft through retry, responsive 390/1440 semantic Promotions fact table, exact fixed/minimum-order minor units with BigInt, backend-owned eligibility/stacking/usage and PostgreSQL one-time loyalty accrual retained. Final correction uncovered and verified RED in Cairo Chromium: UTC starts 09:00 rendered misleadingly as local 09:00 and saving moved the instant by three hours. The source `dateTimeInput` now converts UTC to real browser-local components; 390px Playwright on `Africa/Cairo` shows 12:00 and round-trips original UTC; actual Chromium 149/149 green. A separate source-level RED test proved `evaluatePromotionReward` 66.67% of max-safe subtotal gave one extra minor unit (received `6005099743135819` vs exact `6005099743135818`). Corrected by integer BigInt multiplication/division; focused CI tests and complete monorepo source suite green. Other tabs' source untouched.
+
+**Coverage disposition:** M08 loyalty saved-vs-unsaved/version/dirty and shop-scope **engineering PASS**; M09 all supported promotions types, time/channel/catalog/segment/usage/stacking via authoritative existing service/PostgreSQL contracts plus UI **engineering PASS**; M10 honest error/empty and supported navigation **engineering PASS**; M11 360/390/768/1024/1440 browser/mobile checks **engineering PASS**, not pixel-perfect owner visual acceptance. Prior M01–M07 CRM1–CRM3 engineering acceptance preserved. The user explicitly defers Owner authenticated hosted/physical end-to-end, merge, Production SQL and exact final visual signoff until all approved phases finish; no such acceptance claimed.
+
+**Ruling:** Customers/CRM1–CRM4 CLOSED for **PRE-MERGE ENGINEERING**, not production UAT. **Staff S1 exclusively ACTIVE**, then S2 → S3 → S4, followed by Finance F1–F5 and Reports R1–R5. Preserve strict sequence and Draft/HOLD; no merge, production deployment, database mutation or mocked business data.
+
+---
+
 ## 2026-10-28 CRM C3 PRE-MERGE ENGINEERING PASS — CRM C4 exclusively unlocked
 
 **Accepted exact code HEAD:** `fe3135da3ce70fc0c3f9d9cdd9d3e083b52b8fa4`, Draft PR #165, no merge, Production SQL, deployment, or Owner physical UAT. All **nine exact-SHA CI workflow groups SUCCESS**, including a new CRM-specific disposable real PostgreSQL acceptance:
