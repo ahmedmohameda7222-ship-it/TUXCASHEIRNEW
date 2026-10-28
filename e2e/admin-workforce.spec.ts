@@ -659,11 +659,19 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
   }
 }
 
+async function fillEmployeeOperationsSetup(page: Page) {
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Employee Operations PIN').fill('246810');
+  await sheet.getByLabel('Confirm Operations PIN').fill('246810');
+  await sheet.getByLabel('Admin PIN for employee setup').fill('1234');
+}
+
 async function advanceStaffOnboardingToReview(page: Page) {
   const sheet = page.getByRole('dialog', { name: 'Add employee' });
-  for (let step = 0; step < 3; step += 1) {
-    await sheet.getByRole('button', { name: 'Continue' }).click();
-  }
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await fillEmployeeOperationsSetup(page);
+  await sheet.getByRole('button', { name: 'Continue' }).click();
 }
 
 test('S2 onboarding reviews authorized shops before creating and assigning employee', async ({
@@ -739,11 +747,12 @@ test('S2 onboarding reviews authorized shops before creating and assigning emplo
   await sheet.getByRole('checkbox', { name: 'Mall' }).check();
   await sheet.getByRole('button', { name: 'Continue' }).click();
   await expect(sheet.getByText('Employment setup')).toBeVisible();
+  await fillEmployeeOperationsSetup(page);
   await sheet.getByRole('button', { name: 'Continue' }).click();
   await expect(sheet.getByText('Review employee setup')).toBeVisible();
   expect(commands).toHaveLength(0);
-  await sheet.getByRole('button', { name: 'Create employee' }).click();
-  await expect.poll(() => commands.length).toBe(2);
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect.poll(() => commands.length).toBe(5);
   expect(commands[0]).toMatchObject({
     type: 'employee.create',
     shopId,
@@ -754,6 +763,12 @@ test('S2 onboarding reviews authorized shops before creating and assigning emplo
     employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     shopId: otherShopId,
   });
+  expect(commands.slice(2).map((command) => command.type)).toEqual([
+    'employee.pin',
+    'employee.provision-worker',
+    'employee.provision-worker',
+  ]);
+  expect(commands.slice(3).map((command) => command.shopId)).toEqual([shopId, otherShopId]);
   await expect(sheet).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
@@ -804,8 +819,9 @@ test('S2 partial compensation failure resumes after closing without duplicate em
   await sheet.getByRole('button', { name: 'Continue' }).click();
   await sheet.getByLabel('Rate (EGP, optional)').fill('100.00');
   await sheet.getByLabel('Effective from').fill('2026-10-01');
+  await fillEmployeeOperationsSetup(page);
   await sheet.getByRole('button', { name: 'Continue' }).click();
-  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect(sheet.getByRole('alert')).toContainText('compensation temporarily unavailable');
   await expect.poll(() => commands.length).toBe(2);
   await sheet.getByRole('button', { name: 'Cancel' }).click();
@@ -864,10 +880,10 @@ test('S2 rejected employee creation retries the same idempotency intent on phone
   const sheet = page.getByRole('dialog', { name: 'Add employee' });
   await sheet.getByLabel('Name').fill('Amira Retries');
   await advanceStaffOnboardingToReview(page);
-  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect(page.getByRole('alert')).toContainText('staff store temporarily unavailable');
   await expect(sheet).toBeVisible();
-  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect.poll(() => attempts.length).toBe(2);
   expect(attempts[0]).toBeTruthy();
   expect(attempts[1]).toBe(attempts[0]);
@@ -899,7 +915,7 @@ test('rejected employee creation preserves the Add employee sheet and does not c
   const sheet = page.getByRole('dialog', { name: 'Add employee' });
   await sheet.getByLabel('Name').fill('Existing Employee');
   await advanceStaffOnboardingToReview(page);
-  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect(sheet).toBeVisible();
   await expect(sheet.getByText('Existing Employee')).toBeVisible();
   await expect(page.getByRole('alert')).toContainText('employee already exists');
@@ -917,7 +933,7 @@ test('new employee sheet persists actual hire date and notes through the trusted
   await sheet.getByLabel('Hire date').fill('2026-10-01');
   await sheet.getByLabel('Internal notes').fill('Cross-trained at counter');
   await advanceStaffOnboardingToReview(page);
-  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect
     .poll(() => commands.some((command) => command['type'] === 'employee.create'))
     .toBe(true);
@@ -1106,8 +1122,9 @@ test('S2 interrupted onboarding survives reload without creating a duplicate emp
   await sheet.getByRole('button', { name: 'Continue' }).click();
   await sheet.getByLabel('Rate (EGP, optional)').fill('100.00');
   await sheet.getByLabel('Effective from').fill('2026-10-01');
+  await fillEmployeeOperationsSetup(page);
   await sheet.getByRole('button', { name: 'Continue' }).click();
-  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect(sheet.getByRole('alert')).toContainText('compensation temporarily unavailable');
   expect(creates).toBe(1);
   await page.reload();
