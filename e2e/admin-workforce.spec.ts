@@ -1161,6 +1161,9 @@ test('S2 interrupted onboarding survives reload without creating a duplicate emp
   await expect(resumedSheet).toHaveCount(0);
   expect(compensationAttempts).toBe(2);
   expect(creates).toBe(1);
+  await page.goBack();
+  await expect(page).toHaveURL(/\\/staff$/);
+  await expect(page.getByRole('button', { name: 'Complete employee setup' })).toHaveCount(0);
 });
 
 test('S4 payroll pending second-person approval does not claim a posted staff payment', async ({
