@@ -1164,3 +1164,58 @@ test('new employee sheet persists actual hire date and notes through the trusted
     role: 'STAFF',
   });
 });
+
+test('S2 pending approval resumes worker provisioning without duplicating employee or PIN', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  const submitted: string[] = [];
+  let approvalApplied = false;
+  await page.route('**/api/admin/staff**', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const command = route.request().postDataJSON() as { type: string };
+    submitted.push(command.type);
+    const response =
+      command.type === 'employee.create'
+        ? { ok: true, employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }
+        : command.type === 'employee.pin'
+          ? {
+              ok: true,
+              state: 'PENDING_APPROVAL',
+              approvalRequestId: '99999999-9999-4999-8999-999999999999',
+            }
+          : command.type === 'employee.provision-worker' && !approvalApplied
+            ? { ok: false, code: 'employee_pin_not_configured' }
+            : { ok: true, state: 'APPLIED' };
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(response),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Pending Access');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByLabel('New employee Operations PIN').fill('6852');
+  await sheet.getByLabel('Confirm employee Operations PIN').fill('6852');
+  await sheet.getByLabel('Your Admin PIN to authorize setup').fill('1234');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
+
+  await expect(sheet.getByRole('alert')).toContainText(/approval/i);
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole('button', { name: 'Resume after approval' })).toBeEnabled();
+  expect(submitted).toEqual(['employee.create', 'employee.pin']);
+
+  approvalApplied = true;
+  await sheet.getByRole('button', { name: 'Resume after approval' }).click();
+  await expect(sheet).toHaveCount(0);
+  expect(submitted).toEqual(['employee.create', 'employee.pin', 'employee.provision-worker']);
+});
