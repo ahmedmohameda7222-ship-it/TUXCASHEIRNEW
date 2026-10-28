@@ -203,6 +203,62 @@ test('S1 mobile directory searches name and phone within explicitly loaded staff
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
+test('S1 loaded-only role and status filters narrow staff without server-side claims', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() !== 'GET' || url.searchParams.has('employeeId')) {
+      await route.fallback();
+      return;
+    }
+    const current = workspace();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...current,
+        employees: {
+          rows: [
+            ...current.employees.rows,
+            {
+              id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              displayName: 'Youssef Hassan',
+              phone: '+201011111111',
+              role: 'MANAGER',
+              active: false,
+              shopIds: [shopId],
+              operationsSetupRequiredShopIds: [],
+            },
+          ],
+          nextCursor: 'more-staff-exist',
+        },
+      }),
+    });
+  });
+  await page.goto('/staff');
+  const role = page.getByRole('combobox', { name: 'Role (loaded results)' });
+  const status = page.getByRole('combobox', { name: 'Status (loaded results)' });
+  await expect(role).toBeVisible();
+  await expect(status).toBeVisible();
+  await role.selectOption('MANAGER');
+  await expect(page.getByRole('button', { name: /Youssef Hassan/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Mona Ali/ })).toHaveCount(0);
+  await status.selectOption('active');
+  await expect(page.getByText('No employees match search')).toBeVisible();
+  await status.selectOption('suspended');
+  await expect(page.getByRole('button', { name: /Youssef Hassan/ })).toBeVisible();
+  await role.selectOption('all');
+  await status.selectOption('active');
+  await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Youssef Hassan/ })).toHaveCount(0);
+  await expect(page.getByText('Loaded results only')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
 test('S1 selected desktop employee keeps directory and inspector adjacent at 1440px', async ({
   page,
 }) => {
