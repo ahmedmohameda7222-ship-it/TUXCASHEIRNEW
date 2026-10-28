@@ -548,6 +548,46 @@ test('CRM3 one in-flight adjustment cannot submit twice via the active form', as
   }
 });
 
+test('CRM3 rejected loyalty adjustment retains command identity for a safe retry', async ({ page }) => {
+  const attempts: string[] = [];
+  await page.route('**/api/admin/customers**', async (route) => {
+    const request = route.request();
+    const command = request.method() === 'POST' ? request.postDataJSON() : null;
+    if (command?.type !== 'loyalty.adjust') {
+      await route.fallback();
+      return;
+    }
+    attempts.push(command.commandId as string);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        attempts.length === 1
+          ? { ok: false, code: 'loyalty_adjustment_conflict' }
+          : {
+              ok: true,
+              ledgerEventId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              balance: 130,
+              replayed: false,
+            },
+      ),
+    });
+  });
+  await openCustomer(page);
+  await page.getByRole('tab', { name: 'Loyalty' }).click();
+  const loyalty = page.getByLabel('Customer loyalty');
+  await loyalty.getByLabel('Points delta').fill('10');
+  await loyalty.getByLabel('Reason').selectOption('55555555-5555-4555-8555-555555555555');
+  await loyalty.getByRole('button', { name: 'Adjust points' }).click();
+  await expect(page.getByText('Loyalty update failed')).toBeVisible();
+  await expect(page.getByText('Loyalty balance updated', { exact: true })).toHaveCount(0);
+  await loyalty.getByRole('button', { name: 'Adjust points' }).click();
+  await expect(page.getByText('Loyalty balance updated', { exact: true })).toBeVisible();
+  expect(attempts).toHaveLength(2);
+  expect(attempts[0]).toBeTruthy();
+  expect(attempts[1]).toBe(attempts[0]);
+});
+
 test('exposes controlled merge, loyalty configuration and full promotion editor', async ({
   page,
 }) => {
