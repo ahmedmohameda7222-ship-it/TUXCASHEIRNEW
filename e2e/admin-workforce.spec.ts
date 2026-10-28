@@ -669,6 +669,37 @@ async function advanceStaffOnboardingToReview(page: Page) {
   }
 }
 
+test('S2 initial Cairo shift is scheduled inside employee creation before sheet closes', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Amira First Shift');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByLabel('Initial shift starts').fill('2026-10-29T09:00');
+  await sheet.getByLabel('Initial shift ends').fill('2026-10-29T17:00');
+  await sheet.getByLabel('Initial shift break minutes').fill('30');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByText('Review employee setup')).toBeVisible();
+  expect(commands).toHaveLength(0);
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await expect.poll(() => commands.length).toBe(2);
+  expect(commands.map((command) => command.type)).toEqual(['employee.create', 'shift.create']);
+  expect(commands[1]).toMatchObject({
+    employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    shopId,
+    startsAt: '2026-10-29T06:00:00.000Z',
+    endsAt: '2026-10-29T14:00:00.000Z',
+    plannedBreakMinutes: 30,
+  });
+  await expect(sheet).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
 test('Staff onboarding configures a secure PIN and authorized Operations workers before closing', async ({
   page,
 }) => {
