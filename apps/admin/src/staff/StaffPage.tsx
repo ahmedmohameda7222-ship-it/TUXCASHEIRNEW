@@ -107,7 +107,7 @@ export function StaffPage() {
   const [newEmployeePhone, setNewEmployeePhone] = useState('');
   const [newEmployeeHireDate, setNewEmployeeHireDate] = useState('');
   const [newEmployeeNotes, setNewEmployeeNotes] = useState('');
-  const staff = useStaff(shopId, selectedId);
+  const staff = useStaff(shopId, selectedId ?? createdEmployeeId);
   const shopChoices = useMemo(
     () => staff.workspaceQuery.data?.shops ?? [],
     [staff.workspaceQuery.data?.shops],
@@ -342,10 +342,42 @@ export function StaffPage() {
           <button
             className="admin-primary-button"
             type="button"
+            disabled={
+              Boolean(createdEmployeeId && !newEmployeeName.trim()) &&
+              (staff.detailQuery.isLoading || staff.detailQuery.isError)
+            }
             onClick={() => {
               if (createdEmployeeId && !newEmployeeName.trim()) {
-                navigate(`${detailPath('/staff', createdEmployeeId)}?section=permissions`);
-                setCreatedEmployeeId(null);
+                const pending = staff.detailQuery.data;
+                if (!pending || pending.id !== createdEmployeeId) {
+                  setOnboardingError('Saved employee could not be verified. Reload and retry.');
+                  return;
+                }
+                setNewEmployeeName(pending.displayName);
+                setNewEmployeePhone(pending.phone ?? '');
+                setNewEmployeeHireDate(pending.hireDate ?? '');
+                setNewEmployeeNotes(pending.notes ?? '');
+                const linked = pending.assignments
+                  .filter((assignment) => assignment.assigned)
+                  .map((assignment) => assignment.shopId);
+                setOnboardingShopIds([...new Set([shopId, ...linked])]);
+                setAssignedShopIds(linked.filter((id) => id !== shopId));
+                setProvisionedShopIds(
+                  pending.operationsIdentities
+                    .filter((identity) => identity.kind === 'LINKED' && identity.workerActive)
+                    .map((identity) => identity.shopId),
+                );
+                setCompensationConfigured(pending.compensation.length > 0);
+                setNewEmployeeRate('');
+                setNewEmployeeEffectiveFrom('');
+                setEmployeePinApplied(false);
+                setSetupAdminPin('');
+                setNewEmployeePin('');
+                setConfirmEmployeePin('');
+                setNewEmployeePinCommandId(crypto.randomUUID());
+                setOnboardingError(null);
+                setOnboardingStep('employment');
+                setCreateOpen(true);
                 return;
               }
               if (createdEmployeeId) {
