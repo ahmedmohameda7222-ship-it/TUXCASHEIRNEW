@@ -628,6 +628,51 @@ test('exposes controlled merge, loyalty configuration and full promotion editor'
   await expect(page.getByLabel('Can combine with other promotions?')).toBeVisible();
 });
 
+test('CRM4 saved redemption value retains every safe minor unit at phone width', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const exactMinor = Number.MAX_SAFE_INTEGER - 1;
+  await page.route('**/api/admin/customers**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() !== 'GET' || url.searchParams.get('view') !== 'loyalty-program') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        program: {
+          businessId: session.principal.businessId,
+          enabled: true,
+          earnPointsPer100Minor: 3,
+          redemptionMinorPerPoint: exactMinor,
+          minimumRedemptionPoints: 75,
+          pointExpiryDays: 180,
+          shopIds: [shopId, otherShopId],
+          version: 3,
+          updatedAt: '2026-09-20T12:00:00.000Z',
+        },
+      }),
+    });
+  });
+  await page.goto('/customers/settings');
+  const saved = page.getByRole('region', { name: 'Current saved loyalty settings' });
+  await expect(saved).toContainText('90071992547409.90');
+  await expect(page.getByLabel('Point value (EGP)')).toHaveValue('90071992547409.90');
+  await page.getByRole('button', { name: 'Save loyalty program' }).click();
+  await expect
+    .poll(
+      () =>
+        postedCommands.find((command) => command.type === 'loyalty.program.upsert')
+          ?.redemptionMinorPerPoint,
+    )
+    .toBe(exactMinor);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
 test('hydrates canonical loyalty values and preserves hidden multi-shop scopes on save', async ({
   page,
 }) => {
