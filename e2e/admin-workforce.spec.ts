@@ -1160,3 +1160,40 @@ test('S4 payroll pending second-person approval does not claim a posted staff pa
   await expect(page.getByLabel('Paid amount (EGP)')).toHaveValue('500.00');
   await expect(page.getByLabel('Admin PIN for staff payment')).toHaveValue('');
 });
+
+
+test('S4 role change pending approval is shown as not applied', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  let requests = 0;
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'POST' || request.postDataJSON()?.type !== 'employee.role') {
+      await route.fallback();
+      return;
+    }
+    requests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        state: 'PENDING_APPROVAL',
+        approvalRequestId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+  await page.getByRole('button', { name: 'Change role' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Change role' });
+  await sheet.getByLabel('New role').selectOption('MANAGER');
+  await sheet.getByLabel('Admin PIN for staff changes').fill('1234');
+  await sheet.getByRole('button', { name: 'Confirm change' }).click();
+  await expect.poll(() => requests).toBe(1);
+  await expect(page.getByRole('status')).toContainText(
+    'Pending second-person approval; the change has not been applied',
+  );
+  await expect(page.getByRole('article', { name: 'Employee Mona Ali' })).toContainText('Staff');
+});
