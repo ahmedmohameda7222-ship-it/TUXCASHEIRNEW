@@ -671,7 +671,6 @@
   }
 }
 
-
 /* Clean reference access hierarchy: one title, distinct work areas, no stacked shortcut cards. */
 .admin-staff-access-heading {
   display: grid;
