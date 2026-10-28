@@ -15,7 +15,12 @@ type NamedOption = { id: string; name: string };
 type AppliesTo = 'all' | 'products' | 'categories';
 
 function dateTimeInput(value: string | null | undefined): string {
-  return value ? value.slice(0, 16) : '';
+  if (!value) return '';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  const pad = (part: number) => String(part).padStart(2, '0');
+  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return `${day}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function optionalPositiveInteger(raw: string): number | null {
