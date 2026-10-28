@@ -156,6 +156,12 @@ async function mockWorkforce(page: Page, withAccount = true) {
         ...(command.type === 'employee.create'
           ? { employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }
           : {}),
+        ...(command.type === 'employee.provision-worker'
+          ? {
+              workerId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              shopId: command.shopId,
+            }
+          : {}),
       }),
     });
   });
@@ -727,6 +733,12 @@ test('S2 onboarding reviews authorized shops before creating and assigning emplo
         replayed: false,
         ...(command.type === 'employee.create'
           ? { employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }
+          : {}),
+        ...(command.type === 'employee.provision-worker'
+          ? {
+              workerId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              shopId: command.shopId,
+            }
           : {}),
       }),
     });
