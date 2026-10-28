@@ -1,3 +1,22 @@
+## 2026-10-28 CRM C3 PRE-MERGE ENGINEERING PASS — CRM C4 exclusively unlocked
+
+**Accepted exact code HEAD:** `fe3135da3ce70fc0c3f9d9cdd9d3e083b52b8fa4`, Draft PR #165, no merge, Production SQL, deployment, or Owner physical UAT. All **nine exact-SHA CI workflow groups SUCCESS**, including a new CRM-specific disposable real PostgreSQL acceptance:
+- [TUX V2 CI 40649943348](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40649943348): source/TypeScript/Prettier/units/security/migrations green.
+- [Six-tab responsive rendered 40649943288](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40649943288): Chromium phone/desktop CRM3 rejection/retry and existing cross-tab acceptance green; screenshot artifact `12799207070` generated.
+- [CRM3 real PostgreSQL 40649943366](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40649943366): disposable localhost PG17, `node scripts/test-admin-loyalty-postgres.mjs` prints `Admin loyalty PostgreSQL behavior passed.`; newly permanent `.github/workflows/customers-crm-postgres.yml`. No hosted Supabase writes.
+- [Full monorepo/Chromium 40649943263](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40649943263): all core/regression/quality/browser jobs success.
+- [Purchasing/Orders/Inventory integrated mainline 40649943345](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40649943345): combined real PG, build/source, Admin/Operations/Menu Chromium success.
+- [Orders isolated PG 40649943273](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40649943273): success.
+- [Purchasing isolated PG 40649943365](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40649943365): success.
+- [Inventory I3 isolated PG 40649943258](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40649943258): success.
+- [P0 Business Day PG 40649943253](https://github.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/actions/runs/40649943253): success.
+
+**CRM3 RED→GREEN root-cause correction:** on initial RED browser commit `5cae81f`, an application-level `{ok:false}` manual loyalty adjustment yielded an incorrect new idempotency ID on retry (143 others passed); `CustomersPage.tsx` incorrectly called `commandIds.complete` before `requireSuccessfulCrmMutation(result)`. Fixed at `57322cc` to retain intent identity until accepted; regression normalized `e75f39c`, full current-HEAD browser and PG green. Prior CRM3 exact BigInt safe-money and in-flight duplicate prevention commits retained. No fake balances, no cross-tab source mutations, no new Production migrations.
+
+**Ruling:** CRM3 is accepted for **PRE-MERGE ENGINEERING only**; not Owner-hosted/physical testing, full screenshot pixel equivalence or production rollout. **CRM4 exclusively ACTIVE** (saved Loyalty settings and Promotions eligibility, exact currency, version/permission, 390/1440 parity and backend checkout cross-app checks). Staff, Finance and Reports remain locked. Continue strictly serially.
+
+---
+
 ## 2026-10-28 CRM C2 PRE-MERGE ENGINEERING PASS — CRM C3 exclusively unlocked
 
 **Accepted exact code HEAD:** `3574bebfcfc1591864bac950dd98cc522175a193`, Draft PR #165, no merge/deployment/Production SQL. All eight **exact-SHA GitHub Actions workflow groups completed SUCCESS**:
