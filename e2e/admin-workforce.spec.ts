@@ -350,9 +350,7 @@ test('S3 payment records exact safe minor units without floating-point rounding 
     expectedAmountMinor: 9007199254740990,
     paidAmountMinor: 9007199254740990,
   });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
-    false,
-  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
 test('staff payment shows a clear no-account state instead of inventing an account', async ({
