@@ -77,6 +77,7 @@ export function StaffPage() {
   const [adminConfirmationPin, setAdminConfirmationPin] = useState('');
   const [pinCommandId, setPinCommandId] = useState(() => crypto.randomUUID());
   const [pinApplied, setPinApplied] = useState(false);
+  const [compensationApplied, setCompensationApplied] = useState(false);
   const [provisionOperations, setProvisionOperations] = useState(true);
   const [provisionedShopIds, setProvisionedShopIds] = useState<string[]>([]);
   const [employeeSearch, setEmployeeSearch] = useState('');
@@ -180,7 +181,7 @@ export function StaffPage() {
         setAssignedShopIds([...completed]);
       }
 
-      if (rateMinor !== null) {
+      if (rateMinor !== null && !compensationApplied) {
         const result = await staff.command.mutateAsync({
           type: 'compensation.set',
           employeeId,
@@ -192,6 +193,7 @@ export function StaffPage() {
         if (!result.ok || result.state === 'PENDING_APPROVAL') {
           throw new Error('compensation_setup_unconfirmed');
         }
+        setCompensationApplied(true);
       }
       // Reuse the server-side hash/approval PIN path; never copy this PIN to
       // employee.create, local storage, worker records or audit metadata.
@@ -244,6 +246,7 @@ export function StaffPage() {
       setConfirmEmployeePin('');
       setAdminConfirmationPin('');
       setPinApplied(false);
+      setCompensationApplied(false);
       setProvisionedShopIds([]);
       setPinCommandId(crypto.randomUUID());
       navigate(detailPath('/staff', employeeId));
@@ -312,6 +315,7 @@ export function StaffPage() {
               setOnboardingShopIds([shopId]);
               setAssignedShopIds([]);
               setPinApplied(false);
+              setCompensationApplied(false);
               setProvisionedShopIds([]);
               setNewEmployeePin('');
               setConfirmEmployeePin('');
@@ -501,6 +505,7 @@ export function StaffPage() {
         <AdminDialog
           open={createOpen}
           variant="sheet"
+          size="wide"
           title="Add employee"
           description="Complete employee identity, shops, employment and secure Operations PIN setup in this form."
           onOpenChange={(open) => {
@@ -529,7 +534,7 @@ export function StaffPage() {
               ))}
             </nav>
             {onboardingStep === 'identity' ? (
-              <>
+              <div className="admin-staff-onboarding-identity">
                 <h3>Identity</h3>
                 <label className="admin-field">
                   <span>Name</span>
@@ -570,7 +575,7 @@ export function StaffPage() {
                 <p>
                   New employees start as Staff. Elevated access requires an approved role change.
                 </p>
-              </>
+              </div>
             ) : null}
             {onboardingStep === 'shops' ? (
               <fieldset className="admin-staff-onboarding-shops">
@@ -744,7 +749,7 @@ export function StaffPage() {
             {onboardingError || staff.command.isError ? (
               <p role="alert">{onboardingError ?? readableError(staff.command.error)}</p>
             ) : null}
-            <div className="admin-inline-actions">
+            <div className="admin-inline-actions admin-staff-onboarding-actions">
               <button
                 className="admin-secondary-button"
                 type="button"
@@ -762,7 +767,7 @@ export function StaffPage() {
                 <button
                   className="admin-secondary-button"
                   type="button"
-                  disabled={onboardingBusy || Boolean(createdEmployeeId)}
+                  disabled={onboardingBusy}
                   onClick={() =>
                     setOnboardingStep(
                       onboardingStep === 'review'
