@@ -453,10 +453,7 @@ export function CustomersPage() {
                           </div>
                           <div>
                             <dt>Redemption value</dt>
-                            <dd>
-                              EGP {savedPointValueEgp} per
-                              point
-                            </dd>
+                            <dd>EGP {savedPointValueEgp} per point</dd>
                           </div>
                           <div>
                             <dt>Minimum redemption</dt>
