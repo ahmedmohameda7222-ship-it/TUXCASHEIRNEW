@@ -884,6 +884,60 @@ export function StaffPage() {
                 ) : (
                   <p>Operations PIN and worker provisioning require an Owner or Administrator.</p>
                 )}
+                {canProvisionWorker ? (
+                  <fieldset className="admin-staff-onboarding-access">
+                    <legend>Role and module access</legend>
+                    <label className="admin-field">
+                      <span>Employee role</span>
+                      <select
+                        value={newEmployeeRole}
+                        onChange={(event) =>
+                          setNewEmployeeRole(event.currentTarget.value as 'STAFF' | 'MANAGER' | 'ADMIN')
+                        }
+                      >
+                        <option value="STAFF">Staff</option>
+                        <option value="MANAGER">Manager</option>
+                        <option value="ADMIN">Administrator</option>
+                      </select>
+                    </label>
+                    <details>
+                      <summary>Customize module permissions</summary>
+                      <div className="admin-staff-onboarding-permissions">
+                        {ADMIN_PERMISSIONS.map((permission) => {
+                          const [module, action] = permission.split('.');
+                          return (
+                            <label className="admin-field" key={permission}>
+                              <span>
+                                {module.charAt(0).toUpperCase() + module.slice(1)} ·{' '}
+                                {(action ?? '').replaceAll('_', ' ').replace(/^./, (c) => c.toUpperCase())}
+                              </span>
+                              <select
+                                value={newEmployeePermissionOverrides[permission] ?? 'INHERIT'}
+                                onChange={(event) => {
+                                  const effect = event.currentTarget.value;
+                                  setNewEmployeePermissionOverrides((current) => {
+                                    const next = { ...current };
+                                    if (effect === 'INHERIT') delete next[permission];
+                                    else next[permission] = effect as 'ALLOW' | 'DENY';
+                                    return next;
+                                  });
+                                }}
+                              >
+                                <option value="INHERIT">Role default</option>
+                                <option value="ALLOW">Allowed</option>
+                                <option value="DENY">Not allowed</option>
+                              </select>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </details>
+                    <p>
+                      Role changes and explicit permission overrides require Admin PIN
+                      reauthentication and any configured second-person approval before they apply.
+                    </p>
+                  </fieldset>
+                ) : null}
               </>
             ) : null}
             {onboardingStep === 'review' ? (
@@ -893,7 +947,7 @@ export function StaffPage() {
               >
                 <h3>Review employee setup</h3>
                 <p>
-                  <strong>{newEmployeeName.trim()}</strong> · Staff
+                  <strong>{newEmployeeName.trim()}</strong> · {newEmployeeRole}
                 </p>
                 <p>{newEmployeePhone.trim() || 'No phone provided'}</p>
                 <p>{newEmployeeHireDate || 'Hire date not provided'}</p>
@@ -924,14 +978,23 @@ export function StaffPage() {
                     : ': not requested (setup remains required)'}
                 </p>
                 <p>
-                  Elevated roles and permission changes still require their separate server-side
-                  approval. No access is granted until the server confirms it.
+                  Requested role: {newEmployeeRole}. Explicit module overrides:{' '}
+                  {Object.keys(newEmployeePermissionOverrides).length}. Access changes are sent
+                  through the protected server commands during this same Save, with any mandatory
+                  second-person approval preserved.
                 </p>
                 {onboardingApprovalPending ? (
                   <p role="status">
                     A second administrator must approve the employee PIN before Operations
                     provisioning can finish. After approval, use Resume after approval to complete
                     the same employee without creating another account or resetting the PIN.
+                  </p>
+                ) : null}
+                {accessApprovalPending ? (
+                  <p role="status">
+                    Role or permission changes are awaiting second-person approval. Once approved,
+                    Resume after approval verifies the effective access before finishing setup.
+                    Reenter your Admin PIN for any remaining protected changes.
                   </p>
                 ) : null}
                 {createdEmployeeId ? (
@@ -989,7 +1052,7 @@ export function StaffPage() {
                 }
               >
                 {onboardingStep === 'review'
-                  ? onboardingApprovalPending
+                  ? onboardingApprovalPending || accessApprovalPending
                     ? 'Resume after approval'
                     : createdEmployeeId
                       ? 'Resume onboarding'
