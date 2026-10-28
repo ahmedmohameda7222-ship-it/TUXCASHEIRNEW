@@ -717,6 +717,24 @@ test('CRM4 rejected promotion keeps mobile editor, draft and retained command fo
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
+test('CRM4 approved promotions table keeps factual type, channel, discount and Edit at 390px', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/customers/settings');
+  const table = page.getByRole('table', { name: 'Promotions list' });
+  for (const heading of ['Promotion', 'Discount', 'Status']) {
+    await expect(table.getByRole('columnheader', { name: heading })).toBeVisible();
+  }
+  const row = table.getByRole('row', { name: /Lunch 10%/ });
+  await expect(row).toContainText('10%');
+  await expect(row).toContainText('Both channels');
+  await expect(row).toContainText('Active');
+  await row.getByRole('button', { name: 'Edit Lunch 10%' }).click();
+  await expect(page.getByRole('form', { name: 'Promotion editor' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
 test('hydrates canonical loyalty values and preserves hidden multi-shop scopes on save', async ({
   page,
 }) => {
