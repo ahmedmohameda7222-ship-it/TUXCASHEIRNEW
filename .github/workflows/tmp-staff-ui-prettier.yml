@@ -1,0 +1,40 @@
+name: Temporary Staff approved UI formatting
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/src/staff/**'
+      - 'e2e/admin-workforce.spec.ts'
+      - '.github/workflows/tmp-staff-ui-prettier.yml'
+permissions:
+  contents: read
+jobs:
+  formatter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Exact formatting output
+        run: |
+          npx prettier --write \
+            apps/admin/src/staff/StaffPage.tsx \
+            apps/admin/src/staff/EmployeeDetailPage.tsx \
+            apps/admin/src/staff/staff.css \
+            apps/admin/src/staff/staffPresentationRound2.test.ts \
+            e2e/admin-workforce.spec.ts
+          for file in \
+            apps/admin/src/staff/StaffPage.tsx \
+            apps/admin/src/staff/EmployeeDetailPage.tsx \
+            apps/admin/src/staff/staff.css \
+            apps/admin/src/staff/staffPresentationRound2.test.ts \
+            e2e/admin-workforce.spec.ts
+          do
+            echo "===FORMATTED_START:${file}==="
+            cat "${file}"
+            echo
+            echo "===FORMATTED_END:${file}==="
+          done
