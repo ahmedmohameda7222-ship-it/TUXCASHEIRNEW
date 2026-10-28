@@ -561,3 +561,49 @@
     display: none;
   }
 }
+
+/* Access choices stay in the Add employee sheet, not a post-create task.
+   Keep the long permission matrix contained at both desktop and phone widths. */
+.admin-staff-onboarding-access {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+}
+.admin-staff-onboarding-access > p {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--tux-text-secondary);
+}
+.admin-staff-onboarding-access details {
+  min-width: 0;
+}
+.admin-staff-onboarding-access summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.admin-staff-onboarding-permissions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  min-width: 0;
+  max-height: 22rem;
+  overflow-y: auto;
+  margin-top: 0.75rem;
+}
+.admin-staff-onboarding-permissions .admin-field,
+.admin-staff-onboarding-permissions select {
+  min-width: 0;
+  width: 100%;
+}
+@media (max-width: 700px) {
+  .admin-staff-onboarding-access {
+    padding: 0.75rem;
+  }
+  .admin-staff-onboarding-permissions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
