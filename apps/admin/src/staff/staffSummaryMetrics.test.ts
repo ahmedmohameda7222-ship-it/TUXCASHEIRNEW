@@ -16,12 +16,12 @@ describe('Staff directory summary', () => {
       'Employees',
       'Active staff',
       'Setup required',
-      'Pending leave',
+      'Suspended staff',
     ]);
-    expect(metrics.map((metric) => metric.value)).toEqual([3, 2, 1, null]);
+    expect(metrics.map((metric) => metric.value)).toEqual([3, 2, 1, 1]);
   });
 
-  it('does not present paginated partial rows or unavailable leave aggregates as full totals', () => {
+  it('does not present paginated partial rows as full-shop totals', () => {
     const metrics = staffSummaryMetrics(rows, currentShop, false);
     expect(metrics.every((metric) => metric.value === null)).toBe(true);
   });
