@@ -11,12 +11,40 @@ import { adminFetch } from '../lib/adminApi';
 import { createRetainedCommandIds } from '../lib/retainedCommandIds';
 import { requireSuccessfulCrmMutation } from '../customers/crmMutationGuard';
 import { PromotionEditor } from './PromotionEditor';
+import './promotions.css';
 
 function csrfToken(session: ReturnType<typeof useAdminSession>): string {
   if (session.state.status !== 'authenticated') {
     throw new Error('session_required');
   }
   return session.state.session.csrfToken;
+}
+
+function moneyMinor(minor: number): string {
+  if (!Number.isSafeInteger(minor)) return 'Unavailable';
+  const value = BigInt(minor);
+  const absolute = value < 0n ? -value : value;
+  const whole = absolute / 100n;
+  const fraction = String(absolute % 100n).padStart(2, '0');
+  return `${value < 0n ? '-' : ''}${whole}.${fraction}`;
+}
+
+function promotionType(promotion: AdminPromotion): string {
+  if (promotion.kind === 'PERCENT') return 'Percentage discount';
+  if (promotion.kind === 'FIXED') return 'Fixed amount discount';
+  return 'Free item';
+}
+
+function promotionDiscount(promotion: AdminPromotion): string {
+  if (promotion.kind === 'PERCENT') return `${(promotion.percentBasisPoints ?? 0) / 100}%`;
+  if (promotion.kind === 'FIXED') return `EGP ${moneyMinor(promotion.fixedDiscountMinor ?? 0)}`;
+  return 'Free item';
+}
+
+function promotionChannel(promotion: AdminPromotion): string {
+  if (promotion.channel === 'POS') return 'In-store';
+  if (promotion.channel === 'ONLINE') return 'Online';
+  return 'Both channels';
 }
 
 export function PromotionsPage({ shopId }: { shopId: string }) {
@@ -105,28 +133,49 @@ export function PromotionsPage({ shopId }: { shopId: string }) {
       {promotions.length === 0 && !promotionsQuery.isLoading && !promotionsQuery.isError ? (
         <p>No promotions configured.</p>
       ) : (
-        <ul>
-          {promotions.map((promotion) => (
-            <li key={promotion.id}>
-              <button
-                className="admin-secondary-button"
-                type="button"
-                onClick={() => {
-                  setCreating(false);
-                  setEditing(promotion);
-                }}
-              >
-                {promotion.name} ·{' '}
-                {promotion.kind === 'PERCENT'
-                  ? 'Percentage discount'
-                  : promotion.kind === 'FIXED'
-                    ? 'Fixed amount discount'
-                    : 'Free item'}{' '}
-                · {promotion.active ? 'Active' : 'Inactive'}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <table className="admin-crm-promotions-table" aria-label="Promotions list">
+          <thead>
+            <tr>
+              <th scope="col">Promotion</th>
+              <th scope="col">Discount</th>
+              <th scope="col">Status</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {promotions.map((promotion) => (
+              <tr key={promotion.id}>
+                <td>
+                  <strong>{promotion.name}</strong>
+                  <small>
+                    {promotionType(promotion)} · {promotionChannel(promotion)}
+                  </small>
+                </td>
+                <td className="admin-crm-promotions-table__discount">
+                  {promotionDiscount(promotion)}
+                </td>
+                <td>
+                  <span className="admin-crm-promotions-table__status">
+                    {promotion.active ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
+                <td>
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    aria-label={`Edit ${promotion.name}`}
+                    onClick={() => {
+                      setCreating(false);
+                      setEditing(promotion);
+                    }}
+                  >
+                    Edit
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
 
       {creating || editing ? (
