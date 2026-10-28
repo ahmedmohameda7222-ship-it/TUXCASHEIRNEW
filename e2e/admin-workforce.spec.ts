@@ -769,6 +769,23 @@ test('Staff onboarding configures a secure PIN and authorized Operations workers
   await expect(sheet).toHaveCount(0);
 });
 
+test('Selected employee on phone uses a focused inspector without duplicate Staff header and KPIs', async ({
+  page,
+}) => {
+  await mockWorkforce(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await expect(page.locator('.admin-page > .admin-page__header')).toBeHidden();
+  await expect(page.locator('.admin-metric-strip[aria-label="Staff summary"]')).toBeHidden();
+  await expect(page.getByRole('link', { name: /Back to employees/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Mona Ali' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.locator('.admin-page > .admin-page__header')).toBeVisible();
+  await expect(page.locator('.admin-metric-strip[aria-label="Staff summary"]')).toBeVisible();
+});
+
 test('Staff detail Access layout follows approved compact grid without overlap at 390 and 1440', async ({
   page,
 }) => {
