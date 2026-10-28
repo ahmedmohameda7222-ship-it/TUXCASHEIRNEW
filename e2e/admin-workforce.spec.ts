@@ -759,10 +759,17 @@ test('S1 selected employee inspector uses approved non-overlapping cards on mobi
     });
     expect(result.overflow).toBe(false);
     expect(result.contentWidth).toBeLessThanOrEqual(result.panelWidth + 1);
-    for (const card of result.cardBounds) {
+    for (const [index, card] of result.cardBounds.entries()) {
       expect(card.x).toBeGreaterThanOrEqual(0);
       expect(card.right).toBeLessThanOrEqual(width + 1);
+      if (index > 0) {
+        expect(card.y).toBeGreaterThanOrEqual(result.cardBounds[index - 1]!.bottom - 1);
+      }
     }
+    const tracks = await page
+      .locator('.admin-staff-permissions-grid')
+      .evaluate((grid) => getComputedStyle(grid).gridTemplateColumns.split(' ').length);
+    expect(tracks).toBe(width === 1440 ? 2 : 1);
   }
 });
 
