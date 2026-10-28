@@ -673,6 +673,50 @@ test('CRM4 saved redemption value retains every safe minor unit at phone width',
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
+test('CRM4 rejected promotion keeps mobile editor, draft and retained command for retry', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const attempts: string[] = [];
+  await page.route('**/api/admin/customers**', async (route) => {
+    const request = route.request();
+    const command = request.method() === 'POST' ? request.postDataJSON() : null;
+    if (command?.type !== 'promotion.upsert') {
+      await route.fallback();
+      return;
+    }
+    attempts.push(command.commandId as string);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        attempts.length === 1
+          ? { ok: false, code: 'promotion_version_conflict' }
+          : {
+              ok: true,
+              promotionId: '11111111-1111-4111-8111-111111111111',
+              version: 4,
+              replayed: false,
+            },
+      ),
+    });
+  });
+  await page.goto('/customers/settings');
+  await page.getByRole('button', { name: 'New promotion' }).click();
+  const editor = page.getByRole('form', { name: 'Promotion editor' });
+  await editor.getByLabel('Name').fill('Mobile welcome 5%');
+  await editor.getByLabel('Discount (%)').fill('5');
+  await editor.getByRole('button', { name: 'Save promotion' }).click();
+  await expect(page.getByRole('alert')).toContainText('Promotion could not be saved.');
+  await expect(editor).toBeVisible();
+  await expect(editor.getByLabel('Name')).toHaveValue('Mobile welcome 5%');
+  await editor.getByRole('button', { name: 'Save promotion' }).click();
+  await expect.poll(() => attempts.length).toBe(2);
+  expect(attempts[1]).toBe(attempts[0]);
+  await expect(editor).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
 test('hydrates canonical loyalty values and preserves hidden multi-shop scopes on save', async ({
   page,
 }) => {
