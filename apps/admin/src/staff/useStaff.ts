@@ -94,11 +94,12 @@ export function useStaff(shopId: string | undefined, employeeId: string | null) 
         },
         csrfToken(session),
       );
-      if (!isPendingApprovalResult(result)) {
+      const accepted = assertStaffCommandOutcome(result);
+      if (!isPendingApprovalResult(accepted)) {
         if (seed === null) commandIds.complete(scope, intent);
         else ephemeralCommandIds.complete(seed);
       }
-      return assertStaffCommandOutcome(result);
+      return accepted;
     } catch (error) {
       if (staffCommandErrorIsTerminal(error)) {
         if (seed === null) commandIds.complete(scope, intent);
