@@ -702,6 +702,11 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
 async function advanceStaffOnboardingToReview(page: Page) {
   const sheet = page.getByRole('dialog', { name: 'Add employee' });
   for (let step = 0; step < 3; step += 1) {
+    if (step === 2) {
+      await sheet.getByLabel('New employee Operations PIN').fill('6852');
+      await sheet.getByLabel('Confirm employee Operations PIN').fill('6852');
+      await sheet.getByLabel('Your Admin PIN to authorize setup').fill('1234');
+    }
     await sheet.getByRole('button', { name: 'Continue' }).click();
   }
 }
@@ -720,13 +725,21 @@ test('S2 initial Cairo shift is scheduled inside employee creation before sheet 
   await sheet.getByLabel('Initial shift starts').fill('2026-10-29T09:00');
   await sheet.getByLabel('Initial shift ends').fill('2026-10-29T17:00');
   await sheet.getByLabel('Initial shift break minutes').fill('30');
+  await sheet.getByLabel('New employee Operations PIN').fill('6852');
+  await sheet.getByLabel('Confirm employee Operations PIN').fill('6852');
+  await sheet.getByLabel('Your Admin PIN to authorize setup').fill('1234');
   await sheet.getByRole('button', { name: 'Continue' }).click();
   await expect(sheet.getByText('Review employee setup')).toBeVisible();
   expect(commands).toHaveLength(0);
   await sheet.getByRole('button', { name: 'Create employee' }).click();
-  await expect.poll(() => commands.length).toBe(2);
-  expect(commands.map((command) => command.type)).toEqual(['employee.create', 'shift.create']);
-  expect(commands[1]).toMatchObject({
+  await expect.poll(() => commands.length).toBe(4);
+  expect(commands.map((command) => command.type)).toEqual([
+    'employee.create',
+    'employee.pin',
+    'employee.provision-worker',
+    'shift.create',
+  ]);
+  expect(commands[3]).toMatchObject({
     employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     shopId,
     startsAt: '2026-10-29T06:00:00.000Z',
@@ -973,11 +986,14 @@ test('S2 onboarding reviews authorized shops before creating and assigning emplo
   await sheet.getByRole('checkbox', { name: 'Mall' }).check();
   await sheet.getByRole('button', { name: 'Continue' }).click();
   await expect(sheet.getByText('Employment setup')).toBeVisible();
+  await sheet.getByLabel('New employee Operations PIN').fill('6852');
+  await sheet.getByLabel('Confirm employee Operations PIN').fill('6852');
+  await sheet.getByLabel('Your Admin PIN to authorize setup').fill('1234');
   await sheet.getByRole('button', { name: 'Continue' }).click();
   await expect(sheet.getByText('Review employee setup')).toBeVisible();
   expect(commands).toHaveLength(0);
   await sheet.getByRole('button', { name: 'Create employee' }).click();
-  await expect.poll(() => commands.length).toBe(2);
+  await expect.poll(() => commands.length).toBe(5);
   expect(commands[0]).toMatchObject({
     type: 'employee.create',
     shopId,
@@ -1038,6 +1054,9 @@ test('S2 partial compensation failure resumes after closing without duplicate em
   await sheet.getByRole('button', { name: 'Continue' }).click();
   await sheet.getByLabel('Rate (EGP, optional)').fill('100.00');
   await sheet.getByLabel('Effective from').fill('2026-10-01');
+  await sheet.getByLabel('New employee Operations PIN').fill('6852');
+  await sheet.getByLabel('Confirm employee Operations PIN').fill('6852');
+  await sheet.getByLabel('Your Admin PIN to authorize setup').fill('1234');
   await sheet.getByRole('button', { name: 'Continue' }).click();
   await sheet.getByRole('button', { name: 'Create employee' }).click();
   await expect(sheet.getByRole('alert')).toContainText('compensation temporarily unavailable');
