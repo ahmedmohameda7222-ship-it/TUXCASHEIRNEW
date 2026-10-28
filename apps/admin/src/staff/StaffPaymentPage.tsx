@@ -1,6 +1,7 @@
 import type { EmployeeDetail, StaffFinanceAccountChoice } from '@tux/admin-contracts';
 import { useState } from 'react';
 
+import { isPendingApprovalResult } from '../lib/retainedCommandIds';
 import type { StaffCommandDraft } from './SchedulePage';
 import { formatStaffMoney, parseStaffMoneyMinor } from './staffMoney';
 
@@ -31,6 +32,7 @@ export function StaffPaymentPage({
   const [actorPin, setActorPin] = useState('');
   const [savingPayment, setSavingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
   const expectedAmountMinor = parseStaffMoneyMinor(expected.trim() || paid);
   const paidAmountMinor = parseStaffMoneyMinor(paid);
   const accountTypeLabel = (type: string) =>
@@ -130,6 +132,7 @@ export function StaffPaymentPage({
             approval remains enforced by the server.
           </p>
           {paymentError ? <p role="alert">{paymentError}</p> : null}
+          {paymentNotice ? <p role="status">{paymentNotice}</p> : null}
           <button
             className="admin-primary-button"
             type="button"
@@ -146,6 +149,7 @@ export function StaffPaymentPage({
             onClick={async () => {
               if (expectedAmountMinor === null || paidAmountMinor === null || savingPayment) return;
               setPaymentError(null);
+              setPaymentNotice(null);
               setSavingPayment(true);
               try {
                 const command: StaffCommandDraft = {
@@ -161,10 +165,17 @@ export function StaffPaymentPage({
                   note: null,
                   reference: null,
                 };
-                await onSensitiveCommand(command, actorPin);
+                const result = await onSensitiveCommand(command, actorPin);
                 setActorPin('');
-                setPaid('');
-                setExpected('');
+                if (isPendingApprovalResult(result)) {
+                  setPaymentNotice(
+                    'Pending second-person approval. Payment has not been recorded.',
+                  );
+                } else {
+                  setPaid('');
+                  setExpected('');
+                  setPaymentNotice('Staff payment recorded.');
+                }
               } catch (error) {
                 setPaymentError(
                   error instanceof Error
