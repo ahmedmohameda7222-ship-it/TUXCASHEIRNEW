@@ -1,0 +1,24 @@
+name: Temporary Staff exact E2E format
+on:
+  pull_request:
+    paths:
+      - 'e2e/admin-workforce.spec.ts'
+      - '.github/workflows/temporary-staff-final-format.yml'
+permissions:
+  contents: read
+jobs:
+  formatter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Print exact Prettier-normalized E2E
+        run: |
+          npx prettier --write e2e/admin-workforce.spec.ts
+          echo '===STAFF_E2E_FORM_START==='
+          cat e2e/admin-workforce.spec.ts
+          echo '===STAFF_E2E_FORM_END==='
