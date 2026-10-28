@@ -27,47 +27,54 @@ export function StaffMetricsPanel({ employee }: { employee: EmployeeDetail }) {
   ).length;
   const absentShifts = employee.attendanceSummaries.filter((summary) => summary.absent).length;
 
+  const primaryFacts = [
+    ['Shifts', scheduledShifts],
+    ['Clock events', employee.attendanceEvents.length],
+    ['Corrections', employee.attendanceCorrections.length],
+    ['Approved leave', approvedLeave],
+    ['Payments', employee.payments.length],
+    [
+      'Overrides',
+      employee.customPermissions.length + (employee.customDeniedPermissions?.length ?? 0),
+    ],
+  ] as const;
+
   return (
-    <section aria-label="Staff factual metrics">
+    <section className="admin-staff-section admin-staff-facts" aria-label="Staff factual metrics">
       <h3>Activity facts</h3>
-      <div className="admin-more-grid">
-        <div className="admin-more-card">
-          <strong>{formatDuration(workedMinutes)}</strong>
-          <span>Worked</span>
-        </div>
-        <div className="admin-more-card">
-          <strong>{formatDuration(overtimeMinutes)}</strong>
-          <span>Overtime</span>
-        </div>
-        <div className="admin-more-card">
-          <strong>{lateShifts}</strong>
-          <span>Late shifts</span>
-        </div>
-        <div className="admin-more-card">
-          <strong>{absentShifts}</strong>
-          <span>Absent shifts</span>
-        </div>
-        <div className="admin-more-card">
-          <strong>{scheduledShifts}</strong>
-          <span>Scheduled shifts</span>
-        </div>
-        <div className="admin-more-card">
-          <strong>{attendanceSessions}</strong>
-          <span>Attendance sessions</span>
-        </div>
-        <div className="admin-more-card">
-          <strong>{employee.attendanceCorrections.length}</strong>
-          <span>Attendance corrections</span>
-        </div>
-        <div className="admin-more-card">
-          <strong>{approvedLeave}</strong>
-          <span>Approved leave requests</span>
-        </div>
-        <div className="admin-more-card">
-          <strong>{employee.payments.length}</strong>
-          <span>Recorded staff payments</span>
-        </div>
+      <div className="admin-staff-activity-grid">
+        {primaryFacts.map(([label, value]) => (
+          <div className="admin-staff-activity-fact" key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </div>
+        ))}
       </div>
+      <details className="admin-staff-extra-facts">
+        <summary>More attendance facts</summary>
+        <div className="admin-staff-activity-grid">
+          <div className="admin-staff-activity-fact">
+            <span>Worked</span>
+            <strong>{formatDuration(workedMinutes)}</strong>
+          </div>
+          <div className="admin-staff-activity-fact">
+            <span>Overtime</span>
+            <strong>{formatDuration(overtimeMinutes)}</strong>
+          </div>
+          <div className="admin-staff-activity-fact">
+            <span>Late shifts</span>
+            <strong>{lateShifts}</strong>
+          </div>
+          <div className="admin-staff-activity-fact">
+            <span>Absent shifts</span>
+            <strong>{absentShifts}</strong>
+          </div>
+          <div className="admin-staff-activity-fact">
+            <span>Attendance sessions</span>
+            <strong>{attendanceSessions}</strong>
+          </div>
+        </div>
+      </details>
     </section>
   );
 }
