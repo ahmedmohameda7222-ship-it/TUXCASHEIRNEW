@@ -735,7 +735,8 @@ export function StaffPage() {
                     : 'Compensation will be configured later.'}
                 </p>
                 <p>
-                  Operations PIN: {pinApplied || newEmployeePin ? 'Included in this setup' : 'Not provided'}
+                  Operations PIN:{' '}
+                  {pinApplied || newEmployeePin ? 'Included in this setup' : 'Not provided'}
                   {canProvisionWorker && provisionOperations
                     ? ' · authorized workers will be provisioned for selected shops'
                     : ' · automatic worker provisioning not selected'}
