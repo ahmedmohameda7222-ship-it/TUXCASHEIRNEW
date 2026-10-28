@@ -20,11 +20,13 @@ export function AttendancePage({
   shopId,
   canManage,
   onCommand,
+  onVerifiedCommand,
 }: {
   employee: EmployeeDetail;
   shopId: string;
   canManage: boolean;
   onCommand(command: StaffCommandDraft): void;
+  onVerifiedCommand?: ((command: StaffCommandDraft) => Promise<unknown>) | undefined;
 }) {
   const events = employee.attendanceEvents.filter((event) => event.shopId === shopId);
   const corrections = employee.attendanceCorrections.filter(
@@ -41,6 +43,8 @@ export function AttendancePage({
   const [correctedAt, setCorrectedAt] = useState('');
   const [reason, setReason] = useState('');
   const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [savingCorrection, setSavingCorrection] = useState(false);
+  const [correctionError, setCorrectionError] = useState<string | null>(null);
 
   return (
     <section aria-label="Attendance">
@@ -125,7 +129,9 @@ export function AttendancePage({
             variant="sheet"
             title="Correct attendance"
             description="Record the corrected time and why it changed. The original event remains in history."
-            onOpenChange={setCorrectionOpen}
+            onOpenChange={(open) => {
+              if (!savingCorrection) setCorrectionOpen(open);
+            }}
           >
             <label className="admin-field">
               <span>Attendance event</span>
@@ -149,19 +155,32 @@ export function AttendancePage({
               <span>Reason</span>
               <textarea value={reason} onChange={(event) => setReason(event.target.value)} />
             </label>
+            {correctionError ? <p role="alert">{correctionError}</p> : null}
             <button
               className="admin-primary-button"
               type="button"
-              disabled={!eventId || !correctedAt || !reason.trim()}
-              onClick={() => {
-                onCommand({
-                  type: 'attendance.correct',
-                  attendanceEventId: eventId,
-                  shopId,
-                  correctedOccurredAt: businessLocalDateTimeToIso(correctedAt),
-                  reason: reason.trim(),
-                });
-                setCorrectionOpen(false);
+              disabled={!eventId || !correctedAt || !reason.trim() || savingCorrection}
+              onClick={async () => {
+                setCorrectionError(null);
+                setSavingCorrection(true);
+                try {
+                  const command: StaffCommandDraft = {
+                    type: 'attendance.correct',
+                    attendanceEventId: eventId,
+                    shopId,
+                    correctedOccurredAt: businessLocalDateTimeToIso(correctedAt),
+                    reason: reason.trim(),
+                  };
+                  if (onVerifiedCommand) await onVerifiedCommand(command);
+                  else onCommand(command);
+                  setCorrectionOpen(false);
+                } catch (error) {
+                  setCorrectionError(
+                    error instanceof Error ? error.message.replaceAll('_', ' ') : 'Attendance correction failed',
+                  );
+                } finally {
+                  setSavingCorrection(false);
+                }
               }}
             >
               Record correction
