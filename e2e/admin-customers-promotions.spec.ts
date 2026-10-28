@@ -798,6 +798,72 @@ test('CRM4 fixed promotion values preserve safe minor units through 390px edit a
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
+test.describe('CRM4 Cairo promotion scheduling', () => {
+  test.use({ timezoneId: 'Africa/Cairo' });
+
+  test('existing UTC offer window shows Cairo local time and round-trips without drift', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.route('**/api/admin/customers**', async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (request.method() !== 'GET' || url.searchParams.get('view') !== 'promotions') {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          promotions: [
+            {
+              id: '44444444-4444-4444-8444-444444444444',
+              businessId: session.principal.businessId,
+              name: 'Lunch 10%',
+              active: true,
+              kind: 'PERCENT',
+              percentBasisPoints: 1000,
+              fixedDiscountMinor: null,
+              freeProductId: null,
+              startsAt: '2026-10-28T09:00:00.000Z',
+              endsAt: '2026-10-28T10:00:00.000Z',
+              minimumOrderMinor: 5000,
+              shopIds: [shopId],
+              channel: 'BOTH',
+              productIds: [],
+              categoryIds: [],
+              totalUsageLimit: null,
+              perCustomerUsageLimit: null,
+              stackingPolicy: 'ONE_ORDER_LEVEL',
+              targetSegments: [],
+              version: 2,
+              updatedAt: '2026-10-20T09:00:00.000Z',
+            },
+          ],
+        }),
+      });
+    });
+    await page.goto('/customers/settings');
+    await page.getByRole('button', { name: 'Edit Lunch 10%' }).click();
+    const editor = page.getByRole('form', { name: 'Promotion editor' });
+    await expect(editor.getByLabel('Starts')).toHaveValue('2026-10-28T12:00');
+    await expect(editor.getByLabel('Ends')).toHaveValue('2026-10-28T13:00');
+    await editor.getByRole('button', { name: 'Save promotion' }).click();
+    await expect
+      .poll(() => postedCommands.find((command) => command.type === 'promotion.upsert'))
+      .toMatchObject({
+        promotion: {
+          startsAt: '2026-10-28T09:00:00.000Z',
+          endsAt: '2026-10-28T10:00:00.000Z',
+        },
+      });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
+      false,
+    );
+  });
+});
+
 test('hydrates canonical loyalty values and preserves hidden multi-shop scopes on save', async ({
   page,
 }) => {
