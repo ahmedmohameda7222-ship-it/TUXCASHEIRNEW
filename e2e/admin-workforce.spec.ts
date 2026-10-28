@@ -1255,3 +1255,92 @@ test('S2 owner cannot save an Operations-unready employee without entering a sec
   await expect(sheet.getByText('Employment setup')).toBeVisible();
   expect(commands).toHaveLength(0);
 });
+
+test('S2 configures selected role and module permission inside Add employee before Save finishes', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  const sent: Array<Record<string, unknown>> = [];
+  let currentRole = 'STAFF';
+  let currentVersion = 2;
+  let denied = false;
+  const newId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === 'GET' && url.searchParams.has('employeeId')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          employee: {
+            ...employee(),
+            id: newId,
+            displayName: 'Access Before Save',
+            role: currentRole,
+            profileVersion: currentVersion,
+            customDeniedPermissions: denied ? ['orders.view'] : [],
+          },
+        }),
+      });
+      return;
+    }
+    if (request.method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const command = request.postDataJSON() as Record<string, unknown>;
+    sent.push(command);
+    if (command.type === 'employee.role') {
+      expect(command.expectedVersion).toBe(2);
+      currentRole = 'MANAGER';
+      currentVersion += 1;
+    }
+    if (command.type === 'employee.permission') {
+      expect(command.expectedVersion).toBe(3);
+      expect(command.permissionKey).toBe('orders.view');
+      expect(command.effect).toBe('DENY');
+      denied = true;
+      currentVersion += 1;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        state: 'APPLIED',
+        ...(command.type === 'employee.create' ? { employeeId: newId } : {}),
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Access Before Save');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByLabel('New employee Operations PIN').fill('6852');
+  await sheet.getByLabel('Confirm employee Operations PIN').fill('6852');
+  await sheet.getByLabel('Your Admin PIN to authorize setup').fill('1234');
+  await sheet.getByLabel('Employee role').selectOption('MANAGER');
+  await sheet.getByText('Customize module permissions').click();
+  await sheet.getByLabel('Orders · View').selectOption('DENY');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByText('Review employee setup')).toBeVisible();
+  expect(sent).toHaveLength(0);
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await expect(sheet).toHaveCount(0);
+  expect(sent.map((command) => command.type)).toEqual([
+    'employee.create',
+    'employee.pin',
+    'employee.provision-worker',
+    'employee.role',
+    'employee.permission',
+  ]);
+  for (const sensitive of sent.filter((command) =>
+    ['employee.pin', 'employee.role', 'employee.permission'].includes(String(command.type)),
+  )) {
+    expect(sensitive.requesterPin).toBe('1234');
+  }
+});
