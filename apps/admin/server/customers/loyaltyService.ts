@@ -177,7 +177,7 @@ export function evaluatePromotionReward(
       ) {
         return { ok: false, code: 'promotion_invalid_configuration' };
       }
-      const rawDiscount = Math.floor((context.subtotalMinor * basisPoints) / 10_000);
+      const rawDiscount = Number((BigInt(context.subtotalMinor) * BigInt(basisPoints)) / 10_000n);
       if (!Number.isSafeInteger(rawDiscount) || rawDiscount < 0) {
         return { ok: false, code: 'promotion_invalid_configuration' };
       }
