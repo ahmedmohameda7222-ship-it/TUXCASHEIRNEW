@@ -149,8 +149,9 @@ export function CustomersPage() {
         },
         csrfToken(session),
       );
+      const accepted = requireSuccessfulCrmMutation(result);
       commandIds.complete('loyalty.adjust', intent);
-      return requireSuccessfulCrmMutation(result);
+      return accepted;
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'customers', shopId] });
