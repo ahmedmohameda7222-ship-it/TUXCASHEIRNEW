@@ -430,7 +430,10 @@ export function EmployeeDetailPage({
           </div>
         </section>
       ) : null}
-      <section id="staff-permission-policy" className="admin-staff-section admin-staff-access-policy">
+      <section
+        id="staff-permission-policy"
+        className="admin-staff-section admin-staff-access-policy"
+      >
         <PermissionsEditor
           employee={employee}
           shopId={shopId}
