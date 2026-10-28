@@ -1219,3 +1219,20 @@ test('S2 pending approval resumes worker provisioning without duplicating employ
   await expect(sheet).toHaveCount(0);
   expect(submitted).toEqual(['employee.create', 'employee.pin', 'employee.provision-worker']);
 });
+
+test('S2 owner cannot save an Operations-unready employee without entering a secure PIN', async ({
+  page,
+}) => {
+  const commands = await mockWorkforce(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Ready On Save');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByRole('alert')).toContainText('employee PIN required');
+  await expect(sheet.getByText('Employment setup')).toBeVisible();
+  expect(commands).toHaveLength(0);
+});
