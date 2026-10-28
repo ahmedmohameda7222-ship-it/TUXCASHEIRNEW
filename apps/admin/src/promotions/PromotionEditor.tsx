@@ -24,6 +24,23 @@ function optionalPositiveInteger(raw: string): number | null {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function formatMinor(minor: number): string {
+  if (!Number.isSafeInteger(minor)) return 'Unavailable';
+  const value = BigInt(minor);
+  const absolute = value < 0n ? -value : value;
+  const whole = absolute / 100n;
+  const fraction = String(absolute % 100n).padStart(2, '0');
+  return `${value < 0n ? '-' : ''}${whole}.${fraction}`;
+}
+
+function parseDecimalMinor(raw: string): number | null {
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(raw.trim());
+  if (!match) return null;
+  const value = BigInt(match[1]!) * 100n + BigInt((match[2] ?? '').padEnd(2, '0') || '0');
+  if (value > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  return Number(value);
+}
+
 function toggle(values: readonly string[], id: string, checked: boolean): string[] {
   return checked ? [...new Set([...values, id])] : values.filter((value) => value !== id);
 }
@@ -51,6 +68,7 @@ export function PromotionEditor({
   const [active, setActive] = useState(true);
   const [kind, setKind] = useState<AdminPromotionKind>('PERCENT');
   const [discount, setDiscount] = useState('');
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [freeProductId, setFreeProductId] = useState('');
   const [minimumOrderEgp, setMinimumOrderEgp] = useState('0');
   const [startsAt, setStartsAt] = useState('');
@@ -66,18 +84,19 @@ export function PromotionEditor({
     useState<AdminPromotionStackingPolicy>('ONE_ORDER_LEVEL');
 
   useEffect(() => {
+    setValidationError(null);
     setName(promotion?.name ?? '');
     setActive(promotion?.active ?? true);
     setKind(promotion?.kind ?? 'PERCENT');
     setDiscount(
       promotion?.kind === 'PERCENT'
-        ? String((promotion.percentBasisPoints ?? 0) / 100)
+        ? formatMinor(promotion.percentBasisPoints ?? 0)
         : promotion?.kind === 'FIXED'
-          ? String((promotion.fixedDiscountMinor ?? 0) / 100)
+          ? formatMinor(promotion.fixedDiscountMinor ?? 0)
           : '',
     );
     setFreeProductId(promotion?.freeProductId ?? '');
-    setMinimumOrderEgp(String((promotion?.minimumOrderMinor ?? 0) / 100));
+    setMinimumOrderEgp(formatMinor(promotion?.minimumOrderMinor ?? 0));
     setStartsAt(dateTimeInput(promotion?.startsAt));
     setEndsAt(dateTimeInput(promotion?.endsAt));
     setChannel(promotion?.channel ?? 'BOTH');
@@ -100,19 +119,29 @@ export function PromotionEditor({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const numericDiscount = Number(discount);
+    setValidationError(null);
+    const amount = kind === 'FREE_ITEM' ? null : parseDecimalMinor(discount);
+    const minimumMinor = parseDecimalMinor(minimumOrderEgp.trim() || '0');
+    if (
+      minimumMinor === null ||
+      (kind !== 'FREE_ITEM' && amount === null) ||
+      (kind === 'PERCENT' && (amount === null || amount <= 0 || amount > 10_000))
+    ) {
+      setValidationError('Enter valid amounts with at most two decimal places.');
+      return;
+    }
     onSave({
       id: promotion?.id ?? null,
       expectedVersion: promotion?.version ?? null,
       name: name.trim(),
       active,
       kind,
-      percentBasisPoints: kind === 'PERCENT' ? Math.round(numericDiscount * 100) : null,
-      fixedDiscountMinor: kind === 'FIXED' ? Math.round(numericDiscount * 100) : null,
+      percentBasisPoints: kind === 'PERCENT' ? amount : null,
+      fixedDiscountMinor: kind === 'FIXED' ? amount : null,
       freeProductId: kind === 'FREE_ITEM' ? freeProductId || null : null,
       startsAt: startsAt ? new Date(startsAt).toISOString() : null,
       endsAt: endsAt ? new Date(endsAt).toISOString() : null,
-      minimumOrderMinor: Math.round(Number(minimumOrderEgp) * 100),
+      minimumOrderMinor: minimumMinor,
       shopIds: promotion?.shopIds ?? [shopId],
       channel,
       productIds: appliesTo === 'products' ? productIds : [],
@@ -330,6 +359,7 @@ export function PromotionEditor({
           />{' '}
           Active
         </label>
+        {validationError ? <p role="alert">{validationError}</p> : null}
         {error ? <p role="alert">Promotion could not be saved.</p> : null}
         <div className="admin-dialog__actions">
           <button className="admin-secondary-button" type="button" onClick={onCancel}>
