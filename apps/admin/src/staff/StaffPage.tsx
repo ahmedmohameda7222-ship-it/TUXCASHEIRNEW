@@ -404,6 +404,7 @@ export function StaffPage() {
                 workers={staff.workspaceQuery.data?.workers ?? []}
                 shops={shopChoices}
                 onCommand={execute}
+                onVerifiedScheduleCommand={(command) => staff.command.mutateAsync(command)}
                 onSensitiveCommand={executeSensitive}
               />
             ) : (
