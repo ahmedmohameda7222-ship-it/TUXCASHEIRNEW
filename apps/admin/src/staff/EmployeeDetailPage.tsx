@@ -402,8 +402,6 @@ export function EmployeeDetailPage({
         {operationsHealthy ? <p>Operations access: Ready</p> : null}
       </section>
 
-      <StaffMetricsPanel employee={employee} />
-
       {canManage ? (
         <section
           className="admin-staff-section is-compact"
@@ -445,6 +443,7 @@ export function EmployeeDetailPage({
           onSensitiveCommand={onSensitiveCommand}
         />
       </div>
+      <StaffMetricsPanel employee={employee} />
     </>
   );
 
