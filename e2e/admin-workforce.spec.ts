@@ -700,13 +700,19 @@ test('Staff onboarding configures a secure PIN and authorized Operations workers
     });
   });
   await page.route('**/api/admin/staff**', async (route) => {
-    if (route.request().method() === 'GET' && !new URL(route.request().url()).searchParams.has('employeeId')) {
+    if (
+      route.request().method() === 'GET' &&
+      !new URL(route.request().url()).searchParams.has('employeeId')
+    ) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           ...workspace(),
-          shops: [{ id: shopId, name: 'Downtown' }, { id: secondShop, name: 'Mall' }],
+          shops: [
+            { id: shopId, name: 'Downtown' },
+            { id: secondShop, name: 'Mall' },
+          ],
         }),
       });
       return;
@@ -774,8 +780,10 @@ test('Staff detail Access layout follows approved compact grid without overlap a
     await page.getByRole('tab', { name: 'Access & Permissions' }).click();
     const policy = page.locator('.admin-staff-access-policy .admin-more-grid').first();
     const grid = await policy.evaluate((node) => getComputedStyle(node).gridTemplateColumns);
-    expect(grid.trim().split(/\\s+/).length).toBe(width === 390 ? 1 : 2);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+    expect(grid.trim().split(/\s+/).length).toBe(width === 390 ? 1 : 2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
+      false,
+    );
     await expect(page.getByRole('region', { name: 'Permissions' })).toBeVisible();
   }
 });
