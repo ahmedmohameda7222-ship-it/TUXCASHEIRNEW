@@ -41,6 +41,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Assert real staff lifecycle and financial database invariants
         run: node scripts/test-admin-workforce-postgres.mjs
+      - name: Verify first Operations worker provisioning, login identity and multi-shop idempotency
+        run: node scripts/test-admin-first-operations-worker-provision-postgres.mjs
+      - name: Verify Admin and Operations share the canonical worker PIN verifier
+        run: node scripts/test-admin-worker-pin-compatibility.mjs
 
   tenant-scope:
     name: Staff PIN command tenant isolation PostgreSQL
