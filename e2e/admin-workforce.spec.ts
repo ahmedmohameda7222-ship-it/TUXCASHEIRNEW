@@ -666,6 +666,95 @@ async function advanceStaffOnboardingToReview(page: Page) {
   }
 }
 
+test('S2 owner configures employee PIN and real Operations worker during Add employee', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  let adminReauths = 0;
+  await page.route('**/api/admin/reauth', async (route) => {
+    adminReauths += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, reauthenticatedAt: '2026-10-28T10:00:00.000Z' }),
+    });
+  });
+
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Amira Full Setup');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByLabel('Employee PIN', { exact: true }).fill('6829');
+  await sheet.getByLabel('Confirm employee PIN').fill('6829');
+  await expect(sheet.getByLabel('Employee PIN', { exact: true })).toHaveAttribute(
+    'type',
+    'password',
+  );
+  await sheet.getByLabel('Confirm with your Admin PIN').fill('1234');
+  await expect(sheet.getByRole('checkbox', { name: 'Provision Operations worker in assigned shops' }))
+    .toBeChecked();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByText('Review employee setup')).toBeVisible();
+  expect(commands).toHaveLength(0);
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await expect.poll(() => commands.length).toBe(3);
+  expect(commands.map((c) => c.type)).toEqual([
+    'employee.create',
+    'employee.pin',
+    'employee.provision-worker',
+  ]);
+  expect(adminReauths).toBe(1);
+  expect(commands[0]).not.toHaveProperty('newPin');
+  expect(commands[1]).toMatchObject({
+    employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    newPin: '6829',
+  });
+  expect(commands[2]).not.toHaveProperty('newPin');
+  await expect(sheet).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('S1 selected employee inspector uses approved non-overlapping cards on mobile and desktop', async ({
+  page,
+}) => {
+  await mockWorkforce(page);
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/staff');
+    await selectEmployee(page, 'Mona Ali');
+    await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+    const inspector = page.locator('.admin-staff-employee');
+    await expect(inspector).toBeVisible();
+    const result = await inspector.evaluate((root) => {
+      const entries = [
+        ...root.querySelectorAll<HTMLElement>(
+          '.admin-staff-section, .admin-staff-access-policy, .admin-staff-activity',
+        ),
+      ].filter((element) => element.getBoundingClientRect().height > 0);
+      const panel = root.closest('.admin-master-detail__detail')!;
+      const bound = panel.getBoundingClientRect();
+      return {
+        overflow: document.documentElement.scrollWidth > innerWidth,
+        panelWidth: bound.width,
+        contentWidth: root.scrollWidth,
+        cardBounds: entries.map((element) => {
+          const rect = element.getBoundingClientRect();
+          return { x: rect.x, right: rect.right, y: rect.y, bottom: rect.bottom };
+        }),
+      };
+    });
+    expect(result.overflow).toBe(false);
+    expect(result.contentWidth).toBeLessThanOrEqual(result.panelWidth + 1);
+    for (const card of result.cardBounds) {
+      expect(card.x).toBeGreaterThanOrEqual(0);
+      expect(card.right).toBeLessThanOrEqual(width + 1);
+    }
+  }
+});
+
 test('S2 onboarding reviews authorized shops before creating and assigning employee', async ({
   page,
 }) => {
