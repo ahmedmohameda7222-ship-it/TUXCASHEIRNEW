@@ -983,7 +983,7 @@ export function StaffPage() {
                       <summary>Customize module permissions</summary>
                       <div className="admin-staff-onboarding-permissions">
                         {ADMIN_PERMISSIONS.map((permission) => {
-                          const [module, action] = permission.split('.');
+                          const [module = 'Other', action = 'View'] = permission.split('.');
                           return (
                             <label className="admin-field" key={permission}>
                               <span>
