@@ -47,6 +47,23 @@
   font-weight: 700;
   line-height: 1.3;
 }
+/* The selected Clean desktop reference keeps the employee list beside the real inspector.
+   Narrow viewports remain list-first with a dedicated Back route. */
+@media (min-width: 1100px) {
+  .admin-staff-workspace .admin-master-detail {
+    display: grid;
+    grid-template-columns: minmax(0, 44%) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.75rem;
+  }
+  .admin-staff-workspace .admin-master-detail[data-detail-active='true'] .admin-master-detail__list {
+    display: block;
+  }
+  .admin-staff-workspace .admin-master-detail__list,
+  .admin-staff-workspace .admin-master-detail__detail {
+    min-width: 0;
+  }
+}
 @media (max-width: 480px) {
   .admin-staff-row__states {
     align-items: flex-start;
