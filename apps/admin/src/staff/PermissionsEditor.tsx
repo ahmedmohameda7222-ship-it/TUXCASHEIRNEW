@@ -70,13 +70,15 @@ export function PermissionsEditor({
   shopId?: string;
   canManage: boolean;
   onCommand?(command: StaffCommandDraft): void;
-  onSensitiveCommand?(command: StaffCommandDraft, pin: string): void;
+  onSensitiveCommand?(command: StaffCommandDraft, pin: string): Promise<unknown> | void;
 }) {
   const [pendingChange, setPendingChange] = useState<{
     permission: AdminPermission;
     effect: 'ALLOW' | 'DENY' | 'INHERIT';
   } | null>(null);
   const [actorPin, setActorPin] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   function command(permission: AdminPermission, effect: 'ALLOW' | 'DENY' | 'INHERIT') {
     return {
@@ -163,9 +165,10 @@ export function PermissionsEditor({
             : 'Confirm this permission change with your Admin PIN.'
         }
         onOpenChange={(open) => {
-          if (!open) {
+          if (!open && !saving) {
             setPendingChange(null);
             setActorPin('');
+            setSaveError(null);
           }
         }}
       >
@@ -178,6 +181,7 @@ export function PermissionsEditor({
             onChange={(event) => setActorPin(event.target.value)}
           />
         </label>
+        {saveError ? <p role="alert">{saveError}</p> : null}
         <div className="admin-dialog__actions">
           <button
             className="admin-secondary-button"
@@ -189,12 +193,22 @@ export function PermissionsEditor({
           <button
             className="admin-primary-button"
             type="button"
-            disabled={!actorPin}
-            onClick={() => {
-              if (!pendingChange || !onSensitiveCommand) return;
-              onSensitiveCommand(command(pendingChange.permission, pendingChange.effect), actorPin);
-              setPendingChange(null);
-              setActorPin('');
+            disabled={!actorPin || saving}
+            onClick={async () => {
+              if (!pendingChange || !onSensitiveCommand || saving) return;
+              setSaveError(null);
+              setSaving(true);
+              try {
+                await onSensitiveCommand(command(pendingChange.permission, pendingChange.effect), actorPin);
+                setPendingChange(null);
+                setActorPin('');
+              } catch (error) {
+                setSaveError(
+                  error instanceof Error ? error.message.replaceAll('_', ' ') : 'Permission update failed',
+                );
+              } finally {
+                setSaving(false);
+              }
             }}
           >
             Confirm change
