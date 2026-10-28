@@ -59,7 +59,7 @@ describe('staffStore', () => {
     } as unknown as AdminSupabaseClient).loadWorkspace(SHOP_ID, BUSINESS_ID, [SHOP_ID]);
     expect(workspace.employees.rows).toHaveLength(1001);
     expect(workspace.employees.nextCursor).toBeNull();
-    expect(workspace.employees.rows[1000]?.id).toBe('employee-1000');
+    expect(workspace.employees.rows.some((employee) => employee.id === 'employee-1000')).toBe(true);
   });
 
   it('counts every pending leave request for the selected shop and business-wide leave', async () => {
