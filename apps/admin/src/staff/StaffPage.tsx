@@ -690,7 +690,7 @@ export function StaffPage() {
                   <span>Compensation type</span>
                   <select
                     value={newEmployeeCompensationType}
-                    disabled={Boolean(createdEmployeeId)}
+                    disabled={Boolean(createdEmployeeId && compensationConfigured)}
                     onChange={(event) =>
                       setNewEmployeeCompensationType(event.target.value as 'MONTHLY' | 'HOURLY')
                     }
@@ -704,7 +704,7 @@ export function StaffPage() {
                   <input
                     inputMode="decimal"
                     value={newEmployeeRate}
-                    disabled={Boolean(createdEmployeeId)}
+                    disabled={Boolean(createdEmployeeId && compensationConfigured)}
                     onChange={(event) => setNewEmployeeRate(event.target.value)}
                   />
                 </label>
@@ -713,7 +713,7 @@ export function StaffPage() {
                   <input
                     type="date"
                     value={newEmployeeEffectiveFrom}
-                    disabled={Boolean(createdEmployeeId)}
+                    disabled={Boolean(createdEmployeeId && compensationConfigured)}
                     onChange={(event) => setNewEmployeeEffectiveFrom(event.target.value)}
                   />
                 </label>
