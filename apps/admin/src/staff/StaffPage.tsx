@@ -172,6 +172,9 @@ export function StaffPage() {
     setOnboardingBusy(true);
     setOnboardingError(null);
     try {
+      if (canProvisionWorker && !newEmployeePin && !onboardingPinApplied && !onboardingApprovalPending) {
+        throw new Error('employee_PIN_required_for_Operations_readiness');
+      }
       const rateMinor = optionalCompensationMinor(newEmployeeRate);
       const initialShift = validateInitialShift(
         initialShiftStartsAt,
@@ -343,6 +346,9 @@ export function StaffPage() {
           throw new Error('compensation_effective_date_required');
         }
         validateInitialShift(initialShiftStartsAt, initialShiftEndsAt, initialShiftBreakMinutes);
+        if (canProvisionWorker && !newEmployeePin && !onboardingPinApplied && !onboardingApprovalPending) {
+          throw new Error('employee_PIN_required_for_Operations_readiness');
+        }
         if (newEmployeePin || confirmEmployeePin || setupAdminPin) {
           if (!canProvisionWorker) throw new Error('owner_admin_required_for_operations_setup');
           if (!/^\d{4,12}$/.test(newEmployeePin)) throw new Error('invalid_employee_pin_format');
@@ -779,7 +785,9 @@ export function StaffPage() {
                         onChange={(event) => setSetupAdminPin(event.currentTarget.value)}
                       />
                     </label>
-                    <p>Leave the fields empty only if Operations access will be set up later.</p>
+                    <p>Operations PIN and your Admin PIN are required to finish with a ready
+                      worker login. If your business requires a second approver, setup stays
+                      pending until they approve the secure PIN change.</p>
                   </fieldset>
                 ) : (
                   <p>Operations PIN and worker provisioning require an Owner or Administrator.</p>
