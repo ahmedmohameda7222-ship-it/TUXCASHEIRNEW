@@ -321,3 +321,214 @@
     padding: 0.75rem;
   }
 }
+
+/* Selected CLEAN Staff inspector: keep all nested details inside the actual panel. */
+.admin-staff-inspector {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  width: 100%;
+}
+.admin-staff-inspector__header {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  align-items: start;
+  gap: 0.875rem;
+  min-width: 0;
+  padding: 1rem;
+  border-bottom: 1px solid var(--tux-border-subtle);
+}
+.admin-staff-inspector__avatar {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.875rem;
+  background: var(--tux-surface-subtle);
+  color: var(--tux-text-primary);
+  font-weight: 700;
+}
+.admin-staff-inspector__identity {
+  display: grid;
+  gap: 0.375rem;
+  min-width: 0;
+}
+.admin-staff-inspector__identity h2 {
+  margin: 0;
+  font-size: clamp(1.125rem, 1.5vw, 1.5rem);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.admin-staff-inspector__identity > p {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--tux-text-secondary);
+  overflow-wrap: anywhere;
+}
+.admin-staff-inspector__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+.admin-staff-inspector__badges span {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  background: var(--tux-surface-subtle);
+  color: var(--tux-text-secondary);
+}
+.admin-staff-inspector__badges [data-state='active'],
+.admin-staff-inspector__badges [data-state='ready'] {
+  color: #276749;
+  background: #edf7ef;
+}
+.admin-staff-inspector__badges [data-state='setup'] {
+  color: #99611b;
+  background: #fcf3e5;
+}
+.admin-staff-inspector__badges [data-state='suspended'] {
+  color: #a3322d;
+  background: #fceae8;
+}
+.admin-staff-inspector .admin-tabs,
+.admin-staff-inspector .admin-tabs__panel {
+  min-width: 0;
+  width: 100%;
+}
+.admin-staff-inspector .admin-tabs__list {
+  display: flex;
+  overflow-x: auto;
+  max-width: 100%;
+  min-width: 0;
+  overscroll-behavior-x: contain;
+  border-bottom: 1px solid var(--tux-border-subtle);
+  scrollbar-width: thin;
+}
+.admin-staff-inspector .admin-tabs__tab {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-width: 0;
+  font-size: 0.78rem;
+  padding: 0.75rem 0.6rem;
+}
+.admin-staff-inspector .admin-tabs__panel {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem 1.25rem;
+  box-sizing: border-box;
+}
+.admin-staff-inspector .admin-staff-section {
+  overflow-wrap: anywhere;
+}
+.admin-staff-inspector .admin-staff-section dl {
+  display: grid;
+  grid-template-columns: minmax(6rem, 32%) minmax(0, 1fr);
+  gap: 0.625rem 1rem;
+  margin: 0;
+}
+.admin-staff-inspector .admin-staff-section dt {
+  color: var(--tux-text-secondary);
+  font-size: 0.8125rem;
+}
+.admin-staff-inspector .admin-staff-section dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.admin-staff-access-policy > section[aria-label='Permissions'] {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.875rem;
+  min-width: 0;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+}
+.admin-staff-access-policy > section[aria-label='Permissions'] > h3,
+.admin-staff-access-policy > section[aria-label='Permissions'] > p {
+  margin: 0;
+}
+.admin-staff-access-policy .admin-more-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  min-width: 0;
+}
+.admin-staff-access-policy .admin-permission-group {
+  min-width: 0;
+  width: 100%;
+  padding: 0.7rem;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+.admin-staff-access-policy .admin-permission-group > summary {
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+.admin-staff-access-policy .admin-permission-group > summary span {
+  white-space: normal;
+  text-align: end;
+}
+.admin-staff-access-policy .admin-permission-group .admin-field,
+.admin-staff-access-policy .admin-permission-group select {
+  width: 100%;
+  min-width: 0;
+}
+.admin-staff-inspector section[aria-label='Staff factual metrics'] {
+  display: grid;
+  gap: 0.625rem;
+  min-width: 0;
+  padding: 0.875rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+}
+.admin-staff-inspector section[aria-label='Staff factual metrics'] h3 {
+  margin: 0;
+}
+.admin-staff-inspector section[aria-label='Staff factual metrics'] .admin-more-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.admin-staff-inspector section[aria-label='Staff factual metrics'] .admin-more-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.admin-staff-onboarding-pin {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+}
+.admin-staff-onboarding-pin > p {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--tux-text-secondary);
+}
+.admin-staff-onboarding-pin .admin-field {
+  min-width: 0;
+}
+@media (max-width: 700px) {
+  .admin-staff-inspector__header {
+    grid-template-columns: 2.875rem minmax(0, 1fr);
+    padding: 0.875rem;
+  }
+  .admin-staff-inspector .admin-tabs__panel {
+    padding: 0.875rem;
+  }
+  .admin-staff-inspector .admin-staff-section dl {
+    grid-template-columns: 1fr;
+  }
+  .admin-staff-access-policy .admin-more-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-staff-access-policy > section[aria-label='Permissions'] {
+    padding: 0.75rem;
+  }
+  .admin-staff-inspector section[aria-label='Staff factual metrics'] .admin-more-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
