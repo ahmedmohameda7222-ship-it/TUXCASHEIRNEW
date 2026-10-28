@@ -1063,8 +1063,9 @@ test('S3 leave list hides requests scoped to other shops but keeps business-wide
   await expect(page.getByText('Other shop leave')).toHaveCount(0);
 });
 
-
-test('S2 interrupted onboarding survives reload without creating a duplicate employee', async ({ page }) => {
+test('S2 interrupted onboarding survives reload without creating a duplicate employee', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockWorkforce(page);
   let creates = 0;
@@ -1080,7 +1081,9 @@ test('S2 interrupted onboarding survives reload without creating a duplicate emp
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          ok: true, replayed: false, employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          ok: true,
+          replayed: false,
+          employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         }),
       });
       return;
@@ -1111,6 +1114,8 @@ test('S2 interrupted onboarding survives reload without creating a duplicate emp
   const resume = page.getByRole('button', { name: 'Complete employee setup' });
   await expect(resume).toBeVisible();
   await resume.click();
-  await expect(page).toHaveURL(/\/staff\/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\?section=permissions$/);
+  await expect(page).toHaveURL(
+    /\/staff\/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\?section=permissions$/,
+  );
   expect(creates).toBe(1);
 });

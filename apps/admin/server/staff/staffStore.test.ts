@@ -28,7 +28,8 @@ describe('staffStore', () => {
   it('counts every pending leave request for the selected shop and business-wide leave', async () => {
     const select = vi.fn(async (table: string, params: URLSearchParams) => {
       if (table === 'business_employees') return [employeeRow()];
-      if (table === 'employee_shop_assignments') return [{ employee_id: EMPLOYEE_ID, shop_id: SHOP_ID }];
+      if (table === 'employee_shop_assignments')
+        return [{ employee_id: EMPLOYEE_ID, shop_id: SHOP_ID }];
       if (table === 'employee_worker_links' || table === 'workers') return [];
       if (table === 'finance_accounts') return [];
       if (table === 'shops') return [{ id: SHOP_ID, name: 'Downtown' }];
@@ -40,8 +41,9 @@ describe('staffStore', () => {
       }
       throw new Error(`unexpected_table:${table}`);
     });
-    const workspace = await createSupabaseStaffStore({ select } as unknown as AdminSupabaseClient)
-      .loadWorkspace(SHOP_ID, BUSINESS_ID, [SHOP_ID]);
+    const workspace = await createSupabaseStaffStore({
+      select,
+    } as unknown as AdminSupabaseClient).loadWorkspace(SHOP_ID, BUSINESS_ID, [SHOP_ID]);
     expect(workspace.pendingLeaveCount).toBe(2);
   });
 
