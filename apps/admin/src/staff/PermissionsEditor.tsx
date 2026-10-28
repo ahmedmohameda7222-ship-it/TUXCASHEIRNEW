@@ -93,7 +93,10 @@ export function PermissionsEditor({
     <section className="admin-staff-permissions-card" aria-label="Permissions">
       <div className="admin-staff-permissions-heading">
         <h3>Permission overrides</h3>
-        <span>{employee.customPermissions.length + (employee.customDeniedPermissions?.length ?? 0)} customized</span>
+        <span>
+          {employee.customPermissions.length + (employee.customDeniedPermissions?.length ?? 0)}{' '}
+          customized
+        </span>
       </div>
       <p>
         Role defaults provide the normal access level. Use an override only when this employee needs
