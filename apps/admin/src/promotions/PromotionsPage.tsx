@@ -144,7 +144,6 @@ export function PromotionsPage({ shopId }: { shopId: string }) {
           onSave={(input) => savePromotion.mutate(input)}
         />
       ) : null}
-
     </section>
   );
 }
