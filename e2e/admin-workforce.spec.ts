@@ -174,6 +174,42 @@ async function selectEmployee(page: Page, name: string) {
   await expect(page.getByRole('heading', { name })).toBeVisible();
 }
 
+test('S1 directory setup badge uses the current shop, not another assigned shop', async ({
+  page,
+}) => {
+  const otherShopId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  await mockWorkforce(page);
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() !== 'GET' || url.searchParams.has('employeeId')) {
+      await route.fallback();
+      return;
+    }
+    const current = workspace();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...current,
+        employees: {
+          ...current.employees,
+          rows: [
+            {
+              ...current.employees.rows[0],
+              operationsSetupRequiredShopIds: [otherShopId],
+            },
+          ],
+        },
+      }),
+    });
+  });
+  await page.goto('/staff');
+  const employeeRow = page.getByRole('button', { name: /Mona Ali/ });
+  await expect(employeeRow).toBeVisible();
+  await expect(employeeRow).not.toContainText('Setup needed');
+});
+
 test('S1 mobile directory searches name and phone within explicitly loaded staff', async ({
   page,
 }) => {
