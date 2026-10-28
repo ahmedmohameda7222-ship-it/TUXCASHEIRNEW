@@ -73,6 +73,16 @@ describe('EmployeeDetailPage', () => {
     expect(html).not.toContain(SHOP_ID);
   });
 
+  it('uses the approved clean Access inspector hierarchy without decorative shortcut cards', () => {
+    const html = render(employee(), true, [], 'permissions', true);
+    expect(html).toContain('Access &amp; permissions');
+    expect(html).toContain('Operations access');
+    expect(html).toContain('Sensitive access actions');
+    expect(html).toContain('Permission overrides');
+    expect(html).toContain('Activity facts');
+    expect(html).not.toContain('admin-staff-access-tasks');
+  });
+
   it('renders an inactive preserved link as disabled rather than healthy setup', () => {
     const html = render(
       employee({
