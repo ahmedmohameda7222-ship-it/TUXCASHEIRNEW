@@ -56,7 +56,9 @@
     align-items: start;
     gap: 0.75rem;
   }
-  .admin-staff-workspace .admin-master-detail[data-detail-active='true'] .admin-master-detail__list {
+  .admin-staff-workspace
+    .admin-master-detail[data-detail-active='true']
+    .admin-master-detail__list {
     display: block;
   }
   .admin-staff-workspace .admin-master-detail__list,
