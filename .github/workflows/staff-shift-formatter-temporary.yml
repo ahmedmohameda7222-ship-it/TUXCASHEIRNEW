@@ -1,0 +1,25 @@
+name: Temporary Staff shift formatting diff
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/staff-shift-formatter-temporary.yml'
+permissions:
+  contents: read
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Exact StaffPage Prettier diff
+        run: |
+          npx prettier apps/admin/src/staff/StaffPage.tsx | diff -u apps/admin/src/staff/StaffPage.tsx - || true
