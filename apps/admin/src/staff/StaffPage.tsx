@@ -265,6 +265,7 @@ export function StaffPage() {
             rows,
             shopId,
             staff.workspaceQuery.data.employees.nextCursor === null,
+            staff.workspaceQuery.data.pendingLeaveCount ?? null,
           )}
         />
       ) : null}
