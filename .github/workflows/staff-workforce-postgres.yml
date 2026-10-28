@@ -68,7 +68,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Assert cross-tenant staff PIN and shop security
         run: node scripts/test-admin-workforce-tenant-isolation-postgres.mjs
-access-parity:
+  access-parity:
     name: Staff role, suspension, PIN and Operations reactivation PostgreSQL
     runs-on: ubuntu-latest
     timeout-minutes: 40
