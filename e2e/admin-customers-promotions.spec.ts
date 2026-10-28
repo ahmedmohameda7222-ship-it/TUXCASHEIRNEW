@@ -735,6 +735,70 @@ test('CRM4 approved promotions table keeps factual type, channel, discount and E
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
+test('CRM4 fixed promotion values preserve safe minor units through 390px edit and save', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const preciseMinor = Number.MAX_SAFE_INTEGER - 1;
+  await page.route('**/api/admin/customers**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() !== 'GET' || url.searchParams.get('view') !== 'promotions') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        promotions: [
+          {
+            id: '44444444-4444-4444-8444-444444444444',
+            businessId: session.principal.businessId,
+            name: 'Exact fixed amount',
+            active: true,
+            kind: 'FIXED',
+            percentBasisPoints: null,
+            fixedDiscountMinor: preciseMinor,
+            freeProductId: null,
+            startsAt: null,
+            endsAt: null,
+            minimumOrderMinor: preciseMinor,
+            shopIds: [shopId, otherShopId],
+            channel: 'BOTH',
+            productIds: [],
+            categoryIds: [],
+            totalUsageLimit: null,
+            perCustomerUsageLimit: null,
+            stackingPolicy: 'ONE_ORDER_LEVEL',
+            targetSegments: [],
+            version: 3,
+            updatedAt: '2026-09-20T12:00:00.000Z',
+          },
+        ],
+      }),
+    });
+  });
+  await page.goto('/customers/settings');
+  await page.getByRole('button', { name: 'Edit Exact fixed amount' }).click();
+  const editor = page.getByRole('form', { name: 'Promotion editor' });
+  await expect(editor.getByLabel('Discount (EGP)')).toHaveValue('90071992547409.90');
+  await expect(editor.getByLabel('Minimum order (EGP)')).toHaveValue('90071992547409.90');
+  await editor.getByRole('button', { name: 'Save promotion' }).click();
+  await expect
+    .poll(
+      () =>
+        postedCommands.find((command) => command.type === 'promotion.upsert')?.promotion,
+    )
+    .toMatchObject({
+      fixedDiscountMinor: preciseMinor,
+      minimumOrderMinor: preciseMinor,
+      expectedVersion: 3,
+      shopIds: [shopId, otherShopId],
+    });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
 test('hydrates canonical loyalty values and preserves hidden multi-shop scopes on save', async ({
   page,
 }) => {
