@@ -172,7 +172,12 @@ export function StaffPage() {
     setOnboardingBusy(true);
     setOnboardingError(null);
     try {
-      if (canProvisionWorker && !newEmployeePin && !onboardingPinApplied && !onboardingApprovalPending) {
+      if (
+          canProvisionWorker &&
+          !newEmployeePin &&
+          !onboardingPinApplied &&
+          !onboardingApprovalPending
+        ) {
         throw new Error('employee_PIN_required_for_Operations_readiness');
       }
       const rateMinor = optionalCompensationMinor(newEmployeeRate);
@@ -346,7 +351,12 @@ export function StaffPage() {
           throw new Error('compensation_effective_date_required');
         }
         validateInitialShift(initialShiftStartsAt, initialShiftEndsAt, initialShiftBreakMinutes);
-        if (canProvisionWorker && !newEmployeePin && !onboardingPinApplied && !onboardingApprovalPending) {
+        if (
+          canProvisionWorker &&
+          !newEmployeePin &&
+          !onboardingPinApplied &&
+          !onboardingApprovalPending
+        ) {
           throw new Error('employee_PIN_required_for_Operations_readiness');
         }
         if (newEmployeePin || confirmEmployeePin || setupAdminPin) {
@@ -785,9 +795,11 @@ export function StaffPage() {
                         onChange={(event) => setSetupAdminPin(event.currentTarget.value)}
                       />
                     </label>
-                    <p>Operations PIN and your Admin PIN are required to finish with a ready
-                      worker login. If your business requires a second approver, setup stays
-                      pending until they approve the secure PIN change.</p>
+                    <p>
+                      Operations PIN and your Admin PIN are required to finish with a ready worker
+                      login. If your business requires a second approver, setup stays pending until
+                      they approve the secure PIN change.
+                    </p>
                   </fieldset>
                 ) : (
                   <p>Operations PIN and worker provisioning require an Owner or Administrator.</p>
