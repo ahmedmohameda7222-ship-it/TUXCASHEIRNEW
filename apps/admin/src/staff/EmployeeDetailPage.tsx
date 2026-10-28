@@ -461,7 +461,10 @@ export function EmployeeDetailPage({
         </span>
         <div className="admin-staff-inspector__identity">
           <h2>{employee.displayName}</h2>
-          <p>{employee.phone ?? 'Phone not provided'} · {employee.assignments.length} assigned shop(s)</p>
+          <p>
+            {employee.phone ?? 'Phone not provided'} · {employee.assignments.length} assigned
+            shop(s)
+          </p>
           <div className="admin-staff-inspector__badges">
             <span>{roleLabel(employee.role)}</span>
             <span data-state={employee.active ? 'active' : 'suspended'}>
