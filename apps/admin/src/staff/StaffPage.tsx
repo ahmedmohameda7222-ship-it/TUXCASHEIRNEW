@@ -21,6 +21,15 @@ function readableError(error: unknown): string | null {
   return raw.trim().replaceAll('_', ' ').replaceAll('-', ' ') || 'Staff action failed';
 }
 
+function employeeInitials(displayName: string): string {
+  return displayName
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((name) => name.charAt(0).toLocaleUpperCase())
+    .join('');
+}
+
 function roleLabel(role: string): string {
   return role === 'OWNER'
     ? 'Owner'
@@ -463,15 +472,22 @@ export function StaffPage() {
                   type="button"
                   onClick={() => navigate(detailPath('/staff', employee.id))}
                 >
-                  <span>
-                    <strong>{employee.displayName}</strong>
-                    <small>
-                      {roleLabel(employee.role)} · {employee.shopIds.length} shop
-                      {employee.shopIds.length === 1 ? '' : 's'}
-                    </small>
+                  <span className="admin-staff-person">
+                    <span className="admin-staff-person__avatar" aria-hidden="true">
+                      {employeeInitials(employee.displayName)}
+                    </span>
+                    <span className="admin-staff-person__text">
+                      <strong>{employee.displayName}</strong>
+                      <small>
+                        {roleLabel(employee.role)} · {employee.shopIds.length} shop
+                        {employee.shopIds.length === 1 ? '' : 's'}
+                      </small>
+                    </span>
                   </span>
                   <span className="admin-staff-row__states">
-                    <span>{employee.active ? 'Active' : 'Suspended'}</span>
+                    <span className="admin-staff-status-chip" data-active={employee.active}>
+                      {employee.active ? 'Active' : 'Suspended'}
+                    </span>
                     {employee.operationsSetupRequiredShopIds.length > 0 ? (
                       <span
                         className="admin-staff-row__setup"
