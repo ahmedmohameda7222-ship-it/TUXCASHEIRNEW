@@ -1162,7 +1162,7 @@ test('S2 interrupted onboarding survives reload without creating a duplicate emp
   expect(compensationAttempts).toBe(2);
   expect(creates).toBe(1);
   await page.goBack();
-  await expect(page).toHaveURL(/\\/staff$/);
+  await expect.poll(() => new URL(page.url()).pathname + new URL(page.url()).search).toBe('/staff');
   await expect(page.getByRole('button', { name: 'Complete employee setup' })).toHaveCount(0);
 });
 
