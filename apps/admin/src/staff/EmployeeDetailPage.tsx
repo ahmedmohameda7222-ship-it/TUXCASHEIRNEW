@@ -460,7 +460,7 @@ export function EmployeeDetailPage({
         value={section}
         onChange={onSectionChange}
         tabs={[
-          { id: 'profile', label: 'Profile', content: profileContent },
+          { id: 'profile', label: 'Overview', content: profileContent },
           {
             id: 'schedule',
             label: 'Schedule',
@@ -500,12 +500,12 @@ export function EmployeeDetailPage({
           },
           {
             id: 'pay',
-            label: 'Pay / Compensation',
+            label: 'Pay',
             content: compensationContent,
           },
           {
             id: 'permissions',
-            label: 'Access & Permissions',
+            label: 'Access & permissions',
             content: accessContent,
           },
         ]}
