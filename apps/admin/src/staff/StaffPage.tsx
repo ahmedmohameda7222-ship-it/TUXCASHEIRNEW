@@ -183,7 +183,7 @@ export function StaffPage() {
       const requestedPinSetup = Boolean(newEmployeePin) || onboardingPinApplied;
       if (newEmployeePin && !onboardingPinApplied) {
         if (!canProvisionWorker) throw new Error('owner_admin_required_for_operations_setup');
-        if (!/^\\d{4,12}$/.test(newEmployeePin) || newEmployeePin !== confirmEmployeePin) {
+        if (!/^\d{4,12}$/.test(newEmployeePin) || newEmployeePin !== confirmEmployeePin) {
           throw new Error('invalid_or_mismatched_employee_pin');
         }
         if (!setupAdminPin) throw new Error('admin_pin_required');
@@ -285,7 +285,7 @@ export function StaffPage() {
         }
         if (newEmployeePin || confirmEmployeePin || setupAdminPin) {
           if (!canProvisionWorker) throw new Error('owner_admin_required_for_operations_setup');
-          if (!/^\\d{4,12}$/.test(newEmployeePin)) throw new Error('invalid_employee_pin_format');
+          if (!/^\d{4,12}$/.test(newEmployeePin)) throw new Error('invalid_employee_pin_format');
           if (newEmployeePin !== confirmEmployeePin) throw new Error('employee_pin_mismatch');
           if (!setupAdminPin) throw new Error('admin_pin_required');
         }
