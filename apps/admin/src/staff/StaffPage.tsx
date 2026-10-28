@@ -801,7 +801,8 @@ export function StaffPage() {
                     : 'Compensation will be configured later.'}
                 </p>
                 <p>
-                  First shift: {initialShiftStartsAt && initialShiftEndsAt
+                  First shift:{' '}
+                  {initialShiftStartsAt && initialShiftEndsAt
                     ? 'Scheduled through the real shift workflow'
                     : 'No initial shift requested'}
                 </p>
