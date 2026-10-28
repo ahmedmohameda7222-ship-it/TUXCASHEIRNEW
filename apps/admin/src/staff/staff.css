@@ -536,15 +536,11 @@
 /* An opened employee is a focused full-width screen below the desktop split breakpoint.
    The CLEAN 390px reference does not repeat the parent Staff heading or summary KPIs. */
 @media (max-width: 1099px) {
-  .admin-page:has(
-      .admin-staff-workspace .admin-master-detail[data-detail-active='true']
-    )
+  .admin-page:has(.admin-staff-workspace .admin-master-detail[data-detail-active='true'])
     > .admin-page__header {
     display: none;
   }
-  .admin-page:has(
-      .admin-staff-workspace .admin-master-detail[data-detail-active='true']
-    )
+  .admin-page:has(.admin-staff-workspace .admin-master-detail[data-detail-active='true'])
     .admin-metric-strip[aria-label='Staff summary'] {
     display: none;
   }
