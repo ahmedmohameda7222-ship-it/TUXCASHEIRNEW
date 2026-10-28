@@ -353,6 +353,31 @@ export interface StaffStore {
   ): Promise<StaffCommandResult>;
 }
 
+async function countPendingLeaveRequests(
+  client: AdminSupabaseClient,
+  businessId: string,
+  shopId: string,
+): Promise<number> {
+  let count = 0;
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await client.select<Array<{ id: string }>>(
+      'leave_requests',
+      new URLSearchParams({
+        select: 'id',
+        business_id: `eq.${businessId}`,
+        status: 'eq.PENDING',
+        or: `(shop_id.eq.${shopId},shop_id.is.null)`,
+        order: 'id.asc',
+        limit: String(pageSize),
+        offset: String(offset),
+      }),
+    );
+    count += page.length;
+    if (page.length < pageSize) return count;
+  }
+}
+
 export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStore {
   return {
     async loadWorkspace(shopId, businessId, visibleShopIds): Promise<StaffWorkspace> {
@@ -450,7 +475,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
         };
       });
 
-      const [financeAccounts, workerChoices, shops] = await Promise.all([
+      const [financeAccounts, workerChoices, shops, pendingLeaveCount] = await Promise.all([
         client.select<FinanceAccountRow[]>(
           'finance_accounts',
           new URLSearchParams({
@@ -479,6 +504,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
             order: 'name.asc,id.asc',
           }),
         ),
+        countPendingLeaveRequests(client, businessId, shopId),
       ]);
 
       const linkedEmployeeByWorker = new Map(
@@ -496,6 +522,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
       const employeesResult: StaffListResult = { rows, nextCursor: null };
       return {
         employees: employeesResult,
+        pendingLeaveCount,
         shops,
         financeAccounts: financeAccounts.map((account) => ({
           id: account.id,
