@@ -1296,3 +1296,68 @@ for (const width of [390, 1024, 1440]) {
     );
   });
 }
+
+
+test('S2 employee setup waits for PIN approval and never provisions Operations prematurely', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'POST' || request.postDataJSON()?.type !== 'employee.pin') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        state: 'PENDING_APPROVAL',
+        approvalRequestId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Awaiting Approval');
+  await advanceStaffOnboardingToReview(page);
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect(sheet.getByRole('alert')).toContainText('pending approval');
+  await expect(sheet).toBeVisible();
+  expect(commands.filter((command) => command.type === 'employee.provision-worker')).toHaveLength(0);
+  expect(commands.filter((command) => command.type === 'employee.create')).toHaveLength(1);
+});
+
+test('S2 shop manager cannot promise immediate Operations readiness without provision rights', async ({
+  page,
+}) => {
+  const commands = await mockWorkforce(page);
+  await page.route('**/api/admin/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...session,
+        principal: {
+          ...session.principal,
+          role: 'MANAGER',
+          permissions: ['staff.view', 'staff.manage'],
+        },
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Unprovisionable Employee');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByRole('alert')).toContainText('Owner or Admin');
+  await fillEmployeeOperationsSetup(page);
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByRole('alert')).toContainText('Owner or Admin');
+  expect(commands).toHaveLength(0);
+});
