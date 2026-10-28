@@ -120,6 +120,12 @@ export function EmployeeDetailPage({
   );
   const operationsHealthy = setupRequired.length === 0 && inactiveOperationsIdentities.length === 0;
   const shopName = (id: string) => shops.find((shop) => shop.id === id)?.name ?? 'Authorized shop';
+  const initials = employee.displayName
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toLocaleUpperCase())
+    .join('');
 
   const profileContent = (
     <>
@@ -406,8 +412,6 @@ export function EmployeeDetailPage({
         {operationsHealthy ? <p>Operations access: Ready</p> : null}
       </section>
 
-      <StaffMetricsPanel employee={employee} />
-
       {canManage ? (
         <section
           className="admin-staff-section is-compact"
@@ -449,18 +453,26 @@ export function EmployeeDetailPage({
           onSensitiveCommand={onSensitiveCommand}
         />
       </div>
+      <StaffMetricsPanel employee={employee} />
     </>
   );
 
   return (
-    <article aria-label={`Employee ${employee.displayName}`}>
-      <header className="admin-page__header">
-        <div>
-          <p className="admin-page__eyebrow">Staff profile</p>
+    <article className="admin-staff-inspector" aria-label={`Employee ${employee.displayName}`}>
+      <header className="admin-staff-inspector__header">
+        <span className="admin-staff-inspector__avatar" aria-hidden="true">{initials}</span>
+        <div className="admin-staff-inspector__identity">
           <h2>{employee.displayName}</h2>
-          <p className="admin-page__description">
-            {roleLabel(employee.role)} · {employee.active ? 'Active' : 'Suspended'}
-          </p>
+          <p>{employee.phone || 'No phone'} · {employee.assignments.length} assigned shop(s)</p>
+          <div className="admin-staff-inspector__badges">
+            <span className="admin-staff-status-chip">{roleLabel(employee.role)}</span>
+            <span className="admin-staff-status-chip" data-active={employee.active}>
+              {employee.active ? 'Active' : 'Suspended'}
+            </span>
+            <span className="admin-staff-status-chip" data-ready={operationsHealthy && employee.active}>
+              {operationsHealthy && employee.active ? 'Operations ready' : 'Operations setup needed'}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -469,7 +481,7 @@ export function EmployeeDetailPage({
         value={section}
         onChange={onSectionChange}
         tabs={[
-          { id: 'profile', label: 'Profile', content: profileContent },
+          { id: 'profile', label: 'Overview', content: profileContent },
           {
             id: 'schedule',
             label: 'Schedule',
