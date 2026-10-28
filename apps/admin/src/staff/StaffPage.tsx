@@ -759,7 +759,7 @@ export function StaffPage() {
                   setConfirmEmployeePin('');
                   setAdminConfirmationPin('');
                   setCreateOpen(false);
-                }
+                }}
               >
                 Cancel
               </button>
