@@ -25,6 +25,34 @@ function employeeRow() {
 }
 
 describe('staffStore', () => {
+  it('returns a complete directory beyond a one-thousand-row PostgREST page', async () => {
+    const ids = Array.from({ length: 1001 }, (_, index) => `employee-${index}`);
+    const select = vi.fn(async (table: string, params: URLSearchParams) => {
+      if (table === 'employee_shop_assignments') {
+        if (params.has('employee_id')) {
+          const group = (params.get('employee_id') ?? '').replace(/^in\.\(/, '').replace(/\)$/, '').split(',');
+          return group.map((id) => ({ employee_id: id, shop_id: SHOP_ID }));
+        }
+        const offset = Number(params.get('offset') ?? 0);
+        const limit = Number(params.get('limit') ?? 1000);
+        return ids.slice(offset, offset + limit).map((id) => ({ employee_id: id, shop_id: SHOP_ID }));
+      }
+      if (table === 'business_employees') {
+        const group = (params.get('id') ?? '').replace(/^in\.\(/, '').replace(/\)$/, '').split(',');
+        return group.map((id) => ({ ...employeeRow(), id }));
+      }
+      if (table === 'employee_worker_links' || table === 'workers') return [];
+      if (table === 'finance_accounts' || table === 'leave_requests') return [];
+      if (table === 'shops') return [{ id: SHOP_ID, name: 'Downtown' }];
+      throw new Error(`unexpected_table:${table}`);
+    });
+    const workspace = await createSupabaseStaffStore({ select } as unknown as AdminSupabaseClient)
+      .loadWorkspace(SHOP_ID, BUSINESS_ID, [SHOP_ID]);
+    expect(workspace.employees.rows).toHaveLength(1001);
+    expect(workspace.employees.nextCursor).toBeNull();
+    expect(workspace.employees.rows[1000]?.id).toBe('employee-1000');
+  });
+
   it('counts every pending leave request for the selected shop and business-wide leave', async () => {
     const select = vi.fn(async (table: string, params: URLSearchParams) => {
       if (table === 'business_employees') return [employeeRow()];
