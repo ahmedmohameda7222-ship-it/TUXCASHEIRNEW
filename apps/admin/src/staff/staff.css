@@ -781,10 +781,8 @@
 @media (max-width: 1099px) {
   /* Match the more specific page-level mobile header rule above.
      Otherwise its display:grid overrides this focused-detail display:none. */
-  .admin-page:has(> .admin-page__body .admin-staff-workspace--inspecting)
-    > .admin-page__header,
-  .admin-page:has(> .admin-page__body .admin-staff-workspace--inspecting)
-    .admin-staff-summary {
+  .admin-page:has(> .admin-page__body .admin-staff-workspace--inspecting) > .admin-page__header,
+  .admin-page:has(.admin-staff-workspace--inspecting) .admin-staff-summary {
     display: none;
   }
 }
