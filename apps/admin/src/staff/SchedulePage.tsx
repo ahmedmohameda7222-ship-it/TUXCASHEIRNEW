@@ -28,11 +28,13 @@ export function SchedulePage({
   shopId,
   canManage,
   onCommand,
+  onVerifiedCommand,
 }: {
   employee: EmployeeDetail;
   shopId: string;
   canManage: boolean;
   onCommand(command: StaffCommandDraft): void;
+  onVerifiedCommand?(command: StaffCommandDraft): Promise<unknown>;
 }) {
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
@@ -40,6 +42,8 @@ export function SchedulePage({
   const [targetWeekStart, setTargetWeekStart] = useState('');
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
   const [shiftOpen, setShiftOpen] = useState(false);
+  const [savingShift, setSavingShift] = useState(false);
+  const [shiftError, setShiftError] = useState<string | null>(null);
 
   const shifts = employee.shifts.filter((shift) => shift.shopId === shopId);
 
@@ -102,6 +106,7 @@ export function SchedulePage({
               setStartsAt('');
               setEndsAt('');
               setBreakMinutes('0');
+              setShiftError(null);
               setShiftOpen(true);
             }}
           >
@@ -113,6 +118,7 @@ export function SchedulePage({
             title={editingShiftId ? 'Edit shift' : 'Add shift'}
             description="Set the employee's working time and planned break."
             onOpenChange={(open) => {
+              if (savingShift) return;
               setShiftOpen(open);
               if (!open) setEditingShiftId(null);
             }}
@@ -141,37 +147,47 @@ export function SchedulePage({
                 onChange={(event) => setBreakMinutes(event.target.value)}
               />
             </label>
+            {shiftError ? <p role="alert">{shiftError}</p> : null}
             <button
               className="admin-primary-button"
               type="button"
-              disabled={!startsAt || !endsAt}
-              onClick={() => {
-                const editingShift = employee.shifts.find((shift) => shift.id === editingShiftId);
-                if (editingShift) {
-                  onCommand({
-                    type: 'shift.update',
-                    shiftId: editingShift.id,
-                    shopId,
-                    expectedVersion: editingShift.version,
-                    startsAt: businessLocalDateTimeToIso(startsAt),
-                    endsAt: businessLocalDateTimeToIso(endsAt),
-                    plannedBreakMinutes: Number(breakMinutes) || 0,
-                  });
-                } else {
-                  onCommand({
-                    type: 'shift.create',
-                    employeeId: employee.id,
-                    shopId,
-                    startsAt: businessLocalDateTimeToIso(startsAt),
-                    endsAt: businessLocalDateTimeToIso(endsAt),
-                    plannedBreakMinutes: Number(breakMinutes) || 0,
-                  });
+              disabled={!startsAt || !endsAt || savingShift}
+              onClick={async () => {
+                setShiftError(null);
+                setSavingShift(true);
+                try {
+                  const editingShift = employee.shifts.find((shift) => shift.id === editingShiftId);
+                  const command: StaffCommandDraft = editingShift
+                    ? {
+                        type: 'shift.update',
+                        shiftId: editingShift.id,
+                        shopId,
+                        expectedVersion: editingShift.version,
+                        startsAt: businessLocalDateTimeToIso(startsAt),
+                        endsAt: businessLocalDateTimeToIso(endsAt),
+                        plannedBreakMinutes: Number(breakMinutes) || 0,
+                      }
+                    : {
+                        type: 'shift.create',
+                        employeeId: employee.id,
+                        shopId,
+                        startsAt: businessLocalDateTimeToIso(startsAt),
+                        endsAt: businessLocalDateTimeToIso(endsAt),
+                        plannedBreakMinutes: Number(breakMinutes) || 0,
+                      };
+                  if (onVerifiedCommand) await onVerifiedCommand(command);
+                  else onCommand(command);
+                  setEditingShiftId(null);
+                  setShiftOpen(false);
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : 'Shift could not be saved';
+                  setShiftError(message.replaceAll('_', ' '));
+                } finally {
+                  setSavingShift(false);
                 }
-                setEditingShiftId(null);
-                setShiftOpen(false);
               }}
             >
-              {editingShiftId ? 'Save shift' : 'Add shift'}
+              {savingShift ? 'Saving…' : editingShiftId ? 'Save shift' : 'Add shift'}
             </button>
           </AdminDialog>
 
