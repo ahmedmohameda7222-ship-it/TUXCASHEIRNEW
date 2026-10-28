@@ -1,0 +1,70 @@
+name: Staff workforce isolated PostgreSQL acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/server/staff/**'
+      - 'apps/admin/src/staff/**'
+      - 'e2e/admin-workforce.spec.ts'
+      - 'scripts/test-admin-workforce-*.mjs'
+      - 'supabase/migrations/**'
+      - '.github/workflows/staff-workforce-postgres.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core-workforce:
+    name: Worker provisioning, staff lifecycle, attendance and payroll PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Assert real staff lifecycle and financial database invariants
+        run: node scripts/test-admin-workforce-postgres.mjs
+
+  tenant-scope:
+    name: Staff PIN command tenant isolation PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Assert cross-tenant staff PIN and shop security
+        run: node scripts/test-admin-workforce-tenant-isolation-postgres.mjs
