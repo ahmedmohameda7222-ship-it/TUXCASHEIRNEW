@@ -70,6 +70,7 @@ describe('staffStore', () => {
         return [{ employee_id: EMPLOYEE_ID, shop_id: SHOP_ID }];
       if (table === 'employee_worker_links') return [];
       if (table === 'workers') return [];
+      if (table === 'leave_requests') return [];
       if (table === 'shops') {
         expect(params.has('business_id')).toBe(false);
         expect(params.get('id')).toBe(`in.(${SHOP_ID})`);
@@ -106,6 +107,7 @@ describe('staffStore', () => {
           },
         ];
       if (table === 'finance_accounts') return [];
+      if (table === 'leave_requests') return [];
       if (table === 'shops') return [{ id: SHOP_ID, name: 'Downtown' }];
       throw new Error(`unexpected_table:${table}`);
     });
