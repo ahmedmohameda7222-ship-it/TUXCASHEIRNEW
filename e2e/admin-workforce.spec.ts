@@ -711,6 +711,73 @@ test('S2 onboarding reviews authorized shops before creating and assigning emplo
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
+test('S2 partial compensation failure resumes after closing without duplicate employee', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  const commands: Array<{ type?: string; commandId?: string }> = [];
+  let compensationAttempts = 0;
+  await page.route('**/api/admin/staff**', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const command = route.request().postDataJSON() as {
+      type?: string;
+      commandId?: string;
+    };
+    if (command.type !== 'employee.create' && command.type !== 'compensation.set') {
+      await route.fallback();
+      return;
+    }
+    commands.push(command);
+    if (command.type === 'compensation.set') compensationAttempts += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        command.type === 'compensation.set' && compensationAttempts === 1
+          ? { ok: false, code: 'compensation_temporarily_unavailable' }
+          : {
+              ok: true,
+              replayed: false,
+              ...(command.type === 'employee.create'
+                ? { employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }
+                : {}),
+            },
+      ),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  let sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Amira Resumable');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByLabel('Rate (EGP, optional)').fill('100.00');
+  await sheet.getByLabel('Effective from').fill('2026-10-01');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await expect(sheet.getByRole('alert')).toContainText('compensation temporarily unavailable');
+  await expect.poll(() => commands.length).toBe(2);
+  await sheet.getByRole('button', { name: 'Cancel' }).click();
+  await expect(sheet).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await expect(sheet.getByText('Review employee setup')).toBeVisible();
+  await expect(sheet.getByRole('button', { name: 'Resume onboarding' })).toBeVisible();
+  await sheet.getByRole('button', { name: 'Resume onboarding' }).click();
+  await expect.poll(() => commands.length).toBe(3);
+  expect(commands.map((command) => command.type)).toEqual([
+    'employee.create',
+    'compensation.set',
+    'compensation.set',
+  ]);
+  expect(commands[2]?.commandId).toBe(commands[1]?.commandId);
+  await expect(sheet).toHaveCount(0);
+});
+
 test('S2 rejected employee creation retries the same idempotency intent on phone', async ({
   page,
 }) => {
