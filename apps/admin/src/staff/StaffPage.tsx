@@ -11,6 +11,7 @@ import { useShopScope } from '../shops/ShopScopeProvider';
 import { EmployeeDetailPage, type StaffDetailSection } from './EmployeeDetailPage';
 import { staffSummaryMetrics } from './staffSummaryMetrics';
 import { parseStaffMoneyMinor } from './staffMoney';
+import { businessLocalDateTimeToIso } from './businessTime';
 import { useStaff, type StaffApiCommandDraft } from './useStaff';
 import './staff.css';
 
@@ -53,6 +54,27 @@ function optionalCompensationMinor(raw: string): number | null {
   return minor;
 }
 
+function validateInitialShift(
+  starts: string,
+  ends: string,
+  breakMinutes: string,
+): { startsAt: string; endsAt: string; plannedBreakMinutes: number } | null {
+  if (!starts && !ends) return null;
+  if (!starts || !ends) throw new Error('invalid_initial_shift_schedule');
+  const startsAt = businessLocalDateTimeToIso(starts);
+  const endsAt = businessLocalDateTimeToIso(ends);
+  const minutes = Number(breakMinutes);
+  if (
+    Date.parse(endsAt) <= Date.parse(startsAt) ||
+    !/^\d+$/.test(breakMinutes) ||
+    !Number.isSafeInteger(minutes) ||
+    minutes >= (Date.parse(endsAt) - Date.parse(startsAt)) / 60000
+  ) {
+    throw new Error('invalid_initial_shift_schedule');
+  }
+  return { startsAt, endsAt, plannedBreakMinutes: minutes };
+}
+
 export function StaffPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
@@ -65,6 +87,13 @@ export function StaffPage() {
   const [onboardingShopIds, setOnboardingShopIds] = useState<string[]>(shopId ? [shopId] : []);
   const [createdEmployeeId, setCreatedEmployeeId] = useState<string | null>(null);
   const [assignedShopIds, setAssignedShopIds] = useState<string[]>([]);
+  const [newEmployeePin, setNewEmployeePin] = useState('');
+  const [confirmEmployeePin, setConfirmEmployeePin] = useState('');
+  const [setupAdminPin, setSetupAdminPin] = useState('');
+  const [pinCommandId, setPinCommandId] = useState(() => crypto.randomUUID());
+  const [onboardingPinApplied, setOnboardingPinApplied] = useState(false);
+  const [provisionedShopIds, setProvisionedShopIds] = useState<string[]>([]);
+  const [onboardingApprovalPending, setOnboardingApprovalPending] = useState(false);
   const [onboardingBusy, setOnboardingBusy] = useState(false);
   const [onboardingError, setOnboardingError] = useState<string | null>(null);
   const [newEmployeeCompensationType, setNewEmployeeCompensationType] = useState<
@@ -72,6 +101,11 @@ export function StaffPage() {
   >('MONTHLY');
   const [newEmployeeRate, setNewEmployeeRate] = useState('');
   const [newEmployeeEffectiveFrom, setNewEmployeeEffectiveFrom] = useState('');
+  const [compensationApplied, setCompensationApplied] = useState(false);
+  const [initialShiftStartsAt, setInitialShiftStartsAt] = useState('');
+  const [initialShiftEndsAt, setInitialShiftEndsAt] = useState('');
+  const [initialShiftBreakMinutes, setInitialShiftBreakMinutes] = useState('0');
+  const [initialShiftCreated, setInitialShiftCreated] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -119,6 +153,8 @@ export function StaffPage() {
 
   const canManage = principal.permissions.includes('staff.manage');
   const canPay = principal.permissions.includes('staff.payments');
+  const canProvisionWorker =
+    canManage && (principal.role === 'OWNER' || principal.role === 'ADMIN');
   const detail = staff.detailQuery.data;
   const actionError =
     readableError(staff.sensitiveCommand.error) ?? readableError(staff.command.error);
@@ -131,10 +167,16 @@ export function StaffPage() {
   async function createEmployee() {
     const displayName = newEmployeeName.trim();
     if (!displayName || onboardingBusy || !shopId) return;
+    if (onboardingApprovalPending) return;
     setOnboardingBusy(true);
     setOnboardingError(null);
     try {
       const rateMinor = optionalCompensationMinor(newEmployeeRate);
+      const initialShift = validateInitialShift(
+        initialShiftStartsAt,
+        initialShiftEndsAt,
+        initialShiftBreakMinutes,
+      );
       if (rateMinor !== null && !newEmployeeEffectiveFrom) {
         throw new Error('compensation_effective_date_required');
       }
@@ -171,7 +213,55 @@ export function StaffPage() {
         setAssignedShopIds([...completed]);
       }
 
-      if (rateMinor !== null) {
+      const requestedPinSetup = Boolean(newEmployeePin) || onboardingPinApplied;
+      if (newEmployeePin && !onboardingPinApplied) {
+        if (!canProvisionWorker) throw new Error('owner_admin_required_for_operations_setup');
+        if (!/^\d{4,12}$/.test(newEmployeePin) || newEmployeePin !== confirmEmployeePin) {
+          throw new Error('invalid_or_mismatched_employee_pin');
+        }
+        if (!setupAdminPin) throw new Error('admin_pin_required');
+        const result = await staff.sensitiveCommand.mutateAsync({
+          draft: {
+            type: 'employee.pin',
+            employeeId,
+            shopId,
+            newPin: newEmployeePin,
+            commandId: pinCommandId,
+          },
+          pin: setupAdminPin,
+        });
+        if (result.state === 'PENDING_APPROVAL') {
+          setOnboardingApprovalPending(true);
+          setNewEmployeePin('');
+          setConfirmEmployeePin('');
+          setSetupAdminPin('');
+          throw new Error('employee_pin_awaiting_second_person_approval');
+        }
+        if (!result.ok) throw new Error('employee_pin_setup_unconfirmed');
+        setOnboardingPinApplied(true);
+        setNewEmployeePin('');
+        setConfirmEmployeePin('');
+        setSetupAdminPin('');
+      }
+
+      if (requestedPinSetup) {
+        const readyShops = new Set(provisionedShopIds);
+        for (const targetShopId of onboardingShopIds) {
+          if (readyShops.has(targetShopId)) continue;
+          const result = await staff.command.mutateAsync({
+            type: 'employee.provision-worker',
+            employeeId,
+            shopId: targetShopId,
+          });
+          if (!result.ok || result.state === 'PENDING_APPROVAL') {
+            throw new Error('operations_worker_setup_unconfirmed');
+          }
+          readyShops.add(targetShopId);
+          setProvisionedShopIds([...readyShops]);
+        }
+      }
+
+      if (rateMinor !== null && !compensationApplied) {
         const result = await staff.command.mutateAsync({
           type: 'compensation.set',
           employeeId,
@@ -183,17 +273,42 @@ export function StaffPage() {
         if (!result.ok || result.state === 'PENDING_APPROVAL') {
           throw new Error('compensation_setup_unconfirmed');
         }
+        setCompensationApplied(true);
+      }
+      if (initialShift && !initialShiftCreated) {
+        const result = await staff.command.mutateAsync({
+          type: 'shift.create',
+          employeeId,
+          shopId,
+          ...initialShift,
+        });
+        if (!result.ok || result.state === 'PENDING_APPROVAL') {
+          throw new Error('initial_shift_setup_unconfirmed');
+        }
+        setInitialShiftCreated(true);
       }
       setCreateOpen(false);
       setOnboardingStep('identity');
       setCreatedEmployeeId(null);
       setAssignedShopIds([]);
+      setProvisionedShopIds([]);
+      setOnboardingPinApplied(false);
+      setOnboardingApprovalPending(false);
+      setPinCommandId(crypto.randomUUID());
+      setNewEmployeePin('');
+      setConfirmEmployeePin('');
+      setSetupAdminPin('');
       setNewEmployeeName('');
       setNewEmployeePhone('');
       setNewEmployeeHireDate('');
       setNewEmployeeNotes('');
       setNewEmployeeRate('');
       setNewEmployeeEffectiveFrom('');
+      setCompensationApplied(false);
+      setInitialShiftStartsAt('');
+      setInitialShiftEndsAt('');
+      setInitialShiftBreakMinutes('0');
+      setInitialShiftCreated(false);
       navigate(detailPath('/staff', employeeId));
     } catch (error) {
       setOnboardingError(readableError(error) ?? 'Employee onboarding could not be completed');
@@ -218,6 +333,13 @@ export function StaffPage() {
         const rate = optionalCompensationMinor(newEmployeeRate);
         if (rate !== null && !newEmployeeEffectiveFrom) {
           throw new Error('compensation_effective_date_required');
+        }
+        validateInitialShift(initialShiftStartsAt, initialShiftEndsAt, initialShiftBreakMinutes);
+        if (newEmployeePin || confirmEmployeePin || setupAdminPin) {
+          if (!canProvisionWorker) throw new Error('owner_admin_required_for_operations_setup');
+          if (!/^\d{4,12}$/.test(newEmployeePin)) throw new Error('invalid_employee_pin_format');
+          if (newEmployeePin !== confirmEmployeePin) throw new Error('employee_pin_mismatch');
+          if (!setupAdminPin) throw new Error('admin_pin_required');
         }
         setOnboardingStep('review');
       } catch (error) {
@@ -248,6 +370,18 @@ export function StaffPage() {
               setOnboardingStep('identity');
               setOnboardingShopIds([shopId]);
               setAssignedShopIds([]);
+              setProvisionedShopIds([]);
+              setCompensationApplied(false);
+              setInitialShiftStartsAt('');
+              setInitialShiftEndsAt('');
+              setInitialShiftBreakMinutes('0');
+              setInitialShiftCreated(false);
+              setOnboardingPinApplied(false);
+              setOnboardingApprovalPending(false);
+              setNewEmployeePin('');
+              setConfirmEmployeePin('');
+              setSetupAdminPin('');
+              setPinCommandId(crypto.randomUUID());
               setOnboardingError(null);
               setCreateOpen(true);
             }}
@@ -410,6 +544,9 @@ export function StaffPage() {
                 shops={shopChoices}
                 onCommand={execute}
                 onVerifiedScheduleCommand={(command) => staff.command.mutateAsync(command)}
+                onVerifiedPaymentCommand={(command, pin) =>
+                  staff.sensitiveCommand.mutateAsync({ draft: command, pin })
+                }
                 onSensitiveCommand={executeSensitive}
               />
             ) : (
@@ -433,7 +570,7 @@ export function StaffPage() {
           open={createOpen}
           variant="sheet"
           title="Add employee"
-          description="Create the employee profile, assign authorized shops and review employment details. Operations worker and PIN setup follow in the employee access workspace."
+          description="Add identity, shops, compensation and secure Operations PIN here. Authorized worker setup happens during this same flow."
           onOpenChange={(open) => {
             if (!onboardingBusy && !staff.command.isPending) setCreateOpen(open);
           }}
@@ -556,10 +693,89 @@ export function StaffPage() {
                     onChange={(event) => setNewEmployeeEffectiveFrom(event.target.value)}
                   />
                 </label>
-                <p>
-                  Operations worker and PIN setup must be completed through the protected employee
-                  access workflow.
-                </p>
+                <fieldset className="admin-staff-onboarding-shops">
+                  <legend>Initial shift (optional)</legend>
+                  <p>Schedule the first shift in Cairo local time during employee creation.</p>
+                  <label className="admin-field">
+                    <span>Initial shift starts</span>
+                    <input
+                      type="datetime-local"
+                      value={initialShiftStartsAt}
+                      disabled={Boolean(createdEmployeeId)}
+                      onChange={(event) => setInitialShiftStartsAt(event.target.value)}
+                    />
+                  </label>
+                  <label className="admin-field">
+                    <span>Initial shift ends</span>
+                    <input
+                      type="datetime-local"
+                      value={initialShiftEndsAt}
+                      disabled={Boolean(createdEmployeeId)}
+                      onChange={(event) => setInitialShiftEndsAt(event.target.value)}
+                    />
+                  </label>
+                  <label className="admin-field">
+                    <span>Initial shift break minutes</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={initialShiftBreakMinutes}
+                      disabled={Boolean(createdEmployeeId)}
+                      onChange={(event) => setInitialShiftBreakMinutes(event.target.value)}
+                    />
+                  </label>
+                </fieldset>
+                {canProvisionWorker ? (
+                  <fieldset className="admin-staff-onboarding-pin">
+                    <legend>Operations PIN and worker setup</legend>
+                    <p>
+                      Set the employee PIN here to provision an Operations worker for every selected
+                      shop. The server verifies uniqueness and securely hashes the PIN.
+                    </p>
+                    <label className="admin-field">
+                      <span>New employee Operations PIN</span>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        minLength={4}
+                        maxLength={12}
+                        value={newEmployeePin}
+                        disabled={onboardingPinApplied || onboardingApprovalPending}
+                        onChange={(event) => {
+                          setNewEmployeePin(event.currentTarget.value);
+                          setPinCommandId(crypto.randomUUID());
+                        }}
+                      />
+                    </label>
+                    <label className="admin-field">
+                      <span>Confirm employee Operations PIN</span>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        value={confirmEmployeePin}
+                        disabled={onboardingPinApplied || onboardingApprovalPending}
+                        onChange={(event) => setConfirmEmployeePin(event.currentTarget.value)}
+                      />
+                    </label>
+                    <label className="admin-field">
+                      <span>Your Admin PIN to authorize setup</span>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        value={setupAdminPin}
+                        disabled={onboardingPinApplied || onboardingApprovalPending}
+                        onChange={(event) => setSetupAdminPin(event.currentTarget.value)}
+                      />
+                    </label>
+                    <p>Leave the fields empty only if Operations access will be set up later.</p>
+                  </fieldset>
+                ) : (
+                  <p>Operations PIN and worker provisioning require an Owner or Administrator.</p>
+                )}
               </>
             ) : null}
             {onboardingStep === 'review' ? (
@@ -588,8 +804,20 @@ export function StaffPage() {
                     : 'Compensation will be configured later.'}
                 </p>
                 <p>
-                  After creation, complete Operations worker/PIN readiness and any elevated
-                  permissions in the employee profile.
+                  First shift:{' '}
+                  {initialShiftStartsAt && initialShiftEndsAt
+                    ? 'Scheduled through the real shift workflow'
+                    : 'No initial shift requested'}
+                </p>
+                <p>
+                  Operations PIN and worker access
+                  {newEmployeePin || onboardingPinApplied
+                    ? ': secure PIN and a worker for each assigned shop'
+                    : ': not requested (setup remains required)'}
+                </p>
+                <p>
+                  Elevated roles and permission changes still require their separate server-side
+                  approval. No access is granted until the server confirms it.
                 </p>
                 {createdEmployeeId ? (
                   <p>
@@ -598,15 +826,24 @@ export function StaffPage() {
                 ) : null}
               </section>
             ) : null}
-            {onboardingError || staff.command.isError ? (
-              <p role="alert">{onboardingError ?? readableError(staff.command.error)}</p>
+            {onboardingError || staff.command.isError || staff.sensitiveCommand.isError ? (
+              <p role="alert">
+                {onboardingError ??
+                  readableError(staff.sensitiveCommand.error) ??
+                  readableError(staff.command.error)}
+              </p>
             ) : null}
             <div className="admin-inline-actions">
               <button
                 className="admin-secondary-button"
                 type="button"
                 disabled={onboardingBusy}
-                onClick={() => setCreateOpen(false)}
+                onClick={() => {
+                  setCreateOpen(false);
+                  setNewEmployeePin('');
+                  setConfirmEmployeePin('');
+                  setSetupAdminPin('');
+                }}
               >
                 Cancel
               </button>
@@ -614,7 +851,7 @@ export function StaffPage() {
                 <button
                   className="admin-secondary-button"
                   type="button"
-                  disabled={onboardingBusy || Boolean(createdEmployeeId)}
+                  disabled={onboardingBusy}
                   onClick={() =>
                     setOnboardingStep(
                       onboardingStep === 'review'
@@ -632,7 +869,9 @@ export function StaffPage() {
                 className="admin-primary-button"
                 type="submit"
                 disabled={
-                  onboardingBusy || (onboardingStep === 'identity' && !newEmployeeName.trim())
+                  onboardingBusy ||
+                  onboardingApprovalPending ||
+                  (onboardingStep === 'identity' && !newEmployeeName.trim())
                 }
               >
                 {onboardingStep === 'review'

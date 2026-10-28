@@ -62,12 +62,20 @@ describe('StaffMetricsPanel', () => {
   it('shows factual attendance totals without scoring or ranking employees', () => {
     const html = renderToStaticMarkup(<StaffMetricsPanel employee={employee} />);
 
-    expect(html).toContain('Worked');
-    expect(html).toContain('7h 35m');
-    expect(html).toContain('Overtime');
-    expect(html).toContain('5m');
-    expect(html).toContain('Late shifts');
-    expect(html).toContain('Absent shifts');
+    expect(html).toContain('Activity facts');
+    for (const label of [
+      'Shifts',
+      'Clock events',
+      'Corrections',
+      'Approved leave',
+      'Payments',
+      'Overrides',
+    ]) {
+      expect(html).toContain(label);
+    }
+    expect((html.match(/class="admin-more-card"/g) ?? []).length).toBe(6);
+    expect(html).not.toContain('7h 35m');
+    expect(html).not.toContain('Overtime');
     expect(html).not.toContain('score');
     expect(html).not.toContain('rank');
   });

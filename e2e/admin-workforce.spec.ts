@@ -416,6 +416,43 @@ test('S4 payroll requires successful Admin PIN reauth before protected payment c
   });
 });
 
+test('S4 pending payroll approval never claims a posted payment', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  let attempts = 0;
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'POST' || request.postDataJSON()?.type !== 'payment.record') {
+      await route.fallback();
+      return;
+    }
+    attempts += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        state: 'PENDING_APPROVAL',
+        approvalRequestId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Pay / Compensation' }).click();
+  await page.getByLabel('Pay period start').fill('2026-10-01');
+  await page.getByLabel('Pay period end').fill('2026-10-31');
+  await page.getByLabel('Expected amount (EGP)').fill('500.00');
+  await page.getByLabel('Paid amount (EGP)').fill('500.00');
+  await page.getByLabel('Payment date').fill('2026-10-31');
+  await page.getByLabel('Admin PIN for staff payment').fill('1234');
+  await page.getByRole('button', { name: 'Record payment' }).click();
+  await expect.poll(() => attempts).toBe(1);
+  await expect(page.getByRole('status')).toContainText('Pending second-person approval');
+  await expect(page.getByLabel('Paid amount (EGP)')).toHaveValue('500.00');
+  await expect(page.getByLabel('Admin PIN for staff payment')).toHaveValue('');
+});
+
 test('S3 payment records exact safe minor units without floating-point rounding on phone', async ({
   page,
 }) => {
@@ -622,9 +659,12 @@ test('switching employees resets local profile editor state to the selected empl
   const monaProfile = page.getByRole('article', { name: 'Employee Mona Ali' });
   await expect(monaProfile.getByLabel('Name')).toHaveValue('Mona Ali');
 
-  // Workforce detail is a full-width task surface; navigate back before
-  // changing employees, then verify the replacement editor state is clean.
-  await page.getByRole('link', { name: /back to employees/i }).click();
+  // On desktop the approved master/detail keeps the directory visible;
+  // on a phone the same change happens through the focused Back route.
+  const directory = page.locator('.admin-staff-workspace .admin-master-detail__list');
+  if (!(await directory.isVisible())) {
+    await page.getByRole('link', { name: /back to employees/i }).click();
+  }
   await selectEmployee(page, 'Youssef Hassan');
 
   const youssefProfile = page.getByRole('article', { name: 'Employee Youssef Hassan' });
@@ -665,6 +705,200 @@ async function advanceStaffOnboardingToReview(page: Page) {
     await sheet.getByRole('button', { name: 'Continue' }).click();
   }
 }
+
+test('S2 initial Cairo shift is scheduled inside employee creation before sheet closes', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Amira First Shift');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByLabel('Initial shift starts').fill('2026-10-29T09:00');
+  await sheet.getByLabel('Initial shift ends').fill('2026-10-29T17:00');
+  await sheet.getByLabel('Initial shift break minutes').fill('30');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByText('Review employee setup')).toBeVisible();
+  expect(commands).toHaveLength(0);
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await expect.poll(() => commands.length).toBe(2);
+  expect(commands.map((command) => command.type)).toEqual(['employee.create', 'shift.create']);
+  expect(commands[1]).toMatchObject({
+    employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    shopId,
+    startsAt: '2026-10-29T06:00:00.000Z',
+    endsAt: '2026-10-29T14:00:00.000Z',
+    plannedBreakMinutes: 30,
+  });
+  await expect(sheet).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('Staff onboarding configures a secure PIN and authorized Operations workers before closing', async ({
+  page,
+}) => {
+  const secondShop = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const commands: Record<string, unknown>[] = [];
+  const reauthRequests: Record<string, unknown>[] = [];
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  await page.route('**/api/admin/reauth', async (route) => {
+    reauthRequests.push(route.request().postDataJSON() as Record<string, unknown>);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, reauthenticatedAt: '2026-10-28T11:00:00.000Z' }),
+    });
+  });
+  await page.route('**/api/admin/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...session,
+        principal: {
+          ...session.principal,
+          shopIds: [shopId, secondShop],
+          shopSummaries: [
+            ...session.principal.shopSummaries,
+            { id: secondShop, name: 'TUX Mall', active: true, temporaryClosed: false },
+          ],
+        },
+      }),
+    });
+  });
+  await page.route('**/api/admin/staff**', async (route) => {
+    if (
+      route.request().method() === 'GET' &&
+      !new URL(route.request().url()).searchParams.has('employeeId')
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...workspace(),
+          shops: [
+            { id: shopId, name: 'Downtown' },
+            { id: secondShop, name: 'Mall' },
+          ],
+        }),
+      });
+      return;
+    }
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const command = route.request().postDataJSON() as Record<string, unknown>;
+    commands.push(command);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        replayed: false,
+        ...(command.type === 'employee.create'
+          ? { employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }
+          : {}),
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Hana Access');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('checkbox', { name: 'Mall' }).check();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByLabel('New employee Operations PIN').fill('6852');
+  await sheet.getByLabel('Confirm employee Operations PIN').fill('6852');
+  await sheet.getByLabel('Your Admin PIN to authorize setup').fill('1234');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByText('Review employee setup')).toBeVisible();
+  await expect(sheet.getByText('Operations PIN and worker access')).toBeVisible();
+  expect(commands).toHaveLength(0);
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await expect.poll(() => commands.length).toBe(5);
+  expect(commands.map((command) => command.type)).toEqual([
+    'employee.create',
+    'employee.assign-shop',
+    'employee.pin',
+    'employee.provision-worker',
+    'employee.provision-worker',
+  ]);
+  expect(reauthRequests).toHaveLength(1);
+  expect(commands[2]).toMatchObject({
+    type: 'employee.pin',
+    newPin: '6852',
+    employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    shopId,
+  });
+  expect(commands.slice(3).map((command) => command.shopId)).toEqual([shopId, secondShop]);
+  await expect(sheet).toHaveCount(0);
+});
+
+test('Selected employee on phone uses a focused inspector without duplicate Staff header and KPIs', async ({
+  page,
+}) => {
+  await mockWorkforce(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await expect(page.locator('.admin-page > .admin-page__header')).toBeHidden();
+  await expect(page.locator('.admin-metric-strip[aria-label="Staff summary"]')).toBeHidden();
+  await expect(page.getByRole('link', { name: /Back to employees/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Mona Ali' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.locator('.admin-page > .admin-page__header')).toBeVisible();
+  await expect(page.locator('.admin-metric-strip[aria-label="Staff summary"]')).toBeVisible();
+});
+
+test('S1 approved Access inspector places six readable facts below permissions at 390px', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+  const policy = page.locator('.admin-staff-access-policy');
+  const activity = page.locator('section[aria-label="Staff factual metrics"]');
+  const cards = activity.locator('.admin-more-card');
+  await expect(cards).toHaveCount(6);
+  const columns = await activity
+    .locator('.admin-more-grid')
+    .evaluate((node) => getComputedStyle(node).gridTemplateColumns.trim().split(/\s+/).length);
+  expect(columns).toBe(2);
+  const policyBox = await policy.boundingBox();
+  const activityBox = await activity.boundingBox();
+  expect(policyBox).not.toBeNull();
+  expect(activityBox).not.toBeNull();
+  expect(activityBox!.y).toBeGreaterThanOrEqual(policyBox!.y + policyBox!.height - 1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('Staff detail Access layout follows approved compact grid without overlap at 390 and 1440', async ({
+  page,
+}) => {
+  await mockWorkforce(page);
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/staff');
+    await selectEmployee(page, 'Mona Ali');
+    await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+    const policy = page.locator('.admin-staff-access-policy .admin-more-grid').first();
+    const grid = await policy.evaluate((node) => getComputedStyle(node).gridTemplateColumns);
+    expect(grid.trim().split(/\s+/).length).toBe(width === 390 ? 1 : 2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
+      false,
+    );
+    await expect(page.getByRole('region', { name: 'Permissions' })).toBeVisible();
+  }
+});
 
 test('S2 onboarding reviews authorized shops before creating and assigning employee', async ({
   page,

@@ -61,6 +61,7 @@ export function EmployeeDetailPage({
   shops,
   onCommand,
   onVerifiedScheduleCommand,
+  onVerifiedPaymentCommand,
   onSensitiveCommand,
 }: {
   employee: EmployeeDetail;
@@ -75,6 +76,7 @@ export function EmployeeDetailPage({
   shops: readonly StaffShopChoice[];
   onCommand(command: StaffCommandDraft): void;
   onVerifiedScheduleCommand?(command: StaffCommandDraft): Promise<unknown>;
+  onVerifiedPaymentCommand?(command: StaffCommandDraft, pin: string): Promise<unknown>;
   onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
 }) {
   const [sensitiveAction, setSensitiveAction] = useState<SensitiveAction>(null);
@@ -282,7 +284,7 @@ export function EmployeeDetailPage({
         shopId={shopId}
         canPay={canPay}
         financeAccounts={financeAccounts}
-        onSensitiveCommand={onSensitiveCommand}
+        onVerifiedCommand={onVerifiedPaymentCommand}
       />
     </>
   );
@@ -402,8 +404,6 @@ export function EmployeeDetailPage({
         {operationsHealthy ? <p>Operations access: Ready</p> : null}
       </section>
 
-      <StaffMetricsPanel employee={employee} />
-
       {canManage ? (
         <section
           className="admin-staff-section is-compact"
@@ -445,18 +445,36 @@ export function EmployeeDetailPage({
           onSensitiveCommand={onSensitiveCommand}
         />
       </div>
+      <StaffMetricsPanel employee={employee} />
     </>
   );
 
   return (
-    <article aria-label={`Employee ${employee.displayName}`}>
-      <header className="admin-page__header">
-        <div>
-          <p className="admin-page__eyebrow">Staff profile</p>
+    <article className="admin-staff-inspector" aria-label={`Employee ${employee.displayName}`}>
+      <header className="admin-staff-inspector__header">
+        <span className="admin-staff-inspector__avatar" aria-hidden="true">
+          {employee.displayName
+            .trim()
+            .split(/\s+/)
+            .slice(0, 2)
+            .map((part) => part.charAt(0).toUpperCase())
+            .join('')}
+        </span>
+        <div className="admin-staff-inspector__identity">
           <h2>{employee.displayName}</h2>
-          <p className="admin-page__description">
-            {roleLabel(employee.role)} · {employee.active ? 'Active' : 'Suspended'}
+          <p>
+            {employee.phone ?? 'Phone not provided'} · {employee.assignments.length} assigned
+            shop(s)
           </p>
+          <div className="admin-staff-inspector__badges">
+            <span>{roleLabel(employee.role)}</span>
+            <span data-state={employee.active ? 'active' : 'suspended'}>
+              {employee.active ? 'Active' : 'Suspended'}
+            </span>
+            <span data-state={operationsHealthy ? 'ready' : 'setup'}>
+              {operationsHealthy ? 'Operations ready' : 'Setup needed'}
+            </span>
+          </div>
         </div>
       </header>
 
