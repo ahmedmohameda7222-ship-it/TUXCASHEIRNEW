@@ -257,10 +257,7 @@ export function EmployeeDetailPage({
             <button
               className="admin-secondary-button"
               type="button"
-              disabled={
-                !compensationEffectiveFrom ||
-                compensationRateMinor === null
-              }
+              disabled={!compensationEffectiveFrom || compensationRateMinor === null}
               onClick={() =>
                 compensationRateMinor !== null &&
                 onCommand({
