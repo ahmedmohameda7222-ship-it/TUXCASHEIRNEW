@@ -299,6 +299,10 @@ export function EmployeeDetailPage({
 
   const accessContent = (
     <>
+      <header className="admin-staff-access-heading">
+        <h3>Access &amp; permissions</h3>
+        <p>Operations readiness, role defaults and explicit permission overrides</p>
+      </header>
       <section className="admin-staff-section" aria-labelledby="staff-operations-access">
         <h3 id="staff-operations-access">Operations access</h3>
         {setupRequired.length > 0 ? (
@@ -426,7 +430,7 @@ export function EmployeeDetailPage({
           </div>
         </section>
       ) : null}
-      <div id="staff-permission-policy" className="admin-staff-access-policy">
+      <section id="staff-permission-policy" className="admin-staff-section admin-staff-access-policy">
         <PermissionsEditor
           employee={employee}
           shopId={shopId}
@@ -434,7 +438,7 @@ export function EmployeeDetailPage({
           onCommand={onCommand}
           onSensitiveCommand={onSensitiveCommand}
         />
-      </div>
+      </section>
       <StaffMetricsPanel employee={employee} />
     </>
   );
