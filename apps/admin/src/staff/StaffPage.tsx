@@ -126,7 +126,8 @@ export function StaffPage() {
 
   const canManage = principal.permissions.includes('staff.manage');
   const canPay = principal.permissions.includes('staff.payments');
-  const canProvisionWorker = canManage && (principal.role === 'OWNER' || principal.role === 'ADMIN');
+  const canProvisionWorker =
+    canManage && (principal.role === 'OWNER' || principal.role === 'ADMIN');
   const detail = staff.detailQuery.data;
   const actionError =
     readableError(staff.sensitiveCommand.error) ?? readableError(staff.command.error);
@@ -728,7 +729,11 @@ export function StaffPage() {
               </section>
             ) : null}
             {onboardingError || staff.command.isError || staff.sensitiveCommand.isError ? (
-              <p role="alert">{onboardingError ?? readableError(staff.sensitiveCommand.error) ?? readableError(staff.command.error)}</p>
+              <p role="alert">
+                {onboardingError ??
+                  readableError(staff.sensitiveCommand.error) ??
+                  readableError(staff.command.error)}
+              </p>
             ) : null}
             <div className="admin-inline-actions">
               <button
@@ -766,7 +771,9 @@ export function StaffPage() {
                 className="admin-primary-button"
                 type="submit"
                 disabled={
-                  onboardingBusy || onboardingApprovalPending || (onboardingStep === 'identity' && !newEmployeeName.trim())
+                  onboardingBusy ||
+                  onboardingApprovalPending ||
+                  (onboardingStep === 'identity' && !newEmployeeName.trim())
                 }
               >
                 {onboardingStep === 'review'
