@@ -42,6 +42,29 @@ function csrfToken(session: ReturnType<typeof useAdminSession>): string {
   return session.state.session.csrfToken;
 }
 
+function formatPointValueEgp(minor: number): string {
+  if (!Number.isSafeInteger(minor)) return 'Unavailable';
+  const value = BigInt(minor);
+  const absolute = value < 0n ? -value : value;
+  return `${value < 0n ? '-' : ''}${absolute / 100n}.${String(absolute % 100n).padStart(2, '0')}`;
+}
+
+function parsePointValueMinor(input: string): number {
+  const matched = /^(\\d+)(?:\\.(\\d{1,2}))?$/.exec(input.trim());
+  if (!matched) throw new Error('invalid_loyalty_point_value');
+  const value = BigInt(matched[1]!) * 100n + BigInt((matched[2] ?? '').padEnd(2, '0') || '0');
+  if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('invalid_loyalty_point_value');
+  return Number(value);
+}
+
+function pointValuePreview(input: string): string {
+  try {
+    return formatPointValueEgp(parsePointValueMinor(input));
+  } catch {
+    return 'Unavailable';
+  }
+}
+
 export function CustomersPage() {
   const { scope, principal } = useShopScope();
   const session = useAdminSession();
@@ -124,7 +147,7 @@ export function CustomersPage() {
     setProgramDraft({
       enabled: program.enabled,
       earnPointsPer100Minor: String(program.earnPointsPer100Minor),
-      pointValueEgp: (program.redemptionMinorPerPoint / 100).toFixed(2),
+      pointValueEgp: formatPointValueEgp(program.redemptionMinorPerPoint),
       minimumRedemptionPoints: String(program.minimumRedemptionPoints),
       pointExpiryDays: program.pointExpiryDays === null ? '' : String(program.pointExpiryDays),
     });
@@ -202,7 +225,7 @@ export function CustomersPage() {
               shopId,
               enabled: programDraft.enabled,
               earnPointsPer100Minor: Number(programDraft.earnPointsPer100Minor),
-              redemptionMinorPerPoint: Math.round(Number(programDraft.pointValueEgp) * 100),
+              redemptionMinorPerPoint: parsePointValueMinor(programDraft.pointValueEgp),
               minimumRedemptionPoints: Number(programDraft.minimumRedemptionPoints),
               pointExpiryDays: programDraft.pointExpiryDays.trim()
                 ? Number(programDraft.pointExpiryDays)
@@ -426,7 +449,7 @@ export function CustomersPage() {
                           <div>
                             <dt>Redemption value</dt>
                             <dd>
-                              EGP {(programQuery.data.redemptionMinorPerPoint / 100).toFixed(2)} per
+                              EGP {formatPointValueEgp(programQuery.data.redemptionMinorPerPoint)} per
                               point
                             </dd>
                           </div>
@@ -489,7 +512,7 @@ export function CustomersPage() {
                           }
                         />
                       </label>
-                      <p>1 point = EGP {Number(programDraft.pointValueEgp || 0).toFixed(2)}</p>
+                      <p>1 point = EGP {pointValuePreview(programDraft.pointValueEgp)}</p>
                       <label className="admin-field">
                         <span>Minimum points to redeem</span>
                         <input
