@@ -23,29 +23,37 @@ export function LeavePage({
   shopId,
   canManage,
   onCommand,
+  onVerifiedCommand,
 }: {
   employee: EmployeeDetail;
   shopId: string;
   canManage: boolean;
   onCommand(command: StaffCommandDraft): void;
+  onVerifiedCommand?: ((command: StaffCommandDraft) => Promise<unknown>) | undefined;
 }) {
   const [leaveType, setLeaveType] = useState<StaffLeaveType>('VACATION');
   const [startsOn, setStartsOn] = useState('');
   const [endsOn, setEndsOn] = useState('');
   const [note, setNote] = useState('');
   const [requestOpen, setRequestOpen] = useState(false);
+  const [savingRequest, setSavingRequest] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const visibleLeaveRequests = employee.leaveRequests.filter(
+    (request) => request.shopId === shopId || request.shopId === null,
+  );
 
   return (
     <section aria-label="Leave">
       <h3>Leave</h3>
-      {employee.leaveRequests.length === 0 ? <p>No leave requests.</p> : null}
-      {employee.leaveRequests.map((request) => (
+      {visibleLeaveRequests.length === 0 ? <p>No leave requests for this shop.</p> : null}
+      {visibleLeaveRequests.map((request) => (
         <article className="admin-staff-record-row" key={request.id}>
           <span>
             <strong>{leaveTypeLabel(request.leaveType)}</strong>
             <small>
               {request.startsOn} → {request.endsOn}
             </small>
+            {request.note ? <small>{request.note}</small> : null}
           </span>
           <span>
             {leaveStatusLabel(request.status)}
@@ -103,7 +111,9 @@ export function LeavePage({
             variant="sheet"
             title="New leave request"
             description="Record the requested dates and leave type."
-            onOpenChange={setRequestOpen}
+            onOpenChange={(open) => {
+              if (!savingRequest) setRequestOpen(open);
+            }}
           >
             <label className="admin-field">
               <span>Type</span>
@@ -137,21 +147,34 @@ export function LeavePage({
               <span>Note</span>
               <textarea value={note} onChange={(event) => setNote(event.target.value)} />
             </label>
+            {requestError ? <p role="alert">{requestError}</p> : null}
             <button
               className="admin-primary-button"
               type="button"
-              disabled={!startsOn || !endsOn}
-              onClick={() => {
-                onCommand({
-                  type: 'leave.create',
-                  employeeId: employee.id,
-                  shopId,
-                  leaveType,
-                  startsOn,
-                  endsOn,
-                  note: note.trim() || null,
-                });
-                setRequestOpen(false);
+              disabled={!startsOn || !endsOn || savingRequest}
+              onClick={async () => {
+                setRequestError(null);
+                setSavingRequest(true);
+                try {
+                  const command: StaffCommandDraft = {
+                    type: 'leave.create',
+                    employeeId: employee.id,
+                    shopId,
+                    leaveType,
+                    startsOn,
+                    endsOn,
+                    note: note.trim() || null,
+                  };
+                  if (onVerifiedCommand) await onVerifiedCommand(command);
+                  else onCommand(command);
+                  setRequestOpen(false);
+                } catch (error) {
+                  setRequestError(
+                    error instanceof Error ? error.message.replaceAll('_', ' ') : 'Leave request failed',
+                  );
+                } finally {
+                  setSavingRequest(false);
+                }
               }}
             >
               Request leave
