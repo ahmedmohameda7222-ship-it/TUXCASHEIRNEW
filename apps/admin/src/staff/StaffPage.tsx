@@ -167,7 +167,8 @@ export function StaffPage() {
   async function createEmployee() {
     const displayName = newEmployeeName.trim();
     if (!displayName || onboardingBusy || !shopId) return;
-    if (onboardingApprovalPending) return;
+    // A pending PIN request can only be completed after a separate approver acts.
+    // Retrying checks the authoritative worker-provisioning contract, never the PIN locally.
     setOnboardingBusy(true);
     setOnboardingError(null);
     try {
@@ -213,7 +214,8 @@ export function StaffPage() {
         setAssignedShopIds([...completed]);
       }
 
-      const requestedPinSetup = Boolean(newEmployeePin) || onboardingPinApplied;
+      const requestedPinSetup =
+        Boolean(newEmployeePin) || onboardingPinApplied || onboardingApprovalPending;
       if (newEmployeePin && !onboardingPinApplied) {
         if (!canProvisionWorker) throw new Error('owner_admin_required_for_operations_setup');
         if (!/^\d{4,12}$/.test(newEmployeePin) || newEmployeePin !== confirmEmployeePin) {
@@ -254,11 +256,17 @@ export function StaffPage() {
             shopId: targetShopId,
           });
           if (!result.ok || result.state === 'PENDING_APPROVAL') {
-            throw new Error('operations_worker_setup_unconfirmed');
+            throw new Error(
+              onboardingApprovalPending
+                ? 'employee_pin_awaiting_second_person_approval'
+                : 'operations_worker_setup_unconfirmed',
+            );
           }
           readyShops.add(targetShopId);
           setProvisionedShopIds([...readyShops]);
         }
+        setOnboardingPinApplied(true);
+        setOnboardingApprovalPending(false);
       }
 
       if (rateMinor !== null && !compensationApplied) {
@@ -819,6 +827,13 @@ export function StaffPage() {
                   Elevated roles and permission changes still require their separate server-side
                   approval. No access is granted until the server confirms it.
                 </p>
+                {onboardingApprovalPending ? (
+                  <p role="status">
+                    A second administrator must approve the employee PIN before Operations
+                    provisioning can finish. After approval, use Resume after approval to complete
+                    the same employee without creating another account or resetting the PIN.
+                  </p>
+                ) : null}
                 {createdEmployeeId ? (
                   <p>
                     Profile created. Resume remaining setup without creating a duplicate employee.
@@ -870,13 +885,14 @@ export function StaffPage() {
                 type="submit"
                 disabled={
                   onboardingBusy ||
-                  onboardingApprovalPending ||
                   (onboardingStep === 'identity' && !newEmployeeName.trim())
                 }
               >
                 {onboardingStep === 'review'
-                  ? createdEmployeeId
-                    ? 'Resume onboarding'
+                  ? onboardingApprovalPending
+                    ? 'Resume after approval'
+                    : createdEmployeeId
+                      ? 'Resume onboarding'
                     : onboardingBusy
                       ? 'Creating…'
                       : 'Create employee'
