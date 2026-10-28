@@ -428,7 +428,9 @@ export function StaffPage() {
 
       <div
         className={
-          selectedId ? 'admin-staff-workspace admin-staff-workspace--inspecting' : 'admin-staff-workspace'
+          selectedId
+            ? 'admin-staff-workspace admin-staff-workspace--inspecting'
+            : 'admin-staff-workspace'
         }
       >
         <ResponsiveMasterDetail
