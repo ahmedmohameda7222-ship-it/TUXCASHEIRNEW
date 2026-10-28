@@ -330,6 +330,31 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
   expect(String(commands[0]?.commandId ?? '')).not.toBe('');
 });
 
+test('S3 payment records exact safe minor units without floating-point rounding on phone', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Pay / Compensation' }).click();
+  await page.getByLabel('Pay period start').fill('2026-10-01');
+  await page.getByLabel('Pay period end').fill('2026-10-31');
+  await page.getByLabel('Expected amount (EGP)').fill('90071992547409.90');
+  await page.getByLabel('Paid amount (EGP)').fill('90071992547409.90');
+  await page.getByLabel('Payment date').fill('2026-10-31');
+  await page.getByRole('button', { name: 'Record payment' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'payment.record',
+    expectedAmountMinor: 9007199254740990,
+    paidAmountMinor: 9007199254740990,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
+    false,
+  );
+});
+
 test('staff payment shows a clear no-account state instead of inventing an account', async ({
   page,
 }) => {
