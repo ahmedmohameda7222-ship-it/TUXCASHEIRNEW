@@ -544,6 +544,9 @@ export function StaffPage() {
                 shops={shopChoices}
                 onCommand={execute}
                 onVerifiedScheduleCommand={(command) => staff.command.mutateAsync(command)}
+                onVerifiedPaymentCommand={(command, pin) =>
+                  staff.sensitiveCommand.mutateAsync({ draft: command, pin })
+                }
                 onSensitiveCommand={executeSensitive}
               />
             ) : (
