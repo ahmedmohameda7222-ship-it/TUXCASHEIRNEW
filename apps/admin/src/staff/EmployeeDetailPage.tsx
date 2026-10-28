@@ -61,6 +61,7 @@ export function EmployeeDetailPage({
   shops,
   onCommand,
   onVerifiedScheduleCommand,
+  onVerifiedPaymentCommand,
   onSensitiveCommand,
 }: {
   employee: EmployeeDetail;
@@ -75,6 +76,7 @@ export function EmployeeDetailPage({
   shops: readonly StaffShopChoice[];
   onCommand(command: StaffCommandDraft): void;
   onVerifiedScheduleCommand?(command: StaffCommandDraft): Promise<unknown>;
+  onVerifiedPaymentCommand?: ((command: StaffCommandDraft, pin: string) => Promise<unknown>) | undefined;
   onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
 }) {
   const [sensitiveAction, setSensitiveAction] = useState<SensitiveAction>(null);
@@ -282,7 +284,7 @@ export function EmployeeDetailPage({
         shopId={shopId}
         canPay={canPay}
         financeAccounts={financeAccounts}
-        onSensitiveCommand={onSensitiveCommand}
+        onVerifiedCommand={onVerifiedPaymentCommand}
       />
     </>
   );
