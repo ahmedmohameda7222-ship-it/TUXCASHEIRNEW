@@ -239,9 +239,14 @@ export function StaffPage() {
             className="admin-primary-button"
             type="button"
             onClick={() => {
+              if (createdEmployeeId) {
+                setOnboardingStep('review');
+                setOnboardingError(null);
+                setCreateOpen(true);
+                return;
+              }
               setOnboardingStep('identity');
               setOnboardingShopIds([shopId]);
-              setCreatedEmployeeId(null);
               setAssignedShopIds([]);
               setOnboardingError(null);
               setCreateOpen(true);
