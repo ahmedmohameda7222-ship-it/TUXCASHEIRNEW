@@ -330,6 +330,46 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
   expect(String(commands[0]?.commandId ?? '')).not.toBe('');
 });
 
+test('S3 rejected shift creation retains original draft and retries without a duplicate', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  let attempts = 0;
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'POST' || request.postDataJSON()?.type !== 'shift.create') {
+      await route.fallback();
+      return;
+    }
+    attempts += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        attempts === 1
+          ? { ok: false, code: 'shift_schedule_temporarily_unavailable' }
+          : { ok: true, replayed: false },
+      ),
+    });
+  });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Schedule' }).click();
+  await page.getByRole('button', { name: 'Add shift' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add shift' });
+  await sheet.getByLabel('Starts').fill('2026-10-29T09:00');
+  await sheet.getByLabel('Ends').fill('2026-10-29T17:00');
+  await sheet.getByRole('button', { name: 'Add shift' }).click();
+  await expect.poll(() => attempts).toBe(1);
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByLabel('Starts')).toHaveValue('2026-10-29T09:00');
+  await expect(sheet.getByLabel('Ends')).toHaveValue('2026-10-29T17:00');
+  await sheet.getByRole('button', { name: 'Add shift' }).click();
+  await expect.poll(() => attempts).toBe(2);
+  await expect(sheet).toHaveCount(0);
+});
+
 test('S3 payment records exact safe minor units without floating-point rounding on phone', async ({
   page,
 }) => {
