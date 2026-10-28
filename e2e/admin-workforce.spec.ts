@@ -1119,3 +1119,44 @@ test('S2 interrupted onboarding survives reload without creating a duplicate emp
   );
   expect(creates).toBe(1);
 });
+
+
+test('S4 payroll pending second-person approval does not claim a posted staff payment', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  let attempts = 0;
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'POST' || request.postDataJSON()?.type !== 'payment.record') {
+      await route.fallback();
+      return;
+    }
+    attempts += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        state: 'PENDING_APPROVAL',
+        approvalRequestId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        replayed: attempts > 1,
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Pay / Compensation' }).click();
+  await page.getByLabel('Pay period start').fill('2026-10-01');
+  await page.getByLabel('Pay period end').fill('2026-10-31');
+  await page.getByLabel('Expected amount (EGP)').fill('500.00');
+  await page.getByLabel('Paid amount (EGP)').fill('500.00');
+  await page.getByLabel('Payment date').fill('2026-10-31');
+  await page.getByLabel('Admin PIN for staff payment').fill('1234');
+  await page.getByRole('button', { name: 'Record payment' }).click();
+  await expect.poll(() => attempts).toBe(1);
+  await expect(page.getByRole('status')).toContainText('Pending second-person approval');
+  await expect(page.getByLabel('Paid amount (EGP)')).toHaveValue('500.00');
+  await expect(page.getByLabel('Admin PIN for staff payment')).toHaveValue('');
+});
