@@ -785,12 +785,11 @@ test('CRM4 fixed promotion values preserve safe minor units through 390px edit a
   await expect(editor.getByLabel('Discount (EGP)')).toHaveValue('90071992547409.90');
   await expect(editor.getByLabel('Minimum order (EGP)')).toHaveValue('90071992547409.90');
   await editor.getByRole('button', { name: 'Save promotion' }).click();
-  await expect
-    .poll(
-      () =>
-        postedCommands.find((command) => command.type === 'promotion.upsert')?.promotion,
-    )
-    .toMatchObject({
+  const savedPromotion = () => {
+    const command = postedCommands.find((item) => item.type === 'promotion.upsert');
+    return command?.promotion;
+  };
+  await expect.poll(savedPromotion).toMatchObject({
       fixedDiscountMinor: preciseMinor,
       minimumOrderMinor: preciseMinor,
       expectedVersion: 3,
