@@ -35,7 +35,9 @@ jobs:
             apps/admin/src/staff/staffSummaryMetrics.ts \
             apps/admin/src/staff/staffSummaryMetrics.test.ts \
             e2e/admin-workforce.spec.ts \
-            apps/admin/server/staff/staffStore.ts
+            apps/admin/server/staff/staffStore.ts \
+            apps/admin/server/staff/staffStore.test.ts \
+            packages/admin-contracts/src/staff.ts
           for file in \
             apps/admin/src/staff/StaffPage.tsx \
             apps/admin/src/staff/EmployeeDetailPage.tsx \
@@ -46,7 +48,9 @@ jobs:
             apps/admin/src/staff/staffSummaryMetrics.ts \
             apps/admin/src/staff/staffSummaryMetrics.test.ts \
             e2e/admin-workforce.spec.ts \
-            apps/admin/server/staff/staffStore.test.ts
+            apps/admin/server/staff/staffStore.ts \
+            apps/admin/server/staff/staffStore.test.ts \
+            packages/admin-contracts/src/staff.ts
           do
             echo "===FORMATTED_START:${file}==="
             cat "${file}"
