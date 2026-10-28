@@ -548,7 +548,9 @@ test('CRM3 one in-flight adjustment cannot submit twice via the active form', as
   }
 });
 
-test('CRM3 rejected loyalty adjustment retains command identity for a safe retry', async ({ page }) => {
+test('CRM3 rejected loyalty adjustment retains command identity for a safe retry', async ({
+  page,
+}) => {
   const attempts: string[] = [];
   await page.route('**/api/admin/customers**', async (route) => {
     const request = route.request();
