@@ -8,6 +8,7 @@ import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDet
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { AdminDialog } from '../components/overlay/AdminDialog';
 import { useShopScope } from '../shops/ShopScopeProvider';
+import { isPendingApprovalResult } from '../lib/retainedCommandIds';
 import { EmployeeDetailPage, type StaffDetailSection } from './EmployeeDetailPage';
 import { staffSummaryMetrics } from './staffSummaryMetrics';
 import { parseStaffMoneyMinor } from './staffMoney';
@@ -77,6 +78,7 @@ export function StaffPage() {
   const [assignedShopIds, setAssignedShopIds] = useState<string[]>([]);
   const [onboardingBusy, setOnboardingBusy] = useState(false);
   const [onboardingError, setOnboardingError] = useState<string | null>(null);
+  const [approvalNotice, setApprovalNotice] = useState<string | null>(null);
   const [newEmployeeCompensationType, setNewEmployeeCompensationType] = useState<
     'MONTHLY' | 'HOURLY'
   >('MONTHLY');
@@ -134,8 +136,14 @@ export function StaffPage() {
     readableError(staff.sensitiveCommand.error) ?? readableError(staff.command.error);
 
   const execute = (command: StaffApiCommandDraft) => staff.command.mutate(command);
-  const executeSensitive = (command: StaffApiCommandDraft, pin: string) =>
-    staff.sensitiveCommand.mutateAsync({ draft: command, pin });
+  const executeSensitive = async (command: StaffApiCommandDraft, pin: string) => {
+    setApprovalNotice(null);
+    const result = await staff.sensitiveCommand.mutateAsync({ draft: command, pin });
+    if (command.type !== 'payment.record' && isPendingApprovalResult(result)) {
+      setApprovalNotice('Pending second-person approval; the change has not been applied.');
+    }
+    return result;
+  };
 
   async function createEmployee() {
     const displayName = newEmployeeName.trim();
@@ -279,6 +287,7 @@ export function StaffPage() {
       }
     >
       {actionError && !createOpen ? <p role="alert">{actionError}</p> : null}
+      {approvalNotice ? <p role="status">{approvalNotice}</p> : null}
 
       {staff.workspaceQuery.isSuccess ? (
         <AdminMetricStrip
