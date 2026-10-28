@@ -1,3 +1,4 @@
+import { ADMIN_PERMISSIONS, type AdminPermission, type EmployeeDetail } from '@tux/admin-contracts';
 import { useMemo, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
 
@@ -9,6 +10,7 @@ import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { AdminDialog } from '../components/overlay/AdminDialog';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { isPendingApprovalResult } from '../lib/retainedCommandIds';
+import { adminFetch } from '../lib/adminApi';
 import { EmployeeDetailPage, type StaffDetailSection } from './EmployeeDetailPage';
 import { staffSummaryMetrics } from './staffSummaryMetrics';
 import { parseStaffMoneyMinor } from './staffMoney';
@@ -95,6 +97,10 @@ export function StaffPage() {
   const [onboardingBusy, setOnboardingBusy] = useState(false);
   const [onboardingError, setOnboardingError] = useState<string | null>(null);
   const [approvalNotice, setApprovalNotice] = useState<string | null>(null);
+  const [newEmployeeRole, setNewEmployeeRole] = useState<'STAFF' | 'MANAGER' | 'ADMIN'>('STAFF');
+  const [newEmployeePermissionOverrides, setNewEmployeePermissionOverrides] = useState<
+    Partial<Record<AdminPermission, 'ALLOW' | 'DENY'>>
+  >({});
   const [newEmployeeCompensationType, setNewEmployeeCompensationType] = useState<
     'MONTHLY' | 'HOURLY'
   >('MONTHLY');
@@ -274,6 +280,70 @@ export function StaffPage() {
         provisioned.add(assignedShopId);
         setProvisionedShopIds([...provisioned]);
       }
+      // Verify every requested elevated access change against the server's authoritative
+      // employee version. Pending second-person approvals must not complete the creation flow.
+      const overrides = Object.entries(newEmployeePermissionOverrides).filter(
+        (entry): entry is [AdminPermission, 'ALLOW' | 'DENY'] =>
+          entry[1] === 'ALLOW' || entry[1] === 'DENY',
+      );
+      if (newEmployeeRole !== 'STAFF' || overrides.length > 0) {
+        const readAccess = async (): Promise<EmployeeDetail> => {
+          const result = await adminFetch<{ employee: EmployeeDetail }>(
+            `/api/admin/staff?shopId=${encodeURIComponent(shopId)}&employeeId=${encodeURIComponent(employeeId)}`,
+          );
+          return result.employee;
+        };
+        let actual = await readAccess();
+        if (actual.role !== newEmployeeRole) {
+          const result = await staff.sensitiveCommand.mutateAsync({
+            draft: {
+              type: 'employee.role',
+              employeeId,
+              shopId,
+              role: newEmployeeRole,
+              expectedVersion: actual.profileVersion,
+            },
+            pin: setupAdminPin,
+          });
+          if (!result.ok || isPendingApprovalResult(result)) {
+            throw new Error('Role change awaiting second-person approval');
+          }
+          actual = await readAccess();
+          if (actual.role !== newEmployeeRole) {
+            throw new Error('Employee role is not yet confirmed by the server');
+          }
+        }
+        for (const [permissionKey, effect] of overrides) {
+          const currentEffect = actual.customPermissions.includes(permissionKey)
+            ? 'ALLOW'
+            : actual.customDeniedPermissions?.includes(permissionKey)
+              ? 'DENY'
+              : 'INHERIT';
+          if (currentEffect === effect) continue;
+          const result = await staff.sensitiveCommand.mutateAsync({
+            draft: {
+              type: 'employee.permission',
+              employeeId,
+              shopId,
+              permissionKey,
+              effect,
+              expectedVersion: actual.profileVersion,
+            },
+            pin: setupAdminPin,
+          });
+          if (!result.ok || isPendingApprovalResult(result)) {
+            throw new Error('Permission change awaiting second-person approval');
+          }
+          actual = await readAccess();
+          const confirmed = effect === 'ALLOW'
+            ? actual.customPermissions.includes(permissionKey)
+            : actual.customDeniedPermissions?.includes(permissionKey);
+          if (!confirmed) {
+            throw new Error('Employee permission is not yet confirmed by the server');
+          }
+        }
+      }
+
       setCreateOpen(false);
       setOnboardingStep('identity');
       setCreatedEmployeeId(null);
@@ -285,6 +355,8 @@ export function StaffPage() {
       setConfirmEmployeePin('');
       setSetupAdminPin('');
       setNewEmployeePinCommandId(crypto.randomUUID());
+      setNewEmployeeRole('STAFF');
+      setNewEmployeePermissionOverrides({});
       setNewEmployeeName('');
       setNewEmployeePhone('');
       setNewEmployeeHireDate('');
@@ -397,6 +469,8 @@ export function StaffPage() {
                 return;
               }
               setOnboardingStep('identity');
+              setNewEmployeeRole('STAFF');
+              setNewEmployeePermissionOverrides({});
               setOnboardingShopIds([shopId]);
               setAssignedShopIds([]);
               setOnboardingError(null);
@@ -660,7 +734,8 @@ export function StaffPage() {
                   />
                 </label>
                 <p>
-                  New employees start as Staff. Elevated access requires an approved role change.
+                  New employees start as Staff. Any selected elevated role is applied through a
+                  protected approval command during the same Save.
                 </p>
               </>
             ) : null}
@@ -783,6 +858,65 @@ export function StaffPage() {
                     </p>
                   ) : null}
                 </section>
+                {canProvisionWorker ? (
+                  <fieldset className="admin-staff-onboarding-access">
+                    <legend>Role and module access</legend>
+                    <label className="admin-field">
+                      <span>Employee role</span>
+                      <select
+                        value={newEmployeeRole}
+                        onChange={(event) =>
+                          setNewEmployeeRole(
+                            event.currentTarget.value as 'STAFF' | 'MANAGER' | 'ADMIN',
+                          )
+                        }
+                      >
+                        <option value="STAFF">Staff</option>
+                        <option value="MANAGER">Manager</option>
+                        <option value="ADMIN">Administrator</option>
+                      </select>
+                    </label>
+                    <details>
+                      <summary>Customize module permissions</summary>
+                      <div className="admin-staff-onboarding-permissions">
+                        {ADMIN_PERMISSIONS.map((permission) => {
+                          const [module, action] = permission.split('.');
+                          return (
+                            <label className="admin-field" key={permission}>
+                              <span>
+                                {module.charAt(0).toUpperCase() + module.slice(1)} ·{' '}
+                                {(action ?? '')
+                                  .replaceAll('_', ' ')
+                                  .replace(/^./, (c) => c.toUpperCase())}
+                              </span>
+                              <select
+                                value={newEmployeePermissionOverrides[permission] ?? 'INHERIT'}
+                                onChange={(event) => {
+                                  const effect = event.currentTarget.value;
+                                  setNewEmployeePermissionOverrides((current) => {
+                                    const next = { ...current };
+                                    if (effect === 'INHERIT') delete next[permission];
+                                    else next[permission] = effect as 'ALLOW' | 'DENY';
+                                    return next;
+                                  });
+                                }}
+                              >
+                                <option value="INHERIT">Role default</option>
+                                <option value="ALLOW">Allowed</option>
+                                <option value="DENY">Not allowed</option>
+                              </select>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </details>
+                    <p>
+                      The Admin PIN authorizes requested role and module changes. Configured
+                      second-person approvals remain mandatory; Save does not claim completion
+                      before the effective access is confirmed.
+                    </p>
+                  </fieldset>
+                ) : null}
               </>
             ) : null}
             {onboardingStep === 'review' ? (
@@ -792,7 +926,7 @@ export function StaffPage() {
               >
                 <h3>Review employee setup</h3>
                 <p>
-                  <strong>{newEmployeeName.trim()}</strong> · Staff
+                  <strong>{newEmployeeName.trim()}</strong> · {newEmployeeRole}
                 </p>
                 <p>{newEmployeePhone.trim() || 'No phone provided'}</p>
                 <p>{newEmployeeHireDate || 'Hire date not provided'}</p>
@@ -814,6 +948,11 @@ export function StaffPage() {
                   Operations access will be ready in all selected shops after the employee PIN is
                   verified and workers are provisioned. If approval or setup fails, save remains
                   incomplete and the draft can be resumed without creating a second employee.
+                </p>
+                <p>
+                  Requested role: {newEmployeeRole}. Explicit module permissions:{' '}
+                  {Object.keys(newEmployeePermissionOverrides).length}. These changes are
+                  confirmed against the server before Save finishes.
                 </p>
                 {createdEmployeeId ? (
                   <p>
