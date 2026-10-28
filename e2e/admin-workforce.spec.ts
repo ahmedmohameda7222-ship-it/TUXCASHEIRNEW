@@ -875,7 +875,9 @@ test('S2 partial compensation failure resumes after closing without duplicate em
   await page.getByRole('button', { name: 'Add employee' }).click();
   sheet = page.getByRole('dialog', { name: 'Add employee' });
   await expect(sheet.getByText('Review employee setup')).toBeVisible();
-  await expect(sheet.getByRole('button', { name: 'Save employee & enable Operations' })).toBeVisible();
+  await expect(
+    sheet.getByRole('button', { name: 'Save employee & enable Operations' }),
+  ).toBeVisible();
   await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect.poll(() => commands.length).toBe(3);
   expect(commands.map((command) => command.type)).toEqual([
