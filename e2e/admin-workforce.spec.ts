@@ -1197,3 +1197,59 @@ test('S4 role change pending approval is shown as not applied', async ({ page })
   ).toHaveCount(1);
   await expect(page.getByRole('article', { name: 'Employee Mona Ali' })).toContainText('Staff');
 });
+
+
+test('S2 new employee saves worker PIN and provisions Operations before closing Add employee', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('New Operations User');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByLabel('Employee Operations PIN').fill('246810');
+  await sheet.getByLabel('Confirm Operations PIN').fill('246810');
+  await sheet.getByLabel('Admin PIN for employee setup').fill('1234');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet).toContainText('Operations access will be ready');
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect(sheet).toHaveCount(0);
+  expect(commands.map((item) => item.type)).toEqual([
+    'employee.create',
+    'employee.pin',
+    'employee.provision-worker',
+  ]);
+  expect(commands[1]).toMatchObject({
+    employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    newPin: '246810',
+    requesterPin: '1234',
+  });
+  expect(commands[2]).toMatchObject({
+    employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    shopId,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('S2 Add employee rejects missing and mismatching Operations PIN before writing anything', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Secure New Employee');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByLabel('Employee Operations PIN')).toBeVisible();
+  await sheet.getByLabel('Employee Operations PIN').fill('2468');
+  await sheet.getByLabel('Confirm Operations PIN').fill('9999');
+  await sheet.getByLabel('Admin PIN for employee setup').fill('1234');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByRole('alert')).toContainText('PINs do not match');
+  expect(commands).toHaveLength(0);
+});
