@@ -1,0 +1,27 @@
+name: CRM4 money temporary Prettier diagnosis
+
+on:
+  push:
+    branches:
+      - feat/admin-eight-tabs-approved-ui-20261025
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Show exact CRM4 E2E Prettier diff
+        run: |
+          npx prettier e2e/admin-customers-promotions.spec.ts > /tmp/crm4-e2e.formatted.ts
+          diff -u e2e/admin-customers-promotions.spec.ts /tmp/crm4-e2e.formatted.ts || true
