@@ -820,6 +820,30 @@ test('Selected employee on phone uses a focused inspector without duplicate Staf
   await expect(page.locator('.admin-metric-strip[aria-label="Staff summary"]')).toBeVisible();
 });
 
+test('S1 approved Access inspector places six readable facts below permissions at 390px', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+  const policy = page.locator('.admin-staff-access-policy');
+  const activity = page.locator('section[aria-label="Staff factual metrics"]');
+  const cards = activity.locator('.admin-more-card');
+  await expect(cards).toHaveCount(6);
+  const columns = await activity
+    .locator('.admin-more-grid')
+    .evaluate((node) => getComputedStyle(node).gridTemplateColumns.trim().split(/\s+/).length);
+  expect(columns).toBe(2);
+  const policyBox = await policy.boundingBox();
+  const activityBox = await activity.boundingBox();
+  expect(policyBox).not.toBeNull();
+  expect(activityBox).not.toBeNull();
+  expect(activityBox!.y).toBeGreaterThanOrEqual(policyBox!.y + policyBox!.height - 1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
 test('Staff detail Access layout follows approved compact grid without overlap at 390 and 1440', async ({
   page,
 }) => {
