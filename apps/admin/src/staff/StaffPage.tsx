@@ -740,7 +740,7 @@ export function StaffPage() {
                   setNewEmployeePin('');
                   setConfirmEmployeePin('');
                   setSetupAdminPin('');
-                }
+                }}
               >
                 Cancel
               </button>
