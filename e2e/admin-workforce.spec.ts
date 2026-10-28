@@ -1083,8 +1083,25 @@ test('S2 interrupted onboarding survives reload without creating a duplicate emp
   await page.setViewportSize({ width: 390, height: 844 });
   await mockWorkforce(page);
   let creates = 0;
+  let compensationAttempts = 0;
   await page.route('**/api/admin/staff**', async (route) => {
-    if (route.request().method() !== 'POST') {
+    if (route.request().method() === 'GET') {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get('employeeId') === 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            employee: {
+              ...employee(),
+              id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              displayName: 'Amira Resumable',
+              credentialVersion: 1,
+            },
+          }),
+        });
+        return;
+      }
       await route.fallback();
       return;
     }
@@ -1103,10 +1120,15 @@ test('S2 interrupted onboarding survives reload without creating a duplicate emp
       return;
     }
     if (command.type === 'compensation.set') {
+      compensationAttempts += 1;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ ok: false, code: 'compensation_temporarily_unavailable' }),
+        body: JSON.stringify(
+          compensationAttempts === 1
+            ? { ok: false, code: 'compensation_temporarily_unavailable' }
+            : { ok: true, replayed: false },
+        ),
       });
       return;
     }
@@ -1129,9 +1151,15 @@ test('S2 interrupted onboarding survives reload without creating a duplicate emp
   const resume = page.getByRole('button', { name: 'Complete employee setup' });
   await expect(resume).toBeVisible();
   await resume.click();
-  await expect(page).toHaveURL(
-    /\/staff\/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\?section=permissions$/,
-  );
+  const resumedSheet = page.getByRole('dialog', { name: 'Add employee' });
+  await expect(resumedSheet.getByLabel('Rate (EGP, optional)')).toBeVisible();
+  await resumedSheet.getByLabel('Rate (EGP, optional)').fill('100.00');
+  await resumedSheet.getByLabel('Effective from').fill('2026-10-01');
+  await fillEmployeeOperationsSetup(page);
+  await resumedSheet.getByRole('button', { name: 'Continue' }).click();
+  await resumedSheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect(resumedSheet).toHaveCount(0);
+  expect(compensationAttempts).toBe(2);
   expect(creates).toBe(1);
 });
 
