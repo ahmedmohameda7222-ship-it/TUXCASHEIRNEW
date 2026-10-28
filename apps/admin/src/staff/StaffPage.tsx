@@ -77,7 +77,7 @@ function validateInitialShift(
   const endsAt = businessLocalDateTimeToIso(ends);
   const minutes = Number(breaks);
   if (
-    !/^\\d+$/.test(breaks) ||
+    !/^\d+$/.test(breaks) ||
     !Number.isSafeInteger(minutes) ||
     Date.parse(endsAt) <= Date.parse(startsAt) ||
     minutes >= (Date.parse(endsAt) - Date.parse(startsAt)) / 60000
