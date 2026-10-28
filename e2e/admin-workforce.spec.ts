@@ -693,8 +693,9 @@ test('S2 owner configures employee PIN and real Operations worker during Add emp
     'password',
   );
   await sheet.getByLabel('Confirm with your Admin PIN').fill('1234');
-  await expect(sheet.getByRole('checkbox', { name: 'Provision Operations worker in assigned shops' }))
-    .toBeChecked();
+  await expect(
+    sheet.getByRole('checkbox', { name: 'Provision Operations worker in assigned shops' }),
+  ).toBeChecked();
   await sheet.getByRole('button', { name: 'Continue' }).click();
   await expect(sheet.getByText('Review employee setup')).toBeVisible();
   expect(commands).toHaveLength(0);
