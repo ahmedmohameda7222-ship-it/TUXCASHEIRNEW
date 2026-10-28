@@ -170,7 +170,9 @@ export function LeavePage({
                   setRequestOpen(false);
                 } catch (error) {
                   setRequestError(
-                    error instanceof Error ? error.message.replaceAll('_', ' ') : 'Leave request failed',
+                    error instanceof Error
+                      ? error.message.replaceAll('_', ' ')
+                      : 'Leave request failed',
                   );
                 } finally {
                   setSavingRequest(false);

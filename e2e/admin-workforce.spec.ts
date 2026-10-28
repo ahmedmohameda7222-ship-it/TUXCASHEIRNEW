@@ -931,8 +931,9 @@ test('new employee sheet persists actual hire date and notes through the trusted
   });
 });
 
-
-test('S3 leave rejection preserves the request sheet, values and retry identity on phone', async ({ page }) => {
+test('S3 leave rejection preserves the request sheet, values and retry identity on phone', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const commands = await mockWorkforce(page);
   let attempts = 0;
@@ -971,7 +972,9 @@ test('S3 leave rejection preserves the request sheet, values and retry identity 
   expect(commands.filter((command) => command.type === 'leave.create')).toHaveLength(1);
 });
 
-test('S4 refused role change keeps PIN confirmation open and never claims success', async ({ page }) => {
+test('S4 refused role change keeps PIN confirmation open and never claims success', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockWorkforce(page);
   let attempts = 0;
@@ -1021,11 +1024,21 @@ test('S3 leave list hides requests scoped to other shops but keeps business-wide
     }
     const current = employee();
     const leave = (id: string, requestedShopId: string | null, note: string) => ({
-      id, employeeId, shopId: requestedShopId, leaveType: 'VACATION',
-      startsOn: '2026-11-01', endsOn: '2026-11-02', note,
-      status: 'PENDING', requesterEmployeeId: employeeId,
-      decidedByEmployeeId: null, decisionReason: null, decidedAt: null,
-      version: 1, createdAt: '2026-10-28T00:00:00Z', updatedAt: '2026-10-28T00:00:00Z',
+      id,
+      employeeId,
+      shopId: requestedShopId,
+      leaveType: 'VACATION',
+      startsOn: '2026-11-01',
+      endsOn: '2026-11-02',
+      note,
+      status: 'PENDING',
+      requesterEmployeeId: employeeId,
+      decidedByEmployeeId: null,
+      decisionReason: null,
+      decidedAt: null,
+      version: 1,
+      createdAt: '2026-10-28T00:00:00Z',
+      updatedAt: '2026-10-28T00:00:00Z',
     });
     await route.fulfill({
       status: 200,

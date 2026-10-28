@@ -610,63 +610,65 @@ export function EmployeeDetailPage({
               setSensitiveError(null);
               setSensitiveBusy(true);
               try {
-              if (sensitiveAction.kind === 'role')
-                await onSensitiveCommand(
-                  {
-                    type: 'employee.role',
-                    employeeId: employee.id,
-                    shopId,
-                    role: roleDraft,
-                    expectedVersion: employee.profileVersion,
-                  },
-                  actorPin,
-                );
-              if (sensitiveAction.kind === 'pin')
-                await onSensitiveCommand(
-                  {
-                    type: 'employee.pin',
-                    employeeId: employee.id,
-                    shopId,
-                    newPin,
-                    commandId: pinCommandId,
-                  },
-                  actorPin,
-                );
-              if (sensitiveAction.kind === 'status')
-                await onSensitiveCommand(
-                  employee.active
-                    ? {
-                        type: 'employee.suspend',
-                        employeeId: employee.id,
-                        shopId,
-                        expectedVersion: employee.profileVersion,
-                      }
-                    : {
-                        type: 'employee.reactivate',
-                        employeeId: employee.id,
-                        shopId,
-                        expectedVersion: employee.profileVersion,
-                      },
-                  actorPin,
-                );
-              if (sensitiveAction.kind === 'restore')
-                await onSensitiveCommand(
-                  {
-                    type: 'employee.reactivate-worker',
-                    employeeId: employee.id,
-                    shopId: sensitiveAction.identity.shopId,
-                    workerId: sensitiveAction.identity.workerId,
-                    expectedEmployeeCredentialVersion: employee.credentialVersion,
-                    expectedWorkerCredentialVersion: sensitiveAction.identity.credentialVersion,
-                  },
-                  actorPin,
-                );
-              setSensitiveAction(null);
-              setActorPin('');
-              setNewPin('');
+                if (sensitiveAction.kind === 'role')
+                  await onSensitiveCommand(
+                    {
+                      type: 'employee.role',
+                      employeeId: employee.id,
+                      shopId,
+                      role: roleDraft,
+                      expectedVersion: employee.profileVersion,
+                    },
+                    actorPin,
+                  );
+                if (sensitiveAction.kind === 'pin')
+                  await onSensitiveCommand(
+                    {
+                      type: 'employee.pin',
+                      employeeId: employee.id,
+                      shopId,
+                      newPin,
+                      commandId: pinCommandId,
+                    },
+                    actorPin,
+                  );
+                if (sensitiveAction.kind === 'status')
+                  await onSensitiveCommand(
+                    employee.active
+                      ? {
+                          type: 'employee.suspend',
+                          employeeId: employee.id,
+                          shopId,
+                          expectedVersion: employee.profileVersion,
+                        }
+                      : {
+                          type: 'employee.reactivate',
+                          employeeId: employee.id,
+                          shopId,
+                          expectedVersion: employee.profileVersion,
+                        },
+                    actorPin,
+                  );
+                if (sensitiveAction.kind === 'restore')
+                  await onSensitiveCommand(
+                    {
+                      type: 'employee.reactivate-worker',
+                      employeeId: employee.id,
+                      shopId: sensitiveAction.identity.shopId,
+                      workerId: sensitiveAction.identity.workerId,
+                      expectedEmployeeCredentialVersion: employee.credentialVersion,
+                      expectedWorkerCredentialVersion: sensitiveAction.identity.credentialVersion,
+                    },
+                    actorPin,
+                  );
+                setSensitiveAction(null);
+                setActorPin('');
+                setNewPin('');
               } catch (error) {
                 setSensitiveError(
-                  error instanceof Error ? error.message.replaceAll('_', ' ') : 'Access change failed',
+                  error instanceof Error
+                    ? error.message.replaceAll('_', ' ')
+                    : 'Access change failed',
                 );
               } finally {
                 setSensitiveBusy(false);

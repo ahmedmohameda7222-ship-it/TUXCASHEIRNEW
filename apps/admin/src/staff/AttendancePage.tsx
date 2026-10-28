@@ -176,7 +176,9 @@ export function AttendancePage({
                   setCorrectionOpen(false);
                 } catch (error) {
                   setCorrectionError(
-                    error instanceof Error ? error.message.replaceAll('_', ' ') : 'Attendance correction failed',
+                    error instanceof Error
+                      ? error.message.replaceAll('_', ' ')
+                      : 'Attendance correction failed',
                   );
                 } finally {
                   setSavingCorrection(false);

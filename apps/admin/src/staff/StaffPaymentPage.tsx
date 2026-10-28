@@ -167,7 +167,9 @@ export function StaffPaymentPage({
                 setExpected('');
               } catch (error) {
                 setPaymentError(
-                  error instanceof Error ? error.message.replaceAll('_', ' ') : 'Payment posting failed',
+                  error instanceof Error
+                    ? error.message.replaceAll('_', ' ')
+                    : 'Payment posting failed',
                 );
               } finally {
                 setSavingPayment(false);

@@ -199,12 +199,17 @@ export function PermissionsEditor({
               setSaveError(null);
               setSaving(true);
               try {
-                await onSensitiveCommand(command(pendingChange.permission, pendingChange.effect), actorPin);
+                await onSensitiveCommand(
+                  command(pendingChange.permission, pendingChange.effect),
+                  actorPin,
+                );
                 setPendingChange(null);
                 setActorPin('');
               } catch (error) {
                 setSaveError(
-                  error instanceof Error ? error.message.replaceAll('_', ' ') : 'Permission update failed',
+                  error instanceof Error
+                    ? error.message.replaceAll('_', ' ')
+                    : 'Permission update failed',
                 );
               } finally {
                 setSaving(false);
