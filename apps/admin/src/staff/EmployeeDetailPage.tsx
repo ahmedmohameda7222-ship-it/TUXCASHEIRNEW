@@ -449,14 +449,28 @@ export function EmployeeDetailPage({
   );
 
   return (
-    <article aria-label={`Employee ${employee.displayName}`}>
-      <header className="admin-page__header">
-        <div>
-          <p className="admin-page__eyebrow">Staff profile</p>
+    <article className="admin-staff-inspector" aria-label={`Employee ${employee.displayName}`}>
+      <header className="admin-staff-inspector__header">
+        <span className="admin-staff-inspector__avatar" aria-hidden="true">
+          {employee.displayName
+            .trim()
+            .split(/\s+/)
+            .slice(0, 2)
+            .map((part) => part.charAt(0).toUpperCase())
+            .join('')}
+        </span>
+        <div className="admin-staff-inspector__identity">
           <h2>{employee.displayName}</h2>
-          <p className="admin-page__description">
-            {roleLabel(employee.role)} · {employee.active ? 'Active' : 'Suspended'}
-          </p>
+          <p>{employee.phone ?? 'Phone not provided'} · {employee.assignments.length} assigned shop(s)</p>
+          <div className="admin-staff-inspector__badges">
+            <span>{roleLabel(employee.role)}</span>
+            <span data-state={employee.active ? 'active' : 'suspended'}>
+              {employee.active ? 'Active' : 'Suspended'}
+            </span>
+            <span data-state={operationsHealthy ? 'ready' : 'setup'}>
+              {operationsHealthy ? 'Operations ready' : 'Setup needed'}
+            </span>
+          </div>
         </div>
       </header>
 
