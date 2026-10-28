@@ -61,6 +61,7 @@ export function EmployeeDetailPage({
   shops,
   onCommand,
   onVerifiedScheduleCommand,
+  onVerifiedStaffCommand,
   onSensitiveCommand,
 }: {
   employee: EmployeeDetail;
@@ -75,10 +76,13 @@ export function EmployeeDetailPage({
   shops: readonly StaffShopChoice[];
   onCommand(command: StaffCommandDraft): void;
   onVerifiedScheduleCommand?(command: StaffCommandDraft): Promise<unknown>;
-  onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
+  onVerifiedStaffCommand?(command: StaffCommandDraft): Promise<unknown>;
+  onSensitiveCommand(command: StaffCommandDraft, pin: string): Promise<unknown> | void;
 }) {
   const [sensitiveAction, setSensitiveAction] = useState<SensitiveAction>(null);
   const [actorPin, setActorPin] = useState('');
+  const [sensitiveBusy, setSensitiveBusy] = useState(false);
+  const [sensitiveError, setSensitiveError] = useState<string | null>(null);
   const [newPin, setNewPin] = useState('');
   const [pinCommandId, setPinCommandId] = useState(() => crypto.randomUUID());
   const [roleDraft, setRoleDraft] = useState<AdminRole>(employee.role);
@@ -488,6 +492,7 @@ export function EmployeeDetailPage({
                 shopId={shopId}
                 canManage={canManage}
                 onCommand={onCommand}
+                onVerifiedCommand={onVerifiedStaffCommand}
               />
             ),
           },
@@ -500,6 +505,7 @@ export function EmployeeDetailPage({
                 shopId={shopId}
                 canManage={canManage}
                 onCommand={onCommand}
+                onVerifiedCommand={onVerifiedStaffCommand}
               />
             ),
           },
@@ -532,9 +538,10 @@ export function EmployeeDetailPage({
         }
         description="Confirm this access change with your own Admin PIN."
         onOpenChange={(open) => {
-          if (!open) {
+          if (!open && !sensitiveBusy) {
             setSensitiveAction(null);
             setActorPin('');
+            setSensitiveError(null);
           }
         }}
       >
@@ -576,6 +583,7 @@ export function EmployeeDetailPage({
             onChange={(event) => setActorPin(event.target.value)}
           />
         </label>
+        {sensitiveError ? <p role="alert">{sensitiveError}</p> : null}
         <div className="admin-dialog__actions">
           <button
             className="admin-secondary-button"
@@ -592,14 +600,18 @@ export function EmployeeDetailPage({
             }
             type="button"
             disabled={
+              sensitiveBusy ||
               !actorPin ||
               (sensitiveAction?.kind === 'role' && roleDraft === employee.role) ||
               (sensitiveAction?.kind === 'pin' && !/^\d{4,12}$/.test(newPin))
             }
-            onClick={() => {
-              if (!sensitiveAction) return;
+            onClick={async () => {
+              if (!sensitiveAction || sensitiveBusy) return;
+              setSensitiveError(null);
+              setSensitiveBusy(true);
+              try {
               if (sensitiveAction.kind === 'role')
-                onSensitiveCommand(
+                await onSensitiveCommand(
                   {
                     type: 'employee.role',
                     employeeId: employee.id,
@@ -610,7 +622,7 @@ export function EmployeeDetailPage({
                   actorPin,
                 );
               if (sensitiveAction.kind === 'pin')
-                onSensitiveCommand(
+                await onSensitiveCommand(
                   {
                     type: 'employee.pin',
                     employeeId: employee.id,
@@ -621,7 +633,7 @@ export function EmployeeDetailPage({
                   actorPin,
                 );
               if (sensitiveAction.kind === 'status')
-                onSensitiveCommand(
+                await onSensitiveCommand(
                   employee.active
                     ? {
                         type: 'employee.suspend',
@@ -638,7 +650,7 @@ export function EmployeeDetailPage({
                   actorPin,
                 );
               if (sensitiveAction.kind === 'restore')
-                onSensitiveCommand(
+                await onSensitiveCommand(
                   {
                     type: 'employee.reactivate-worker',
                     employeeId: employee.id,
@@ -652,6 +664,13 @@ export function EmployeeDetailPage({
               setSensitiveAction(null);
               setActorPin('');
               setNewPin('');
+              } catch (error) {
+                setSensitiveError(
+                  error instanceof Error ? error.message.replaceAll('_', ' ') : 'Access change failed',
+                );
+              } finally {
+                setSensitiveBusy(false);
+              }
             }}
           >
             Confirm change
