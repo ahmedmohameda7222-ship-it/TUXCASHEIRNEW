@@ -124,9 +124,8 @@ export function StaffPage() {
     readableError(staff.sensitiveCommand.error) ?? readableError(staff.command.error);
 
   const execute = (command: StaffApiCommandDraft) => staff.command.mutate(command);
-  const executeSensitive = (command: StaffApiCommandDraft, pin: string) => {
-    staff.sensitiveCommand.mutate({ draft: command, pin });
-  };
+  const executeSensitive = (command: StaffApiCommandDraft, pin: string) =>
+    staff.sensitiveCommand.mutateAsync({ draft: command, pin });
 
   async function createEmployee() {
     const displayName = newEmployeeName.trim();
@@ -194,7 +193,7 @@ export function StaffPage() {
       setNewEmployeeNotes('');
       setNewEmployeeRate('');
       setNewEmployeeEffectiveFrom('');
-      navigate(detailPath('/staff', employeeId));
+      navigate(`${detailPath('/staff', employeeId)}?section=permissions`);
     } catch (error) {
       setOnboardingError(readableError(error) ?? 'Employee onboarding could not be completed');
     } finally {
@@ -410,6 +409,7 @@ export function StaffPage() {
                 shops={shopChoices}
                 onCommand={execute}
                 onVerifiedScheduleCommand={(command) => staff.command.mutateAsync(command)}
+                onVerifiedStaffCommand={(command) => staff.command.mutateAsync(command)}
                 onSensitiveCommand={executeSensitive}
               />
             ) : (
