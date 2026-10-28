@@ -47,7 +47,7 @@ type EmployeeOnboardingStep = 'identity' | 'shops' | 'employment' | 'review';
 
 function optionalCompensationMinor(raw: string): number | null {
   if (!raw.trim()) return null;
-  const match = /^(\\d+)(?:\\.(\\d{1,2}))?$/.exec(raw.trim());
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(raw.trim());
   if (!match) throw new Error('invalid_compensation_rate');
   const value = BigInt(match[1]!) * 100n + BigInt((match[2] ?? '').padEnd(2, '0') || '0');
   if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('invalid_compensation_rate');
