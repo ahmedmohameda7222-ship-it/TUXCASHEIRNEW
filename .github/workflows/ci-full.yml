@@ -10,6 +10,11 @@ on:
       - 'apps/admin/server/catalog/**'
       - 'apps/admin/api/admin/catalog*'
       - 'packages/admin-contracts/src/catalog.ts'
+      - 'apps/admin/src/staff/**'
+      - 'apps/admin/server/staff/**'
+      - 'packages/admin-contracts/src/staff.ts'
+      - 'e2e/admin-workforce.spec.ts'
+      - '.github/workflows/staff-workforce-postgres.yml'
 
 permissions:
   contents: read
