@@ -790,11 +790,11 @@ test('CRM4 fixed promotion values preserve safe minor units through 390px edit a
     return command?.promotion;
   };
   await expect.poll(savedPromotion).toMatchObject({
-      fixedDiscountMinor: preciseMinor,
-      minimumOrderMinor: preciseMinor,
-      expectedVersion: 3,
-      shopIds: [shopId, otherShopId],
-    });
+    fixedDiscountMinor: preciseMinor,
+    minimumOrderMinor: preciseMinor,
+    expectedVersion: 3,
+    shopIds: [shopId, otherShopId],
+  });
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
