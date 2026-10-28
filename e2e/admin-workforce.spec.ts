@@ -1630,3 +1630,32 @@ test('S2 Add employee holds access-pending approval open without granting unveri
   await expect(sheet.getByRole('alert')).toContainText(/approval/i);
   expect(commands).toContain('employee.role');
 });
+
+test('S2 initial shift is included in Add employee before Operations-ready save', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('First Shift Ready');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await fillEmployeeOperationsSetup(page);
+  await sheet.getByLabel('Initial shift starts').fill('2026-10-29T09:00');
+  await sheet.getByLabel('Initial shift ends').fill('2026-10-29T17:00');
+  await sheet.getByLabel('Initial shift break minutes').fill('30');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  expect(commands).toHaveLength(0);
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect(sheet).toHaveCount(0);
+  expect(commands.map((command) => command.type)).toEqual([
+    'employee.create', 'employee.pin', 'employee.provision-worker', 'shift.create',
+  ]);
+  expect(commands[3]).toMatchObject({
+    startsAt: '2026-10-29T06:00:00.000Z',
+    endsAt: '2026-10-29T14:00:00.000Z',
+    plannedBreakMinutes: 30,
+  });
+});
