@@ -530,7 +530,7 @@ export function StaffPage() {
                     <span className="admin-staff-status-chip" data-active={employee.active}>
                       {employee.active ? 'Active' : 'Suspended'}
                     </span>
-                    {employee.operationsSetupRequiredShopIds.length > 0 ? (
+                    {employee.operationsSetupRequiredShopIds.includes(shopId) ? (
                       <span
                         className="admin-staff-row__setup"
                         title="Operations setup is still required in assigned shops"
