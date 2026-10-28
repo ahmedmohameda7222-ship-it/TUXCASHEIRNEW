@@ -1062,3 +1062,55 @@ test('S3 leave list hides requests scoped to other shops but keeps business-wide
   await expect(page.getByText('Business-wide leave')).toBeVisible();
   await expect(page.getByText('Other shop leave')).toHaveCount(0);
 });
+
+
+test('S2 interrupted onboarding survives reload without creating a duplicate employee', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  let creates = 0;
+  await page.route('**/api/admin/staff**', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const command = route.request().postDataJSON() as { type?: string };
+    if (command.type === 'employee.create') {
+      creates += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true, replayed: false, employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        }),
+      });
+      return;
+    }
+    if (command.type === 'compensation.set') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: false, code: 'compensation_temporarily_unavailable' }),
+      });
+      return;
+    }
+    await route.fallback();
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Amira Resumable');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByLabel('Rate (EGP, optional)').fill('100.00');
+  await sheet.getByLabel('Effective from').fill('2026-10-01');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await expect(sheet.getByRole('alert')).toContainText('compensation temporarily unavailable');
+  expect(creates).toBe(1);
+  await page.reload();
+  const resume = page.getByRole('button', { name: 'Complete employee setup' });
+  await expect(resume).toBeVisible();
+  await resume.click();
+  await expect(page).toHaveURL(/\/staff\/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\?section=permissions$/);
+  expect(creates).toBe(1);
+});
