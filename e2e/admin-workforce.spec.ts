@@ -693,6 +693,9 @@ test('S2 owner configures employee PIN and real Operations worker during Add emp
     'password',
   );
   await sheet.getByLabel('Confirm with your Admin PIN').fill('1234');
+  await sheet.getByLabel('Initial shift starts').fill('2026-10-29T09:00');
+  await sheet.getByLabel('Initial shift ends').fill('2026-10-29T17:00');
+  await sheet.getByLabel('Initial shift break minutes').fill('30');
   await expect(
     sheet.getByRole('checkbox', { name: 'Provision Operations worker in assigned shops' }),
   ).toBeChecked();
@@ -700,11 +703,12 @@ test('S2 owner configures employee PIN and real Operations worker during Add emp
   await expect(sheet.getByText('Review employee setup')).toBeVisible();
   expect(commands).toHaveLength(0);
   await sheet.getByRole('button', { name: 'Create employee' }).click();
-  await expect.poll(() => commands.length).toBe(3);
+  await expect.poll(() => commands.length).toBe(4);
   expect(commands.map((c) => c.type)).toEqual([
     'employee.create',
     'employee.pin',
     'employee.provision-worker',
+    'shift.create',
   ]);
   expect(adminReauths).toBe(1);
   expect(commands[0]).not.toHaveProperty('newPin');
@@ -713,6 +717,11 @@ test('S2 owner configures employee PIN and real Operations worker during Add emp
     newPin: '6829',
   });
   expect(commands[2]).not.toHaveProperty('newPin');
+  expect(commands[3]).toMatchObject({
+    startsAt: '2026-10-29T06:00:00.000Z',
+    endsAt: '2026-10-29T14:00:00.000Z',
+    plannedBreakMinutes: 30,
+  });
   await expect(sheet).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
