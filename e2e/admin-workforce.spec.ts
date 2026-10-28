@@ -154,6 +154,55 @@ async function selectEmployee(page: Page, name: string) {
   await expect(page.getByRole('heading', { name })).toBeVisible();
 }
 
+test('S1 mobile directory searches name and phone within explicitly loaded staff', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() !== 'GET' || url.searchParams.has('employeeId')) {
+      await route.fallback();
+      return;
+    }
+    const current = workspace();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...current,
+        employees: {
+          rows: [
+            ...current.employees.rows,
+            {
+              id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              displayName: 'Youssef Hassan',
+              phone: '+201011111111',
+              role: 'MANAGER',
+              active: false,
+              shopIds: [shopId],
+              operationsSetupRequiredShopIds: [],
+            },
+          ],
+          nextCursor: 'more-staff-exist',
+        },
+      }),
+    });
+  });
+  await page.goto('/staff');
+  const search = page.getByRole('searchbox', { name: 'Search employees (loaded results)' });
+  await expect(search).toBeVisible();
+  await expect(page.getByText('Loaded results only')).toBeVisible();
+  await search.fill('Youssef');
+  await expect(page.getByRole('button', { name: /Youssef Hassan/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Mona Ali/ })).toHaveCount(0);
+  await search.fill('+201000000000');
+  await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Youssef Hassan/ })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
 test('S1 selected desktop employee keeps directory and inspector adjacent at 1440px', async ({
   page,
 }) => {
