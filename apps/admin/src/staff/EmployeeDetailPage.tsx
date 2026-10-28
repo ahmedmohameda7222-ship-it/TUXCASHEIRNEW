@@ -460,17 +460,26 @@ export function EmployeeDetailPage({
   return (
     <article className="admin-staff-inspector" aria-label={`Employee ${employee.displayName}`}>
       <header className="admin-staff-inspector__header">
-        <span className="admin-staff-inspector__avatar" aria-hidden="true">{initials}</span>
+        <span className="admin-staff-inspector__avatar" aria-hidden="true">
+          {initials}
+        </span>
         <div className="admin-staff-inspector__identity">
           <h2>{employee.displayName}</h2>
-          <p>{employee.phone || 'No phone'} · {employee.assignments.length} assigned shop(s)</p>
+          <p>
+            {employee.phone || 'No phone'} · {employee.assignments.length} assigned shop(s)
+          </p>
           <div className="admin-staff-inspector__badges">
             <span className="admin-staff-status-chip">{roleLabel(employee.role)}</span>
             <span className="admin-staff-status-chip" data-active={employee.active}>
               {employee.active ? 'Active' : 'Suspended'}
             </span>
-            <span className="admin-staff-status-chip" data-ready={operationsHealthy && employee.active}>
-              {operationsHealthy && employee.active ? 'Operations ready' : 'Operations setup needed'}
+            <span
+              className="admin-staff-status-chip"
+              data-ready={operationsHealthy && employee.active}
+            >
+              {operationsHealthy && employee.active
+                ? 'Operations ready'
+                : 'Operations setup needed'}
             </span>
           </div>
         </div>

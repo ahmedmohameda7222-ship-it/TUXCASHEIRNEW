@@ -322,7 +322,6 @@
   }
 }
 
-
 /* Approved Clean Staff inspector: self-contained narrow panels, not shared lazy route CSS. */
 .admin-staff-workspace .admin-master-detail {
   grid-template-columns: minmax(0, 41%) minmax(0, 1fr);

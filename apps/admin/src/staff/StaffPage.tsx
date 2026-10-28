@@ -137,7 +137,8 @@ export function StaffPage() {
   }
 
   const canManage = principal.permissions.includes('staff.manage');
-  const canProvisionWorker = canManage && (principal.role === 'OWNER' || principal.role === 'ADMIN');
+  const canProvisionWorker =
+    canManage && (principal.role === 'OWNER' || principal.role === 'ADMIN');
   const canPay = principal.permissions.includes('staff.payments');
   const detail = staff.detailQuery.data;
   const actionError =
@@ -309,7 +310,9 @@ export function StaffPage() {
           throw new Error('Admin PIN must be 4–12 digits');
         }
         if (!canProvisionWorker) {
-          throw new Error('Owner or Admin access is required for immediate Operations provisioning');
+          throw new Error(
+            'Owner or Admin access is required for immediate Operations provisioning',
+          );
         }
         setOnboardingStep('review');
       } catch (error) {
@@ -502,9 +505,7 @@ export function StaffPage() {
                 }}
                 shopId={shopId}
                 canManage={canManage}
-                canProvisionWorker={
-                  canProvisionWorker
-                }
+                canProvisionWorker={canProvisionWorker}
                 canPay={canPay}
                 financeAccounts={staff.workspaceQuery.data?.financeAccounts ?? []}
                 workers={staff.workspaceQuery.data?.workers ?? []}
@@ -658,9 +659,15 @@ export function StaffPage() {
                     onChange={(event) => setNewEmployeeEffectiveFrom(event.target.value)}
                   />
                 </label>
-                <section className="admin-staff-onboarding-security" aria-label="Operations access setup">
+                <section
+                  className="admin-staff-onboarding-security"
+                  aria-label="Operations access setup"
+                >
                   <h3>Operations access — ready on save</h3>
-                  <p>Set the employee PIN now. Your Admin PIN confirms secure setup; neither PIN is stored in browser storage.</p>
+                  <p>
+                    Set the employee PIN now. Your Admin PIN confirms secure setup; neither PIN is
+                    stored in browser storage.
+                  </p>
                   <label className="admin-field">
                     <span>Employee Operations PIN</span>
                     <input
@@ -705,7 +712,10 @@ export function StaffPage() {
                     />
                   </label>
                   {!canProvisionWorker ? (
-                    <p role="alert">An Owner or Admin must create employees who can immediately log in to Operations.</p>
+                    <p role="alert">
+                      An Owner or Admin must create employees who can immediately log in to
+                      Operations.
+                    </p>
                   ) : null}
                 </section>
               </>

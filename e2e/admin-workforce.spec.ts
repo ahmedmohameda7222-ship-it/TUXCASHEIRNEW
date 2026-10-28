@@ -1215,7 +1215,6 @@ test('S4 role change pending approval is shown as not applied', async ({ page })
   await expect(page.getByRole('article', { name: 'Employee Mona Ali' })).toContainText('Staff');
 });
 
-
 test('S2 new employee saves worker PIN and provisions Operations before closing Add employee', async ({
   page,
 }) => {
@@ -1271,9 +1270,10 @@ test('S2 Add employee rejects missing and mismatching Operations PIN before writ
   expect(commands).toHaveLength(0);
 });
 
-
 for (const width of [390, 1024, 1440]) {
-  test(`S4 employee permission controls fit their card without colliding at ${width}px`, async ({ page }) => {
+  test(`S4 employee permission controls fit their card without colliding at ${width}px`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width, height: 900 });
     await mockWorkforce(page);
     await page.goto('/staff');
@@ -1296,7 +1296,6 @@ for (const width of [390, 1024, 1440]) {
     );
   });
 }
-
 
 test('S2 employee setup waits for PIN approval and never provisions Operations prematurely', async ({
   page,
@@ -1327,7 +1326,9 @@ test('S2 employee setup waits for PIN approval and never provisions Operations p
   await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect(sheet.getByRole('alert')).toContainText('pending approval');
   await expect(sheet).toBeVisible();
-  expect(commands.filter((command) => command.type === 'employee.provision-worker')).toHaveLength(0);
+  expect(commands.filter((command) => command.type === 'employee.provision-worker')).toHaveLength(
+    0,
+  );
   expect(commands.filter((command) => command.type === 'employee.create')).toHaveLength(1);
 });
 
