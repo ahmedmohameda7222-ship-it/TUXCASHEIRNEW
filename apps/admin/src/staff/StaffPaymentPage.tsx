@@ -10,14 +10,14 @@ export function StaffPaymentPage({
   accounts,
   financeAccounts,
   canPay,
-  onCommand,
+  onSensitiveCommand,
 }: {
   employee: EmployeeDetail;
   shopId: string;
   accounts?: readonly StaffFinanceAccountChoice[];
   financeAccounts?: readonly StaffFinanceAccountChoice[];
   canPay: boolean;
-  onCommand(command: StaffCommandDraft): void;
+  onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
 }) {
   const available = (accounts ?? financeAccounts ?? []).filter(
     (account) => account.shopId === null || account.shopId === shopId,
@@ -28,6 +28,7 @@ export function StaffPaymentPage({
   const [expected, setExpected] = useState('');
   const [paid, setPaid] = useState('');
   const [paymentDate, setPaymentDate] = useState('');
+  const [actorPin, setActorPin] = useState('');
   const expectedAmountMinor = parseStaffMoneyMinor(expected.trim() || paid);
   const paidAmountMinor = parseStaffMoneyMinor(paid);
   const accountTypeLabel = (type: string) =>
@@ -112,6 +113,17 @@ export function StaffPaymentPage({
               onChange={(event) => setPaymentDate(event.target.value)}
             />
           </label>
+          <label className="admin-field">
+            <span>Admin PIN for staff payment</span>
+            <input
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              value={actorPin}
+              onChange={(event) => setActorPin(event.target.value)}
+            />
+          </label>
+          <p>Payment posting requires Admin PIN reauthentication. Any configured second-person approval remains enforced by the server.</p>
           <button
             className="admin-primary-button"
             type="button"
@@ -121,6 +133,7 @@ export function StaffPaymentPage({
               !periodEnd ||
               paidAmountMinor === null ||
               expectedAmountMinor === null ||
+              !/^\d{4,12}$/.test(actorPin) ||
               !paymentDate
             }
             onClick={() => {
@@ -138,7 +151,8 @@ export function StaffPaymentPage({
                 note: null,
                 reference: null,
               };
-              onCommand(command);
+              onSensitiveCommand(command, actorPin);
+              setActorPin('');
             }}
           >
             Record payment
