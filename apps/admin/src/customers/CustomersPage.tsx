@@ -46,11 +46,13 @@ function formatPointValueEgp(minor: number): string {
   if (!Number.isSafeInteger(minor)) return 'Unavailable';
   const value = BigInt(minor);
   const absolute = value < 0n ? -value : value;
-  return `${value < 0n ? '-' : ''}${absolute / 100n}.${String(absolute % 100n).padStart(2, '0')}`;
+  const whole = absolute / 100n;
+  const fraction = String(absolute % 100n).padStart(2, '0');
+  return `${value < 0n ? '-' : ''}${whole}.${fraction}`;
 }
 
 function parsePointValueMinor(input: string): number {
-  const matched = /^(\\d+)(?:\\.(\\d{1,2}))?$/.exec(input.trim());
+  const matched = /^(\d+)(?:\.(\d{1,2}))?$/.exec(input.trim());
   if (!matched) throw new Error('invalid_loyalty_point_value');
   const value = BigInt(matched[1]!) * 100n + BigInt((matched[2] ?? '').padEnd(2, '0') || '0');
   if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('invalid_loyalty_point_value');
