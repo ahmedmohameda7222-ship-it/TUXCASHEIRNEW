@@ -1190,8 +1190,10 @@ test('S4 role change pending approval is shown as not applied', async ({ page })
   await sheet.getByLabel('Admin PIN for staff changes').fill('1234');
   await sheet.getByRole('button', { name: 'Confirm change' }).click();
   await expect.poll(() => requests).toBe(1);
-  await expect(page.getByRole('status')).toContainText(
-    'Pending second-person approval; the change has not been applied',
-  );
+  await expect(
+    page
+      .getByRole('status')
+      .filter({ hasText: 'Pending second-person approval; the change has not been applied' }),
+  ).toHaveCount(1);
   await expect(page.getByRole('article', { name: 'Employee Mona Ali' })).toContainText('Staff');
 });
