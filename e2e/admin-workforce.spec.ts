@@ -103,6 +103,14 @@ async function mockWorkforce(page: Page, withAccount = true) {
     });
   });
 
+  await page.route('**/api/admin/reauth', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, reauthenticatedAt: '2026-10-28T09:00:00.000Z' }),
+    });
+  });
+
   await page.route('**/api/admin/staff**', async (route: Route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -316,6 +324,7 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
   await page.getByLabel('Expected amount (EGP)').fill('1200');
   await page.getByLabel('Paid amount (EGP)').fill('1200');
   await page.getByLabel('Payment date').fill('2026-09-30');
+  await page.getByLabel('Admin PIN for staff payment').fill('1234');
   await page.getByRole('button', { name: 'Record payment' }).click();
 
   await expect.poll(() => commands.length).toBe(1);
@@ -420,6 +429,7 @@ test('S3 payment records exact safe minor units without floating-point rounding 
   await page.getByLabel('Expected amount (EGP)').fill('90071992547409.90');
   await page.getByLabel('Paid amount (EGP)').fill('90071992547409.90');
   await page.getByLabel('Payment date').fill('2026-10-31');
+  await page.getByLabel('Admin PIN for staff payment').fill('1234');
   await page.getByRole('button', { name: 'Record payment' }).click();
   await expect.poll(() => commands.length).toBe(1);
   expect(commands[0]).toMatchObject({
