@@ -1,3 +1,4 @@
+import { ADMIN_PERMISSIONS, type AdminPermission, type AdminRole, type EmployeeDetail } from '@tux/admin-contracts';
 import { useMemo, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
 
@@ -6,6 +7,7 @@ import { AdminMetricStrip } from '../components/layout/AdminMetricStrip';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
+import { adminFetch } from '../lib/adminApi';
 import { AdminDialog } from '../components/overlay/AdminDialog';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { EmployeeDetailPage, type StaffDetailSection } from './EmployeeDetailPage';
@@ -94,6 +96,11 @@ export function StaffPage() {
   const [onboardingPinApplied, setOnboardingPinApplied] = useState(false);
   const [provisionedShopIds, setProvisionedShopIds] = useState<string[]>([]);
   const [onboardingApprovalPending, setOnboardingApprovalPending] = useState(false);
+  const [accessApprovalPending, setAccessApprovalPending] = useState(false);
+  const [newEmployeeRole, setNewEmployeeRole] = useState<'STAFF' | 'MANAGER' | 'ADMIN'>('STAFF');
+  const [newEmployeePermissionOverrides, setNewEmployeePermissionOverrides] = useState<
+    Partial<Record<AdminPermission, 'ALLOW' | 'DENY'>>
+  >({});
   const [onboardingBusy, setOnboardingBusy] = useState(false);
   const [onboardingError, setOnboardingError] = useState<string | null>(null);
   const [newEmployeeCompensationType, setNewEmployeeCompensationType] = useState<
@@ -222,6 +229,9 @@ export function StaffPage() {
         setAssignedShopIds([...completed]);
       }
 
+      // The actor PIN is ephemeral for this submit. State is cleared after the protected PIN
+      // mutation; it is never persisted and is only reused for additional server reauth calls.
+      const authorizationPin = setupAdminPin;
       const requestedPinSetup =
         Boolean(newEmployeePin) || onboardingPinApplied || onboardingApprovalPending;
       if (newEmployeePin && !onboardingPinApplied) {
@@ -277,6 +287,70 @@ export function StaffPage() {
         setOnboardingApprovalPending(false);
       }
 
+      const requestedOverrides = Object.entries(newEmployeePermissionOverrides).filter(
+        (entry): entry is [AdminPermission, 'ALLOW' | 'DENY'] =>
+          entry[1] === 'ALLOW' || entry[1] === 'DENY',
+      );
+      if ((newEmployeeRole !== 'STAFF' || requestedOverrides.length > 0) && canProvisionWorker) {
+        const loadAccess = async (): Promise<EmployeeDetail> => {
+          const response = await adminFetch<{ employee: EmployeeDetail }>(
+            `/api/admin/staff?shopId=${encodeURIComponent(shopId)}&employeeId=${encodeURIComponent(employeeId)}`,
+          );
+          return response.employee;
+        };
+        let actual = await loadAccess();
+        if (actual.role !== newEmployeeRole) {
+          if (!authorizationPin) throw new Error('admin_pin_required_for_access_changes');
+          const result = await staff.sensitiveCommand.mutateAsync({
+            draft: {
+              type: 'employee.role',
+              employeeId,
+              shopId,
+              role: newEmployeeRole as AdminRole,
+              expectedVersion: actual.profileVersion,
+            },
+            pin: authorizationPin,
+          });
+          if (result.state === 'PENDING_APPROVAL') {
+            setAccessApprovalPending(true);
+            throw new Error('employee_access_awaiting_second_person_approval');
+          }
+          actual = await loadAccess();
+          if (actual.role !== newEmployeeRole) throw new Error('employee_role_not_yet_confirmed');
+        }
+
+        for (const [permissionKey, effect] of requestedOverrides) {
+          const actualEffect = actual.customPermissions.includes(permissionKey)
+            ? 'ALLOW'
+            : actual.customDeniedPermissions?.includes(permissionKey)
+              ? 'DENY'
+              : 'INHERIT';
+          if (actualEffect === effect) continue;
+          if (!authorizationPin) throw new Error('admin_pin_required_for_access_changes');
+          const result = await staff.sensitiveCommand.mutateAsync({
+            draft: {
+              type: 'employee.permission',
+              employeeId,
+              shopId,
+              permissionKey,
+              effect,
+              expectedVersion: actual.profileVersion,
+            },
+            pin: authorizationPin,
+          });
+          if (result.state === 'PENDING_APPROVAL') {
+            setAccessApprovalPending(true);
+            throw new Error('employee_access_awaiting_second_person_approval');
+          }
+          actual = await loadAccess();
+          const confirmed = effect === 'ALLOW'
+            ? actual.customPermissions.includes(permissionKey)
+            : actual.customDeniedPermissions?.includes(permissionKey);
+          if (!confirmed) throw new Error('employee_permission_not_yet_confirmed');
+        }
+        setAccessApprovalPending(false);
+      }
+
       if (rateMinor !== null && !compensationApplied) {
         const result = await staff.command.mutateAsync({
           type: 'compensation.set',
@@ -310,6 +384,9 @@ export function StaffPage() {
       setProvisionedShopIds([]);
       setOnboardingPinApplied(false);
       setOnboardingApprovalPending(false);
+      setAccessApprovalPending(false);
+      setNewEmployeeRole('STAFF');
+      setNewEmployeePermissionOverrides({});
       setPinCommandId(crypto.randomUUID());
       setNewEmployeePin('');
       setConfirmEmployeePin('');
@@ -359,7 +436,7 @@ export function StaffPage() {
         ) {
           throw new Error('employee_PIN_required_for_Operations_readiness');
         }
-        if (newEmployeePin || confirmEmployeePin || setupAdminPin) {
+        if (!onboardingPinApplied && !onboardingApprovalPending && (newEmployeePin || confirmEmployeePin || setupAdminPin)) {
           if (!canProvisionWorker) throw new Error('owner_admin_required_for_operations_setup');
           if (!/^\d{4,12}$/.test(newEmployeePin)) throw new Error('invalid_employee_pin_format');
           if (newEmployeePin !== confirmEmployeePin) throw new Error('employee_pin_mismatch');
@@ -402,6 +479,9 @@ export function StaffPage() {
               setInitialShiftCreated(false);
               setOnboardingPinApplied(false);
               setOnboardingApprovalPending(false);
+              setAccessApprovalPending(false);
+              setNewEmployeeRole('STAFF');
+              setNewEmployeePermissionOverrides({});
               setNewEmployeePin('');
               setConfirmEmployeePin('');
               setSetupAdminPin('');
@@ -791,7 +871,7 @@ export function StaffPage() {
                         inputMode="numeric"
                         autoComplete="off"
                         value={setupAdminPin}
-                        disabled={onboardingPinApplied || onboardingApprovalPending}
+                        disabled={onboardingBusy}
                         onChange={(event) => setSetupAdminPin(event.currentTarget.value)}
                       />
                     </label>
