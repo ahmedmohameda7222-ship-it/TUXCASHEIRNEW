@@ -6,6 +6,8 @@ on:
       - '.github/workflows/temporary-staff-exact-prettier.yml'
       - 'apps/admin/src/staff/**'
       - 'e2e/admin-workforce.spec.ts'
+      - 'apps/admin/server/staff/**'
+      - 'packages/admin-contracts/src/staff.ts'
 
 permissions:
   contents: read
@@ -32,7 +34,8 @@ jobs:
             apps/admin/src/staff/StaffPaymentPage.tsx \
             apps/admin/src/staff/staffSummaryMetrics.ts \
             apps/admin/src/staff/staffSummaryMetrics.test.ts \
-            e2e/admin-workforce.spec.ts
+            e2e/admin-workforce.spec.ts \
+            apps/admin/server/staff/staffStore.ts
           for file in \
             apps/admin/src/staff/StaffPage.tsx \
             apps/admin/src/staff/EmployeeDetailPage.tsx \
@@ -42,7 +45,8 @@ jobs:
             apps/admin/src/staff/StaffPaymentPage.tsx \
             apps/admin/src/staff/staffSummaryMetrics.ts \
             apps/admin/src/staff/staffSummaryMetrics.test.ts \
-            e2e/admin-workforce.spec.ts
+            e2e/admin-workforce.spec.ts \
+            apps/admin/server/staff/staffStore.test.ts
           do
             echo "===FORMATTED_START:${file}==="
             cat "${file}"
