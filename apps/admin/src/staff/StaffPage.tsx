@@ -486,7 +486,9 @@ export function StaffPage() {
                     onChange={(event) => setNewEmployeeNotes(event.currentTarget.value)}
                   />
                 </label>
-                <p>New employees start as Staff. Elevated access requires an approved role change.</p>
+                <p>
+                  New employees start as Staff. Elevated access requires an approved role change.
+                </p>
               </>
             ) : null}
             {onboardingStep === 'shops' ? (
@@ -548,19 +550,46 @@ export function StaffPage() {
                     onChange={(event) => setNewEmployeeEffectiveFrom(event.target.value)}
                   />
                 </label>
-                <p>Operations worker and PIN setup must be completed through the protected employee access workflow.</p>
+                <p>
+                  Operations worker and PIN setup must be completed through the protected employee
+                  access workflow.
+                </p>
               </>
             ) : null}
             {onboardingStep === 'review' ? (
-              <section className="admin-staff-onboarding-review" aria-label="Employee onboarding review">
+              <section
+                className="admin-staff-onboarding-review"
+                aria-label="Employee onboarding review"
+              >
                 <h3>Review employee setup</h3>
-                <p><strong>{newEmployeeName.trim()}</strong> · Staff</p>
+                <p>
+                  <strong>{newEmployeeName.trim()}</strong> · Staff
+                </p>
                 <p>{newEmployeePhone.trim() || 'No phone provided'}</p>
                 <p>{newEmployeeHireDate || 'Hire date not provided'}</p>
-                <p>Assigned shops: {onboardingShopIds.map((id) => onboardingShops.find((shop) => shop.id === id)?.name ?? 'Current shop').join(', ')}</p>
-                <p>{newEmployeeRate.trim() ? 'Compensation will be recorded using the selected rate and effective date.' : 'Compensation will be configured later.'}</p>
-                <p>After creation, complete Operations worker/PIN readiness and any elevated permissions in the employee profile.</p>
-                {createdEmployeeId ? <p>Profile created. Resume remaining setup without creating a duplicate employee.</p> : null}
+                <p>
+                  Assigned shops:{' '}
+                  {onboardingShopIds
+                    .map(
+                      (id) =>
+                        onboardingShops.find((shop) => shop.id === id)?.name ?? 'Current shop',
+                    )
+                    .join(', ')}
+                </p>
+                <p>
+                  {newEmployeeRate.trim()
+                    ? 'Compensation will be recorded using the selected rate and effective date.'
+                    : 'Compensation will be configured later.'}
+                </p>
+                <p>
+                  After creation, complete Operations worker/PIN readiness and any elevated
+                  permissions in the employee profile.
+                </p>
+                {createdEmployeeId ? (
+                  <p>
+                    Profile created. Resume remaining setup without creating a duplicate employee.
+                  </p>
+                ) : null}
               </section>
             ) : null}
             {onboardingError || staff.command.isError ? (
@@ -596,7 +625,9 @@ export function StaffPage() {
               <button
                 className="admin-primary-button"
                 type="submit"
-                disabled={onboardingBusy || (onboardingStep === 'identity' && !newEmployeeName.trim())}
+                disabled={
+                  onboardingBusy || (onboardingStep === 'identity' && !newEmployeeName.trim())
+                }
               >
                 {onboardingStep === 'review'
                   ? createdEmployeeId
