@@ -15,7 +15,7 @@ describe('staff Round 2 presentation', () => {
     expect(page).not.toContain('`Shop ${index + 1}`');
     expect(page).not.toContain('{employee.role}');
     for (const label of [
-      'Profile',
+      'Overview',
       'Schedule',
       'Attendance',
       'Leave',
