@@ -114,6 +114,45 @@ function render(order: AdminOrderDetail, canViewDelivery = false): string {
 }
 
 describe('OrderDetailPage', () => {
+  it('prioritizes real customer and fulfillment above detailed items, and moves immutable identity to a disclosure', () => {
+    const html = render(fixture);
+    expect(html).toContain('Order #42');
+    expect(html).toContain('Full order identity and references');
+    expect(html.indexOf('id="order-detail-customer"')).toBeLessThan(
+      html.indexOf('id="order-detail-items"'),
+    );
+    expect(html.indexOf('id="order-detail-fulfillment"')).toBeLessThan(
+      html.indexOf('id="order-detail-items"'),
+    );
+    expect(html).toContain('11111111-1111-4111-8111-111111111111');
+    expect(html).toContain('Business day: Not available');
+  });
+
+  it('provides six accessible inspector landmarks without concealing financial or inventory chronology', () => {
+    const html = render({ ...fixture, status: 'DONE' });
+    const navigation = html.match(
+      /<nav[^>]*aria-label="Order detail sections"[^>]*>(.*?)<\/nav>/s,
+    )?.[1];
+    expect(navigation).toBeDefined();
+    const anchors = [
+      ['Overview', '#order-detail-overview'],
+      ['Items', '#order-detail-items'],
+      ['Payments', '#order-detail-payments'],
+      ['Customer', '#order-detail-customer'],
+      ['Fulfillment', '#order-detail-fulfillment'],
+      ['History', '#order-detail-history'],
+    ] as const;
+    for (const [label, href] of anchors) {
+      expect(navigation).toContain(`href="${href}"`);
+      expect(navigation).toContain(`>${label}</a>`);
+      expect(html).toContain(`id="${href.slice(1)}"`);
+    }
+    expect(html).toContain('Financial corrections');
+    expect(html).toContain('Inventory effect');
+    expect(html).toContain('Administrative history');
+    expect(html).not.toContain('New order</button>');
+  });
+
   it('shows scoped delivery status, assigned rider and immutable transition timestamps', () => {
     const html = render(
       {

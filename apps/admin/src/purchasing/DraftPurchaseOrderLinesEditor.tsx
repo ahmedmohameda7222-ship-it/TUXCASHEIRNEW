@@ -3,6 +3,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import {
   calculatePurchaseOrderSubtotalMinor,
   formatPurchaseMicros,
+  formatPurchaseMoneyMinor,
   parsePurchaseDecimalMicros,
   parsePurchaseMoneyMinor,
   validatePurchaseOrderLines,
@@ -54,7 +55,7 @@ export function DraftPurchaseOrderLinesEditor({
       inventoryItemId: line.inventoryItemId,
       purchaseUnitLabel: line.purchaseUnitLabel,
       quantity: formatPurchaseMicros(line.orderedPurchaseUnitsMicros),
-      cost: formatPurchaseMicros(line.expectedPurchaseUnitCostMinor * 10_000),
+      cost: formatPurchaseMoneyMinor(line.expectedPurchaseUnitCostMinor),
     })),
   );
   const [error, setError] = useState<string | null>(null);

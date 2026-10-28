@@ -11,6 +11,7 @@ import { ADMIN_CORE_VIEWPORTS } from './adminViewports';
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const otherShopId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const itemId = '11111111-1111-4111-8111-111111111111';
+const alphabeticalFirstItemId = '88888888-8888-4888-8888-888888888888';
 const adjustmentReasonId = '22222222-2222-4222-8222-222222222222';
 const wasteReasonId = '33333333-3333-4333-8333-333333333333';
 const csrfToken = 'i'.repeat(64);
@@ -46,6 +47,12 @@ async function mockInventory(
     failureCode?: string;
     failureCodesByCommand?: Readonly<Record<string, string>>;
     itemActive?: boolean;
+    includeAlphabeticalFirst?: boolean;
+    includePurchaseConversion?: boolean;
+    exactThresholdMicros?: number;
+    includeSecondTrackedItem?: boolean;
+    allowStaleItemHistory?: boolean;
+    pendingAdjustment?: boolean;
   } = {},
 ) {
   const commands: InventoryCommand[] = [];
@@ -84,12 +91,23 @@ async function mockInventory(
       }
       const requestedInventoryItemId = url.searchParams.get('inventoryItemId');
       if (requestedInventoryItemId !== null) {
-        expect(requestedInventoryItemId).toBe(itemId);
+        if (options.allowStaleItemHistory && requestedInventoryItemId !== itemId) {
+          await route.fulfill({
+            status: 404,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: 'inventory_item_not_found' }),
+          });
+          return;
+        }
+        if (requestedInventoryItemId !== itemId) {
+          expect(options.includeAlphabeticalFirst).toBe(true);
+          expect(requestedInventoryItemId).toBe(alphabeticalFirstItemId);
+        }
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            inventoryItemId: itemId,
+            inventoryItemId: requestedInventoryItemId,
             history: [
               {
                 id: '66666666-6666-4666-8666-666666666666',
@@ -125,7 +143,58 @@ async function mockInventory(
               availableMicros: onHandMicros - reservedMicros,
               weightedUnitCostMinor: 12000,
               history: [],
+              ...(options.exactThresholdMicros === undefined
+                ? {}
+                : { lowStockThresholdMicros: options.exactThresholdMicros }),
+              ...(options.includePurchaseConversion
+                ? {
+                    definitionVersion: 7,
+                    conversions: [
+                      {
+                        id: '66666666-6666-4666-8666-666666666667',
+                        inventoryItemId: itemId,
+                        purchaseUnitLabel: 'case',
+                        baseMicrosPerPurchaseUnit: 12_000_000,
+                        active: true,
+                        definitionVersion: 3,
+                      },
+                    ],
+                  }
+                : {}),
             },
+            ...(options.includeSecondTrackedItem
+              ? [
+                  {
+                    id: '99999999-9999-4999-8999-999999999998',
+                    name: 'Rice',
+                    unitLabel: 'g',
+                    trackingMode: 'RECIPE_TRACKED',
+                    active: true,
+                    definitionVersion: 1,
+                    onHandMicros: 1_000_000,
+                    reservedMicros: 0,
+                    availableMicros: 1_000_000,
+                    weightedUnitCostMinor: 0,
+                    history: [],
+                  },
+                ]
+              : []),
+            ...(options.includeAlphabeticalFirst
+              ? [
+                  {
+                    id: alphabeticalFirstItemId,
+                    name: 'Apple',
+                    unitLabel: 'kg',
+                    trackingMode: 'RECIPE_TRACKED',
+                    active: true,
+                    onHandMicros: 2_000_000,
+                    reservedMicros: 0,
+                    availableMicros: 2_000_000,
+                    weightedUnitCostMinor: 12000,
+                    history: [],
+                  },
+                ]
+              : []),
           ],
           reasonCodes: [
             {
@@ -207,6 +276,14 @@ async function mockInventory(
       return;
     }
 
+    if (command.type === 'adjust' && options.pendingAdjustment) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, idempotentReplay: false, state: 'PENDING_APPROVAL' }),
+      });
+      return;
+    }
     if (command.type === 'adjust') {
       onHandMicros += Number(command.quantityDeltaMicros);
     }
@@ -255,6 +332,267 @@ async function mockInventory(
 
   return { commands };
 }
+
+test('I1 desktop inventory defaults to the first authorized item and approved action order', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 940 });
+  await mockInventory(page);
+  await page.goto('/inventory');
+  await expect(page.getByLabel('Inventory item detail')).toBeVisible();
+  await expect(page.locator('.admin-inventory-row.is-selected')).toContainText('Beef');
+
+  const actions = await page
+    .locator('.admin-inventory-page-actions')
+    .evaluate((container) =>
+      Array.from(container.children, (child) =>
+        child.tagName === 'DETAILS'
+          ? child.querySelector('summary')?.textContent?.trim()
+          : child.textContent?.trim(),
+      ),
+    );
+  expect(actions).toEqual(['Export CSV', 'Stock count', 'More actions', 'Add inventory item']);
+  await page.screenshot({ path: 'test-results/inventory-i1-desktop-1440.png' });
+});
+
+test('I1 desktop selects the alphabetically first displayed item, not the API row order', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 940 });
+  await mockInventory(page, { includeAlphabeticalFirst: true });
+  await page.goto('/inventory');
+  await expect(page.locator('.admin-inventory-row').first()).toContainText('Apple');
+  await expect(page.locator('.admin-inventory-row.is-selected')).toContainText('Apple');
+  await expect(page.getByLabel('Inventory item detail')).toContainText('Apple');
+});
+
+test('I1 mobile-first phone shows a complete first item above fixed navigation', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page);
+  await page.goto('/inventory');
+
+  const first = page
+    .getByRole('region', { name: 'Inventory items' })
+    .locator('.admin-inventory-row')
+    .first();
+  await expect(first).toContainText('Beef');
+  await expect(first).toContainText('kg');
+  await expect(first).toContainText('In stock');
+  const rowBox = await first.boundingBox();
+  expect(rowBox).not.toBeNull();
+  expect(rowBox!.y + rowBox!.height).toBeLessThanOrEqual(844 - 72);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
+test('I1 phone opens the inventory list without forcing an inspector route', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page);
+  await page.goto('/inventory');
+  await expect(page.getByRole('region', { name: 'Inventory items' })).toBeVisible();
+  await expect(page.getByLabel('Inventory item detail')).toBeHidden();
+  await page.screenshot({ path: 'test-results/inventory-i1-mobile-390.png' });
+});
+
+test('I1 mobile item detail replaces the directory header with a visible single-pane inspector', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page);
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+
+  const inspector = page.getByLabel('Inventory item detail');
+  const itemHeading = inspector.getByRole('heading', { name: 'Beef' });
+  await expect(itemHeading).toBeVisible();
+  await expect(page.getByRole('link', { name: /back to inventory items/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeHidden();
+  const headingBox = await itemHeading.boundingBox();
+  expect(headingBox).not.toBeNull();
+  expect(headingBox!.y).toBeLessThan(240);
+  await page.screenshot({ path: 'test-results/inventory-i1-item-detail-mobile-390.png' });
+});
+
+test('I1 360px inspector keeps all three balance cards on one readable row', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await mockInventory(page);
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+
+  const cards = page.locator('.inventory-balance-grid > div');
+  await expect(cards).toHaveCount(3);
+  const topEdges = await cards.evaluateAll((elements) =>
+    elements.map((element) => element.getBoundingClientRect().top),
+  );
+  expect(Math.max(...topEdges) - Math.min(...topEdges)).toBeLessThanOrEqual(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.screenshot({ path: 'test-results/inventory-i1-item-detail-mobile-360.png' });
+});
+
+test('I2 mobile create and edit forms are focused above the directory and restore context', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page);
+  await page.goto('/inventory');
+
+  await page.getByRole('button', { name: 'Add inventory item' }).click();
+  const addEditor = page.getByRole('region', { name: 'Add inventory item' });
+  await expect(addEditor.getByLabel('Item name')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeHidden();
+  const addBox = await addEditor.getByLabel('Item name').boundingBox();
+  expect(addBox).not.toBeNull();
+  expect(addBox!.y).toBeLessThan(290);
+  await page.screenshot({ path: 'test-results/inventory-i2-add-mobile-390.png' });
+  await addEditor.getByRole('button', { name: 'Close' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible();
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+  await page.getByRole('button', { name: 'Edit item' }).click();
+
+  const editEditor = page.getByRole('region', { name: 'Edit inventory item' });
+  await expect(editEditor.getByLabel('Item name')).toHaveValue('Beef');
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeHidden();
+  const editBox = await editEditor.getByLabel('Item name').boundingBox();
+  expect(editBox).not.toBeNull();
+  expect(editBox!.y).toBeLessThan(290);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.screenshot({ path: 'test-results/inventory-i2-edit-mobile-390.png' });
+  await editEditor.getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByLabel('Inventory item detail')).toBeVisible();
+});
+
+test('I2 rejects case-insensitive duplicate purchase-unit labels before any command', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page, { includePurchaseConversion: true });
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+  await page.getByRole('button', { name: 'Edit item' }).click();
+
+  const editor = page.getByRole('region', { name: 'Edit inventory item' });
+  await expect(editor).toContainText('case');
+  await editor.getByRole('button', { name: 'Add purchase unit' }).click();
+  await editor.getByLabel('Purchase unit label').fill('CASE');
+  await editor.getByLabel('Base units per purchase unit').fill('12');
+  await editor.getByRole('button', { name: 'Save purchase unit' }).click();
+
+  await expect(editor.getByRole('alert')).toContainText(/already exists/i);
+  expect(commands).toHaveLength(0);
+});
+
+test('I2 preserves exact six-decimal threshold micros after edit form initialization', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page, { exactThresholdMicros: Number.MAX_SAFE_INTEGER });
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+  await page.getByRole('button', { name: 'Edit item' }).click();
+
+  await expect(
+    page
+      .getByRole('region', { name: 'Edit inventory item' })
+      .getByLabel('Low-stock threshold (base units)'),
+  ).toHaveValue('9007199254.740991');
+});
+
+test('I2 create submits accurate zero threshold and tracking selection without stock overwrite', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page);
+  await page.goto('/inventory');
+  await page.getByRole('button', { name: 'Add inventory item' }).click();
+  const editor = page.getByRole('region', { name: 'Add inventory item' });
+  await editor.getByLabel('Item name').fill('Minced beef');
+  await editor.getByLabel('Base unit', { exact: true }).fill('kg');
+  await editor.getByLabel('Tracking mode').selectOption('BULK_MANUAL');
+  await editor.getByLabel('Low-stock threshold (base units)').fill('0');
+  await editor.getByRole('button', { name: 'Create inventory item' }).click();
+
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'item.create',
+    entityId: null,
+    expectedVersion: null,
+    payload: {
+      name: 'Minced beef',
+      unitLabel: 'kg',
+      trackingMode: 'BULK_MANUAL',
+      lowStockThresholdMicros: 0,
+    },
+  });
+  expect(JSON.stringify(commands[0])).not.toContain('onHandMicros');
+});
+
+test('I2 edit archive and conversion commands keep independent optimistic versions', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page, { includePurchaseConversion: true });
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+  await page.getByRole('button', { name: 'Edit item' }).click();
+
+  const editor = page.getByRole('region', { name: 'Edit inventory item' });
+  await editor.getByLabel('Low-stock threshold (base units)').fill('0.000001');
+  await editor.getByRole('button', { name: 'Save item' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'item.update',
+    entityId: itemId,
+    expectedVersion: 7,
+    payload: { lowStockThresholdMicros: 1, unitLabel: 'kg', trackingMode: 'RECIPE_TRACKED' },
+  });
+
+  await editor.getByRole('button', { name: 'Edit', exact: true }).click();
+  await editor.getByLabel('Purchase unit label').fill('carton');
+  await editor.getByLabel('Base units per purchase unit').fill('12.5');
+  await editor.getByRole('button', { name: 'Save purchase unit' }).click();
+  await expect.poll(() => commands.length).toBe(2);
+  expect(commands[1]).toMatchObject({
+    type: 'conversion.update',
+    entityId: '66666666-6666-4666-8666-666666666667',
+    expectedVersion: 3,
+    payload: { purchaseUnitLabel: 'carton', baseMicrosPerPurchaseUnit: 12_500_000 },
+  });
+
+  await editor.getByRole('button', { name: 'Archive inventory item' }).click();
+  await expect.poll(() => commands.length).toBe(3);
+  expect(commands[2]).toMatchObject({
+    type: 'item.archive',
+    entityId: itemId,
+    expectedVersion: 7,
+    payload: {},
+  });
+});
 
 test('inventory renders on-hand, reserved, available, history, and action entry points', async ({
   page,
@@ -361,6 +699,31 @@ test('inventory clears an older mutation error after a later action succeeds', a
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
+test('I4 mobile replenishment rejects sub-micro policy values instead of silently rounding', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page);
+  await page.goto('/inventory');
+  await page.getByText('More actions', { exact: true }).click();
+  await page.getByRole('button', { name: 'Reorder suggestions' }).click();
+  await page.getByRole('button', { name: 'Edit policy for Beef' }).click();
+
+  await page.getByLabel('Par level (kg)').fill('0.0000004');
+  await page.getByRole('button', { name: 'Save policy' }).click();
+  await expect(page.getByRole('alert')).toContainText('valid non-negative quantities');
+  expect(commands).toHaveLength(0);
+
+  await page.getByLabel('Par level (kg)').fill('0.000001');
+  await page.getByRole('button', { name: 'Save policy' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'replenishment.update',
+    inventoryItemId: itemId,
+    parLevelMicros: 1,
+  });
+});
+
 test('replenishment save submits the workspace version the admin actually edited', async ({
   page,
 }) => {
@@ -419,6 +782,177 @@ test('inventory adjustment and waste use structured reasons through the trusted 
   });
 });
 
+test('I3 mobile Adjust and Waste sheets show the current available stock before posting', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page);
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+
+  await page.getByRole('button', { name: 'Adjust stock' }).click();
+  const adjust = page.getByRole('dialog', { name: 'Adjust stock' });
+  await expect(adjust).toContainText('Beef · Available 2.1 kg');
+  await expect(adjust.getByRole('button', { name: 'Post adjustment' })).toBeDisabled();
+  await adjust.getByRole('button', { name: 'Cancel' }).click();
+
+  await page.getByRole('button', { name: 'Record waste' }).click();
+  const waste = page.getByRole('dialog', { name: /Record waste/i });
+  await expect(waste).toContainText('Beef · Available 2.1 kg');
+  await expect(waste.getByRole('button', { name: 'Post waste' })).toBeDisabled();
+});
+
+test('I3 adjust and waste reject fractional micros instead of rounding a stock movement', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page);
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+
+  await page.getByRole('button', { name: 'Adjust stock' }).click();
+  const adjustment = page.getByLabel('Quantity change');
+  await adjustment.fill('0.0000005');
+  await expect(page.getByRole('button', { name: 'Post adjustment' })).toBeDisabled();
+  await adjustment.fill('-0.0000005');
+  await expect(page.getByRole('button', { name: 'Post adjustment' })).toBeDisabled();
+  await adjustment.fill('-0.000001');
+  await expect(page.getByRole('button', { name: 'Post adjustment' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Post adjustment' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'adjust',
+    quantityDeltaMicros: -1,
+    inventoryItemId: itemId,
+    reasonCodeId: adjustmentReasonId,
+  });
+
+  await page.getByRole('button', { name: 'Record waste' }).click();
+  const waste = page.getByLabel('Waste quantity');
+  await waste.fill('0.0000005');
+  await expect(page.getByRole('button', { name: 'Post waste' })).toBeDisabled();
+  await waste.fill('0.0000001');
+  await expect(page.getByRole('button', { name: 'Post waste' })).toBeDisabled();
+  await waste.fill('0.000001');
+  await expect(page.getByRole('button', { name: 'Post waste' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Post waste' }).click();
+  await expect.poll(() => commands.length).toBe(2);
+  expect(commands[1]).toMatchObject({
+    type: 'waste',
+    quantityMicros: 1,
+    inventoryItemId: itemId,
+    reasonCodeId: wasteReasonId,
+  });
+});
+
+test('I3 mobile adjustment pending approval does not post stock or change shown balance', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page, { pendingAdjustment: true });
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+  await page.getByRole('button', { name: 'Adjust stock' }).click();
+
+  await expect(page.getByRole('dialog', { name: 'Adjust stock' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/inventory-i3-adjust-mobile-390.png' });
+  await page.getByLabel('Quantity change').fill('0.25');
+  await page.getByLabel('Adjustment reason').selectOption(adjustmentReasonId);
+  await page.getByRole('button', { name: 'Post adjustment' }).click();
+
+  await expect(page.getByText(/Stock adjustment submitted for approval/)).toBeVisible();
+  await expect(page.getByLabel('Inventory item detail').getByText('3.2 kg')).toBeVisible();
+  expect(commands).toHaveLength(1);
+  expect(commands[0]).toMatchObject({
+    type: 'adjust',
+    quantityDeltaMicros: 250_000,
+    reasonCodeId: adjustmentReasonId,
+  });
+});
+
+test('I3 rejected adjustment retains command ID for exact retry but changes it for new intent', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page, {
+    failCommandType: 'adjust',
+    failureCode: 'inventory_conflict',
+  });
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+  await page.getByRole('button', { name: 'Adjust stock' }).click();
+  await page.getByLabel('Quantity change').fill('0.5');
+  const submit = page.getByRole('button', { name: 'Post adjustment' });
+  await submit.click();
+  await expect.poll(() => commands.length).toBe(1);
+  await submit.click();
+  await expect.poll(() => commands.length).toBe(2);
+  expect(commands[0]?.commandId).toBe(commands[1]?.commandId);
+  await page.getByLabel('Quantity change').fill('0.6');
+  await submit.click();
+  await expect.poll(() => commands.length).toBe(3);
+  expect(commands[2]?.commandId).not.toBe(commands[1]?.commandId);
+  await expect(page.getByLabel('Inventory item detail').getByText('3.2 kg')).toBeVisible();
+});
+
+test('I3 390px adjustment and waste dialogs keep labeled selects and action footers accessible', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page);
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+
+  for (const [openLabel, title, selectLabel, submitLabel, filename] of [
+    ['Adjust stock', 'Adjust stock', 'Adjustment reason', 'Post adjustment', 'adjust'],
+    ['Record waste', 'Record waste for Beef', 'Waste reason', 'Post waste', 'waste'],
+  ] as const) {
+    await page.getByRole('button', { name: openLabel }).click();
+    const dialog = page.getByRole('dialog', { name: title });
+    await expect(dialog).toBeVisible();
+    const reasonText = dialog.getByText(selectLabel, { exact: true });
+    const reasonInput = dialog.getByLabel(selectLabel);
+    const labelBox = await reasonText.boundingBox();
+    const inputBox = await reasonInput.boundingBox();
+    expect(labelBox).not.toBeNull();
+    expect(inputBox).not.toBeNull();
+    expect(inputBox!.y).toBeGreaterThanOrEqual(labelBox!.y + labelBox!.height + 4);
+
+    const footer = dialog.locator('.admin-dialog__footer');
+    await expect(footer.getByRole('button', { name: submitLabel })).toBeVisible();
+    await expect(footer.getByRole('button', { name: 'Cancel' })).toBeVisible();
+    const dialogBox = await dialog.boundingBox();
+    const footerBox = await footer.boundingBox();
+    expect(dialogBox).not.toBeNull();
+    expect(footerBox).not.toBeNull();
+    expect(footerBox!.y + footerBox!.height).toBeLessThanOrEqual(
+      dialogBox!.y + dialogBox!.height + 1,
+    );
+    await page.screenshot({
+      path: 'test-results/inventory-i3-' + filename + '-sheet-mobile-390.png',
+    });
+    await footer.getByRole('button', { name: 'Cancel' }).click();
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
 test('inventory stocktake shows business quantities and preserves count authority', async ({
   page,
 }) => {
@@ -459,6 +993,26 @@ test('inventory stocktake shows business quantities and preserves count authorit
     stocktakeId: '99999999-9999-4999-8999-999999999999',
     lines: [{ inventoryItemId: itemId, actualCountMicros: 3_000_000 }],
   });
+});
+
+test('I4 clears accepted mobile transfer draft to block repeat sends', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page);
+  await page.goto('/inventory');
+  await page.getByText('More actions', { exact: true }).click();
+  await page.getByRole('button', { name: 'Transfer stock' }).click();
+  await page.getByLabel('Quantity (base units)').fill('0.000001');
+  await page.getByRole('button', { name: 'Add to transfer' }).click();
+  await page.getByRole('button', { name: 'Review transfer' }).click();
+  await page.getByRole('button', { name: 'Confirm send' }).click();
+
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({ type: 'transfer.send' });
+  await expect(page.getByRole('button', { name: 'Confirm send' })).toHaveCount(0);
+  await expect(page.getByText('Draft items (0)')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
 });
 
 test('inventory can receive a sent inter-shop transfer without using purchasing receive', async ({
@@ -570,6 +1124,174 @@ for (const viewport of premiumVisualViewports([{ name: 'desktop', width: 1440, h
     },
   );
 }
+
+test('I2 restores an archived definition through the trusted versioned command', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page, {
+    itemActive: false,
+    includePurchaseConversion: true,
+  });
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+  await page.getByRole('button', { name: 'Edit item' }).click();
+  await page.getByRole('button', { name: 'Restore inventory item' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'item.restore',
+    entityId: itemId,
+    expectedVersion: 7,
+    payload: {},
+  });
+});
+
+test('I2 creates exact micro conversion through trusted inventory definition command', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { commands } = await mockInventory(page);
+  await page.goto('/inventory');
+  await page
+    .getByRole('region', { name: 'Inventory items' })
+    .getByRole('button', { name: /Beef/ })
+    .click();
+  await page.getByRole('button', { name: 'Edit item' }).click();
+  const editor = page.getByRole('region', { name: 'Edit inventory item' });
+  await editor.getByRole('button', { name: 'Add purchase unit' }).click();
+  await editor.getByLabel('Purchase unit label').fill('box');
+  await editor.getByLabel('Base units per purchase unit').fill('12.000001');
+  await editor.getByRole('button', { name: 'Save purchase unit' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'conversion.create',
+    entityId: null,
+    expectedVersion: null,
+    payload: {
+      inventoryItemId: itemId,
+      purchaseUnitLabel: 'box',
+      baseMicrosPerPurchaseUnit: 12_000_001,
+    },
+  });
+});
+
+test('I2 recipe master controls stay hidden for Manager even with composite permissions', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page);
+  await page.route('**/api/admin/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...ownerSession,
+        principal: {
+          ...ownerSession.principal,
+          role: 'MANAGER',
+          permissions: [...ownerSession.principal.permissions, 'catalog.edit'],
+        },
+      }),
+    });
+  });
+  await page.goto('/inventory');
+  await page.getByText('More actions', { exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Manage recipe master bindings' })).toHaveCount(0);
+});
+
+test('I2 stale item detail link cannot expose a foreign inventory record or edit actions', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page, { allowStaleItemHistory: true });
+  await page.goto('/inventory/ffffffff-ffff-4fff-8fff-ffffffffffff');
+  const detail = page.getByLabel('Inventory item detail');
+  await expect(detail).toContainText('Inventory item unavailable');
+  await expect(detail.getByRole('button', { name: 'Edit item' })).toHaveCount(0);
+  await expect(detail.getByRole('button', { name: 'Adjust stock' })).toHaveCount(0);
+});
+
+test('I2 mobile master mapping clears incompatible preview after source-unit switch', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockInventory(page, { includeSecondTrackedItem: true });
+  await page.route('**/api/admin/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...ownerSession,
+        principal: {
+          ...ownerSession.principal,
+          permissions: [...ownerSession.principal.permissions, 'catalog.edit'],
+        },
+      }),
+    });
+  });
+  const posted: unknown[] = [];
+  await page.route('**/api/admin/inventory**', async (route) => {
+    const request = route.request();
+    if (
+      request.method() === 'GET' &&
+      new URL(request.url()).searchParams.get('view') === 'master-bindings'
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          shopId,
+          masters: [
+            {
+              id: '77777777-7777-4777-8777-777777777771',
+              canonicalName: 'Beef master',
+              baseUnitLabel: 'kg',
+              trackingMode: 'RECIPE_TRACKED',
+              inventoryItemId: null,
+              inventoryItemName: null,
+            },
+            {
+              id: '77777777-7777-4777-8777-777777777772',
+              canonicalName: 'Rice master',
+              baseUnitLabel: 'g',
+              trackingMode: 'RECIPE_TRACKED',
+              inventoryItemId: null,
+              inventoryItemName: null,
+            },
+          ],
+        }),
+      });
+      return;
+    }
+    if (request.method() === 'POST' && request.postDataJSON().type === 'master.bind') {
+      posted.push(request.postDataJSON());
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+      return;
+    }
+    await route.fallback();
+  });
+
+  await page.goto('/inventory');
+  await page.getByText('More actions', { exact: true }).click();
+  await page.getByRole('button', { name: 'Manage recipe master bindings' }).click();
+  await page.getByLabel('Attach to an existing master').check();
+  await page
+    .getByLabel('Existing compatible master')
+    .selectOption('77777777-7777-4777-8777-777777777771');
+  const preview = page.getByRole('region', { name: 'Mapping review' });
+  await expect(preview).toContainText('Beef master (kg)');
+
+  await page.getByLabel('Shop inventory item').selectOption('99999999-9999-4999-8999-999999999998');
+  await expect(preview).toContainText('Rice (g)');
+  await expect(page.getByLabel('Existing compatible master')).toHaveValue('');
+  await expect(preview).toContainText('Select a verified compatible master');
+  await expect(preview).not.toContainText('Beef master (kg)');
+  expect(posted).toHaveLength(0);
+});
 
 for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
   test(`inventory master-detail remains usable at ${viewport.name} width`, async ({ page }) => {

@@ -306,8 +306,8 @@ export function buildProductAdvancedDraft(
   const recipeLines = input.model.inventoryItems.flatMap((item) => {
     const rawQuantity =
       input.recipeState[item.inventoryItemId] ??
-      (item.quantityMicros === null ? '' : String(item.quantityMicros));
-    if (rawQuantity.trim() === '') return [];
+      (item.quantityMicros === null ? '' : formatQuantityMicrosForInput(item.quantityMicros));
+    if (/^0(?:\.0{1,6})?$/.test(rawQuantity.trim()) || rawQuantity.trim() === '') return [];
     return [
       {
         shopId: input.shopId,

@@ -3,7 +3,7 @@ import type { AdminCustomerSegment } from '@tux/admin-contracts';
 export function SegmentsPage({ segments }: { segments: readonly AdminCustomerSegment[] }) {
   return (
     <section className="admin-customer-segments" aria-label="Automatic customer segments">
-      <h3>Automatic segments</h3>
+      <h3>Customer segments</h3>
       {segments.length === 0 ? (
         <p>No automatic segments yet.</p>
       ) : (

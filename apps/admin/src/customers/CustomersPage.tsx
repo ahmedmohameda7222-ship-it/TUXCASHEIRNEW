@@ -6,7 +6,7 @@ import type {
   AdminReasonCodeConfiguration,
 } from '@tux/admin-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { useLocation } from 'wouter';
 
@@ -20,16 +20,51 @@ import { adminFetch } from '../lib/adminApi';
 import { createRetainedCommandIds } from '../lib/retainedCommandIds';
 import { PromotionsPage } from '../promotions/PromotionsPage';
 import { useShopScope } from '../shops/ShopScopeProvider';
-import { CustomerDetailPage } from './CustomerDetailPage';
+import { CustomerDirectory } from './CustomerDirectory';
+import { CustomerActivityPanel, CustomerDetailPage } from './CustomerDetailPage';
 import { CustomerMergeDialog } from './CustomerMergeDialog';
+import { requireSuccessfulCrmMutation } from './crmMutationGuard';
 import { LoyaltyPanel, type LoyaltyAdjustmentInput } from './LoyaltyPanel';
 import './customers.css';
 
 type CrmSection = 'customers' | 'settings';
 
+const EMPTY_PROGRAM_DRAFT = {
+  enabled: true,
+  earnPointsPer100Minor: '1',
+  pointValueEgp: '0.10',
+  minimumRedemptionPoints: '50',
+  pointExpiryDays: '',
+};
+
 function csrfToken(session: ReturnType<typeof useAdminSession>): string {
   if (session.state.status !== 'authenticated') throw new Error('session_required');
   return session.state.session.csrfToken;
+}
+
+function formatPointValueEgp(minor: number): string {
+  if (!Number.isSafeInteger(minor)) return 'Unavailable';
+  const value = BigInt(minor);
+  const absolute = value < 0n ? -value : value;
+  const whole = absolute / 100n;
+  const fraction = String(absolute % 100n).padStart(2, '0');
+  return `${value < 0n ? '-' : ''}${whole}.${fraction}`;
+}
+
+function parsePointValueMinor(input: string): number {
+  const matched = /^(\d+)(?:\.(\d{1,2}))?$/.exec(input.trim());
+  if (!matched) throw new Error('invalid_loyalty_point_value');
+  const value = BigInt(matched[1]!) * 100n + BigInt((matched[2] ?? '').padEnd(2, '0') || '0');
+  if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('invalid_loyalty_point_value');
+  return Number(value);
+}
+
+function pointValuePreview(input: string): string {
+  try {
+    return formatPointValueEgp(parsePointValueMinor(input));
+  } catch {
+    return 'Unavailable';
+  }
 }
 
 export function CustomersPage() {
@@ -41,15 +76,17 @@ export function CustomersPage() {
   const section: CrmSection = location === '/customers/settings' ? 'settings' : 'customers';
   const selectedId = section === 'settings' ? null : detailIdFromPath(location, '/customers');
   const [query, setQuery] = useState('');
+  const [dismissedCustomerShop, setDismissedCustomerShop] = useState<string | null>(null);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [mergeSearch, setMergeSearch] = useState('');
-  const [programDraft, setProgramDraft] = useState({
-    enabled: true,
-    earnPointsPer100Minor: '1',
-    pointValueEgp: '0.10',
-    minimumRedemptionPoints: '50',
-    pointExpiryDays: '',
-  });
+  const [programDraft, setProgramDraft] = useState({ ...EMPTY_PROGRAM_DRAFT });
+  const programDraftOwnerShop = useRef(shopId);
+  const programDraftEdited = useRef(false);
+
+  function editProgramDraft(update: (current: typeof programDraft) => typeof programDraft) {
+    programDraftEdited.current = true;
+    setProgramDraft(update);
+  }
   const namespace =
     session.state.status === 'authenticated'
       ? `${session.state.session.principal.businessId}:${session.state.session.principal.employeeId}`
@@ -102,16 +139,21 @@ export function CustomersPage() {
   });
 
   useEffect(() => {
+    if (programDraftOwnerShop.current !== shopId) {
+      programDraftOwnerShop.current = shopId;
+      programDraftEdited.current = false;
+      setProgramDraft({ ...EMPTY_PROGRAM_DRAFT });
+    }
     const program = programQuery.data;
-    if (!program) return;
+    if (!program || programDraftEdited.current) return;
     setProgramDraft({
       enabled: program.enabled,
       earnPointsPer100Minor: String(program.earnPointsPer100Minor),
-      pointValueEgp: (program.redemptionMinorPerPoint / 100).toFixed(2),
+      pointValueEgp: formatPointValueEgp(program.redemptionMinorPerPoint),
       minimumRedemptionPoints: String(program.minimumRedemptionPoints),
       pointExpiryDays: program.pointExpiryDays === null ? '' : String(program.pointExpiryDays),
     });
-  }, [programQuery.data]);
+  }, [programQuery.data, shopId]);
 
   const adjustLoyalty = useMutation({
     mutationFn: async (input: LoyaltyAdjustmentInput) => {
@@ -132,8 +174,9 @@ export function CustomersPage() {
         },
         csrfToken(session),
       );
+      const accepted = requireSuccessfulCrmMutation(result);
       commandIds.complete('loyalty.adjust', intent);
-      return result;
+      return accepted;
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'customers', shopId] });
@@ -174,28 +217,31 @@ export function CustomersPage() {
       event.preventDefault();
       if (!shopId) throw new Error('concrete_shop_required');
       const existing = programQuery.data;
-      return adminFetch<{ ok: boolean; code?: string }>(
-        '/api/admin/customers?surface=crm',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            type: 'loyalty.program.upsert',
-            shopId,
-            enabled: programDraft.enabled,
-            earnPointsPer100Minor: Number(programDraft.earnPointsPer100Minor),
-            redemptionMinorPerPoint: Math.round(Number(programDraft.pointValueEgp) * 100),
-            minimumRedemptionPoints: Number(programDraft.minimumRedemptionPoints),
-            pointExpiryDays: programDraft.pointExpiryDays.trim()
-              ? Number(programDraft.pointExpiryDays)
-              : null,
-            shopIds: existing?.shopIds ?? [shopId],
-            expectedVersion: existing?.version ?? null,
-          }),
-        },
-        csrfToken(session),
+      return requireSuccessfulCrmMutation(
+        await adminFetch<{ ok: boolean; code?: string }>(
+          '/api/admin/customers?surface=crm',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              type: 'loyalty.program.upsert',
+              shopId,
+              enabled: programDraft.enabled,
+              earnPointsPer100Minor: Number(programDraft.earnPointsPer100Minor),
+              redemptionMinorPerPoint: parsePointValueMinor(programDraft.pointValueEgp),
+              minimumRedemptionPoints: Number(programDraft.minimumRedemptionPoints),
+              pointExpiryDays: programDraft.pointExpiryDays.trim()
+                ? Number(programDraft.pointExpiryDays)
+                : null,
+              shopIds: existing?.shopIds ?? [shopId],
+              expectedVersion: existing?.version ?? null,
+            }),
+          },
+          csrfToken(session),
+        ),
       );
     },
     onSuccess: async () => {
+      programDraftEdited.current = false;
       await queryClient.invalidateQueries({
         queryKey: ['admin', 'customers', shopId, 'loyalty-program'],
       });
@@ -203,6 +249,31 @@ export function CustomersPage() {
     },
     onError: () => toast.error('Loyalty settings could not be saved'),
   });
+
+  // Only auto-open the first real customer on wide desktop. Phones and tablets
+  // remain list-first; never select another shop's cached/customer detail.
+  useEffect(() => {
+    if (
+      !shopId ||
+      section !== 'customers' ||
+      location !== '/customers' ||
+      !customersQuery.isSuccess ||
+      dismissedCustomerShop === shopId ||
+      window.innerWidth < 1100
+    ) {
+      return;
+    }
+    const first = customersQuery.data?.customers[0];
+    if (first) navigate(detailPath('/customers', first.id), { replace: true });
+  }, [
+    shopId,
+    section,
+    location,
+    navigate,
+    customersQuery.isSuccess,
+    customersQuery.data,
+    dismissedCustomerShop,
+  ]);
 
   if (!shopId) {
     return (
@@ -219,6 +290,9 @@ export function CustomersPage() {
   const canMerge = principal.permissions.includes('customers.merge');
   const canManageLoyalty = principal.permissions.includes('loyalty.manage');
   const canManagePromotions = principal.permissions.includes('promotions.manage');
+  const savedPointValueEgp = programQuery.data
+    ? formatPointValueEgp(programQuery.data.redemptionMinorPerPoint)
+    : null;
   const mergeCandidates = (mergeCandidatesQuery.data?.customers ?? []).filter(
     (customer) => customer.id !== selectedId,
   );
@@ -241,14 +315,6 @@ export function CustomersPage() {
             label: 'Customers',
             content: (
               <>
-                <label className="admin-field">
-                  <span>Search customers</span>
-                  <input
-                    value={query}
-                    placeholder="Name or phone"
-                    onChange={(event) => setQuery(event.target.value)}
-                  />
-                </label>
                 <ResponsiveMasterDetail
                   className="admin-customers-master-detail"
                   listLabel="Customers"
@@ -256,50 +322,24 @@ export function CustomersPage() {
                   detailActive={selectedId !== null}
                   backHref="/customers"
                   list={
-                    <div className="admin-customers-list">
-                      {customersQuery.isLoading ? <LoadingState title="Loading customers" /> : null}
-                      {customersQuery.isError ? (
-                        <ErrorState
-                          title="Customers could not be loaded"
-                          action={
-                            <button
-                              className="admin-secondary-button"
-                              type="button"
-                              onClick={() => void customersQuery.refetch()}
-                            >
-                              Retry
-                            </button>
-                          }
-                        />
-                      ) : null}
-                      {!customersQuery.isLoading &&
-                      !customersQuery.isError &&
-                      customers.length === 0 ? (
-                        <EmptyState
-                          title="No matching customers"
-                          description="Try another name or phone number."
-                        />
-                      ) : null}
-                      {customers.map((customer) => (
-                        <button
-                          className={
-                            customer.id === selectedId
-                              ? 'admin-customer-row is-selected'
-                              : 'admin-customer-row'
-                          }
-                          aria-current={customer.id === selectedId ? 'true' : undefined}
-                          key={customer.id}
-                          type="button"
-                          onClick={() => navigate(detailPath('/customers', customer.id))}
-                        >
-                          <span>
-                            <strong>{customer.displayName ?? 'Unnamed customer'}</strong>
-                            <small>{customer.normalizedPhone}</small>
-                          </span>
-                          <span>{customer.orderCount} orders</span>
-                        </button>
-                      ))}
-                    </div>
+                    <CustomerDirectory
+                      key={shopId}
+                      customers={customers}
+                      selectedId={selectedId}
+                      query={query}
+                      onQueryChange={(nextQuery) => {
+                        setQuery(nextQuery);
+                        if (selectedId !== null) navigate('/customers', { replace: true });
+                      }}
+                      onSelect={(id) => {
+                        setDismissedCustomerShop(null);
+                        navigate(detailPath('/customers', id));
+                      }}
+                      loading={customersQuery.isLoading}
+                      fetching={customersQuery.isFetching}
+                      error={customersQuery.isError}
+                      onRetry={() => void customersQuery.refetch()}
+                    />
                   }
                   detail={
                     detailQuery.isLoading ? (
@@ -312,7 +352,14 @@ export function CustomersPage() {
                     ) : detail ? (
                       <>
                         <CustomerDetailPage
+                          key={detail.id}
                           customer={detail}
+                          program={programQuery.data ?? null}
+                          canAdjustPoints={canManageLoyalty}
+                          onClose={() => {
+                            setDismissedCustomerShop(shopId);
+                            navigate('/customers', { replace: true });
+                          }}
                           loyalty={
                             <LoyaltyPanel
                               customer={detail}
@@ -344,6 +391,11 @@ export function CustomersPage() {
                     />
                   }
                 />
+                {selectedId && detail ? (
+                  <div className="admin-customers-activity-row">
+                    <CustomerActivityPanel customer={detail} />
+                  </div>
+                ) : null}
               </>
             ),
           },
@@ -367,6 +419,16 @@ export function CustomersPage() {
                       aria-label="Current saved loyalty settings"
                     >
                       <h3>Current saved settings</h3>
+                      <button
+                        className="admin-secondary-button"
+                        type="button"
+                        onClick={() => void programQuery.refetch()}
+                        disabled={programQuery.isFetching}
+                      >
+                        {programQuery.isFetching
+                          ? 'Refreshing saved settings…'
+                          : 'Refresh saved loyalty settings'}
+                      </button>
                       {programQuery.isLoading ? (
                         <p role="status">Loading current loyalty settings…</p>
                       ) : null}
@@ -391,10 +453,7 @@ export function CustomersPage() {
                           </div>
                           <div>
                             <dt>Redemption value</dt>
-                            <dd>
-                              EGP {(programQuery.data.redemptionMinorPerPoint / 100).toFixed(2)} per
-                              point
-                            </dd>
+                            <dd>EGP {savedPointValueEgp} per point</dd>
                           </div>
                           <div>
                             <dt>Minimum redemption</dt>
@@ -418,7 +477,7 @@ export function CustomersPage() {
                           type="checkbox"
                           checked={programDraft.enabled}
                           onChange={(event) =>
-                            setProgramDraft((current) => ({
+                            editProgramDraft((current) => ({
                               ...current,
                               enabled: event.target.checked,
                             }))
@@ -435,7 +494,7 @@ export function CustomersPage() {
                           inputMode="numeric"
                           value={programDraft.earnPointsPer100Minor}
                           onChange={(event) =>
-                            setProgramDraft((current) => ({
+                            editProgramDraft((current) => ({
                               ...current,
                               earnPointsPer100Minor: event.target.value,
                             }))
@@ -448,21 +507,21 @@ export function CustomersPage() {
                           inputMode="decimal"
                           value={programDraft.pointValueEgp}
                           onChange={(event) =>
-                            setProgramDraft((current) => ({
+                            editProgramDraft((current) => ({
                               ...current,
                               pointValueEgp: event.target.value,
                             }))
                           }
                         />
                       </label>
-                      <p>1 point = EGP {Number(programDraft.pointValueEgp || 0).toFixed(2)}</p>
+                      <p>1 point = EGP {pointValuePreview(programDraft.pointValueEgp)}</p>
                       <label className="admin-field">
                         <span>Minimum points to redeem</span>
                         <input
                           inputMode="numeric"
                           value={programDraft.minimumRedemptionPoints}
                           onChange={(event) =>
-                            setProgramDraft((current) => ({
+                            editProgramDraft((current) => ({
                               ...current,
                               minimumRedemptionPoints: event.target.value,
                             }))
@@ -478,7 +537,7 @@ export function CustomersPage() {
                           inputMode="numeric"
                           value={programDraft.pointExpiryDays}
                           onChange={(event) =>
-                            setProgramDraft((current) => ({
+                            editProgramDraft((current) => ({
                               ...current,
                               pointExpiryDays: event.target.value,
                             }))

@@ -13,6 +13,8 @@ import {
   type ProductAdvancedDraft,
 } from './catalogAdvancedDraft';
 
+import { ProductInventoryUsage } from './ProductInventoryUsage';
+
 export { formatQuantityMicrosForInput, parseQuantityToMicros } from './catalogAdvancedDraft';
 
 export type ProductEditorDraft = {
@@ -28,10 +30,12 @@ export type ProductEditorProps = {
   canPrice: boolean;
   initialAdvancedOpen?: boolean;
   advancedBundle?: CatalogJsonObject | null;
+  advancedLoadError?: boolean;
   busy?: boolean;
   onRequestAdvanced?(): void | Promise<void>;
   onSaveDraft(draft: ProductEditorDraft): void | Promise<void>;
   onReviewPublish?: (() => void) | undefined;
+  onCancel?: (() => void) | undefined;
   onSetAvailability(soldOut: boolean): void | Promise<void>;
   onUploadImage?: ((file: File) => Promise<{ imageKey: string; publicUrl: string }>) | undefined;
   imageRequiresSaveFirst?: boolean;
@@ -84,10 +88,12 @@ export function ProductEditor({
   canPrice,
   initialAdvancedOpen = false,
   advancedBundle = null,
+  advancedLoadError = false,
   busy = false,
   onRequestAdvanced,
   onSaveDraft,
   onReviewPublish,
+  onCancel,
   onSetAvailability,
   onUploadImage,
   imageRequiresSaveFirst = false,
@@ -142,6 +148,7 @@ export function ProductEditor({
   >({});
   const [comboState, setComboState] = useState<Record<string, boolean>>({});
   const [recipeState, setRecipeState] = useState<Record<string, string>>({});
+  const [recipeError, setRecipeError] = useState<string | null>(null);
 
   const readOnly = !canEdit || busy || imageUploading;
   const priceReadOnly = readOnly || !canPrice;
@@ -177,7 +184,7 @@ export function ProductEditor({
       Object.fromEntries(
         advancedModel.inventoryItems.map((item) => [
           item.inventoryItemId,
-          item.quantityMicros === null ? '' : formatQuantityMicrosForInput(item.quantityMicros),
+          item.quantityMicros === null ? '0' : formatQuantityMicrosForInput(item.quantityMicros),
         ]),
       ),
     );
@@ -213,7 +220,7 @@ export function ProductEditor({
         return (
           current !== undefined &&
           current !==
-            (item.quantityMicros === null ? '' : formatQuantityMicrosForInput(item.quantityMicros))
+            (item.quantityMicros === null ? '0' : formatQuantityMicrosForInput(item.quantityMicros))
         );
       })
     : false;
@@ -268,16 +275,26 @@ export function ProductEditor({
     if (!next.name) throw new Error('invalid_product_name');
     if (!next.categoryId || !Number.isSafeInteger(next.sortOrder) || next.sortOrder < 0)
       throw new Error('invalid_product_menu_structure');
-    const advanced = advancedModel
-      ? buildProductAdvancedDraft({
-          shopId: product.shopId,
-          productId: product.id,
-          model: comboEnabled ? advancedModel : { ...advancedModel, comboOptions: [] },
-          modifierState,
-          comboState: comboEnabled ? comboState : {},
-          recipeState,
-        })
-      : undefined;
+    let advanced: ProductAdvancedDraft | undefined;
+    try {
+      advanced = advancedModel
+        ? buildProductAdvancedDraft({
+            shopId: product.shopId,
+            productId: product.id,
+            model: comboEnabled ? advancedModel : { ...advancedModel, comboOptions: [] },
+            modifierState,
+            comboState: comboEnabled ? comboState : {},
+            recipeState,
+          })
+        : undefined;
+    } catch (error) {
+      if (error instanceof Error && error.message === 'invalid_recipe_quantity') {
+        setRecipeError('Enter a positive quantity with at most 6 decimal places, or 0 to unlink.');
+        return;
+      }
+      throw error;
+    }
+    setRecipeError(null);
     await onSaveDraft({
       product: next,
       changedPaths: changedPathsFor(product, next),
@@ -325,6 +342,86 @@ export function ProductEditor({
 
   return (
     <form className="admin-catalog-editor" onSubmit={(event) => void submit(event)}>
+      <section
+        className="admin-catalog-editor__section admin-catalog-product-photo"
+        aria-labelledby="catalog-images-heading"
+      >
+        <div className="admin-catalog-editor__section-heading">
+          <div>
+            <p className="admin-catalog-editor__eyebrow">Images</p>
+            <h2 id="catalog-images-heading">Product photo</h2>
+          </div>
+        </div>
+        <div className="admin-catalog-image-layout">
+          <div className="admin-product-image-state" role="status">
+            {uploadedImageUrl ? (
+              <img
+                src={uploadedImageUrl}
+                alt={`Selected image for ${product.name}`}
+                loading="lazy"
+                width="90"
+                height="90"
+              />
+            ) : (
+              <span className="admin-product-image-placeholder" aria-hidden="true">
+                {product.name.trim().slice(0, 2).toUpperCase() || 'PH'}
+              </span>
+            )}
+            <strong className="admin-product-image-state__status">
+              {imageKey ? 'Image assigned' : 'No image assigned'}
+            </strong>
+          </div>
+          {onUploadImage ? (
+            <div className="admin-form-grid">
+              {imageRequiresSaveFirst ? (
+                <p className="admin-field__help admin-catalog-photo-save-first" role="status">
+                  Save this product draft first to enable image upload.
+                </p>
+              ) : null}
+              <label className="admin-field admin-catalog-photo-file-field">
+                <span>Choose product image (PNG, JPEG, WebP, AVIF — maximum 2 MB)</span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/avif"
+                  disabled={readOnly || imageRequiresSaveFirst}
+                  onChange={(event) => {
+                    setSelectedImageFile(event.currentTarget.files?.[0] ?? null);
+                    setImageError(null);
+                  }}
+                />
+              </label>
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={readOnly || imageRequiresSaveFirst || selectedImageFile === null}
+                onClick={() => void uploadSelectedImage()}
+              >
+                {imageUploading ? 'Uploading image…' : 'Upload image'}
+              </button>
+              {imageKey ? (
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  disabled={readOnly}
+                  onClick={() => {
+                    setImageKey(null);
+                    setUploadedImageUrl(null);
+                    setSelectedImageFile(null);
+                    setImageError(null);
+                  }}
+                >
+                  Remove image from draft
+                </button>
+              ) : null}
+              {imageError ? <p role="alert">{imageError}</p> : null}
+            </div>
+          ) : null}
+          <p className="admin-catalog-photo-help">
+            Image upload changes remain in Draft until saved and published.
+          </p>
+        </div>
+      </section>
+
       <section className="admin-catalog-editor__section" aria-labelledby="catalog-general-heading">
         <div className="admin-catalog-editor__section-heading">
           <div>
@@ -399,6 +496,15 @@ export function ProductEditor({
             onChange={(event) => setSortOrder(event.currentTarget.value)}
           />
         </label>
+        <label className="admin-check-field">
+          <input
+            type="checkbox"
+            checked={bestSeller}
+            disabled={readOnly}
+            onChange={(event) => setBestSeller(event.currentTarget.checked)}
+          />
+          <span>Best seller</span>
+        </label>
       </section>
 
       <section className="admin-catalog-editor__section" aria-labelledby="catalog-pricing-heading">
@@ -462,80 +568,49 @@ export function ProductEditor({
         </button>
       </section>
 
-      <section className="admin-catalog-editor__section" aria-labelledby="catalog-images-heading">
+      <section
+        className="admin-catalog-editor__section admin-catalog-inventory-usage"
+        aria-labelledby="catalog-inventory-usage-heading"
+      >
         <div className="admin-catalog-editor__section-heading">
-          <div>
-            <p className="admin-catalog-editor__eyebrow">Images</p>
-            <h2 id="catalog-images-heading">Product image</h2>
-          </div>
+          <h2 id="catalog-inventory-usage-heading">Inventory usage</h2>
+          <span className="admin-catalog-inventory-usage__draft-tag">DRAFT ONLY</span>
         </div>
-        <div className="admin-product-image-state" role="status">
-          <strong>{imageKey ? 'Image assigned' : 'No image assigned'}</strong>
-          <span>Image upload changes remain in Draft until saved and published.</span>
-          {uploadedImageUrl ? (
-            <img
-              src={uploadedImageUrl}
-              alt={`Selected image for ${product.name}`}
-              loading="lazy"
-              width="200"
-              height="140"
-            />
-          ) : null}
-        </div>
-        {onUploadImage ? (
-          <div className="admin-form-grid">
-            {imageRequiresSaveFirst ? (
-              <p className="admin-field__help" role="status">
-                Save this product draft first to enable image upload.
-              </p>
-            ) : null}
-            <label className="admin-field">
-              <span>Choose product image (PNG, JPEG, WebP, AVIF — maximum 2 MB)</span>
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/avif"
-                disabled={readOnly || imageRequiresSaveFirst}
-                onChange={(event) => {
-                  setSelectedImageFile(event.currentTarget.files?.[0] ?? null);
-                  setImageError(null);
-                }}
-              />
-            </label>
-            <button
-              className="admin-secondary-button"
-              type="button"
-              disabled={readOnly || imageRequiresSaveFirst || selectedImageFile === null}
-              onClick={() => void uploadSelectedImage()}
-            >
-              {imageUploading ? 'Uploading image…' : 'Upload image'}
-            </button>
-            {imageKey ? (
+        {advancedModel ? (
+          <ProductInventoryUsage
+            inventoryItems={advancedModel.inventoryItems}
+            quantities={recipeState}
+            readOnly={readOnly}
+            onQuantityChange={(itemId, value) => {
+              setRecipeError(null);
+              setRecipeState((state) => ({ ...state, [itemId]: value }));
+            }}
+          />
+        ) : (
+          <div className="admin-catalog-inventory-usage__loading">
+            {advancedLoadError ? (
+              <p role="alert">Inventory usage could not be loaded. No recipe changes were saved.</p>
+            ) : (
+              <p>Loading authorized inventory definitions…</p>
+            )}
+            {advancedLoadError && onRequestAdvanced ? (
               <button
-                className="admin-secondary-button"
                 type="button"
-                disabled={readOnly}
+                className="admin-secondary-button"
                 onClick={() => {
-                  setImageKey(null);
-                  setUploadedImageUrl(null);
-                  setSelectedImageFile(null);
-                  setImageError(null);
+                  void onRequestAdvanced();
                 }}
               >
-                Remove image from draft
+                Retry inventory load
               </button>
             ) : null}
-            {imageError ? <p role="alert">{imageError}</p> : null}
           </div>
+        )}
+        {recipeError ? (
+          <p role="alert" className="admin-catalog-inventory-usage__error">
+            {recipeError}
+          </p>
         ) : null}
-        <label className="admin-check-field">
-          <input
-            type="checkbox"
-            checked={bestSeller}
-            disabled={readOnly}
-            onChange={(event) => setBestSeller(event.currentTarget.checked)}
-          />
-          <span>Best seller</span>
-        </label>
       </section>
 
       <button
@@ -647,54 +722,6 @@ export function ProductEditor({
           ) : null}
 
           <section className="admin-catalog-editor__section is-compact">
-            <h2>Recipe / Inventory</h2>
-            {advancedModel ? (
-              advancedModel.inventoryItems.length === 0 ? (
-                <p className="admin-field__help">
-                  No recipe-tracked inventory items are available.
-                </p>
-              ) : (
-                <div className="admin-catalog-advanced-list">
-                  {advancedModel.inventoryItems.map((item) => {
-                    const quantity =
-                      recipeState[item.inventoryItemId] ??
-                      (item.quantityMicros === null
-                        ? ''
-                        : formatQuantityMicrosForInput(item.quantityMicros));
-                    return (
-                      <label className="admin-field" key={item.inventoryItemId}>
-                        <span>
-                          {item.name} · {item.unitLabel}
-                        </span>
-                        <input
-                          type="number"
-                          min="0.000001"
-                          step="0.000001"
-                          inputMode="decimal"
-                          value={quantity}
-                          placeholder="Not in recipe"
-                          disabled={readOnly || (!item.active && quantity === '')}
-                          aria-label={`${item.name} quantity in ${item.unitLabel}`}
-                          onChange={(event) => {
-                            const value = event.currentTarget.value;
-                            if (!item.active && value !== '') return;
-                            setRecipeState((state) => ({
-                              ...state,
-                              [item.inventoryItemId]: value,
-                            }));
-                          }}
-                        />
-                      </label>
-                    );
-                  })}
-                </div>
-              )
-            ) : (
-              <p className="admin-field__help">Loading recipe inventory…</p>
-            )}
-          </section>
-
-          <section className="admin-catalog-editor__section is-compact">
             <h2>Shop Overrides</h2>
             <label className="admin-check-field">
               <input
@@ -726,11 +753,6 @@ export function ProductEditor({
         </div>
       ) : null}
 
-      <footer className="admin-catalog-editor__actions">
-        <button className="admin-primary-button" type="submit" disabled={readOnly}>
-          Save draft
-        </button>
-      </footer>
       <section className="admin-catalog-danger-zone" aria-label="Product danger zone">
         <div>
           <strong>Danger zone</strong>
@@ -770,6 +792,16 @@ export function ProductEditor({
           </div>
         )}
       </section>
+      <footer className="admin-catalog-editor__actions">
+        {onCancel ? (
+          <button className="admin-secondary-button" type="button" onClick={onCancel}>
+            Cancel
+          </button>
+        ) : null}
+        <button className="admin-primary-button" type="submit" disabled={readOnly}>
+          Save draft
+        </button>
+      </footer>
     </form>
   );
 }

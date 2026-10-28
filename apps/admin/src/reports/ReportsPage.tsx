@@ -1,5 +1,5 @@
 import type { AdminReportArea } from '@tux/admin-contracts';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { ErrorState, LoadingState } from '../components/feedback/AdminStates';
 import { PageScaffold } from '../components/layout/PageScaffold';
@@ -8,6 +8,8 @@ import { OwnerSummaryCard } from '../dashboard/OwnerSummaryCard';
 import { useShopScope } from '../shops/ShopScopeProvider';
 
 import { REPORT_LABELS, ReportFilters } from './ReportFilters';
+import { validReportDateRange } from './reportDateRange';
+import { scopeReportFilters } from './reportScope';
 import { ReportView } from './ReportView';
 import { SavedViews } from './SavedViews';
 import {
@@ -43,8 +45,23 @@ export function ReportsPage() {
     offset: 0,
   }));
   const [filterOptionsExpanded, setFilterOptionsExpanded] = useState(false);
-  const hasContextFilters = Object.values(filters.context ?? {}).some(Boolean);
-  const reports = useReports(shopId, filters, filterOptionsExpanded || hasContextFilters);
+  const scopeKey = scope.kind === 'shop' ? `shop:${scope.shopId}` : 'all-shops';
+  const previousScopeKey = useRef(scopeKey);
+  const scopeChanged = previousScopeKey.current !== scopeKey;
+  const scopedFilters = scopeReportFilters(
+    filters,
+    scope.kind === 'shop' ? { kind: 'shop', shopId: scope.shopId } : { kind: 'all-shops' },
+    principal.shopIds,
+    scopeChanged,
+    principal.role === 'OWNER',
+  );
+  useEffect(() => {
+    if (!scopeChanged) return;
+    previousScopeKey.current = scopeKey;
+    setFilters(scopedFilters);
+  }, [scopeChanged, scopeKey, scopedFilters]);
+  const hasContextFilters = Object.values(scopedFilters.context ?? {}).some(Boolean);
+  const reports = useReports(shopId, scopedFilters, filterOptionsExpanded || hasContextFilters);
   const config = reports.configQuery.data;
 
   if (!shopId)
@@ -105,16 +122,21 @@ export function ReportsPage() {
       description="Canonical performance reports with saved filters, targets and source activity."
     >
       <ReportFilters
-        value={filters}
+        value={scopedFilters}
         onChange={setFilters}
         canCompareShops={principal.role === 'OWNER'}
         allShopIds={principal.shopIds}
         options={reports.optionsQuery.data?.options ?? {}}
         onExpand={() => setFilterOptionsExpanded(true)}
       />
+      {!validReportDateRange(scopedFilters.fromDate, scopedFilters.toDate) ? (
+        <p className="admin-inline-error" role="alert">
+          Select a valid From/To date range in ascending order, no longer than 730 days.
+        </p>
+      ) : null}
       <ReportView
         data={reports.reportQuery.data}
-        filters={filters}
+        filters={scopedFilters}
         loading={reports.reportQuery.isLoading}
         error={reports.reportQuery.isError}
         retry={() => void reports.reportQuery.refetch()}
@@ -140,7 +162,7 @@ export function ReportsPage() {
       {config ? (
         <TargetsPanel
           targets={config.targets}
-          filters={filters}
+          filters={scopedFilters}
           summary={reports.reportQuery.data?.summary}
         />
       ) : null}
@@ -150,7 +172,7 @@ export function ReportsPage() {
           shopId={shopId}
           views={config.savedViews}
           targets={config.targets}
-          filters={filters}
+          filters={scopedFilters}
           canSetTargets={principal.permissions.includes('settings.manage')}
           pending={reports.command.isPending}
           error={reports.command.error}

@@ -44,4 +44,49 @@ describe('supplier management', () => {
     expect(html).not.toContain('Archive Bakery');
     expect(html).not.toContain('Edit Bakery');
   });
+
+  it('blocks new supplier forms while lifecycle commands are pending', () => {
+    const html = renderToStaticMarkup(
+      <SuppliersPage
+        suppliers={suppliers}
+        canManage
+        canManageLifecycle
+        pending
+        onCreate={vi.fn()}
+        onManage={vi.fn()}
+      />,
+    );
+    const addButton = html.match(/<button[^>]*>Add supplier<\/button>/)?.[0];
+    expect(addButton).toContain('disabled=""');
+  });
+
+  it('preserves archived supplier identity and restricts restore to lifecycle managers', () => {
+    const archived = [{ ...suppliers[0]!, active: false, version: 4 }];
+    const authorized = renderToStaticMarkup(
+      <SuppliersPage
+        suppliers={archived}
+        canManage
+        canManageLifecycle
+        pending={false}
+        onCreate={vi.fn()}
+        onManage={vi.fn()}
+      />,
+    );
+    expect(authorized).toContain('Restore Bakery');
+    expect(authorized).not.toContain('Archive Bakery');
+    expect(authorized).toContain('Archived');
+
+    const unauthorized = renderToStaticMarkup(
+      <SuppliersPage
+        suppliers={archived}
+        canManage
+        canManageLifecycle={false}
+        pending={false}
+        onCreate={vi.fn()}
+        onManage={vi.fn()}
+      />,
+    );
+    expect(unauthorized).not.toContain('Restore Bakery');
+    expect(unauthorized).not.toContain('Edit Bakery');
+  });
 });

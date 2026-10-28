@@ -2,12 +2,15 @@ import { useMemo, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
 
 import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
+import { AdminMetricStrip } from '../components/layout/AdminMetricStrip';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { AdminDialog } from '../components/overlay/AdminDialog';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { EmployeeDetailPage, type StaffDetailSection } from './EmployeeDetailPage';
+import { staffSummaryMetrics } from './staffSummaryMetrics';
+import { parseStaffMoneyMinor } from './staffMoney';
 import { useStaff, type StaffApiCommandDraft } from './useStaff';
 import './staff.css';
 
@@ -41,6 +44,15 @@ export function staffSectionFromSearch(search: string): StaffDetailSection {
   }
 }
 
+type EmployeeOnboardingStep = 'identity' | 'shops' | 'employment' | 'review';
+
+function optionalCompensationMinor(raw: string): number | null {
+  if (!raw.trim()) return null;
+  const minor = parseStaffMoneyMinor(raw);
+  if (minor === null) throw new Error('invalid_compensation_rate');
+  return minor;
+}
+
 export function StaffPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
@@ -49,18 +61,51 @@ export function StaffPage() {
   const selectedSection = staffSectionFromSearch(search);
   const selectedId = detailIdFromPath(location, '/staff');
   const [createOpen, setCreateOpen] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState<EmployeeOnboardingStep>('identity');
+  const [onboardingShopIds, setOnboardingShopIds] = useState<string[]>(shopId ? [shopId] : []);
+  const [createdEmployeeId, setCreatedEmployeeId] = useState<string | null>(null);
+  const [assignedShopIds, setAssignedShopIds] = useState<string[]>([]);
+  const [onboardingBusy, setOnboardingBusy] = useState(false);
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
+  const [newEmployeeCompensationType, setNewEmployeeCompensationType] = useState<
+    'MONTHLY' | 'HOURLY'
+  >('MONTHLY');
+  const [newEmployeeRate, setNewEmployeeRate] = useState('');
+  const [newEmployeeEffectiveFrom, setNewEmployeeEffectiveFrom] = useState('');
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [newEmployeeName, setNewEmployeeName] = useState('');
   const [newEmployeePhone, setNewEmployeePhone] = useState('');
+  const [newEmployeeHireDate, setNewEmployeeHireDate] = useState('');
+  const [newEmployeeNotes, setNewEmployeeNotes] = useState('');
   const staff = useStaff(shopId, selectedId);
   const shopChoices = useMemo(
     () => staff.workspaceQuery.data?.shops ?? [],
     [staff.workspaceQuery.data?.shops],
   );
 
+  const onboardingShops = shopChoices.filter((shop) => principal.shopIds.includes(shop.id));
+
   const rows = useMemo(
     () => staff.workspaceQuery.data?.employees.rows ?? [],
     [staff.workspaceQuery.data],
   );
+  const visibleRows = useMemo(() => {
+    const term = employeeSearch.trim().toLocaleLowerCase();
+    return rows.filter((employee) => {
+      if (roleFilter !== 'all' && employee.role !== roleFilter) return false;
+      if (statusFilter === 'active' && !employee.active) return false;
+      if (statusFilter === 'suspended' && employee.active) return false;
+      return (
+        !term ||
+        [employee.displayName, employee.phone ?? '', roleLabel(employee.role)].some((value) =>
+          value.toLocaleLowerCase().includes(term),
+        )
+      );
+    });
+  }, [rows, employeeSearch, roleFilter, statusFilter]);
+  const hasMoreStaff = staff.workspaceQuery.data?.employees.nextCursor != null;
 
   if (!shopId) {
     return (
@@ -83,28 +128,104 @@ export function StaffPage() {
     staff.sensitiveCommand.mutate({ draft: command, pin });
   };
 
-  function createEmployee() {
+  async function createEmployee() {
     const displayName = newEmployeeName.trim();
-    if (!displayName) return;
-    staff.command.mutate(
-      {
-        type: 'employee.create',
-        shopId,
-        displayName,
-        phone: newEmployeePhone.trim() || null,
-        hireDate: null,
-        notes: null,
-        role: 'STAFF',
-      },
-      {
-        onSuccess: (result) => {
-          setNewEmployeeName('');
-          setNewEmployeePhone('');
-          setCreateOpen(false);
-          if (result.ok && result.employeeId) navigate(detailPath('/staff', result.employeeId));
-        },
-      },
-    );
+    if (!displayName || onboardingBusy || !shopId) return;
+    setOnboardingBusy(true);
+    setOnboardingError(null);
+    try {
+      const rateMinor = optionalCompensationMinor(newEmployeeRate);
+      if (rateMinor !== null && !newEmployeeEffectiveFrom) {
+        throw new Error('compensation_effective_date_required');
+      }
+      let employeeId = createdEmployeeId;
+      if (!employeeId) {
+        const result = await staff.command.mutateAsync({
+          type: 'employee.create',
+          shopId,
+          displayName,
+          phone: newEmployeePhone.trim() || null,
+          hireDate: newEmployeeHireDate || null,
+          notes: newEmployeeNotes.trim() || null,
+          role: 'STAFF',
+        });
+        if (!result.ok || !result.employeeId || result.state === 'PENDING_APPROVAL') {
+          throw new Error('employee_creation_unconfirmed');
+        }
+        employeeId = result.employeeId;
+        setCreatedEmployeeId(employeeId);
+      }
+
+      const completed = new Set(assignedShopIds);
+      for (const assignedShopId of onboardingShopIds) {
+        if (assignedShopId === shopId || completed.has(assignedShopId)) continue;
+        const result = await staff.command.mutateAsync({
+          type: 'employee.assign-shop',
+          employeeId,
+          shopId: assignedShopId,
+        });
+        if (!result.ok || result.state === 'PENDING_APPROVAL') {
+          throw new Error('employee_assignment_unconfirmed');
+        }
+        completed.add(assignedShopId);
+        setAssignedShopIds([...completed]);
+      }
+
+      if (rateMinor !== null) {
+        const result = await staff.command.mutateAsync({
+          type: 'compensation.set',
+          employeeId,
+          shopId,
+          compensationType: newEmployeeCompensationType,
+          rateMinor,
+          effectiveFrom: newEmployeeEffectiveFrom,
+        });
+        if (!result.ok || result.state === 'PENDING_APPROVAL') {
+          throw new Error('compensation_setup_unconfirmed');
+        }
+      }
+      setCreateOpen(false);
+      setOnboardingStep('identity');
+      setCreatedEmployeeId(null);
+      setAssignedShopIds([]);
+      setNewEmployeeName('');
+      setNewEmployeePhone('');
+      setNewEmployeeHireDate('');
+      setNewEmployeeNotes('');
+      setNewEmployeeRate('');
+      setNewEmployeeEffectiveFrom('');
+      navigate(detailPath('/staff', employeeId));
+    } catch (error) {
+      setOnboardingError(readableError(error) ?? 'Employee onboarding could not be completed');
+    } finally {
+      setOnboardingBusy(false);
+    }
+  }
+
+  function advanceOnboarding() {
+    setOnboardingError(null);
+    if (onboardingStep === 'identity') {
+      if (!newEmployeeName.trim()) return;
+      setOnboardingStep('shops');
+    } else if (onboardingStep === 'shops') {
+      if (!onboardingShopIds.includes(shopId!)) {
+        setOnboardingError('The current shop must remain assigned');
+        return;
+      }
+      setOnboardingStep('employment');
+    } else if (onboardingStep === 'employment') {
+      try {
+        const rate = optionalCompensationMinor(newEmployeeRate);
+        if (rate !== null && !newEmployeeEffectiveFrom) {
+          throw new Error('compensation_effective_date_required');
+        }
+        setOnboardingStep('review');
+      } catch (error) {
+        setOnboardingError(readableError(error) ?? 'Invalid compensation details');
+      }
+    } else {
+      void createEmployee();
+    }
   }
 
   return (
@@ -117,14 +238,37 @@ export function StaffPage() {
           <button
             className="admin-primary-button"
             type="button"
-            onClick={() => setCreateOpen(true)}
+            onClick={() => {
+              if (createdEmployeeId) {
+                setOnboardingStep('review');
+                setOnboardingError(null);
+                setCreateOpen(true);
+                return;
+              }
+              setOnboardingStep('identity');
+              setOnboardingShopIds([shopId]);
+              setAssignedShopIds([]);
+              setOnboardingError(null);
+              setCreateOpen(true);
+            }}
           >
             Add employee
           </button>
         ) : undefined
       }
     >
-      {actionError ? <p role="alert">{actionError}</p> : null}
+      {actionError && !createOpen ? <p role="alert">{actionError}</p> : null}
+
+      {staff.workspaceQuery.isSuccess ? (
+        <AdminMetricStrip
+          label="Staff summary"
+          metrics={staffSummaryMetrics(
+            rows,
+            shopId,
+            staff.workspaceQuery.data.employees.nextCursor === null,
+          )}
+        />
+      ) : null}
 
       <div className="admin-staff-workspace">
         <ResponsiveMasterDetail
@@ -134,6 +278,46 @@ export function StaffPage() {
           backHref="/staff"
           list={
             <div className="admin-record-list">
+              <div className="admin-staff-directory__toolbar">
+                <strong>Team directory</strong>
+                <span>Select an employee to view their workspace</span>
+                <input
+                  type="search"
+                  aria-label="Search employees (loaded results)"
+                  placeholder="Search name, role or phone..."
+                  value={employeeSearch}
+                  onChange={(event) => setEmployeeSearch(event.currentTarget.value)}
+                />
+                <div className="admin-staff-directory__filters">
+                  <label>
+                    <span>Role</span>
+                    <select
+                      aria-label="Role (loaded results)"
+                      value={roleFilter}
+                      onChange={(event) => setRoleFilter(event.currentTarget.value)}
+                    >
+                      <option value="all">All roles</option>
+                      <option value="OWNER">Owner</option>
+                      <option value="ADMIN">Administrator</option>
+                      <option value="MANAGER">Manager</option>
+                      <option value="STAFF">Staff</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Status</span>
+                    <select
+                      aria-label="Status (loaded results)"
+                      value={statusFilter}
+                      onChange={(event) => setStatusFilter(event.currentTarget.value)}
+                    >
+                      <option value="all">All statuses</option>
+                      <option value="active">Active</option>
+                      <option value="suspended">Suspended</option>
+                    </select>
+                  </label>
+                </div>
+                {hasMoreStaff ? <p>Loaded results only</p> : null}
+              </div>
               {staff.workspaceQuery.isLoading ? <LoadingState title="Loading staff" /> : null}
               {staff.workspaceQuery.isError ? (
                 <ErrorState
@@ -157,7 +341,13 @@ export function StaffPage() {
                   description="Add or assign a staff profile to begin."
                 />
               ) : null}
-              {rows.map((employee) => (
+              {visibleRows.length === 0 && rows.length > 0 && !staff.workspaceQuery.isLoading ? (
+                <EmptyState
+                  title="No employees match search"
+                  description="Try another name, role or phone from the loaded staff."
+                />
+              ) : null}
+              {visibleRows.map((employee) => (
                 <button
                   className={
                     employee.id === selectedId
@@ -219,6 +409,7 @@ export function StaffPage() {
                 workers={staff.workspaceQuery.data?.workers ?? []}
                 shops={shopChoices}
                 onCommand={execute}
+                onVerifiedScheduleCommand={(command) => staff.command.mutateAsync(command)}
                 onSensitiveCommand={executeSensitive}
               />
             ) : (
@@ -242,48 +433,215 @@ export function StaffPage() {
           open={createOpen}
           variant="sheet"
           title="Add employee"
-          description="New employees start as Staff. Elevated access is granted separately through the controlled role-change flow."
+          description="Create the employee profile, assign authorized shops and review employment details. Operations worker and PIN setup follow in the employee access workspace."
           onOpenChange={(open) => {
-            if (!staff.command.isPending) setCreateOpen(open);
+            if (!onboardingBusy && !staff.command.isPending) setCreateOpen(open);
           }}
         >
           <form
             className="admin-form-grid"
             onSubmit={(event) => {
               event.preventDefault();
-              createEmployee();
+              advanceOnboarding();
             }}
           >
-            <label className="admin-field">
-              <span>Name</span>
-              <input
-                autoFocus
-                value={newEmployeeName}
-                onChange={(event) => setNewEmployeeName(event.target.value)}
-              />
-            </label>
-            <label className="admin-field">
-              <span>Phone</span>
-              <input
-                value={newEmployeePhone}
-                onChange={(event) => setNewEmployeePhone(event.target.value)}
-              />
-            </label>
+            <nav className="admin-staff-onboarding-steps" aria-label="Employee onboarding steps">
+              {(['identity', 'shops', 'employment', 'review'] as const).map((step, index) => (
+                <span key={step} aria-current={onboardingStep === step ? 'step' : undefined}>
+                  {index + 1}. {step.charAt(0).toUpperCase() + step.slice(1)}
+                </span>
+              ))}
+            </nav>
+            {onboardingStep === 'identity' ? (
+              <>
+                <h3>Identity</h3>
+                <label className="admin-field">
+                  <span>Name</span>
+                  <input
+                    autoFocus
+                    value={newEmployeeName}
+                    disabled={Boolean(createdEmployeeId)}
+                    onChange={(event) => setNewEmployeeName(event.target.value)}
+                    required
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Phone</span>
+                  <input
+                    value={newEmployeePhone}
+                    disabled={Boolean(createdEmployeeId)}
+                    onChange={(event) => setNewEmployeePhone(event.target.value)}
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Hire date</span>
+                  <input
+                    type="date"
+                    value={newEmployeeHireDate}
+                    disabled={Boolean(createdEmployeeId)}
+                    onChange={(event) => setNewEmployeeHireDate(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Internal notes</span>
+                  <textarea
+                    maxLength={2000}
+                    value={newEmployeeNotes}
+                    disabled={Boolean(createdEmployeeId)}
+                    onChange={(event) => setNewEmployeeNotes(event.currentTarget.value)}
+                  />
+                </label>
+                <p>
+                  New employees start as Staff. Elevated access requires an approved role change.
+                </p>
+              </>
+            ) : null}
+            {onboardingStep === 'shops' ? (
+              <fieldset className="admin-staff-onboarding-shops">
+                <legend>Select assigned shops</legend>
+                <p>Only shops in your authorized scope are available.</p>
+                {onboardingShops.map((shop) => (
+                  <label key={shop.id}>
+                    <input
+                      type="checkbox"
+                      checked={onboardingShopIds.includes(shop.id)}
+                      disabled={onboardingBusy || shop.id === shopId || Boolean(createdEmployeeId)}
+                      onChange={(event) => {
+                        const checked = event.currentTarget.checked;
+                        setOnboardingShopIds((current) =>
+                          checked
+                            ? [...new Set([...current, shop.id])]
+                            : current.filter((id) => id !== shop.id),
+                        );
+                      }}
+                    />
+                    {shop.name}
+                  </label>
+                ))}
+                {onboardingShops.length === 0 ? <p>Current shop only.</p> : null}
+              </fieldset>
+            ) : null}
+            {onboardingStep === 'employment' ? (
+              <>
+                <h3>Employment setup</h3>
+                <p>Compensation is optional here and can be configured later in the Pay tab.</p>
+                <label className="admin-field">
+                  <span>Compensation type</span>
+                  <select
+                    value={newEmployeeCompensationType}
+                    disabled={Boolean(createdEmployeeId)}
+                    onChange={(event) =>
+                      setNewEmployeeCompensationType(event.target.value as 'MONTHLY' | 'HOURLY')
+                    }
+                  >
+                    <option value="MONTHLY">Monthly</option>
+                    <option value="HOURLY">Hourly</option>
+                  </select>
+                </label>
+                <label className="admin-field">
+                  <span>Rate (EGP, optional)</span>
+                  <input
+                    inputMode="decimal"
+                    value={newEmployeeRate}
+                    disabled={Boolean(createdEmployeeId)}
+                    onChange={(event) => setNewEmployeeRate(event.target.value)}
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Effective from</span>
+                  <input
+                    type="date"
+                    value={newEmployeeEffectiveFrom}
+                    disabled={Boolean(createdEmployeeId)}
+                    onChange={(event) => setNewEmployeeEffectiveFrom(event.target.value)}
+                  />
+                </label>
+                <p>
+                  Operations worker and PIN setup must be completed through the protected employee
+                  access workflow.
+                </p>
+              </>
+            ) : null}
+            {onboardingStep === 'review' ? (
+              <section
+                className="admin-staff-onboarding-review"
+                aria-label="Employee onboarding review"
+              >
+                <h3>Review employee setup</h3>
+                <p>
+                  <strong>{newEmployeeName.trim()}</strong> · Staff
+                </p>
+                <p>{newEmployeePhone.trim() || 'No phone provided'}</p>
+                <p>{newEmployeeHireDate || 'Hire date not provided'}</p>
+                <p>
+                  Assigned shops:{' '}
+                  {onboardingShopIds
+                    .map(
+                      (id) =>
+                        onboardingShops.find((shop) => shop.id === id)?.name ?? 'Current shop',
+                    )
+                    .join(', ')}
+                </p>
+                <p>
+                  {newEmployeeRate.trim()
+                    ? 'Compensation will be recorded using the selected rate and effective date.'
+                    : 'Compensation will be configured later.'}
+                </p>
+                <p>
+                  After creation, complete Operations worker/PIN readiness and any elevated
+                  permissions in the employee profile.
+                </p>
+                {createdEmployeeId ? (
+                  <p>
+                    Profile created. Resume remaining setup without creating a duplicate employee.
+                  </p>
+                ) : null}
+              </section>
+            ) : null}
+            {onboardingError || staff.command.isError ? (
+              <p role="alert">{onboardingError ?? readableError(staff.command.error)}</p>
+            ) : null}
             <div className="admin-inline-actions">
               <button
                 className="admin-secondary-button"
                 type="button"
-                disabled={staff.command.isPending}
+                disabled={onboardingBusy}
                 onClick={() => setCreateOpen(false)}
               >
                 Cancel
               </button>
+              {onboardingStep !== 'identity' ? (
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  disabled={onboardingBusy || Boolean(createdEmployeeId)}
+                  onClick={() =>
+                    setOnboardingStep(
+                      onboardingStep === 'review'
+                        ? 'employment'
+                        : onboardingStep === 'employment'
+                          ? 'shops'
+                          : 'identity',
+                    )
+                  }
+                >
+                  Back
+                </button>
+              ) : null}
               <button
                 className="admin-primary-button"
                 type="submit"
-                disabled={!newEmployeeName.trim() || staff.command.isPending}
+                disabled={
+                  onboardingBusy || (onboardingStep === 'identity' && !newEmployeeName.trim())
+                }
               >
-                {staff.command.isPending ? 'Adding…' : 'Add employee'}
+                {onboardingStep === 'review'
+                  ? createdEmployeeId
+                    ? 'Resume onboarding'
+                    : onboardingBusy
+                      ? 'Creating…'
+                      : 'Create employee'
+                  : 'Continue'}
               </button>
             </div>
           </form>

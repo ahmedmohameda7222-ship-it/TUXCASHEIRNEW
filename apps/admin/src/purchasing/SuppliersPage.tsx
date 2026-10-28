@@ -13,11 +13,15 @@ export function SuppliersPage({
   pending,
   onCreate,
   onManage,
+  supplierError,
+  onClearSupplierError,
 }: {
   suppliers: readonly AdminSupplier[];
   canManage: boolean;
   canManageLifecycle: boolean;
   pending: boolean;
+  supplierError?: string | null;
+  onClearSupplierError?(): void;
   onManage(
     input: {
       type: 'supplier.update' | 'supplier.archive' | 'supplier.restore';
@@ -61,6 +65,7 @@ export function SuppliersPage({
     null;
 
   function beginEdit(supplier: AdminSupplier) {
+    onClearSupplierError?.();
     setEditingSupplier(supplier);
     setName(supplier.name);
     setContactName(supplier.contactName ?? '');
@@ -78,13 +83,20 @@ export function SuppliersPage({
 
   return (
     <section aria-labelledby="purchasing-suppliers-heading">
+      {supplierError && !open && archiveTarget === null ? (
+        <p className="admin-purchasing-error-note" role="alert">
+          {supplierError}
+        </p>
+      ) : null}
       <div className="admin-section-heading">
         <h2 id="purchasing-suppliers-heading">Suppliers</h2>
         {canManage ? (
           <button
             className="admin-secondary-button"
             type="button"
+            disabled={pending}
             onClick={() => {
+              onClearSupplierError?.();
               clearDraft();
               setEditingSupplier(null);
               setOpen(true);
@@ -103,16 +115,22 @@ export function SuppliersPage({
                 type="search"
                 value={search}
                 placeholder="Supplier, contact, phone or email"
-                onChange={(event) => setSearch(event.currentTarget.value)}
+                onChange={(event) => {
+                  setSearch(event.currentTarget.value);
+                  setSelectedSupplierId(null);
+                  setMobileInspectorExpanded(false);
+                }}
               />
             </label>
             <label className="admin-field">
               <span>Filter suppliers by status</span>
               <select
                 value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(event.currentTarget.value as 'all' | 'active' | 'archived')
-                }
+                onChange={(event) => {
+                  setStatusFilter(event.currentTarget.value as 'all' | 'active' | 'archived');
+                  setSelectedSupplierId(null);
+                  setMobileInspectorExpanded(false);
+                }}
               >
                 <option value="all">All suppliers</option>
                 <option value="active">Active</option>
@@ -125,6 +143,8 @@ export function SuppliersPage({
               onClick={() => {
                 setSearch('');
                 setStatusFilter('all');
+                setSelectedSupplierId(null);
+                setMobileInspectorExpanded(false);
               }}
             >
               Reset filters
@@ -245,8 +265,10 @@ export function SuppliersPage({
                   disabled={pending}
                   onClick={() => {
                     if (selectedSupplier.active) {
+                      onClearSupplierError?.();
                       setArchiveTarget(selectedSupplier);
                     } else {
+                      onClearSupplierError?.();
                       onManage(
                         {
                           type: 'supplier.restore',
@@ -324,6 +346,11 @@ export function SuppliersPage({
           This removes the supplier from active purchasing choices. It does not delete historical
           orders.
         </p>
+        {supplierError ? (
+          <p className="admin-purchasing-error-note" role="alert">
+            {supplierError}
+          </p>
+        ) : null}
       </AdminDialog>
       {canManage ? (
         <AdminDialog
@@ -375,6 +402,11 @@ export function SuppliersPage({
               }
             }}
           >
+            {supplierError ? (
+              <p className="admin-purchasing-error-note" role="alert">
+                {supplierError}
+              </p>
+            ) : null}
             <FormField id="supplier-name" label="Supplier name" required>
               <input
                 id="supplier-name"

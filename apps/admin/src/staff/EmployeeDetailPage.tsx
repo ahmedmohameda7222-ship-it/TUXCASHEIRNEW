@@ -14,6 +14,7 @@ import { PermissionsEditor } from './PermissionsEditor';
 import { SchedulePage, type StaffCommandDraft } from './SchedulePage';
 import { StaffMetricsPanel } from './StaffMetricsPanel';
 import { StaffPaymentPage } from './StaffPaymentPage';
+import { formatStaffMoney, parseStaffMoneyMinor } from './staffMoney';
 
 export type StaffDetailSection =
   'profile' | 'schedule' | 'attendance' | 'leave' | 'pay' | 'permissions';
@@ -59,6 +60,7 @@ export function EmployeeDetailPage({
   workers,
   shops,
   onCommand,
+  onVerifiedScheduleCommand,
   onSensitiveCommand,
 }: {
   employee: EmployeeDetail;
@@ -72,6 +74,7 @@ export function EmployeeDetailPage({
   workers: readonly StaffWorkerChoice[];
   shops: readonly StaffShopChoice[];
   onCommand(command: StaffCommandDraft): void;
+  onVerifiedScheduleCommand?(command: StaffCommandDraft): Promise<unknown>;
   onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
 }) {
   const [sensitiveAction, setSensitiveAction] = useState<SensitiveAction>(null);
@@ -94,9 +97,10 @@ export function EmployeeDetailPage({
     latestCompensation?.compensationType ?? 'MONTHLY',
   );
   const [compensationRate, setCompensationRate] = useState(
-    latestCompensation ? String(latestCompensation.rateMinor / 100) : '',
+    latestCompensation ? formatStaffMoney(latestCompensation.rateMinor) : '',
   );
   const [compensationEffectiveFrom, setCompensationEffectiveFrom] = useState('');
+  const compensationRateMinor = parseStaffMoneyMinor(compensationRate);
   const availableShopIds = shops.map((shop) => shop.id);
   const unassignedShopIds = availableShopIds.filter(
     (candidate) => !employee.assignments.some((assignment) => assignment.shopId === candidate),
@@ -216,7 +220,7 @@ export function EmployeeDetailPage({
         {latestCompensation ? (
           <p>
             Current: {latestCompensation.compensationType === 'HOURLY' ? 'Hourly' : 'Monthly'} ·{' '}
-            {(latestCompensation.rateMinor / 100).toFixed(2)} EGP · effective{' '}
+            {formatStaffMoney(latestCompensation.rateMinor)} EGP · effective{' '}
             {latestCompensation.effectiveFrom}
           </p>
         ) : (
@@ -255,18 +259,15 @@ export function EmployeeDetailPage({
             <button
               className="admin-secondary-button"
               type="button"
-              disabled={
-                !compensationEffectiveFrom ||
-                !Number.isFinite(Number(compensationRate)) ||
-                Number(compensationRate) < 0
-              }
+              disabled={!compensationEffectiveFrom || compensationRateMinor === null}
               onClick={() =>
+                compensationRateMinor !== null &&
                 onCommand({
                   type: 'compensation.set',
                   employeeId: employee.id,
                   shopId,
                   compensationType,
-                  rateMinor: Math.round(Number(compensationRate) * 100),
+                  rateMinor: compensationRateMinor,
                   effectiveFrom: compensationEffectiveFrom,
                 })
               }
@@ -281,7 +282,7 @@ export function EmployeeDetailPage({
         shopId={shopId}
         canPay={canPay}
         financeAccounts={financeAccounts}
-        onCommand={onCommand}
+        onSensitiveCommand={onSensitiveCommand}
       />
     </>
   );
@@ -474,6 +475,7 @@ export function EmployeeDetailPage({
                 shopId={shopId}
                 canManage={canManage}
                 onCommand={onCommand}
+                onVerifiedCommand={onVerifiedScheduleCommand}
               />
             ),
           },

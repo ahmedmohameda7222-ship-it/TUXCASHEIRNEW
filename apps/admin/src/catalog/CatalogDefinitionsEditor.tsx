@@ -1,5 +1,5 @@
 import type { CatalogCategorySummary, CatalogJsonObject } from '@tux/admin-contracts';
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { useUnsavedShopDraft } from '../shops/ShopScopeProvider';
 import { formatEgpMinor, parseEgpToMinor } from './ProductEditor';
 import type { CatalogDefinitionCollection } from './catalogDefinitionsDraft';
@@ -71,18 +71,20 @@ export function CatalogDefinitionsEditor({
   }): Promise<void>;
 }) {
   const [editor, setEditor] = useState<EditorState | null>(null);
+  const [activeTab, setActiveTab] = useState<CatalogDefinitionCollection>('categories');
+  const tabIdPrefix = useId();
   const [error, setError] = useState<string | null>(null);
   useUnsavedShopDraft(editor !== null);
-  const orderedCategories = [...categories].sort(
-    (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
-  );
-  const orderedModifiers = [...modifiers].sort(
-    (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
-  );
+  const orderedCategories = categories
+    .filter((category) => category.shopId === shopId)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  const orderedModifiers = modifiers
+    .filter((modifier) => modifier.shopId === shopId)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
 
   function beginCreate(collection: CatalogDefinitionCollection) {
     if (!canEdit || (collection === 'modifiers' && !canPrice)) return;
-    const current = collection === 'categories' ? categories : modifiers;
+    const current = collection === 'categories' ? orderedCategories : orderedModifiers;
     setEditor({
       collection,
       id: crypto.randomUUID(),
@@ -128,7 +130,7 @@ export function CatalogDefinitionsEditor({
       });
     } else {
       try {
-        const previous = modifiers.find((modifier) => modifier.id === editor.id);
+        const previous = orderedModifiers.find((modifier) => modifier.id === editor.id);
         const priceMinor = canPrice ? parseEgpToMinor(editor.price) : (previous?.priceMinor ?? 0);
         void persist('modifiers', {
           id: editor.id,
@@ -164,54 +166,127 @@ export function CatalogDefinitionsEditor({
 
   return (
     <section className="admin-form-grid" aria-label="Catalog definitions">
-      <div className="admin-catalog-draft-banner">
-        <strong>
-          Category and modifier changes remain in Draft until validated and published.
-        </strong>
-      </div>
-      <section
-        className="admin-catalog-editor__section"
-        aria-labelledby="catalog-categories-heading"
+      <nav
+        className="admin-catalog-definition-tabs"
+        role="tablist"
+        aria-label="Manage catalog definitions"
       >
-        <div className="admin-catalog-editor__section-heading">
-          <h2 id="catalog-categories-heading">Categories</h2>
-          {canEdit ? (
-            <button
-              className="admin-primary-button"
-              type="button"
-              disabled={pending}
-              onClick={() => beginCreate('categories')}
-            >
-              Add category
-            </button>
-          ) : null}
-        </div>
-        {orderedCategories.length === 0 ? (
-          <p>No categories configured. Add a category to start creating products.</p>
-        ) : null}
-        {orderedCategories.map((category, index) => (
-          <article className="admin-settings-row admin-settings-row--stack" key={category.id}>
-            <div className="admin-settings-row__main">
-              <strong>{category.name}</strong>
-              <span>
-                {category.active ? 'Active' : 'Archived'} · Position {category.sortOrder}
-              </span>
+        <button
+          type="button"
+          role="tab"
+          id={`${tabIdPrefix}-categories-tab`}
+          aria-controls={`${tabIdPrefix}-categories-panel`}
+          aria-selected={activeTab === 'categories'}
+          className={activeTab === 'categories' ? 'is-active' : ''}
+          disabled={pending || editor !== null}
+          onClick={() => setActiveTab('categories')}
+        >
+          Categories <span>{orderedCategories.length}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id={`${tabIdPrefix}-modifiers-tab`}
+          aria-controls={`${tabIdPrefix}-modifiers-panel`}
+          aria-selected={activeTab === 'modifiers'}
+          className={activeTab === 'modifiers' ? 'is-active' : ''}
+          disabled={pending || editor !== null}
+          onClick={() => setActiveTab('modifiers')}
+        >
+          Modifiers / Extras <span>{orderedModifiers.length}</span>
+        </button>
+      </nav>
+      {activeTab === 'categories' ? (
+        <section
+          role="tabpanel"
+          id={`${tabIdPrefix}-categories-panel`}
+          aria-labelledby={`${tabIdPrefix}-categories-tab`}
+          className="admin-catalog-editor__section"
+        >
+          <div className="admin-catalog-editor__section-heading">
+            <div>
+              <h2 id="catalog-categories-heading">Categories</h2>
+              <p>Organize the menu structure, status and display order.</p>
             </div>
             {canEdit ? (
-              <details className="admin-catalog-record-actions">
-                <summary>Actions for {category.name}</summary>
-                <div className="admin-inventory-page-actions">
+              <button
+                className="admin-primary-button"
+                type="button"
+                disabled={pending}
+                onClick={() => beginCreate('categories')}
+              >
+                Add category
+              </button>
+            ) : null}
+          </div>
+          {orderedCategories.length === 0 ? (
+            <p>No categories configured. Add a category to start creating products.</p>
+          ) : null}
+          <div
+            className="admin-catalog-definition-columns"
+            data-catalog-definition-columns="categories"
+            aria-hidden="true"
+          >
+            <span>Category</span>
+            <span>Status</span>
+            <span>Position</span>
+            <span>Actions</span>
+          </div>
+          {orderedCategories.map((category, index) => (
+            <article
+              className="admin-catalog-definition-row admin-catalog-definition-row--categories"
+              key={category.id}
+            >
+              <div className="admin-catalog-definition-row__main">
+                <strong>{category.name}</strong>
+                <span className="admin-catalog-definition-type">Category</span>
+                <span className="admin-catalog-definition-compact-meta">
+                  Position {category.sortOrder} · {category.active ? 'Active' : 'Archived'}
+                </span>
+              </div>
+              <span
+                className={`admin-catalog-definition-status ${category.active ? 'is-active' : 'is-archived'}`}
+              >
+                {category.active ? 'Available' : 'Archived'}
+              </span>
+              <span className="admin-catalog-definition-position">{category.sortOrder}</span>
+              {canEdit ? (
+                <div
+                  className="admin-catalog-definition-actions"
+                  role="group"
+                  aria-label={`Actions for ${category.name}`}
+                >
                   <button
-                    className="admin-secondary-button"
+                    className="admin-catalog-definition-action-button"
                     type="button"
+                    aria-label={`Move up ${category.name}`}
+                    disabled={pending || index === 0}
+                    onClick={() => changeOrder('categories', category.id, 'up')}
+                  >
+                    <span aria-hidden="true">⌃</span>
+                  </button>
+                  <button
+                    className="admin-catalog-definition-action-button"
+                    type="button"
+                    aria-label={`Move down ${category.name}`}
+                    disabled={pending || index === orderedCategories.length - 1}
+                    onClick={() => changeOrder('categories', category.id, 'down')}
+                  >
+                    <span aria-hidden="true">⌄</span>
+                  </button>
+                  <button
+                    className="admin-catalog-definition-action-button"
+                    type="button"
+                    aria-label={`Edit ${category.name}`}
                     disabled={pending}
                     onClick={() => setEditor(editingCategory(category))}
                   >
-                    Edit {category.name}
+                    <span aria-hidden="true">✎</span>
                   </button>
                   <button
-                    className="admin-secondary-button"
+                    className="admin-catalog-definition-action-button"
                     type="button"
+                    aria-label={`${category.active ? 'Archive' : 'Restore'} ${category.name}`}
                     disabled={pending}
                     onClick={() =>
                       void persist('categories', {
@@ -225,72 +300,105 @@ export function CatalogDefinitionsEditor({
                       })
                     }
                   >
-                    {category.active ? 'Archive' : 'Restore'} {category.name}
-                  </button>
-                  <button
-                    className="admin-secondary-button"
-                    type="button"
-                    disabled={pending || index === 0}
-                    onClick={() => changeOrder('categories', category.id, 'up')}
-                  >
-                    Move up
-                  </button>
-                  <button
-                    className="admin-secondary-button"
-                    type="button"
-                    disabled={pending || index === orderedCategories.length - 1}
-                    onClick={() => changeOrder('categories', category.id, 'down')}
-                  >
-                    Move down
+                    <span aria-hidden="true">{category.active ? '▤' : '↻'}</span>
                   </button>
                 </div>
-              </details>
-            ) : null}
-          </article>
-        ))}
-      </section>
-      <section
-        className="admin-catalog-editor__section"
-        aria-labelledby="catalog-modifiers-heading"
-      >
-        <div className="admin-catalog-editor__section-heading">
-          <h2 id="catalog-modifiers-heading">Modifiers / extras</h2>
-          {canEdit && canPrice ? (
-            <button
-              className="admin-primary-button"
-              type="button"
-              disabled={pending}
-              onClick={() => beginCreate('modifiers')}
-            >
-              Add modifier
-            </button>
-          ) : null}
-        </div>
-        {orderedModifiers.length === 0 ? <p>No modifiers configured for this draft.</p> : null}
-        {orderedModifiers.map((modifier, index) => (
-          <article className="admin-settings-row admin-settings-row--stack" key={modifier.id}>
-            <div className="admin-settings-row__main">
-              <strong>{modifier.name}</strong>
-              <span>
-                {formatEgpMinor(modifier.priceMinor)} EGP ·{' '}
-                {modifier.active ? 'Active' : 'Archived'}
-              </span>
+              ) : null}
+            </article>
+          ))}
+        </section>
+      ) : (
+        <section
+          role="tabpanel"
+          id={`${tabIdPrefix}-modifiers-panel`}
+          aria-labelledby={`${tabIdPrefix}-modifiers-tab`}
+          className="admin-catalog-editor__section"
+        >
+          <div className="admin-catalog-editor__section-heading">
+            <div>
+              <h2 id="catalog-modifiers-heading">Modifiers / extras</h2>
+              <p>Manage extras, their prices, status and display order.</p>
             </div>
-            {canEdit ? (
-              <details className="admin-catalog-record-actions">
-                <summary>Actions for {modifier.name}</summary>
-                <div className="admin-inventory-page-actions">
+            {canEdit && canPrice ? (
+              <button
+                className="admin-primary-button"
+                type="button"
+                disabled={pending}
+                onClick={() => beginCreate('modifiers')}
+              >
+                Add modifier
+              </button>
+            ) : null}
+          </div>
+          {orderedModifiers.length === 0 ? <p>No modifiers configured for this draft.</p> : null}
+          <div
+            className="admin-catalog-definition-columns"
+            data-catalog-definition-columns="modifiers"
+            aria-hidden="true"
+          >
+            <span>Modifier</span>
+            <span>Price</span>
+            <span>Status</span>
+            <span>Actions</span>
+          </div>
+          {orderedModifiers.map((modifier, index) => (
+            <article
+              className="admin-catalog-definition-row admin-catalog-definition-row--modifiers"
+              key={modifier.id}
+            >
+              <div className="admin-catalog-definition-row__main">
+                <strong>{modifier.name}</strong>
+                <span className="admin-catalog-definition-type">Modifier</span>
+                <span className="admin-catalog-definition-compact-meta">
+                  EGP {formatEgpMinor(modifier.priceMinor)} ·{' '}
+                  {modifier.active ? 'Active' : 'Archived'}
+                </span>
+              </div>
+              <span className="admin-catalog-definition-price">
+                EGP {formatEgpMinor(modifier.priceMinor)}
+              </span>
+              <span
+                className={`admin-catalog-definition-status ${modifier.active ? 'is-active' : 'is-archived'}`}
+              >
+                {modifier.active ? 'Available' : 'Archived'}
+              </span>
+              {canEdit ? (
+                <div
+                  className="admin-catalog-definition-actions"
+                  role="group"
+                  aria-label={`Actions for ${modifier.name}`}
+                >
                   <button
-                    className="admin-secondary-button"
+                    className="admin-catalog-definition-action-button"
                     type="button"
+                    aria-label={`Move up ${modifier.name}`}
+                    disabled={pending || index === 0}
+                    onClick={() => changeOrder('modifiers', modifier.id, 'up')}
+                  >
+                    <span aria-hidden="true">⌃</span>
+                  </button>
+                  <button
+                    className="admin-catalog-definition-action-button"
+                    type="button"
+                    aria-label={`Move down ${modifier.name}`}
+                    disabled={pending || index === orderedModifiers.length - 1}
+                    onClick={() => changeOrder('modifiers', modifier.id, 'down')}
+                  >
+                    <span aria-hidden="true">⌄</span>
+                  </button>
+                  <button
+                    className="admin-catalog-definition-action-button"
+                    type="button"
+                    aria-label={`Edit ${modifier.name}`}
                     disabled={pending}
                     onClick={() => setEditor(editingModifier(modifier))}
                   >
-                    Edit {modifier.name}
+                    <span aria-hidden="true">✎</span>
                   </button>
                   <button
-                    className="admin-secondary-button"
+                    className="admin-catalog-definition-action-button"
                     type="button"
+                    aria-label={`${modifier.active ? 'Archive' : 'Restore'} ${modifier.name}`}
                     disabled={pending}
                     onClick={() =>
                       void persist('modifiers', {
@@ -303,30 +411,17 @@ export function CatalogDefinitionsEditor({
                       })
                     }
                   >
-                    {modifier.active ? 'Archive' : 'Restore'} {modifier.name}
-                  </button>
-                  <button
-                    className="admin-secondary-button"
-                    type="button"
-                    disabled={pending || index === 0}
-                    onClick={() => changeOrder('modifiers', modifier.id, 'up')}
-                  >
-                    Move up
-                  </button>
-                  <button
-                    className="admin-secondary-button"
-                    type="button"
-                    disabled={pending || index === orderedModifiers.length - 1}
-                    onClick={() => changeOrder('modifiers', modifier.id, 'down')}
-                  >
-                    Move down
+                    <span aria-hidden="true">{modifier.active ? '▤' : '↻'}</span>
                   </button>
                 </div>
-              </details>
-            ) : null}
-          </article>
-        ))}
-      </section>
+              ) : null}
+            </article>
+          ))}
+        </section>
+      )}
+      <p className="admin-catalog-definition-tip">
+        Category and modifier changes are saved as Draft until published.
+      </p>
       {editor && canEdit ? (
         <form className="admin-form-grid" onSubmit={submit}>
           <h3>{editor.collection === 'categories' ? 'Category details' : 'Modifier details'}</h3>
@@ -337,11 +432,10 @@ export function CatalogDefinitionsEditor({
               maxLength={160}
               value={editor.name}
               disabled={pending}
-              onChange={(event) =>
-                setEditor((current) =>
-                  current ? { ...current, name: event.currentTarget.value } : current,
-                )
-              }
+              onChange={(event) => {
+                const nextValue = event.currentTarget.value;
+                setEditor((current) => (current ? { ...current, name: nextValue } : current));
+              }}
             />
           </label>
           {editor.collection === 'categories' ? (
@@ -352,11 +446,12 @@ export function CatalogDefinitionsEditor({
                 maxLength={600}
                 value={editor.description}
                 disabled={pending}
-                onChange={(event) =>
+                onChange={(event) => {
+                  const nextValue = event.currentTarget.value;
                   setEditor((current) =>
-                    current ? { ...current, description: event.currentTarget.value } : current,
-                  )
-                }
+                    current ? { ...current, description: nextValue } : current,
+                  );
+                }}
               />
             </label>
           ) : (
@@ -366,11 +461,10 @@ export function CatalogDefinitionsEditor({
                 inputMode="decimal"
                 value={editor.price}
                 disabled={pending || !canPrice}
-                onChange={(event) =>
-                  setEditor((current) =>
-                    current ? { ...current, price: event.currentTarget.value } : current,
-                  )
-                }
+                onChange={(event) => {
+                  const nextValue = event.currentTarget.value;
+                  setEditor((current) => (current ? { ...current, price: nextValue } : current));
+                }}
               />
             </label>
           )}
@@ -382,11 +476,10 @@ export function CatalogDefinitionsEditor({
               step={1}
               value={editor.sortOrder}
               disabled={pending}
-              onChange={(event) =>
-                setEditor((current) =>
-                  current ? { ...current, sortOrder: event.currentTarget.value } : current,
-                )
-              }
+              onChange={(event) => {
+                const nextValue = event.currentTarget.value;
+                setEditor((current) => (current ? { ...current, sortOrder: nextValue } : current));
+              }}
             />
           </label>
           <label className="admin-check-field">
@@ -394,11 +487,10 @@ export function CatalogDefinitionsEditor({
               type="checkbox"
               checked={editor.active}
               disabled={pending}
-              onChange={(event) =>
-                setEditor((current) =>
-                  current ? { ...current, active: event.currentTarget.checked } : current,
-                )
-              }
+              onChange={(event) => {
+                const nextValue = event.currentTarget.checked;
+                setEditor((current) => (current ? { ...current, active: nextValue } : current));
+              }}
             />
             <span>Active</span>
           </label>

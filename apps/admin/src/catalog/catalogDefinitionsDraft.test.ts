@@ -72,6 +72,38 @@ describe('catalog definition draft persistence', () => {
     ).toThrow();
   });
 
+  it('reorders modifier definitions without dropping existing product links', () => {
+    const input = {
+      ...bundle,
+      snapshot: {
+        ...bundle.snapshot,
+        modifiers: [
+          ...bundle.snapshot.modifiers,
+          {
+            id: 'modifier-b',
+            shopId: 'shop',
+            name: 'Bacon',
+            priceMinor: 250,
+            active: true,
+            sortOrder: 20,
+          },
+        ],
+      },
+    };
+    const result = reorderCatalogDefinitionsInBundle(input, 'modifiers', [
+      'modifier-b',
+      'modifier-a',
+    ]);
+    const snapshot = result.snapshot as Record<string, unknown>;
+    const modifiers = snapshot.modifiers as Array<{ id: string; sortOrder: number }>;
+    expect(modifiers.map(({ id, sortOrder }) => ({ id, sortOrder }))).toEqual([
+      { id: 'modifier-b', sortOrder: 0 },
+      { id: 'modifier-a', sortOrder: 10 },
+    ]);
+    expect(snapshot.productModifierLinks).toEqual(bundle.snapshot.productModifierLinks);
+    expect(input.snapshot.modifiers[0]?.id).toBe('modifier-a');
+  });
+
   it('creates or renames categories only in the canonical catalog snapshot', () => {
     const updated = upsertCatalogDefinitionInBundle(bundle, 'categories', {
       id: 'category-b',

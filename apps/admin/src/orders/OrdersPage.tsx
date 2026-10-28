@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 
 import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
+import { AdminMetricStrip } from '../components/layout/AdminMetricStrip';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
@@ -101,6 +102,12 @@ export function OrdersPage() {
     [query, source, status, businessDayId, timeRange.from, timeRange.to],
   );
   const ordersApi = useOrders(shopId, selectedId, filters, timeRange.error === null);
+  const verifiedKpis = ordersApi.kpiQuery.data?.shopId === shopId ? ordersApi.kpiQuery.data : null;
+  const kpiHint = ordersApi.kpiQuery.isLoading
+    ? 'Loading verified shop total'
+    : ordersApi.kpiQuery.isError
+      ? 'Verified shop totals unavailable; retry using refresh'
+      : 'Full shop, selected date/time range';
   const rows = useMemo(
     () =>
       timeRange.error === null
@@ -145,33 +152,34 @@ export function OrdersPage() {
 
   return (
     <PageScaffold
-      eyebrow="Order supervision"
       title="Orders"
       description={`Search order history for ${shopName} and complete authorized order actions.`}
     >
-      <div className="admin-orders-shop-context" aria-label="Current order shop">
-        <span>Current shop</span>
-        <strong>{shopName}</strong>
-        <span>Only orders belonging to this authorized shop are shown.</span>
+      <div className="admin-orders-context-bar">
+        <div className="admin-orders-shop-context" aria-label="Current order shop">
+          <span>Current shop</span>
+          <strong>{shopName}</strong>
+          <span>Only orders belonging to this authorized shop are shown.</span>
+        </div>
+        <nav aria-label="Orders workspace views" className="admin-orders-shop-context">
+          <button
+            type="button"
+            className="admin-secondary-button"
+            aria-current={!onlineView ? 'page' : undefined}
+            onClick={() => setOnlineView(false)}
+          >
+            Canonical orders
+          </button>
+          <button
+            type="button"
+            className="admin-secondary-button"
+            aria-current={onlineView ? 'page' : undefined}
+            onClick={() => setOnlineView(true)}
+          >
+            Online requests
+          </button>
+        </nav>
       </div>
-      <nav aria-label="Orders workspace views" className="admin-orders-shop-context">
-        <button
-          type="button"
-          className="admin-secondary-button"
-          aria-current={!onlineView ? 'page' : undefined}
-          onClick={() => setOnlineView(false)}
-        >
-          Canonical orders
-        </button>
-        <button
-          type="button"
-          className="admin-secondary-button"
-          aria-current={onlineView ? 'page' : undefined}
-          onClick={() => setOnlineView(true)}
-        >
-          Online requests
-        </button>
-      </nav>
       {onlineView ? (
         <OnlineRequestsPanel
           shopId={shopId}
@@ -179,98 +187,144 @@ export function OrdersPage() {
           date={/^\d{4}-\d{2}-\d{2}$/.test(onlineDate) ? onlineDate : ''}
         />
       ) : (
-        <>
-          <details
-            className="admin-orders-filters"
-            open={Boolean(query || status || source || businessDayId || fromInput || toInput)}
-          >
-            <summary>Search and filters</summary>
-            <section className="admin-order-task-section is-compact" aria-label="Order filters">
-              <label className="admin-field">
-                <span>Search</span>
-                <input
-                  value={query}
-                  placeholder="Order number, customer, phone or operator"
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-              </label>
-              <label className="admin-field">
-                <span>Status</span>
-                <select
-                  value={status}
-                  onChange={(event) => setStatus(event.target.value as AdminOrderStatus | '')}
-                >
-                  <option value="">All statuses</option>
-                  <option value="ACTIVE">Active</option>
-                  <option value="DONE">Done</option>
-                  <option value="CANCELLED">Cancelled</option>
-                  <option value="RETURNED">Returned</option>
-                </select>
-              </label>
-              <label className="admin-field">
-                <span>Operational Business Day</span>
-                <select
-                  value={businessDayId}
-                  onChange={(event) => setBusinessDayId(event.target.value)}
-                >
-                  <option value="">All business days</option>
-                  {(ordersApi.businessDaysQuery.data?.days ?? []).map((day) => (
-                    <option key={day.id} value={day.id}>
-                      {new Intl.DateTimeFormat('en-EG', {
-                        dateStyle: 'medium',
-                        timeStyle: 'short',
-                        timeZone: 'Africa/Cairo',
-                      }).format(new Date(day.startedAt))}{' '}
-                      · {day.status} · {day.id.slice(0, 8)}
-                    </option>
-                  ))}
-                </select>
-                {ordersApi.businessDaysQuery.isError ? (
-                  <small>Business Days are unavailable; refresh to retry.</small>
+        <div className="admin-orders-canonical-view">
+          <AdminMetricStrip
+            label="Orders key metrics"
+            metrics={[
+              {
+                id: 'total',
+                label: 'Total Orders',
+                value: verifiedKpis?.orderCount ?? null,
+                hint: kpiHint,
+              },
+              {
+                id: 'revenue',
+                label: 'Total Revenue',
+                value:
+                  principal.permissions.includes('finance.view') &&
+                  verifiedKpis?.netSalesMinor != null
+                    ? formatEgp(verifiedKpis.netSalesMinor)
+                    : null,
+                hint: principal.permissions.includes('finance.view')
+                  ? kpiHint
+                  : 'Requires finance access',
+              },
+              {
+                id: 'average',
+                label: 'Average Order Value',
+                value:
+                  principal.permissions.includes('finance.view') &&
+                  verifiedKpis?.averageOrderMinor != null
+                    ? formatEgp(verifiedKpis.averageOrderMinor)
+                    : null,
+                hint: principal.permissions.includes('finance.view')
+                  ? verifiedKpis?.denominatorPaidOrderCount === 0
+                    ? 'No paid orders in selected period'
+                    : kpiHint
+                  : 'Requires finance access',
+              },
+              {
+                id: 'active',
+                label: 'Active Orders',
+                value: verifiedKpis?.activeOrderCount ?? null,
+                hint: kpiHint,
+              },
+            ]}
+          />
+          <div className="admin-orders-toolbar">
+            <label className="admin-field admin-orders-search-persistent">
+              <span>Search</span>
+              <input
+                type="search"
+                value={query}
+                placeholder="Order number, customer, phone or operator"
+                onChange={(event) => setQuery(event.currentTarget.value)}
+              />
+            </label>
+            <details
+              className="admin-orders-filters"
+              open={Boolean(status || source || businessDayId || fromInput || toInput)}
+            >
+              <summary>Search and filters</summary>
+              <section className="admin-order-task-section is-compact" aria-label="Order filters">
+                <label className="admin-field">
+                  <span>Status</span>
+                  <select
+                    value={status}
+                    onChange={(event) => setStatus(event.target.value as AdminOrderStatus | '')}
+                  >
+                    <option value="">All statuses</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="DONE">Done</option>
+                    <option value="CANCELLED">Cancelled</option>
+                    <option value="RETURNED">Returned</option>
+                  </select>
+                </label>
+                <label className="admin-field">
+                  <span>Operational Business Day</span>
+                  <select
+                    value={businessDayId}
+                    onChange={(event) => setBusinessDayId(event.target.value)}
+                  >
+                    <option value="">All business days</option>
+                    {(ordersApi.businessDaysQuery.data?.days ?? []).map((day) => (
+                      <option key={day.id} value={day.id}>
+                        {new Intl.DateTimeFormat('en-EG', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                          timeZone: 'Africa/Cairo',
+                        }).format(new Date(day.startedAt))}{' '}
+                        · {day.status} · {day.id.slice(0, 8)}
+                      </option>
+                    ))}
+                  </select>
+                  {ordersApi.businessDaysQuery.isError ? (
+                    <small>Business Days are unavailable; refresh to retry.</small>
+                  ) : null}
+                </label>
+                <label className="admin-field">
+                  <span>From date/time (Cairo)</span>
+                  <input
+                    type="datetime-local"
+                    value={fromInput}
+                    onChange={(event) => setFromInput(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>To date/time (Cairo)</span>
+                  <input
+                    type="datetime-local"
+                    value={toInput}
+                    min={fromInput || undefined}
+                    onChange={(event) => setToInput(event.currentTarget.value)}
+                  />
+                </label>
+                {fromInput || toInput ? (
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    onClick={() => {
+                      setFromInput('');
+                      setToInput('');
+                    }}
+                  >
+                    Clear date filters
+                  </button>
                 ) : null}
-              </label>
-              <label className="admin-field">
-                <span>From date/time (Cairo)</span>
-                <input
-                  type="datetime-local"
-                  value={fromInput}
-                  onChange={(event) => setFromInput(event.currentTarget.value)}
-                />
-              </label>
-              <label className="admin-field">
-                <span>To date/time (Cairo)</span>
-                <input
-                  type="datetime-local"
-                  value={toInput}
-                  min={fromInput || undefined}
-                  onChange={(event) => setToInput(event.currentTarget.value)}
-                />
-              </label>
-              {fromInput || toInput ? (
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  onClick={() => {
-                    setFromInput('');
-                    setToInput('');
-                  }}
-                >
-                  Clear date filters
-                </button>
-              ) : null}
-              <label className="admin-field">
-                <span>Source</span>
-                <select
-                  value={source}
-                  onChange={(event) => setSource(event.target.value as AdminOrderSource | '')}
-                >
-                  <option value="">All sources</option>
-                  <option value="POS">POS</option>
-                  <option value="ONLINE">Online</option>
-                </select>
-              </label>
-            </section>
-          </details>
+                <label className="admin-field">
+                  <span>Source</span>
+                  <select
+                    value={source}
+                    onChange={(event) => setSource(event.target.value as AdminOrderSource | '')}
+                  >
+                    <option value="">All sources</option>
+                    <option value="POS">POS</option>
+                    <option value="ONLINE">Online</option>
+                  </select>
+                </label>
+              </section>
+            </details>
+          </div>
 
           {canExport && !timeRange.error ? (
             <a
@@ -285,6 +339,7 @@ export function OrdersPage() {
           {actionError ? <p role="alert">{actionError}</p> : null}
 
           <ResponsiveMasterDetail
+            className="admin-orders-master-detail"
             listLabel="Orders"
             detailLabel="Order detail"
             detailActive={selectedId !== null}
@@ -334,6 +389,15 @@ export function OrdersPage() {
                     }
                   />
                 ) : null}
+                <div className="admin-orders-list__columns" aria-hidden="true">
+                  <span>Order</span>
+                  <span>Customer</span>
+                  <span>Type</span>
+                  <span>Source</span>
+                  <span>Amount</span>
+                  <span>Status</span>
+                  <span>Date &amp; time</span>
+                </div>
                 {rows.map((row) => (
                   <button
                     className={
@@ -347,26 +411,24 @@ export function OrdersPage() {
                       setAction(null);
                     }}
                   >
-                    <span className="admin-order-row__identity">
+                    <span className="admin-order-row__number">
                       <strong>{row.displayOrderLabel ?? `#${row.displayOrderNo}`}</strong>
-                      <small>{row.customerName ?? row.normalizedPhone ?? 'Walk-in'}</small>
-                      <small>
-                        {row.orderTypeLabel} · {orderSourceLabel(row.source)}
-                      </small>
                     </span>
-                    <span className="admin-order-row__summary">
-                      <b className="admin-order-row__amount">{formatEgp(row.totalMinor)}</b>
-                      <span className="admin-order-row__status">
-                        {orderStatusLabel(row.status)}
-                      </span>
-                      <time dateTime={row.createdAt}>
-                        {new Intl.DateTimeFormat('en-EG', {
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                          timeZone: 'Africa/Cairo',
-                        }).format(new Date(row.createdAt))}
-                      </time>
+                    <span className="admin-order-row__customer">
+                      <strong>{row.customerName ?? 'Walk-in'}</strong>
+                      {row.normalizedPhone ? <small>{row.normalizedPhone}</small> : null}
                     </span>
+                    <span className="admin-order-row__type">{row.orderTypeLabel}</span>
+                    <span className="admin-order-row__source">{orderSourceLabel(row.source)}</span>
+                    <b className="admin-order-row__amount">{formatEgp(row.totalMinor)}</b>
+                    <span className="admin-order-row__status">{orderStatusLabel(row.status)}</span>
+                    <time className="admin-order-row__time" dateTime={row.createdAt}>
+                      {new Intl.DateTimeFormat('en-EG', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                        timeZone: 'Africa/Cairo',
+                      }).format(new Date(row.createdAt))}
+                    </time>
                   </button>
                 ))}
                 {ordersApi.searchQuery.hasNextPage ? (
@@ -477,7 +539,7 @@ export function OrdersPage() {
               />
             }
           />
-        </>
+        </div>
       )}
     </PageScaffold>
   );

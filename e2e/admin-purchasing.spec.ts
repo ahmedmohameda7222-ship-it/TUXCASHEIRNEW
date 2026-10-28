@@ -40,6 +40,8 @@ async function mockPurchasing(
     failureCode?: string;
     failureCodesByCommand?: Readonly<Record<string, string>>;
     supplierCreateResponseLossOnce?: boolean;
+    noReference?: boolean;
+    expectedCostMinor?: number;
   } = {},
 ) {
   const commands: Command[] = [];
@@ -118,7 +120,7 @@ async function mockPurchasing(
               supplierId,
               supplierName: 'Prime Foods',
               status,
-              reference: 'PO-100',
+              reference: options.noReference ? null : 'PO-100',
               expectedDeliveryDate: '2026-09-20',
               version,
               orderedAt: status === 'DRAFT' ? null : '2026-09-19T06:00:00.000Z',
@@ -143,7 +145,7 @@ async function mockPurchasing(
                   remainingBaseMicros:
                     10_000_000 -
                     (receivedPurchaseUnitsMicros * baseMicrosPerPurchaseUnit) / 1_000_000,
-                  expectedPurchaseUnitCostMinor: 24000,
+                  expectedPurchaseUnitCostMinor: options.expectedCostMinor ?? 24000,
                   expectedUnitCostMinor: 12000,
                 },
               ],
@@ -195,6 +197,29 @@ async function mockPurchasing(
         });
         return;
       }
+    }
+    if (
+      command.type === 'supplier.update' ||
+      command.type === 'supplier.archive' ||
+      command.type === 'supplier.restore'
+    ) {
+      const supplierIdToManage = String(command.supplierId);
+      const action = command.type;
+      const patch = command.payload as Partial<AdminSupplier>;
+      suppliers = suppliers.map((supplier) => {
+        if (supplier.id !== supplierIdToManage) return supplier;
+        return {
+          ...supplier,
+          ...(action === 'supplier.update' ? patch : {}),
+          active:
+            action === 'supplier.archive'
+              ? false
+              : action === 'supplier.restore'
+                ? true
+                : supplier.active,
+          version: (supplier.version ?? 1) + 1,
+        };
+      });
     }
     if (command.type === 'po.order') {
       status = 'ORDERED';
@@ -330,6 +355,53 @@ for (const viewport of [
     });
   });
 }
+
+test('P1 desktop selects first PO while phone opens directory', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockPurchasing(page);
+  await page.goto('/purchasing');
+
+  const detail = page.getByRole('region', { name: 'Purchase order detail' });
+  await expect(detail).toBeVisible();
+  await expect(detail).toContainText('PO-100');
+  await expect(page.locator('.admin-purchasing-list-row.is-selected')).toHaveCount(1);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/purchasing');
+  await expect(page.getByRole('heading', { name: 'Purchase orders' })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+  expect(overflow).toBe(false);
+});
+
+test('P1 mobile finds a PO using its displayed fallback reference', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockPurchasing(page, { noReference: true });
+  await page.goto('/purchasing');
+
+  const referenceLabel = page.locator('.admin-purchasing-row-reference strong');
+  const reference = await referenceLabel.innerText();
+  expect(reference).toMatch(/^PO-[0-9A-Z]{13}$/);
+
+  const search = page.getByRole('searchbox', { name: 'Search purchase orders' });
+  await search.fill(reference);
+  await expect(page.locator('.admin-purchasing-list-row')).toHaveCount(1);
+  const empty = page.getByText('No purchase orders match these filters.');
+  await expect(empty).toHaveCount(0);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+  expect(overflow).toBe(false);
+});
+
+test('P2 mobile item cost retains every persisted safe-integer EGP minor unit', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockPurchasing(page, { expectedCostMinor: Number.MAX_SAFE_INTEGER - 1 });
+  await page.goto('/purchasing');
+  await selectPurchaseOrder(page);
+  await page.getByRole('tab', { name: 'Items', exact: true }).click();
+  await expect(page.getByText('90071992547409.90 EGP')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
 
 test('purchasing renders suppliers and can order a draft PO through the trusted BFF', async ({
   page,
@@ -520,6 +592,41 @@ test('purchase order defaults adopt the first supplier created after an initiall
   });
 });
 
+test('P3 mobile receipt and return sheets distinguish ordered, posted, and still allowable units', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const fixture = await mockPurchasing(page);
+  await page.goto('/purchasing');
+  await selectPurchaseOrder(page);
+  await page.getByRole('button', { name: 'Mark ordered' }).click();
+
+  await page.getByRole('button', { name: 'Receive purchase' }).click();
+  const receipt = page.getByRole('dialog', { name: 'Receive purchase' });
+  await expect(receipt.getByText('Ordered: 5 case')).toBeVisible();
+  await expect(receipt.getByText('Already received: 0 case')).toBeVisible();
+  await expect(receipt.getByText('Maximum remaining: 5 case')).toBeVisible();
+  await receipt.getByLabel('Receive Beef').fill('2');
+  await receipt.getByLabel('Unit cost for Beef').fill('250');
+  await receipt.getByRole('button', { name: 'Post receipt' }).click();
+  await expect(page.locator('.admin-purchasing-order-header')).toContainText('Partially received');
+
+  await page.getByRole('button', { name: 'Receive purchase' }).click();
+  const secondReceipt = page.getByRole('dialog', { name: 'Receive purchase' });
+  await expect(secondReceipt.getByText('Ordered: 5 case')).toBeVisible();
+  await expect(secondReceipt.getByText('Already received: 2 case')).toBeVisible();
+  await expect(secondReceipt.getByText('Maximum remaining: 3 case')).toBeVisible();
+  await secondReceipt.getByRole('button', { name: 'Cancel' }).click();
+
+  await page.getByRole('button', { name: 'Return purchase' }).click();
+  const returned = page.getByRole('dialog', { name: 'Return purchase' });
+  await expect(returned.getByText('Already received: 2 case')).toBeVisible();
+  await expect(returned.getByText('Already returned: 0 case')).toBeVisible();
+  await expect(returned.getByText('Maximum returnable: 2 case')).toBeVisible();
+  expect(fixture.commands.filter((command) => command.type === 'po.receive')).toHaveLength(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
 test('purchasing posts partial receiving and purchase returns without pretending the remainder arrived', async ({
   page,
 }) => {
@@ -602,6 +709,150 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     await capturePremiumScreenshot(page, 'purchasing');
   });
 }
+
+test('P4 mobile filter clears supplier inspector before different archive', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const otherId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbd';
+  const fixture = await mockPurchasing(page, {
+    initialSuppliers: [
+      {
+        id: supplierId,
+        businessId: session.principal.businessId,
+        name: 'Prime Foods',
+        contactName: 'Sara',
+        phone: '01000000000',
+        email: 'orders@prime.test',
+        active: true,
+        version: 2,
+      },
+      {
+        id: otherId,
+        businessId: session.principal.businessId,
+        name: 'Delta Produce',
+        contactName: 'Dalia',
+        phone: null,
+        email: null,
+        active: true,
+        version: 3,
+      },
+    ],
+  });
+  await page.goto('/purchasing');
+  await openSuppliers(page);
+  const inspector = page.getByRole('complementary', { name: 'Selected supplier detail' });
+  await page.getByRole('button', { name: 'Prime Foods' }).click();
+  await expect(inspector).toBeVisible();
+  await expect(inspector.getByRole('heading', { name: 'Prime Foods' })).toBeVisible();
+
+  await page.getByRole('searchbox', { name: 'Search suppliers' }).fill('Delta');
+  await expect(inspector).toBeHidden();
+  expect(fixture.commands).toHaveLength(0);
+  await page.getByRole('button', { name: 'Delta Produce' }).click();
+  await expect(inspector.getByRole('heading', { name: 'Delta Produce' })).toBeVisible();
+  await inspector.getByRole('button', { name: 'Archive Delta Produce' }).click();
+  const confirm = page.getByRole('dialog', { name: 'Archive supplier?' });
+  await expect(confirm).toContainText('Delta Produce');
+  await confirm.getByRole('button', { name: 'Archive supplier' }).click();
+  const archiveCommands = () => fixture.commands.filter((c) => c.type === 'supplier.archive');
+  await expect.poll(() => archiveCommands().length).toBe(1);
+  expect(archiveCommands()[0]).toMatchObject({
+    supplierId: otherId,
+    expectedVersion: 3,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('P4 duplicate supplier error stays inside 360px sheet', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  const fixture = await mockPurchasing(page, {
+    failCommandType: 'supplier.create',
+    failureCode: 'duplicate_supplier',
+  });
+  await page.goto('/purchasing');
+  const dialog = await openSupplierDialog(page);
+  await dialog.getByRole('textbox', { name: 'Supplier name' }).fill('Prime Foods');
+  await dialog.getByRole('button', { name: 'Add supplier' }).click();
+  await expect(dialog.getByRole('alert')).toContainText(
+    'A supplier with these details already exists.',
+  );
+  await expect(dialog.getByRole('textbox', { name: 'Supplier name' })).toHaveValue('Prime Foods');
+  await expect(dialog).toBeVisible();
+  expect(fixture.commands.filter((c) => c.type === 'supplier.create')).toHaveLength(1);
+});
+
+test('P4 mobile restore and edit enable archived supplier for new PO', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const archivedId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbe';
+  const fixture = await mockPurchasing(page, {
+    initialSuppliers: [
+      {
+        id: supplierId,
+        businessId: session.principal.businessId,
+        name: 'Prime Foods',
+        contactName: null,
+        phone: null,
+        email: null,
+        active: true,
+        version: 1,
+      },
+      {
+        id: archivedId,
+        businessId: session.principal.businessId,
+        name: 'West Farms',
+        contactName: null,
+        phone: null,
+        email: null,
+        active: false,
+        version: 4,
+      },
+    ],
+  });
+  await page.goto('/purchasing');
+  await openPurchaseOrders(page);
+  await page.getByRole('button', { name: 'New purchase order' }).click();
+  let dialog = page.getByRole('dialog', { name: 'New purchase order' });
+  await expect(dialog.getByLabel('Supplier').locator(`option[value="${archivedId}"]`)).toHaveCount(
+    0,
+  );
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+
+  await openSuppliers(page);
+  await page.getByRole('button', { name: 'West Farms' }).click();
+  const inspector = page.getByRole('complementary', { name: 'Selected supplier detail' });
+  await expect(inspector.getByRole('button', { name: 'Restore West Farms' })).toBeVisible();
+  await inspector.getByRole('button', { name: 'Restore West Farms' }).click();
+  await expect(inspector).toContainText('Active');
+  const restoreCommands = () => fixture.commands.filter((c) => c.type === 'supplier.restore');
+  await expect.poll(() => restoreCommands().length).toBe(1);
+  expect(restoreCommands()[0]).toMatchObject({
+    supplierId: archivedId,
+    expectedVersion: 4,
+    shopId,
+  });
+
+  await inspector.getByRole('button', { name: 'Edit West Farms' }).click();
+  dialog = page.getByRole('dialog', { name: 'Edit supplier' });
+  await expect(dialog.getByLabel('Supplier name')).toHaveValue('West Farms');
+  await dialog.getByLabel('Email').fill('orders@west.test');
+  await dialog.getByRole('button', { name: 'Save supplier' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(inspector).toContainText('orders@west.test');
+  expect(fixture.commands.find((c) => c.type === 'supplier.update')).toMatchObject({
+    supplierId: archivedId,
+    expectedVersion: 5,
+    payload: expect.objectContaining({ email: 'orders@west.test' }),
+  });
+
+  await openPurchaseOrders(page);
+  await page.getByRole('button', { name: 'New purchase order' }).click();
+  dialog = page.getByRole('dialog', { name: 'New purchase order' });
+  await expect(dialog.getByLabel('Supplier').locator(`option[value="${archivedId}"]`)).toHaveCount(
+    1,
+  );
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByText('PO-100').first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
 
 test('selected supplier details appear adjacent to compact directory on desktop', async ({
   page,

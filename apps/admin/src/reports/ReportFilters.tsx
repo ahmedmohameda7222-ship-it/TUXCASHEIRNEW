@@ -1,5 +1,6 @@
 import type { AdminReportArea } from '@tux/admin-contracts';
 
+import { chooseReportArea } from './reportAreaTransition';
 import type { ReportContext, ReportFilters as ReportQueryFilters } from './useReports';
 
 export const REPORT_LABELS: Readonly<Record<AdminReportArea, string>> = {
@@ -146,7 +147,9 @@ export function ReportFilters({
         Report
         <select
           value={value.area}
-          onChange={(event) => set('area', event.target.value as AdminReportArea)}
+          onChange={(event) =>
+            onChange(chooseReportArea(value, event.target.value as AdminReportArea))
+          }
         >
           {REPORT_TOPICS.map((topic) => (
             <optgroup label={topic.label} key={topic.label}>

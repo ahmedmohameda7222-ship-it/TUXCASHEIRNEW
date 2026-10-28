@@ -5,6 +5,13 @@ import type {
 } from '@tux/admin-contracts';
 import { useState, type FormEvent } from 'react';
 
+function exactEgp(minor: number): string {
+  if (!Number.isSafeInteger(minor)) return 'Unavailable';
+  const cents = BigInt(minor);
+  const abs = cents < 0n ? -cents : cents;
+  return `${cents < 0n ? '-' : ''}${abs / 100n}.${String(abs % 100n).padStart(2, '0')}`;
+}
+
 export type LoyaltyAdjustmentInput = {
   pointsDelta: number;
   reasonCodeId: string;
@@ -15,9 +22,11 @@ function loyaltyEventLabel(eventType: string): string {
   const labels: Record<string, string> = {
     EARN: 'Points earned',
     REDEEM: 'Points redeemed',
-    ADJUSTMENT: 'Manual adjustment',
+    MANUAL_ADJUSTMENT: 'Manual adjustment',
     EXPIRY: 'Points expired',
-    REFUND: 'Refund adjustment',
+    CANCEL_COMPENSATION: 'Cancellation adjustment',
+    REFUND_COMPENSATION: 'Refund adjustment',
+    RETURN_COMPENSATION: 'Return adjustment',
   };
   return labels[eventType] ?? 'Loyalty update';
 }
@@ -43,6 +52,7 @@ export function LoyaltyPanel({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving) return;
     const parsed = Number(pointsDelta);
     if (!Number.isSafeInteger(parsed) || parsed === 0 || !reasonCodeId.trim()) {
       return;
@@ -73,7 +83,7 @@ export function LoyaltyPanel({
           </div>
           <div>
             <dt>Redemption value</dt>
-            <dd>1 point = EGP {(program.redemptionMinorPerPoint / 100).toFixed(2)}</dd>
+            <dd>1 point = EGP {exactEgp(program.redemptionMinorPerPoint)}</dd>
           </div>
           <div>
             <dt>Minimum redemption</dt>
@@ -113,6 +123,7 @@ export function LoyaltyPanel({
             <span>Points delta</span>
             <input
               inputMode="numeric"
+              disabled={saving}
               value={pointsDelta}
               onChange={(event) => setPointsDelta(event.target.value)}
             />
@@ -121,6 +132,7 @@ export function LoyaltyPanel({
             <span>Reason</span>
             <select
               value={reasonCodeId}
+              disabled={saving}
               onChange={(event) => setReasonCodeId(event.target.value)}
               required
             >
@@ -134,7 +146,11 @@ export function LoyaltyPanel({
           </label>
           <label className="admin-field">
             <span>Note</span>
-            <textarea value={note} onChange={(event) => setNote(event.target.value)} />
+            <textarea
+              disabled={saving}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+            />
           </label>
           <button className="admin-primary-button" type="submit" disabled={saving}>
             {saving ? 'Saving…' : 'Adjust points'}

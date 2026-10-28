@@ -135,7 +135,13 @@ function summary(order: AdminOrderDetail): AdminOrderSummary {
 
 async function mockOrders(
   page: Page,
-  options: { staleCancellation?: boolean; emptyOrders?: boolean; paidActive?: boolean } = {},
+  options: {
+    staleCancellation?: boolean;
+    emptyOrders?: boolean;
+    paidActive?: boolean;
+    financeVisible?: boolean;
+    paginate?: boolean;
+  } = {},
 ) {
   let active = detail({
     id: activeOrderId,
@@ -158,12 +164,23 @@ async function mockOrders(
   if (options.paidActive) active = { ...active, payments: done.payments };
   const commands: Record<string, unknown>[] = [];
   const searches: URL[] = [];
+  const kpiRequests: URL[] = [];
 
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(ownerSession),
+      body: JSON.stringify(
+        options.financeVisible
+          ? {
+              ...ownerSession,
+              principal: {
+                ...ownerSession.principal,
+                permissions: [...ownerSession.principal.permissions, 'finance.view'],
+              },
+            }
+          : ownerSession,
+      ),
     });
   });
 
@@ -184,6 +201,26 @@ async function mockOrders(
 
     if (request.method() === 'GET') {
       expect(url.searchParams.get('shopId')).toBe(shopId);
+      if (url.searchParams.get('view') === 'kpis') {
+        kpiRequests.push(url);
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            shopId,
+            orderCount: options.emptyOrders ? 0 : 65,
+            activeOrderCount: options.emptyOrders ? 0 : 7,
+            netSalesMinor: options.financeVisible ? (options.emptyOrders ? 0 : 471550) : null,
+            averageOrderMinor: options.financeVisible && !options.emptyOrders ? 7918 : null,
+            denominatorPaidOrderCount: options.financeVisible
+              ? options.emptyOrders
+                ? 0
+                : 58
+              : null,
+          }),
+        });
+        return;
+      }
       if (url.searchParams.get('view') === 'action-reasons') {
         await route.fulfill({
           status: 200,
@@ -261,7 +298,19 @@ async function mockOrders(
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ shopId, rows, nextCursor: null }),
+        body: JSON.stringify({
+          shopId,
+          rows: options.paginate
+            ? rows.slice(
+                url.searchParams.get('cursor') === 'orders-next-2' ? 1 : 0,
+                url.searchParams.get('cursor') === 'orders-next-2' ? 2 : 1,
+              )
+            : rows,
+          nextCursor:
+            options.paginate && !url.searchParams.get('cursor') && rows.length > 1
+              ? 'orders-next-2'
+              : null,
+        }),
       });
       return;
     }
@@ -453,6 +502,7 @@ async function mockOrders(
   return {
     commands,
     searches,
+    kpiRequests,
     get active() {
       return active;
     },
@@ -477,6 +527,8 @@ test('orders search filters real Admin list and exposes status-contextual action
   await expect(page.getByRole('button', { name: 'Return items' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Cancel order' })).toHaveCount(0);
 
+  // The approved Orders view keeps search immediately available; filters remain a disclosure.
+  await expect(page.getByRole('searchbox', { name: 'Search', exact: true })).toBeVisible();
   await page.getByText('Search and filters', { exact: true }).click();
   await page.getByLabel('Search').fill('Mona');
   await page.getByRole('combobox', { name: 'Status' }).first().selectOption('DONE');
@@ -797,7 +849,7 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     const list = page.locator('.admin-master-detail__list');
     await list.getByRole('button', { name: /#101/ }).click();
     await expect(page.locator('.admin-master-detail__detail')).toBeVisible();
-    if (viewport.width <= 480) {
+    if (viewport.width <= 1100) {
       await expect(list).toBeHidden();
       await expect(page.getByRole('link', { name: /back to orders/i })).toBeVisible();
     } else {
@@ -806,6 +858,9 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+    // Full-page screenshots of sticky shell/navigation must start at the real
+    // page origin; clicking a lower list row can otherwise displace topbars.
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     await capturePremiumScreenshot(page, 'orders');
   });
 }
@@ -842,3 +897,346 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
     }
   }
 }
+
+test('approved desktop order directory exposes named data columns without fake selection actions', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1536, height: 960 });
+  await mockOrders(page);
+  await page.goto('/orders');
+  const header = page.locator('.admin-orders-list__columns');
+  await expect(header).toBeVisible();
+  for (const label of ['Order', 'Customer', 'Type', 'Source', 'Amount', 'Status', 'Date & time']) {
+    await expect(header).toContainText(label);
+  }
+  const first = page.locator('.admin-order-row').first();
+  await expect(first.locator('.admin-order-row__number')).toContainText('#101');
+  await expect(first.locator('.admin-order-row__customer')).toContainText('Ahmed');
+  await expect(first.locator('.admin-order-row__source')).toContainText('In-store');
+  await expect(first.locator('.admin-order-row__status')).toContainText('Active');
+  await expect(page.getByRole('button', { name: 'Bulk cancel' })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
+test('O2 KPIs remain shop-wide when only two directory rows are loaded', async ({ page }) => {
+  const fixture = await mockOrders(page, { financeVisible: true });
+  await page.goto('/orders');
+  const strip = page.locator('dl[aria-label="Orders key metrics"]');
+  await expect(strip).toContainText('65');
+  await expect(strip).toContainText('7');
+  await expect(strip).toContainText('EGP 4,715.50');
+  await expect(strip).toContainText('EGP 79.18');
+  expect(fixture.kpiRequests).toHaveLength(1);
+  expect(fixture.kpiRequests[0]?.searchParams.get('cursor')).toBeNull();
+});
+
+test('O2 financial KPI fields never reveal money to orders-only viewer', async ({ page }) => {
+  await mockOrders(page);
+  await page.goto('/orders');
+  const strip = page.locator('dl[aria-label="Orders key metrics"]');
+  await expect(strip).toContainText('Requires finance access');
+  await expect(strip).not.toContainText('EGP 4,715.50');
+  await expect(strip).toContainText('65');
+});
+
+test('O2 zero paid orders have null AOV rather than fabricated zero', async ({ page }) => {
+  await mockOrders(page, { emptyOrders: true, financeVisible: true });
+  await page.goto('/orders');
+  const strip = page.locator('dl[aria-label="Orders key metrics"]');
+  await expect(strip).toContainText('No paid orders in selected period');
+  await expect(strip).toContainText('Unavailable');
+});
+
+test('O1 nextCursor reveals additional server rows without changing the full-shop KPI', async ({
+  page,
+}) => {
+  const fixture = await mockOrders(page, { paginate: true, financeVisible: true });
+  await page.goto('/orders');
+  const list = page.getByRole('region', { name: 'Orders' });
+  await expect(list.getByRole('button', { name: /#101/ })).toBeVisible();
+  await expect(list.getByRole('button', { name: /#102/ })).toHaveCount(0);
+  await expect(page.locator('dl[aria-label="Orders key metrics"]')).toContainText('65');
+  await page.getByRole('button', { name: 'Load more' }).click();
+  await expect(list.getByRole('button', { name: /#102/ })).toBeVisible();
+  await expect(list.getByRole('button', { name: /#101/ })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Load more' })).toHaveCount(0);
+  await expect
+    .poll(() => fixture.searches.some((url) => url.searchParams.get('cursor') === 'orders-next-2'))
+    .toBe(true);
+  await expect(page.locator('dl[aria-label="Orders key metrics"]')).toContainText('65');
+  expect(fixture.kpiRequests).toHaveLength(1);
+});
+
+for (const width of [1100, 720] as const) {
+  test(`Orders inspector landmarks remain reachable at ${width}px CSS viewport`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await mockOrders(page);
+    await page.goto('/orders');
+    await page.getByRole('button', { name: /#101/ }).click();
+    if (width === 1100) {
+      await expect(page.locator('.admin-master-detail__list')).toBeHidden();
+      await expect(page.getByRole('link', { name: /back to orders/i })).toBeVisible();
+    }
+    const inspector = page.getByRole('navigation', { name: 'Order detail sections' });
+    await expect(inspector.getByRole('link')).toHaveCount(6);
+    await inspector.getByRole('link', { name: 'History' }).click();
+    await expect(page).toHaveURL(/#order-detail-history$/);
+    await expect(page.locator('#order-detail-history')).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await capturePremiumScreenshot(page, 'orders-inspector');
+  });
+}
+
+test('approved Orders 1536×1024 reference composition remains fully navigable', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1536, height: 1024 });
+  await mockOrders(page, { financeVisible: true });
+  await page.goto('/orders');
+  const stripPosition = await page.locator('dl[aria-label="Orders key metrics"]').boundingBox();
+  expect(stripPosition?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(300);
+  await expect(page.getByLabel('Current order shop')).toContainText('TUX Maadi');
+  await expect(page.getByRole('button', { name: 'Online requests' })).toBeVisible();
+  const kpis = page.getByLabel('Orders key metrics');
+  for (const exactLabel of [
+    'Total Orders',
+    'Total Revenue',
+    'Average Order Value',
+    'Active Orders',
+  ]) {
+    await expect(kpis.getByText(exactLabel, { exact: true })).toBeVisible();
+  }
+  await page.getByRole('button', { name: /#101/ }).click();
+  await expect(page.getByRole('navigation', { name: 'Order detail sections' })).toBeVisible();
+  await expect(page.locator('.admin-master-detail__list')).toBeVisible();
+  const kpiBox = await page.locator('dl[aria-label="Orders key metrics"]').boundingBox();
+  const inspectorBox = await page.locator('.admin-master-detail__detail').boundingBox();
+  expect(kpiBox).not.toBeNull();
+  expect(inspectorBox).not.toBeNull();
+  expect(kpiBox!.x + kpiBox!.width).toBeLessThanOrEqual(inspectorBox!.x);
+  expect(Math.abs(kpiBox!.y - inspectorBox!.y)).toBeLessThanOrEqual(20);
+  const revenueHeight = await page
+    .locator('dl[aria-label="Orders key metrics"] dd')
+    .nth(1)
+    .evaluate((element) => element.getBoundingClientRect().height);
+  expect(revenueHeight).toBeLessThanOrEqual(28);
+  const completedStatus = page.locator('.admin-order-row__status').filter({ hasText: 'Completed' });
+  const statusHeight = await completedStatus.evaluate(
+    (element) => element.getBoundingClientRect().height,
+  );
+  expect(statusHeight).toBeLessThanOrEqual(28);
+
+  const itemAmount = page
+    .locator('.admin-order-detail__row')
+    .first()
+    .locator('span:last-child strong');
+  const itemCaption = page
+    .locator('.admin-order-detail__row')
+    .first()
+    .locator('span:last-child small');
+  const amountBox = await itemAmount.boundingBox();
+  const captionBox = await itemCaption.boundingBox();
+  expect(amountBox).not.toBeNull();
+  expect(captionBox).not.toBeNull();
+  expect(captionBox!.y).toBeGreaterThanOrEqual(amountBox!.y + amountBox!.height);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await capturePremiumScreenshot(page, 'orders-reference');
+  // The approved static reference is exactly one 1536 × 1024 viewport, not
+  // a browser full-page image extending below the fold.
+  if (process.env['TUX_ADMIN_EIGHT_TABS_CAPTURE'] === '1') {
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+    await page.screenshot({
+      path: 'artifacts/p04-p07/orders-reference-1536x1024.png',
+      fullPage: false,
+      animations: 'disabled',
+    });
+  }
+});
+
+test('O1 date filters transmit Cairo-converted UTC instants to both Orders and full-shop KPIs', async ({
+  page,
+}) => {
+  const fixture = await mockOrders(page, { financeVisible: true });
+  await page.goto('/orders');
+  await page.getByText('Search and filters', { exact: true }).click();
+  const from = page.getByLabel('From date/time (Cairo)');
+  const to = page.getByLabel('To date/time (Cairo)');
+  await from.fill('2026-10-01T08:30');
+  await to.fill('2026-10-01T10:30');
+  await expect
+    .poll(() =>
+      fixture.searches.some(
+        (url) =>
+          url.searchParams.get('from') === '2026-10-01T05:30:00.000Z' &&
+          url.searchParams.get('to') === '2026-10-01T07:30:00.000Z',
+      ),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      fixture.kpiRequests.some(
+        (url) =>
+          url.searchParams.get('from') === '2026-10-01T05:30:00.000Z' &&
+          url.searchParams.get('to') === '2026-10-01T07:30:00.000Z',
+      ),
+    )
+    .toBe(true);
+  await page.getByRole('button', { name: 'Clear date filters' }).click();
+  await expect(from).toHaveValue('');
+  await expect(to).toHaveValue('');
+  // Returning to a cached, unfiltered query need not issue an unnecessary
+  // second network request; validate the visible canonical result instead.
+  await expect(page.getByRole('button', { name: /#101/ })).toBeVisible();
+  await expect(page.locator('dl[aria-label="Orders key metrics"]')).toContainText('65');
+});
+
+test('O1 reversed Cairo range never submits an invalid list or money-aggregation query', async ({
+  page,
+}) => {
+  const fixture = await mockOrders(page, { financeVisible: true });
+  await page.goto('/orders');
+  await expect(page.locator('dl[aria-label="Orders key metrics"]')).toContainText('65');
+  await page.getByText('Search and filters', { exact: true }).click();
+  await page.getByLabel('To date/time (Cairo)').fill('2026-10-01T08:30');
+  await page.getByLabel('From date/time (Cairo)').fill('2026-10-02T10:30');
+  await expect(page.getByRole('alert')).toContainText(
+    'Start date/time must be before end date/time',
+  );
+  const oldSearches = fixture.searches.length;
+  const oldKpis = fixture.kpiRequests.length;
+  await page.waitForTimeout(100);
+  expect(fixture.searches).toHaveLength(oldSearches);
+  expect(fixture.kpiRequests).toHaveLength(oldKpis);
+  await expect(page.getByRole('link', { name: /Export up to/ })).toHaveCount(0);
+});
+
+test('O4 immutable print action keeps its explanatory text readable without overlap', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockOrders(page);
+  await page.goto('/orders');
+  await page.getByRole('button', { name: /#101/ }).click();
+  const print = page.locator('.admin-order-detail__print-action');
+  await expect(print.getByRole('button', { name: 'Print order summary' })).toBeVisible();
+  await expect(
+    print.getByText('not a new numbered fiscal receipt', { exact: false }),
+  ).toBeVisible();
+  const layout = await print.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const gap = Number.parseFloat(style.gap) || 0;
+    const buttonRect = element.querySelector('button')?.getBoundingClientRect();
+    const explanationRect = element.querySelector('small')?.getBoundingClientRect();
+    return {
+      display: style.display,
+      gap,
+      buttonRight: buttonRect?.right ?? 0,
+      buttonBottom: buttonRect?.bottom ?? 0,
+      explanationLeft: explanationRect?.left ?? 0,
+      explanationTop: explanationRect?.top ?? 0,
+    };
+  });
+  expect(['flex', 'grid']).toContain(layout.display);
+  expect(layout.gap).toBeGreaterThanOrEqual(8);
+  expect(
+    layout.explanationTop >= layout.buttonBottom ||
+      layout.explanationLeft - layout.buttonRight >= 8,
+  ).toBe(true);
+});
+
+test('O3 inspector archives stay keyboard-discoverable and print includes their immutable facts', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockOrders(page);
+  await page.goto('/orders');
+  await page.getByRole('button', { name: /#101/ }).click();
+  const detail = page.getByLabel('Order detail');
+  const identity = detail.getByText('Full order identity and references', { exact: true });
+  const reconciliation = detail.getByText('Financial reconciliation breakdown', { exact: true });
+  await expect(identity).toBeVisible();
+  await expect(reconciliation).toBeVisible();
+
+  await identity.click();
+  await expect(detail.getByText('Unique order reference:', { exact: false })).toBeVisible();
+  await reconciliation.click();
+  await expect(detail.getByText('Allocated payments', { exact: true })).toBeVisible();
+
+  // The user can print without manually opening archival disclosures.
+  await identity.click();
+  await reconciliation.click();
+  await page.emulateMedia({ media: 'print' });
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+  await expect(detail.getByText('Unique order reference:', { exact: false })).toBeVisible();
+  await expect(detail.getByText('Allocated payments', { exact: true })).toBeVisible();
+
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+  await page.emulateMedia({ media: 'screen' });
+  await expect(detail.getByText('Unique order reference:', { exact: false })).toBeHidden();
+  await expect(detail.getByText('Allocated payments', { exact: true })).toBeHidden();
+});
+
+test('O11 mobile Escape restores cancellation focus and clears unsent PIN', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const fixture = await mockOrders(page);
+  await page.goto('/orders');
+  await page.getByRole('button', { name: /#101/ }).click();
+
+  const cancelAction = page.getByRole('button', { name: 'Cancel order' });
+  await cancelAction.click();
+  const dialog = page.getByRole('dialog', { name: 'Cancel order' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel('Admin PIN').fill('1234');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(cancelAction).toBeFocused();
+  expect(fixture.commands).toHaveLength(0);
+
+  await cancelAction.click();
+  await expect(
+    page.getByRole('dialog', { name: 'Cancel order' }).getByLabel('Admin PIN'),
+  ).toHaveValue('');
+});
+
+test('O10 successful Admin cancellation sends PIN only to reauthentication and leaves no stored PIN', async ({
+  page,
+}) => {
+  const unexpectedConsoleLeaks: string[] = [];
+  page.on('console', (entry) => {
+    if (entry.text().includes('1234')) unexpectedConsoleLeaks.push(entry.type());
+  });
+  const fixture = await mockOrders(page);
+  await page.goto('/orders');
+  await page.getByRole('button', { name: /#101/ }).click();
+  await page.getByRole('button', { name: 'Cancel order' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Cancel order' });
+  await dialog.getByLabel('Admin PIN').fill('1234');
+  await dialog.getByRole('button', { name: 'Confirm cancellation' }).click();
+  await expect.poll(() => fixture.commands.length).toBe(1);
+  await expect(dialog).toHaveCount(0);
+
+  const command = fixture.commands[0];
+  expect(command).toMatchObject({
+    type: 'order.cancel',
+    shopId,
+    orderId: activeOrderId,
+    reasonCodeId: cancellationReasonId,
+  });
+  expect(command).not.toHaveProperty('pin');
+  expect(JSON.stringify(command)).not.toContain('"1234"');
+  const browserState = await page.evaluate(() => ({
+    local: Object.keys(localStorage).map((key) => [key, localStorage.getItem(key)]),
+    session: Object.keys(sessionStorage).map((key) => [key, sessionStorage.getItem(key)]),
+  }));
+  expect(JSON.stringify(browserState)).not.toContain('"1234"');
+  expect(unexpectedConsoleLeaks).toEqual([]);
+});

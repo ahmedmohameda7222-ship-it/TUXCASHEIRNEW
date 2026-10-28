@@ -261,12 +261,198 @@ async function openCustomer(page: Page) {
   await expect(page).toHaveURL(new RegExp(`/customers/${customerId}$`));
 }
 
+test('CRM1 approved mobile directory uses truthful loaded-only selectors and profile Back', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/customers');
+  const list = page.locator('.admin-master-detail__list');
+  await expect(list.getByRole('searchbox', { name: 'Search customers' })).toBeVisible();
+  await expect(list.getByRole('combobox', { name: 'All segments (loaded results)' })).toBeVisible();
+  await expect(list.getByRole('combobox', { name: 'All loyalty (loaded results)' })).toBeVisible();
+  await expect(list.getByRole('combobox', { name: 'Sort loaded customers' })).toBeVisible();
+  await expect(list).toContainText('loaded');
+  const customerRow = list.getByRole('button', { name: /Mona/ });
+  await expect(customerRow).toBeVisible();
+  const initials = await customerRow.locator('.admin-customer-row__initials').boundingBox();
+  const name = await customerRow.locator('.admin-customer-row__name').boundingBox();
+  expect(initials).not.toBeNull();
+  expect(name).not.toBeNull();
+  expect(name!.x).toBeGreaterThan(initials!.x + initials!.width - 2);
+  await expect(page.getByRole('complementary', { name: 'Customer detail' })).toBeHidden();
+  await list.getByRole('button', { name: /Mona/ }).click();
+  await expect(page).toHaveURL(new RegExp(`/customers/${customerId}$`));
+  await expect(page.getByRole('link', { name: /back to customers/i })).toBeVisible();
+  await expect(list).toBeHidden();
+  await page.getByRole('link', { name: /back to customers/i }).click();
+  await expect(list).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('CRM1 desktop directory exposes real scoped fact columns and loaded-only filtering', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/customers');
+  const directory = page.locator('.admin-customers-directory');
+  await expect(directory).toBeVisible();
+  await expect(directory.getByText('Total spent')).toBeVisible();
+  await expect(directory.getByText('Loyalty', { exact: true })).toBeVisible();
+  await expect(
+    directory.locator('.admin-customers-directory__columns').getByText('Last order'),
+  ).toBeVisible();
+  const sort = directory.getByRole('combobox', { name: 'Sort loaded customers' });
+  await sort.selectOption('orders');
+  await expect(directory.getByRole('button', { name: /Mona/ })).toContainText('12');
+  const segment = directory.getByRole('combobox', {
+    name: 'All segments (loaded results)',
+  });
+  await segment.selectOption('VIP');
+  await expect(directory.getByRole('button', { name: /Mona/ })).toBeVisible();
+  const loyalty = directory.getByRole('combobox', {
+    name: 'All loyalty (loaded results)',
+  });
+  await loyalty.selectOption('none');
+  await expect(directory.getByText('No customers match these loaded-data filters.')).toBeVisible();
+  await loyalty.selectOption('all');
+  await directory.getByRole('button', { name: /Mona/ }).click();
+  await expect(directory.locator('.admin-customer-row.is-selected')).toHaveCount(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('CRM1 server search and shop switching never reuse customers from the prior shop', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const scopedCalls: URL[] = [];
+  await page.route('**/api/admin/session', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...session,
+        principal: {
+          ...session.principal,
+          shopIds: [shopId, otherShopId],
+          shopSummaries: [
+            ...session.principal.shopSummaries,
+            {
+              id: otherShopId,
+              name: 'TUX Zamalek',
+              active: true,
+              temporaryClosed: false,
+            },
+          ],
+        },
+      }),
+    }),
+  );
+  await page.route('**/api/admin/customers**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() !== 'GET' || url.searchParams.get('view') !== 'customers') {
+      await route.fallback();
+      return;
+    }
+    scopedCalls.push(url);
+    if (url.searchParams.get('shopId') !== otherShopId) {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        customers: [{ ...mergeCandidate, displayName: 'Zamalek Customer' }],
+      }),
+    });
+  });
+  await page.goto('/customers');
+  const list = page.locator('.admin-master-detail__list');
+  const search = list.getByRole('searchbox', { name: 'Search customers' });
+  await expect(list.getByRole('button', { name: /Mona/ })).toBeVisible();
+  await search.fill('Nour');
+  await expect(list.getByRole('button', { name: /Nour/ })).toBeVisible();
+  await expect(list.getByRole('button', { name: /Mona/ })).toHaveCount(0);
+  await search.fill('');
+  await expect(list.getByRole('button', { name: /Mona/ })).toBeVisible();
+
+  await page.locator('.shop-switcher select').selectOption(otherShopId);
+  await expect(list.getByRole('button', { name: /Zamalek Customer/ })).toBeVisible();
+  await expect(list.getByRole('button', { name: /Mona/ })).toHaveCount(0);
+  const secondShopWasQueried = () =>
+    scopedCalls.some((url) => url.searchParams.get('shopId') === otherShopId);
+  await expect.poll(secondShopWasQueried).toBe(true);
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > innerWidth,
+  );
+  expect(hasHorizontalOverflow).toBe(false);
+});
+
+test('CRM2 restricted profile shows facts but no merge or point-adjustment actions', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/api/admin/session', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...session,
+        principal: {
+          ...session.principal,
+          role: 'MANAGER',
+          permissions: ['customers.view'],
+        },
+      }),
+    }),
+  );
+  await openCustomer(page);
+  const detail = page.getByRole('complementary', { name: 'Customer detail' });
+  await expect(detail.getByText('Contact information')).toBeVisible();
+  await expect(detail.getByRole('button', { name: 'Merge customer' })).toHaveCount(0);
+  await expect(detail.getByRole('button', { name: 'Adjust points' })).toHaveCount(0);
+  await expect(detail.getByRole('tab', { name: 'Loyalty' })).toBeVisible();
+  expect(postedCommands).toHaveLength(0);
+});
+
+test('CRM2 phone profile has factual metrics and signed loyalty history', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openCustomer(page);
+  const detail = page.getByRole('complementary', { name: 'Customer detail' });
+  await expect(detail.locator('.admin-customer-detail__metrics > div')).toHaveCount(3);
+  await expect(detail.getByText('Contact information')).toBeVisible();
+  await expect(detail.getByText('Loyalty summary')).toBeVisible();
+  await expect(detail.getByText('Customer segments')).toBeVisible();
+  const activity = page.getByLabel('Recent loyalty activity');
+  await expect(activity).toContainText('+20 pts');
+  await expect(detail.getByLabel('Recent loyalty activity')).toHaveCount(0);
+  await detail.getByRole('button', { name: 'Adjust points' }).click();
+  await expect(detail.getByRole('tab', { name: 'Loyalty' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('CRM2 desktop Close preserves intentional empty inspector', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/customers');
+  const close = page.getByRole('button', { name: 'Close customer profile' });
+  await expect(close).toBeVisible();
+  await close.click();
+  await expect(page.getByLabel('Customer detail').getByText('Select a customer')).toHaveCount(1);
+  await expect(close).toHaveCount(0);
+});
+
 test('renders canonical CRM identity, loyalty history and automatic segments', async ({ page }) => {
   await openCustomer(page);
 
-  await expect(page.getByLabel('Customer detail').getByText('+201012345678')).toBeVisible();
-  await expect(page.getByText('VIP')).toBeVisible();
-  await expect(page.getByText('Frequent Delivery')).toBeVisible();
+  await expect(
+    page.locator('.admin-customer-detail__header').getByText('+201012345678'),
+  ).toBeVisible();
+  await expect(page.getByLabel('Customer detail').getByText('VIP')).toBeVisible();
+  await expect(page.getByLabel('Customer detail').getByText('Frequent Delivery')).toBeVisible();
 
   await page.getByRole('tab', { name: 'Addresses' }).click();
   await expect(page.getByText('Road 9, Maadi')).toBeVisible();
@@ -284,6 +470,124 @@ test('renders canonical CRM identity, loyalty history and automatic segments', a
   await expect(page).toHaveURL(/\/customers\/settings$/);
   await expect(page.getByRole('heading', { name: 'Promotions' })).toBeVisible();
   await expect(page.getByText(/Lunch 10%/)).toBeVisible();
+});
+
+test('CRM3 mobile merge review preserves exact safe-integer customer spend', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const preciseMinor = Number.MAX_SAFE_INTEGER - 1;
+  await page.route('**/api/admin/customers**', async (route) => {
+    const url = new URL(route.request().url());
+    if (
+      route.request().method() !== 'GET' ||
+      url.searchParams.get('view') !== 'customers' ||
+      url.searchParams.get('q') !== 'Nour'
+    ) {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        customers: [{ ...mergeCandidate, lifetimeSpendMinor: preciseMinor }],
+      }),
+    });
+  });
+  await openCustomer(page);
+  await page.getByLabel('Customer detail').getByRole('button', { name: 'Merge customer' }).click();
+  await page.getByLabel('Search merge candidates').fill('Nour');
+  await page.getByLabel('Merge candidates').getByRole('button', { name: /Nour/ }).click();
+  const candidate = page.getByRole('article', { name: 'Customer to merge' });
+  await expect(candidate).toContainText('90071992547409.90 EGP');
+  expect(postedCommands.filter((command) => command.type === 'customer.merge')).toHaveLength(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('CRM3 one in-flight adjustment cannot submit twice via the active form', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  let posts = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/admin/customers**', async (route) => {
+    const request = route.request();
+    const command = request.method() === 'POST' ? request.postDataJSON() : null;
+    if (command?.type !== 'loyalty.adjust') {
+      await route.fallback();
+      return;
+    }
+    posts += 1;
+    await gate;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        ledgerEventId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        balance: 130,
+        replayed: posts > 1,
+      }),
+    });
+  });
+  await openCustomer(page);
+  await page.getByRole('tab', { name: 'Loyalty' }).click();
+  const loyalty = page.getByLabel('Customer loyalty');
+  await loyalty.getByLabel('Points delta').fill('10');
+  await loyalty.getByLabel('Reason').selectOption('55555555-5555-4555-8555-555555555555');
+  await loyalty.getByRole('button', { name: 'Adjust points' }).click();
+  await expect(loyalty.getByRole('button', { name: 'Saving…' })).toBeDisabled();
+  try {
+    await loyalty.locator('form').evaluate((form) => {
+      (form as HTMLFormElement).requestSubmit();
+    });
+    await page.waitForTimeout(200);
+    expect(posts).toBe(1);
+  } finally {
+    release();
+  }
+});
+
+test('CRM3 rejected loyalty adjustment retains command identity for a safe retry', async ({
+  page,
+}) => {
+  const attempts: string[] = [];
+  await page.route('**/api/admin/customers**', async (route) => {
+    const request = route.request();
+    const command = request.method() === 'POST' ? request.postDataJSON() : null;
+    if (command?.type !== 'loyalty.adjust') {
+      await route.fallback();
+      return;
+    }
+    attempts.push(command.commandId as string);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        attempts.length === 1
+          ? { ok: false, code: 'loyalty_adjustment_conflict' }
+          : {
+              ok: true,
+              ledgerEventId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              balance: 130,
+              replayed: false,
+            },
+      ),
+    });
+  });
+  await openCustomer(page);
+  await page.getByRole('tab', { name: 'Loyalty' }).click();
+  const loyalty = page.getByLabel('Customer loyalty');
+  await loyalty.getByLabel('Points delta').fill('10');
+  await loyalty.getByLabel('Reason').selectOption('55555555-5555-4555-8555-555555555555');
+  await loyalty.getByRole('button', { name: 'Adjust points' }).click();
+  await expect(page.getByText('Loyalty update failed')).toBeVisible();
+  await expect(page.getByText('Loyalty balance updated', { exact: true })).toHaveCount(0);
+  await loyalty.getByRole('button', { name: 'Adjust points' }).click();
+  await expect(page.getByText('Loyalty balance updated', { exact: true })).toBeVisible();
+  expect(attempts).toHaveLength(2);
+  expect(attempts[0]).toBeTruthy();
+  expect(attempts[1]).toBe(attempts[0]);
 });
 
 test('exposes controlled merge, loyalty configuration and full promotion editor', async ({
@@ -322,6 +626,242 @@ test('exposes controlled merge, loyalty configuration and full promotion editor'
   await expect(page.getByLabel('Total uses (optional)')).toBeVisible();
   await expect(page.getByLabel('Uses per customer (optional)')).toBeVisible();
   await expect(page.getByLabel('Can combine with other promotions?')).toBeVisible();
+});
+
+test('CRM4 saved redemption value retains every safe minor unit at phone width', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const exactMinor = Number.MAX_SAFE_INTEGER - 1;
+  await page.route('**/api/admin/customers**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() !== 'GET' || url.searchParams.get('view') !== 'loyalty-program') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        program: {
+          businessId: session.principal.businessId,
+          enabled: true,
+          earnPointsPer100Minor: 3,
+          redemptionMinorPerPoint: exactMinor,
+          minimumRedemptionPoints: 75,
+          pointExpiryDays: 180,
+          shopIds: [shopId, otherShopId],
+          version: 3,
+          updatedAt: '2026-09-20T12:00:00.000Z',
+        },
+      }),
+    });
+  });
+  await page.goto('/customers/settings');
+  const saved = page.getByRole('region', { name: 'Current saved loyalty settings' });
+  await expect(saved).toContainText('90071992547409.90');
+  await expect(page.getByLabel('Point value (EGP)')).toHaveValue('90071992547409.90');
+  await page.getByRole('button', { name: 'Save loyalty program' }).click();
+  await expect
+    .poll(
+      () =>
+        postedCommands.find((command) => command.type === 'loyalty.program.upsert')
+          ?.redemptionMinorPerPoint,
+    )
+    .toBe(exactMinor);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('CRM4 rejected promotion keeps mobile editor, draft and retained command for retry', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const attempts: string[] = [];
+  await page.route('**/api/admin/customers**', async (route) => {
+    const request = route.request();
+    const command = request.method() === 'POST' ? request.postDataJSON() : null;
+    if (command?.type !== 'promotion.upsert') {
+      await route.fallback();
+      return;
+    }
+    attempts.push(command.commandId as string);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        attempts.length === 1
+          ? { ok: false, code: 'promotion_version_conflict' }
+          : {
+              ok: true,
+              promotionId: '11111111-1111-4111-8111-111111111111',
+              version: 4,
+              replayed: false,
+            },
+      ),
+    });
+  });
+  await page.goto('/customers/settings');
+  await page.getByRole('button', { name: 'New promotion' }).click();
+  const editor = page.getByRole('form', { name: 'Promotion editor' });
+  await editor.getByLabel('Name').fill('Mobile welcome 5%');
+  await editor.getByLabel('Discount (%)').fill('5');
+  await editor.getByRole('button', { name: 'Save promotion' }).click();
+  await expect(page.getByRole('alert')).toContainText('Promotion could not be saved.');
+  await expect(editor).toBeVisible();
+  await expect(editor.getByLabel('Name')).toHaveValue('Mobile welcome 5%');
+  await editor.getByRole('button', { name: 'Save promotion' }).click();
+  await expect.poll(() => attempts.length).toBe(2);
+  expect(attempts[1]).toBe(attempts[0]);
+  await expect(editor).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('CRM4 approved promotions table keeps factual type, channel, discount and Edit at 390px', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/customers/settings');
+  const table = page.getByRole('table', { name: 'Promotions list' });
+  for (const heading of ['Promotion', 'Discount', 'Status']) {
+    await expect(table.getByRole('columnheader', { name: heading })).toBeVisible();
+  }
+  const row = table.getByRole('row', { name: /Lunch 10%/ });
+  await expect(row).toContainText('10%');
+  await expect(row).toContainText('Both channels');
+  await expect(row).toContainText('Active');
+  await row.getByRole('button', { name: 'Edit Lunch 10%' }).click();
+  await expect(page.getByRole('form', { name: 'Promotion editor' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('CRM4 fixed promotion values preserve safe minor units through 390px edit and save', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const preciseMinor = Number.MAX_SAFE_INTEGER - 1;
+  await page.route('**/api/admin/customers**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() !== 'GET' || url.searchParams.get('view') !== 'promotions') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        promotions: [
+          {
+            id: '44444444-4444-4444-8444-444444444444',
+            businessId: session.principal.businessId,
+            name: 'Exact fixed amount',
+            active: true,
+            kind: 'FIXED',
+            percentBasisPoints: null,
+            fixedDiscountMinor: preciseMinor,
+            freeProductId: null,
+            startsAt: null,
+            endsAt: null,
+            minimumOrderMinor: preciseMinor,
+            shopIds: [shopId, otherShopId],
+            channel: 'BOTH',
+            productIds: [],
+            categoryIds: [],
+            totalUsageLimit: null,
+            perCustomerUsageLimit: null,
+            stackingPolicy: 'ONE_ORDER_LEVEL',
+            targetSegments: [],
+            version: 3,
+            updatedAt: '2026-09-20T12:00:00.000Z',
+          },
+        ],
+      }),
+    });
+  });
+  await page.goto('/customers/settings');
+  await page.getByRole('button', { name: 'Edit Exact fixed amount' }).click();
+  const editor = page.getByRole('form', { name: 'Promotion editor' });
+  await expect(editor.getByLabel('Discount (EGP)')).toHaveValue('90071992547409.90');
+  await expect(editor.getByLabel('Minimum order (EGP)')).toHaveValue('90071992547409.90');
+  await editor.getByRole('button', { name: 'Save promotion' }).click();
+  const savedPromotion = () => {
+    const command = postedCommands.find((item) => item.type === 'promotion.upsert');
+    return command?.promotion;
+  };
+  await expect.poll(savedPromotion).toMatchObject({
+    fixedDiscountMinor: preciseMinor,
+    minimumOrderMinor: preciseMinor,
+    expectedVersion: 3,
+    shopIds: [shopId, otherShopId],
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test.describe('CRM4 Cairo promotion scheduling', () => {
+  test.use({ timezoneId: 'Africa/Cairo' });
+
+  test('existing UTC offer window shows Cairo local time and round-trips without drift', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.route('**/api/admin/customers**', async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (request.method() !== 'GET' || url.searchParams.get('view') !== 'promotions') {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          promotions: [
+            {
+              id: '44444444-4444-4444-8444-444444444444',
+              businessId: session.principal.businessId,
+              name: 'Lunch 10%',
+              active: true,
+              kind: 'PERCENT',
+              percentBasisPoints: 1000,
+              fixedDiscountMinor: null,
+              freeProductId: null,
+              startsAt: '2026-10-28T09:00:00.000Z',
+              endsAt: '2026-10-28T10:00:00.000Z',
+              minimumOrderMinor: 5000,
+              shopIds: [shopId],
+              channel: 'BOTH',
+              productIds: [],
+              categoryIds: [],
+              totalUsageLimit: null,
+              perCustomerUsageLimit: null,
+              stackingPolicy: 'ONE_ORDER_LEVEL',
+              targetSegments: [],
+              version: 2,
+              updatedAt: '2026-10-20T09:00:00.000Z',
+            },
+          ],
+        }),
+      });
+    });
+    await page.goto('/customers/settings');
+    await page.getByRole('button', { name: 'Edit Lunch 10%' }).click();
+    const editor = page.getByRole('form', { name: 'Promotion editor' });
+    await expect(editor.getByLabel('Starts')).toHaveValue('2026-10-28T12:00');
+    await expect(editor.getByLabel('Ends')).toHaveValue('2026-10-28T13:00');
+    await editor.getByRole('button', { name: 'Save promotion' }).click();
+    await expect
+      .poll(() => postedCommands.find((command) => command.type === 'promotion.upsert'))
+      .toMatchObject({
+        promotion: {
+          startsAt: '2026-10-28T09:00:00.000Z',
+          endsAt: '2026-10-28T10:00:00.000Z',
+        },
+      });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
+      false,
+    );
+  });
 });
 
 test('hydrates canonical loyalty values and preserves hidden multi-shop scopes on save', async ({
@@ -481,3 +1021,74 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
     }
   }
 }
+
+test('CRM refuses a false success when the server returns an application-level rejection', async ({
+  page,
+}) => {
+  await page.route('**/api/admin/customers**', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const command = route.request().postDataJSON() as { type?: string };
+    if (command.type !== 'loyalty.program.upsert') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: false, code: 'loyalty_policy_version_conflict' }),
+    });
+  });
+  await page.goto('/customers');
+  await page.getByRole('tab', { name: 'CRM settings' }).click();
+  await expect(page.getByLabel('Minimum points to redeem')).toHaveValue('75');
+  await page.getByLabel('Minimum points to redeem').fill('80');
+  await page.getByRole('button', { name: 'Save loyalty program' }).click();
+  await expect(page.getByText('Loyalty settings could not be saved')).toBeVisible();
+  await expect(page.getByText('Loyalty settings saved', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Minimum points to redeem')).toHaveValue('80');
+});
+
+test('background policy refresh preserves unsaved CRM settings edits for the current shop', async ({
+  page,
+}) => {
+  let policyReads = 0;
+  await page.route('**/api/admin/customers**', async (route) => {
+    const url = new URL(route.request().url());
+    if (route.request().method() !== 'GET' || url.searchParams.get('view') !== 'loyalty-program') {
+      await route.fallback();
+      return;
+    }
+    policyReads += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        program: {
+          businessId: session.principal.businessId,
+          enabled: false,
+          earnPointsPer100Minor: 3,
+          redemptionMinorPerPoint: 17,
+          minimumRedemptionPoints: 75,
+          pointExpiryDays: 180,
+          shopIds: [shopId, otherShopId],
+          version: 3,
+          updatedAt: policyReads === 1 ? '2026-09-20T12:00:00Z' : '2026-09-20T12:01:00Z',
+        },
+      }),
+    });
+  });
+  await page.goto('/customers/settings');
+  const minimum = page.getByLabel('Minimum points to redeem');
+  await expect(minimum).toHaveValue('75');
+  await minimum.fill('80');
+
+  await page.getByRole('button', { name: 'Refresh saved loyalty settings' }).click();
+  await expect.poll(() => policyReads).toBeGreaterThan(1);
+  await expect(minimum).toHaveValue('80');
+  await expect(page.getByRole('region', { name: 'Current saved loyalty settings' })).toContainText(
+    '75 points',
+  );
+});

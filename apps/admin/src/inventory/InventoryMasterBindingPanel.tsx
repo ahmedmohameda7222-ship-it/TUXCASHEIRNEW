@@ -59,13 +59,13 @@ export function InventoryMasterBindingPanel({
   const masters = mastersQuery.data?.masters ?? [];
   const item = eligible.find((candidate) => candidate.id === itemId) ?? null;
   const existing = masters.find((master) => master.inventoryItemId === item?.id);
-  const selectedMaster = masters.find((master) => master.id === masterId);
   const compatible = masters.filter(
     (master) =>
       master.baseUnitLabel === item?.unitLabel &&
       master.trackingMode === 'RECIPE_TRACKED' &&
       master.inventoryItemId === null,
   );
+  const selectedMaster = compatible.find((master) => master.id === masterId);
 
   function changed() {
     retainedCommandId.current = null;
@@ -143,6 +143,7 @@ export function InventoryMasterBindingPanel({
                 value={item?.id ?? ''}
                 onChange={(event) => {
                   setItemId(event.currentTarget.value);
+                  setMasterId('');
                   changed();
                 }}
               >

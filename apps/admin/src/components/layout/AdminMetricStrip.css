@@ -1,0 +1,58 @@
+.admin-metric-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.admin-metric-strip__tile {
+  display: flex;
+  min-width: 0;
+  min-height: 96px;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 1rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
+
+.admin-metric-strip__tile dt {
+  margin: 0;
+  color: var(--tux-text-secondary);
+  font-size: 0.8rem;
+}
+
+.admin-metric-strip__tile dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--tux-text-primary);
+  font-size: clamp(1rem, 1.6vw, 1.4rem);
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-metric-strip__tile small {
+  color: var(--tux-text-secondary);
+}
+
+.admin-metric-strip--warning dd {
+  color: #945514;
+}
+
+.admin-metric-strip--critical dd {
+  color: #b4403e;
+}
+
+@media (max-width: 1024px) {
+  .admin-metric-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 390px) {
+  .admin-metric-strip__tile {
+    min-height: 80px;
+    padding: 0.75rem;
+  }
+}

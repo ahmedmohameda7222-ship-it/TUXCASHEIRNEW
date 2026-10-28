@@ -3,12 +3,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 
 import { EmptyState, ErrorState, LoadingState } from '../components/feedback/AdminStates';
+import { AdminMetricStrip } from '../components/layout/AdminMetricStrip';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { ResponsiveMasterDetail } from '../components/layout/ResponsiveMasterDetail';
 import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { AdjustStockSheet } from './AdjustStockSheet';
-import { InventoryItemPage } from './InventoryItemPage';
+import { formatInventoryMicros, InventoryItemPage } from './InventoryItemPage';
 import { InventoryDefinitionEditor } from './InventoryDefinitionEditor';
 import { inventoryCsv } from './inventoryCsv';
 import { InventoryMasterBindingPanel } from './InventoryMasterBindingPanel';
@@ -160,6 +161,23 @@ export function InventoryPage() {
     setStocktakeSavedValues({});
     setMode('detail');
   }, [shopId]);
+  // Desktop uses a master-detail workspace by default. Phones/tablets start in
+  // the list to preserve the single-pane workflow and back navigation.
+  useEffect(() => {
+    if (
+      mode !== 'detail' ||
+      definitionOpen ||
+      location !== '/inventory' ||
+      selectedItemId !== null ||
+      display.rows.length === 0 ||
+      window.innerWidth <= 1150
+    ) {
+      return;
+    }
+    const firstItem = display.rows[0];
+    if (firstItem) navigate(detailPath('/inventory', firstItem.id), { replace: true });
+  }, [definitionOpen, display.rows, location, mode, navigate, selectedItemId]);
+
   const stocktakeItems = useMemo(() => items.filter((item) => item.active), [items]);
 
   const selectedItem = useMemo(() => {
@@ -323,20 +341,6 @@ export function InventoryPage() {
           >
             Export CSV
           </button>
-          {canManageDefinitions ? (
-            <button
-              className="admin-primary-button"
-              type="button"
-              onClick={() => {
-                setDefinitionItemId(null);
-                setDefinitionOpen(true);
-                setMode('detail');
-                navigate('/inventory');
-              }}
-            >
-              Add inventory item
-            </button>
-          ) : null}
           {canStocktake ? (
             <button
               className="admin-primary-button"
@@ -411,6 +415,20 @@ export function InventoryPage() {
               ) : null}
             </div>
           </details>
+          {canManageDefinitions ? (
+            <button
+              className="admin-primary-button admin-inventory-add-item"
+              type="button"
+              onClick={() => {
+                setDefinitionItemId(null);
+                setDefinitionOpen(true);
+                setMode('detail');
+                navigate('/inventory');
+              }}
+            >
+              Add inventory item
+            </button>
+          ) : null}
         </div>
       }
     >
@@ -430,24 +448,26 @@ export function InventoryPage() {
           {mutationErrorText}
         </p>
       ) : null}
-      <section className="admin-inventory-summary" aria-label="Inventory summary">
-        <div>
-          <span>Total items</span>
-          <strong>{counts.total}</strong>
-        </div>
-        <div>
-          <span>Thresholds not set</span>
-          <strong>{counts.unconfigured}</strong>
-        </div>
-        <div>
-          <span>Low stock</span>
-          <strong>{counts.lowStock}</strong>
-        </div>
-        <div>
-          <span>Out of stock</span>
-          <strong>{counts.outOfStock}</strong>
-        </div>
-      </section>
+      <AdminMetricStrip
+        label="Inventory summary"
+        className="admin-inventory-summary"
+        metrics={[
+          { id: 'total', label: 'Total items', value: counts.total },
+          { id: 'unconfigured', label: 'Thresholds not set', value: counts.unconfigured },
+          {
+            id: 'low',
+            label: 'Low stock',
+            value: counts.lowStock,
+            tone: counts.lowStock > 0 ? 'warning' : 'default',
+          },
+          {
+            id: 'out',
+            label: 'Out of stock',
+            value: counts.outOfStock,
+            tone: counts.outOfStock > 0 ? 'critical' : 'default',
+          },
+        ]}
+      />
       {definitionOpen && canManageDefinitions ? (
         <InventoryDefinitionEditor
           item={items.find((item) => item.id === definitionItemId) ?? null}
@@ -671,7 +691,7 @@ export function InventoryPage() {
           receiving={inventory.receiveTransfer.isPending}
           cancelling={inventory.cancelTransfer.isPending}
           onBack={() => setMode('detail')}
-          onSend={(input) => inventory.sendTransfer.mutate(input)}
+          onSend={(input, onSent) => inventory.sendTransfer.mutate(input, { onSuccess: onSent })}
           onReceive={(transferId) => inventory.receiveTransfer.mutate(transferId)}
           onCancelTransfer={(transferId) => inventory.cancelTransfer.mutate(transferId)}
         />
@@ -766,10 +786,7 @@ export function InventoryPage() {
                           : status === 'UNCONFIGURED'
                             ? 'Threshold not set'
                             : 'In stock';
-                  const formatted = (micros: number) =>
-                    new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(
-                      micros / 1_000_000,
-                    );
+                  const formatted = formatInventoryMicros;
                   return (
                     <button
                       className={
@@ -787,7 +804,10 @@ export function InventoryPage() {
                     >
                       <span>
                         <strong>{item.name}</strong>
-                        <small>{trackingModeLabel(item.trackingMode)}</small>
+                        <small>
+                          <span className="admin-inventory-mobile-unit">{item.unitLabel} · </span>
+                          {trackingModeLabel(item.trackingMode)}
+                        </small>
                       </span>
                       <span>{item.unitLabel}</span>
                       <span>{formatted(item.onHandMicros)}</span>

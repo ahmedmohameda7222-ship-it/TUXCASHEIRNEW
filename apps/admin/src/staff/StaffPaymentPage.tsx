@@ -2,6 +2,7 @@ import type { EmployeeDetail, StaffFinanceAccountChoice } from '@tux/admin-contr
 import { useState } from 'react';
 
 import type { StaffCommandDraft } from './SchedulePage';
+import { formatStaffMoney, parseStaffMoneyMinor } from './staffMoney';
 
 export function StaffPaymentPage({
   employee,
@@ -9,14 +10,14 @@ export function StaffPaymentPage({
   accounts,
   financeAccounts,
   canPay,
-  onCommand,
+  onSensitiveCommand,
 }: {
   employee: EmployeeDetail;
   shopId: string;
   accounts?: readonly StaffFinanceAccountChoice[];
   financeAccounts?: readonly StaffFinanceAccountChoice[];
   canPay: boolean;
-  onCommand(command: StaffCommandDraft): void;
+  onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
 }) {
   const available = (accounts ?? financeAccounts ?? []).filter(
     (account) => account.shopId === null || account.shopId === shopId,
@@ -27,6 +28,9 @@ export function StaffPaymentPage({
   const [expected, setExpected] = useState('');
   const [paid, setPaid] = useState('');
   const [paymentDate, setPaymentDate] = useState('');
+  const [actorPin, setActorPin] = useState('');
+  const expectedAmountMinor = parseStaffMoneyMinor(expected.trim() || paid);
+  const paidAmountMinor = parseStaffMoneyMinor(paid);
   const accountTypeLabel = (type: string) =>
     type === 'BANK'
       ? 'Bank account'
@@ -42,7 +46,7 @@ export function StaffPaymentPage({
       {employee.payments.map((payment) => (
         <article className="admin-staff-record-row" key={payment.id}>
           <span>
-            <strong>{(payment.paidAmountMinor / 100).toFixed(2)} EGP</strong>
+            <strong>{formatStaffMoney(payment.paidAmountMinor)} EGP</strong>
             <small>
               {payment.payPeriodStart} → {payment.payPeriodEnd}
             </small>
@@ -109,25 +113,49 @@ export function StaffPaymentPage({
               onChange={(event) => setPaymentDate(event.target.value)}
             />
           </label>
+          <label className="admin-field">
+            <span>Admin PIN for staff payment</span>
+            <input
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              value={actorPin}
+              onChange={(event) => setActorPin(event.target.value)}
+            />
+          </label>
+          <p>
+            Payment posting requires Admin PIN reauthentication. Any configured second-person
+            approval remains enforced by the server.
+          </p>
           <button
             className="admin-primary-button"
             type="button"
-            disabled={!accountId || !periodStart || !periodEnd || !paid || !paymentDate}
+            disabled={
+              !accountId ||
+              !periodStart ||
+              !periodEnd ||
+              paidAmountMinor === null ||
+              expectedAmountMinor === null ||
+              !/^\d{4,12}$/.test(actorPin) ||
+              !paymentDate
+            }
             onClick={() => {
+              if (expectedAmountMinor === null || paidAmountMinor === null) return;
               const command: StaffCommandDraft = {
                 type: 'payment.record',
                 employeeId: employee.id,
                 shopId,
                 payPeriodStart: periodStart,
                 payPeriodEnd: periodEnd,
-                expectedAmountMinor: Math.round(Number(expected || paid) * 100),
-                paidAmountMinor: Math.round(Number(paid) * 100),
+                expectedAmountMinor,
+                paidAmountMinor,
                 financeAccountId: accountId,
                 paymentDate,
                 note: null,
                 reference: null,
               };
-              onCommand(command);
+              onSensitiveCommand(command, actorPin);
+              setActorPin('');
             }}
           >
             Record payment

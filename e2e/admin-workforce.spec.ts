@@ -103,6 +103,14 @@ async function mockWorkforce(page: Page, withAccount = true) {
     });
   });
 
+  await page.route('**/api/admin/reauth', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, reauthenticatedAt: '2026-10-28T09:00:00.000Z' }),
+    });
+  });
+
   await page.route('**/api/admin/staff**', async (route: Route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -142,7 +150,13 @@ async function mockWorkforce(page: Page, withAccount = true) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ ok: true, replayed: false }),
+      body: JSON.stringify({
+        ok: true,
+        replayed: false,
+        ...(command.type === 'employee.create'
+          ? { employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }
+          : {}),
+      }),
     });
   });
 
@@ -153,6 +167,131 @@ async function selectEmployee(page: Page, name: string) {
   await page.getByRole('button', { name: new RegExp(name) }).click();
   await expect(page.getByRole('heading', { name })).toBeVisible();
 }
+
+test('S1 mobile directory searches name and phone within explicitly loaded staff', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() !== 'GET' || url.searchParams.has('employeeId')) {
+      await route.fallback();
+      return;
+    }
+    const current = workspace();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...current,
+        employees: {
+          rows: [
+            ...current.employees.rows,
+            {
+              id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              displayName: 'Youssef Hassan',
+              phone: '+201011111111',
+              role: 'MANAGER',
+              active: false,
+              shopIds: [shopId],
+              operationsSetupRequiredShopIds: [],
+            },
+          ],
+          nextCursor: 'more-staff-exist',
+        },
+      }),
+    });
+  });
+  await page.goto('/staff');
+  const search = page.getByRole('searchbox', { name: 'Search employees (loaded results)' });
+  await expect(search).toBeVisible();
+  await expect(page.getByText('Loaded results only')).toBeVisible();
+  await search.fill('Youssef');
+  await expect(page.getByRole('button', { name: /Youssef Hassan/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Mona Ali/ })).toHaveCount(0);
+  await search.fill('+201000000000');
+  await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Youssef Hassan/ })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('S1 loaded-only role and status filters narrow staff without server-side claims', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() !== 'GET' || url.searchParams.has('employeeId')) {
+      await route.fallback();
+      return;
+    }
+    const current = workspace();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...current,
+        employees: {
+          rows: [
+            ...current.employees.rows,
+            {
+              id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              displayName: 'Youssef Hassan',
+              phone: '+201011111111',
+              role: 'MANAGER',
+              active: false,
+              shopIds: [shopId],
+              operationsSetupRequiredShopIds: [],
+            },
+          ],
+          nextCursor: 'more-staff-exist',
+        },
+      }),
+    });
+  });
+  await page.goto('/staff');
+  const role = page.getByRole('combobox', { name: 'Role (loaded results)' });
+  const status = page.getByRole('combobox', { name: 'Status (loaded results)' });
+  await expect(role).toBeVisible();
+  await expect(status).toBeVisible();
+  await role.selectOption('MANAGER');
+  await expect(page.getByRole('button', { name: /Youssef Hassan/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Mona Ali/ })).toHaveCount(0);
+  await status.selectOption('active');
+  await expect(page.getByText('No employees match search')).toBeVisible();
+  await status.selectOption('suspended');
+  await expect(page.getByRole('button', { name: /Youssef Hassan/ })).toBeVisible();
+  await role.selectOption('all');
+  await status.selectOption('active');
+  await expect(page.getByRole('button', { name: /Mona Ali/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Youssef Hassan/ })).toHaveCount(0);
+  await expect(page.getByText('Loaded results only')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('S1 selected desktop employee keeps directory and inspector adjacent at 1440px', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockWorkforce(page);
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  const list = page.locator('.admin-staff-workspace .admin-master-detail__list');
+  const detail = page.locator('.admin-staff-workspace .admin-master-detail__detail');
+  await expect(list).toBeVisible();
+  await expect(detail).toBeVisible();
+  const listBounds = await list.boundingBox();
+  const detailBounds = await detail.boundingBox();
+  expect(listBounds).not.toBeNull();
+  expect(detailBounds).not.toBeNull();
+  expect(listBounds!.x + listBounds!.width).toBeLessThan(detailBounds!.x + 32);
+  expect(Math.abs(listBounds!.y - detailBounds!.y)).toBeLessThan(32);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
 
 test('staff profile exposes Operations setup and posts payment only to a trusted account', async ({
   page,
@@ -185,6 +324,7 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
   await page.getByLabel('Expected amount (EGP)').fill('1200');
   await page.getByLabel('Paid amount (EGP)').fill('1200');
   await page.getByLabel('Payment date').fill('2026-09-30');
+  await page.getByLabel('Admin PIN for staff payment').fill('1234');
   await page.getByRole('button', { name: 'Record payment' }).click();
 
   await expect.poll(() => commands.length).toBe(1);
@@ -197,6 +337,107 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
     paidAmountMinor: 120000,
   });
   expect(String(commands[0]?.commandId ?? '')).not.toBe('');
+});
+
+test('S3 rejected shift creation retains original draft and retries without a duplicate', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  let attempts = 0;
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'POST' || request.postDataJSON()?.type !== 'shift.create') {
+      await route.fallback();
+      return;
+    }
+    attempts += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        attempts === 1
+          ? { ok: false, code: 'shift_schedule_temporarily_unavailable' }
+          : { ok: true, replayed: false },
+      ),
+    });
+  });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Schedule' }).click();
+  await page.getByRole('button', { name: 'Add shift' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add shift' });
+  await sheet.getByLabel('Starts').fill('2026-10-29T09:00');
+  await sheet.getByLabel('Ends').fill('2026-10-29T17:00');
+  await sheet.getByRole('button', { name: 'Add shift' }).click();
+  await expect.poll(() => attempts).toBe(1);
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByLabel('Starts')).toHaveValue('2026-10-29T09:00');
+  await expect(sheet.getByLabel('Ends')).toHaveValue('2026-10-29T17:00');
+  await sheet.getByRole('button', { name: 'Add shift' }).click();
+  await expect.poll(() => attempts).toBe(2);
+  await expect(sheet).toHaveCount(0);
+});
+
+test('S4 payroll requires successful Admin PIN reauth before protected payment command', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  let reauthRequests = 0;
+  await page.route('**/api/admin/reauth', async (route) => {
+    reauthRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, reauthenticatedAt: '2026-10-28T09:00:00.000Z' }),
+    });
+  });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Pay / Compensation' }).click();
+  await page.getByLabel('Pay period start').fill('2026-10-01');
+  await page.getByLabel('Pay period end').fill('2026-10-31');
+  await page.getByLabel('Expected amount (EGP)').fill('500.00');
+  await page.getByLabel('Paid amount (EGP)').fill('500.00');
+  await page.getByLabel('Payment date').fill('2026-10-31');
+  const record = page.getByRole('button', { name: 'Record payment' });
+  await expect(record).toBeDisabled();
+  expect(commands).toHaveLength(0);
+  await page.getByLabel('Admin PIN for staff payment').fill('1234');
+  await record.click();
+  await expect.poll(() => reauthRequests).toBe(1);
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'payment.record',
+    expectedAmountMinor: 50000,
+    paidAmountMinor: 50000,
+    requesterPin: '1234',
+  });
+});
+
+test('S3 payment records exact safe minor units without floating-point rounding on phone', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Pay / Compensation' }).click();
+  await page.getByLabel('Pay period start').fill('2026-10-01');
+  await page.getByLabel('Pay period end').fill('2026-10-31');
+  await page.getByLabel('Expected amount (EGP)').fill('90071992547409.90');
+  await page.getByLabel('Paid amount (EGP)').fill('90071992547409.90');
+  await page.getByLabel('Payment date').fill('2026-10-31');
+  await page.getByLabel('Admin PIN for staff payment').fill('1234');
+  await page.getByRole('button', { name: 'Record payment' }).click();
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'payment.record',
+    expectedAmountMinor: 9007199254740990,
+    paidAmountMinor: 9007199254740990,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
 test('staff payment shows a clear no-account state instead of inventing an account', async ({
@@ -241,6 +482,7 @@ for (const viewport of premiumVisualViewports(ADMIN_CORE_VIEWPORTS)) {
     await page.goto('/staff');
 
     await expect(page.getByRole('button', { name: 'Add employee' })).toBeVisible();
+    await capturePremiumScreenshot(page, 'workforce-list');
     await selectEmployee(page, 'Mona Ali');
     await expect(page.getByRole('tablist', { name: 'Employee detail sections' })).toBeVisible();
     await page.getByRole('tab', { name: 'Schedule' }).click();
@@ -416,3 +658,275 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
     }
   }
 }
+
+async function advanceStaffOnboardingToReview(page: Page) {
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  for (let step = 0; step < 3; step += 1) {
+    await sheet.getByRole('button', { name: 'Continue' }).click();
+  }
+}
+
+test('S2 onboarding reviews authorized shops before creating and assigning employee', async ({
+  page,
+}) => {
+  const otherShopId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands: Record<string, unknown>[] = [];
+  await mockWorkforce(page);
+  await page.route('**/api/admin/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...session,
+        principal: {
+          ...session.principal,
+          shopIds: [shopId, otherShopId],
+          shopSummaries: [
+            ...session.principal.shopSummaries,
+            { id: otherShopId, name: 'TUX Mall', active: true, temporaryClosed: false },
+          ],
+        },
+      }),
+    });
+  });
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === 'GET' && !url.searchParams.has('employeeId')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...workspace(),
+          shops: [
+            { id: shopId, name: 'Downtown' },
+            { id: otherShopId, name: 'Mall' },
+          ],
+        }),
+      });
+      return;
+    }
+    if (request.method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const command = request.postDataJSON() as Record<string, unknown>;
+    commands.push(command);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        replayed: false,
+        ...(command.type === 'employee.create'
+          ? { employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }
+          : {}),
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  const steps = sheet.getByRole('navigation', { name: 'Employee onboarding steps' });
+  await expect(steps).toContainText('Identity');
+  await expect(steps).toContainText('Shops');
+  await expect(steps).toContainText('Employment');
+  await expect(steps).toContainText('Review');
+  await sheet.getByLabel('Name').fill('Amira Onboarding');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByText('Select assigned shops')).toBeVisible();
+  await sheet.getByRole('checkbox', { name: 'Mall' }).check();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByText('Employment setup')).toBeVisible();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await expect(sheet.getByText('Review employee setup')).toBeVisible();
+  expect(commands).toHaveLength(0);
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await expect.poll(() => commands.length).toBe(2);
+  expect(commands[0]).toMatchObject({
+    type: 'employee.create',
+    shopId,
+    displayName: 'Amira Onboarding',
+  });
+  expect(commands[1]).toMatchObject({
+    type: 'employee.assign-shop',
+    employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    shopId: otherShopId,
+  });
+  await expect(sheet).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('S2 partial compensation failure resumes after closing without duplicate employee', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  const commands: Array<{ type?: string; commandId?: string }> = [];
+  let compensationAttempts = 0;
+  await page.route('**/api/admin/staff**', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const command = route.request().postDataJSON() as {
+      type?: string;
+      commandId?: string;
+    };
+    if (command.type !== 'employee.create' && command.type !== 'compensation.set') {
+      await route.fallback();
+      return;
+    }
+    commands.push(command);
+    if (command.type === 'compensation.set') compensationAttempts += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        command.type === 'compensation.set' && compensationAttempts === 1
+          ? { ok: false, code: 'compensation_temporarily_unavailable' }
+          : {
+              ok: true,
+              replayed: false,
+              ...(command.type === 'employee.create'
+                ? { employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }
+                : {}),
+            },
+      ),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  let sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Amira Resumable');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByLabel('Rate (EGP, optional)').fill('100.00');
+  await sheet.getByLabel('Effective from').fill('2026-10-01');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await expect(sheet.getByRole('alert')).toContainText('compensation temporarily unavailable');
+  await expect.poll(() => commands.length).toBe(2);
+  await sheet.getByRole('button', { name: 'Cancel' }).click();
+  await expect(sheet).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await expect(sheet.getByText('Review employee setup')).toBeVisible();
+  await expect(sheet.getByRole('button', { name: 'Resume onboarding' })).toBeVisible();
+  await sheet.getByRole('button', { name: 'Resume onboarding' }).click();
+  await expect.poll(() => commands.length).toBe(3);
+  expect(commands.map((command) => command.type)).toEqual([
+    'employee.create',
+    'compensation.set',
+    'compensation.set',
+  ]);
+  expect(commands[2]?.commandId).toBe(commands[1]?.commandId);
+  await expect(sheet).toHaveCount(0);
+});
+
+test('S2 rejected employee creation retries the same idempotency intent on phone', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  const attempts: string[] = [];
+  await page.route('**/api/admin/staff**', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const command = route.request().postDataJSON() as {
+      type?: string;
+      commandId?: string;
+    };
+    if (command.type !== 'employee.create') {
+      await route.fallback();
+      return;
+    }
+    attempts.push(command.commandId ?? '');
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        attempts.length === 1
+          ? { ok: false, code: 'staff_store_temporarily_unavailable' }
+          : {
+              ok: true,
+              employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              replayed: false,
+            },
+      ),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Amira Retries');
+  await advanceStaffOnboardingToReview(page);
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await expect(page.getByRole('alert')).toContainText('staff store temporarily unavailable');
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await expect.poll(() => attempts.length).toBe(2);
+  expect(attempts[0]).toBeTruthy();
+  expect(attempts[1]).toBe(attempts[0]);
+  await expect(sheet).toHaveCount(0);
+});
+
+test('rejected employee creation preserves the Add employee sheet and does not claim success', async ({
+  page,
+}) => {
+  await mockWorkforce(page);
+  await page.route('**/api/admin/staff**', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const draft = route.request().postDataJSON() as { type?: string };
+    if (draft.type !== 'employee.create') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: false, code: 'employee_already_exists' }),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Existing Employee');
+  await advanceStaffOnboardingToReview(page);
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText('Existing Employee')).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('employee already exists');
+});
+
+test('new employee sheet persists actual hire date and notes through the trusted create command', async ({
+  page,
+}) => {
+  const commands = await mockWorkforce(page);
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Amira QA');
+  await sheet.getByLabel('Phone').fill('+201098765432');
+  await sheet.getByLabel('Hire date').fill('2026-10-01');
+  await sheet.getByLabel('Internal notes').fill('Cross-trained at counter');
+  await advanceStaffOnboardingToReview(page);
+  await sheet.getByRole('button', { name: 'Create employee' }).click();
+  await expect
+    .poll(() => commands.some((command) => command['type'] === 'employee.create'))
+    .toBe(true);
+  expect(commands.find((command) => command['type'] === 'employee.create')).toMatchObject({
+    shopId,
+    displayName: 'Amira QA',
+    phone: '+201098765432',
+    hireDate: '2026-10-01',
+    notes: 'Cross-trained at counter',
+    role: 'STAFF',
+  });
+});

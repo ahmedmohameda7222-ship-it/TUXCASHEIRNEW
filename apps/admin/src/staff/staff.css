@@ -1,6 +1,111 @@
+.admin-staff-onboarding-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+  min-width: 0;
+}
+.admin-staff-onboarding-steps span {
+  min-width: 0;
+  padding: 0.6rem 0.25rem;
+  border-radius: var(--tux-radius-md);
+  background: var(--tux-surface-subtle);
+  color: var(--tux-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+}
+.admin-staff-onboarding-steps span[aria-current='step'] {
+  border: 1px solid var(--tux-border-strong);
+  background: var(--tux-surface-panel);
+  color: var(--tux-text-primary);
+}
+.admin-staff-onboarding-shops {
+  display: grid;
+  gap: 0.625rem;
+  min-width: 0;
+  padding: 0.875rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-md);
+}
+.admin-staff-onboarding-shops label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+}
+.admin-staff-onboarding-shops p,
+.admin-staff-onboarding-review p {
+  margin: 0;
+  color: var(--tux-text-secondary);
+}
+.admin-staff-onboarding-review {
+  display: grid;
+  gap: 0.625rem;
+  min-width: 0;
+}
+@media (max-width: 480px) {
+  .admin-staff-onboarding-steps span {
+    font-size: 0.6875rem;
+  }
+}
+
 /* Staff task pages own their layout independently of other lazy Admin routes. */
 .admin-staff-workspace {
   min-width: 0;
+}
+.admin-staff-directory__toolbar {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--tux-border-subtle);
+}
+.admin-staff-directory__toolbar > span,
+.admin-staff-directory__toolbar > p {
+  margin: 0;
+  color: var(--tux-text-secondary);
+  font-size: 0.8125rem;
+}
+.admin-staff-directory__toolbar > input {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-md);
+  background: var(--tux-surface-panel);
+  color: var(--tux-text-primary);
+}
+.admin-staff-directory__filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  min-width: 0;
+}
+.admin-staff-directory__filters label {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  color: var(--tux-text-secondary);
+  font-size: 0.75rem;
+}
+.admin-staff-directory__filters select {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-md);
+  background: var(--tux-surface-panel);
+  color: var(--tux-text-primary);
+}
+.admin-staff-directory__filters select:focus-visible {
+  outline: 2px solid var(--tux-accent);
+  outline-offset: 2px;
+}
+.admin-staff-directory__toolbar > input:focus-visible {
+  outline: 2px solid var(--tux-accent);
+  outline-offset: 2px;
 }
 .admin-staff-workspace .admin-master-detail {
   display: block;
@@ -46,6 +151,25 @@
   font-size: 0.75rem;
   font-weight: 700;
   line-height: 1.3;
+}
+/* The selected Clean desktop reference keeps the employee list beside the real inspector.
+   Narrow viewports remain list-first with a dedicated Back route. */
+@media (min-width: 1100px) {
+  .admin-staff-workspace .admin-master-detail {
+    display: grid;
+    grid-template-columns: minmax(0, 44%) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.75rem;
+  }
+  .admin-staff-workspace
+    .admin-master-detail[data-detail-active='true']
+    .admin-master-detail__list {
+    display: block;
+  }
+  .admin-staff-workspace .admin-master-detail__list,
+  .admin-staff-workspace .admin-master-detail__detail {
+    min-width: 0;
+  }
 }
 @media (max-width: 480px) {
   .admin-staff-row__states {

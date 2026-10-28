@@ -105,7 +105,7 @@ export function PurchaseOrdersPage({
         if (statusFilter && order.status !== statusFilter) return false;
         if (supplierFilter && order.supplierId !== supplierFilter) return false;
         if (!normalized) return true;
-        return [order.reference, order.id, order.supplierName]
+        return [order.reference, purchaseOrderDisplayReference(order), order.id, order.supplierName]
           .filter((value): value is string => Boolean(value))
           .some((value) => value.toLocaleLowerCase().includes(normalized));
       })

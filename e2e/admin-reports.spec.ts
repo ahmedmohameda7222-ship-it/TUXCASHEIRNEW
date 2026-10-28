@@ -229,3 +229,30 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
     }
   }
 }
+
+test('Reports blocks an inverted date range instead of sending a misleading query', async ({
+  page,
+}) => {
+  const { queries } = await mockReports(page);
+  await page.goto('/reports');
+  await expect(page.getByRole('table')).toBeVisible();
+  await page
+    .getByRole('region', { name: 'Report filters' })
+    .getByLabel('From', { exact: true })
+    .fill('2026-10-26');
+  await page
+    .getByRole('region', { name: 'Report filters' })
+    .getByLabel('To', { exact: true })
+    .fill('2026-10-01');
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'Select a valid From/To date range' }),
+  ).toBeVisible();
+  expect(
+    queries.some(
+      (params) =>
+        (params.get('from') ?? '') > (params.get('to') ?? '') &&
+        params.get('from') !== null &&
+        params.get('to') !== null,
+    ),
+  ).toBe(false);
+});

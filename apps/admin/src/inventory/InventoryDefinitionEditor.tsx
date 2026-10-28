@@ -62,7 +62,7 @@ export function InventoryDefinitionEditor({
     setThreshold(
       item?.lowStockThresholdMicros === null || item?.lowStockThresholdMicros === undefined
         ? ''
-        : String(item.lowStockThresholdMicros / 1_000_000),
+        : formatPurchaseMicros(item.lowStockThresholdMicros),
     );
     setConversion(null);
     setError(null);
@@ -112,6 +112,18 @@ export function InventoryDefinitionEditor({
         item.unitLabel.trim().toLocaleLowerCase('en')
     ) {
       setError('Enter a valid purchase unit and positive base-unit quantity.');
+      return;
+    }
+    const duplicate = (item.conversions ?? []).some(
+      (existing) =>
+        existing.id !== conversion.id &&
+        existing.purchaseUnitLabel.trim().toLocaleLowerCase('en') ===
+          conversion.label.trim().toLocaleLowerCase('en'),
+    );
+    if (duplicate) {
+      setError(
+        'A purchase unit with this label already exists. Edit or restore the existing unit.',
+      );
       return;
     }
     setError(null);
@@ -281,11 +293,10 @@ export function InventoryDefinitionEditor({
                     maxLength={120}
                     value={conversion.label}
                     disabled={pending}
-                    onChange={(event) =>
-                      setConversion((current) =>
-                        current ? { ...current, label: event.currentTarget.value } : current,
-                      )
-                    }
+                    onChange={(event) => {
+                      const label = event.currentTarget.value;
+                      setConversion((current) => (current ? { ...current, label } : current));
+                    }}
                   />
                 </label>
                 <label>
@@ -295,11 +306,12 @@ export function InventoryDefinitionEditor({
                     inputMode="decimal"
                     value={conversion.baseQuantity}
                     disabled={pending}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      const baseQuantity = event.currentTarget.value;
                       setConversion((current) =>
-                        current ? { ...current, baseQuantity: event.currentTarget.value } : current,
-                      )
-                    }
+                        current ? { ...current, baseQuantity } : current,
+                      );
+                    }}
                   />
                 </label>
                 <button className="admin-primary-button" type="submit" disabled={pending}>

@@ -1,4 +1,5 @@
 import type { AdminOrderDetail } from '@tux/admin-contracts';
+import { useEffect, useRef } from 'react';
 
 function money(minor: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -46,6 +47,35 @@ export function OrderDetailPage({
   onRefund(): void;
   onReturn(): void;
 }) {
+  const articleRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const expandedForPrint = new Set<HTMLDetailsElement>();
+    const beforePrint = () => {
+      articleRef.current
+        ?.querySelectorAll<HTMLDetailsElement>('.admin-order-detail__disclosure')
+        .forEach((details) => {
+          if (details.open) return;
+          details.open = true;
+          expandedForPrint.add(details);
+        });
+    };
+    const afterPrint = () => {
+      expandedForPrint.forEach((details) => {
+        details.open = false;
+      });
+      expandedForPrint.clear();
+    };
+
+    window.addEventListener('beforeprint', beforePrint);
+    window.addEventListener('afterprint', afterPrint);
+    return () => {
+      window.removeEventListener('beforeprint', beforePrint);
+      window.removeEventListener('afterprint', afterPrint);
+      afterPrint();
+    };
+  }, []);
+
   const recordedPaymentMinor = order.payments.reduce(
     (sum, payment) => sum + payment.allocatedMinor,
     0,
@@ -70,19 +100,63 @@ export function OrderDetailPage({
   const canRefundOrReturn = ['DONE', 'RETURNED'].includes(order.status) && canRefund;
 
   return (
-    <article className="admin-order-detail" aria-labelledby="admin-order-detail-title">
+    <article
+      ref={articleRef}
+      className="admin-order-detail"
+      aria-labelledby="admin-order-detail-title"
+    >
       <header className="admin-order-detail__summary">
         <div>
-          <p className="admin-page__eyebrow">
-            {order.displayOrderLabel ?? `#${order.displayOrderNo}`}
-          </p>
-          <h2 id="admin-order-detail-title">Order detail</h2>
+          <h2 id="admin-order-detail-title">
+            Order {order.displayOrderLabel ?? `#${order.displayOrderNo}`}
+          </h2>
           <p>
             {friendly(order.status)} · {order.source === 'POS' ? 'In-store' : 'Online'}
+            {order.fulfillment?.orderTypeLabel ? ` · ${order.fulfillment.orderTypeLabel}` : ''}
           </p>
+          <time dateTime={order.createdAt}>
+            {new Intl.DateTimeFormat('en-EG', {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+              timeZone: 'Africa/Cairo',
+            }).format(new Date(order.createdAt))}{' '}
+            (Cairo)
+          </time>
         </div>
         <strong className="admin-order-detail__total">{money(order.totalMinor)}</strong>
       </header>
+
+      <nav className="admin-order-detail__nav" aria-label="Order detail sections">
+        <a href="#order-detail-overview">Overview</a>
+        <a href="#order-detail-items">Items</a>
+        <a href="#order-detail-payments">Payments</a>
+        <a href="#order-detail-customer">Customer</a>
+        <a href="#order-detail-fulfillment">Fulfillment</a>
+        <a href="#order-detail-history">History</a>
+      </nav>
+
+      <dl
+        id="order-detail-overview"
+        className="admin-order-detail__facts"
+        aria-label="Order overview facts"
+      >
+        <div>
+          <dt>Total amount</dt>
+          <dd>{money(order.totalMinor)}</dd>
+        </div>
+        <div>
+          <dt>Items</dt>
+          <dd>{order.items.reduce((total, item) => total + item.quantity, 0)}</dd>
+        </div>
+        <div>
+          <dt>Source</dt>
+          <dd>{order.source === 'POS' ? 'In-store' : 'Online'}</dd>
+        </div>
+        <div>
+          <dt>Type</dt>
+          <dd>{order.fulfillment?.orderTypeLabel ?? 'Not recorded'}</dd>
+        </div>
+      </dl>
 
       <div className="admin-order-detail__print-action">
         <button className="admin-secondary-button" type="button" onClick={() => window.print()}>
@@ -93,27 +167,49 @@ export function OrderDetailPage({
         </small>
       </div>
 
-      <section className="admin-order-detail__card" aria-label="Order identity">
-        <h3>Order identity</h3>
-        <p>Business day: {order.businessDayId ?? 'Not available'}</p>
-        <p>
-          Unique order reference: <code>{order.id}</code>
-        </p>
-        {order.operatorName ? <p>Operator: {order.operatorName}</p> : null}
-        <p>
-          Created:{' '}
-          <time dateTime={order.createdAt}>
-            {new Intl.DateTimeFormat('en-EG', {
-              dateStyle: 'medium',
-              timeStyle: 'short',
-              timeZone: 'Africa/Cairo',
-            }).format(new Date(order.createdAt))}{' '}
-            (Cairo)
-          </time>
-        </p>
-      </section>
+      <div className="admin-order-detail__grid">
+        <section
+          id="order-detail-customer"
+          className="admin-order-detail__card"
+          aria-labelledby="admin-order-customer-title"
+        >
+          <h3 id="admin-order-customer-title">Customer</h3>
+          {order.customer ? (
+            <>
+              <strong>{order.customer.name ?? 'Unnamed customer'}</strong>
+              {order.customer.normalizedPhone ? <p>{order.customer.normalizedPhone}</p> : null}
+            </>
+          ) : (
+            <p>Walk-in customer</p>
+          )}
+        </section>
 
-      <section className="admin-order-detail__card" aria-labelledby="admin-order-items-title">
+        <section
+          id="order-detail-fulfillment"
+          className="admin-order-detail__card"
+          aria-labelledby="admin-order-fulfillment-title"
+        >
+          <h3 id="admin-order-fulfillment-title">Fulfillment</h3>
+          {order.fulfillment ? (
+            <>
+              <strong>{order.fulfillment.orderTypeLabel}</strong>
+              {order.fulfillment.address ? <p>{order.fulfillment.address}</p> : null}
+              {order.fulfillment.deliveryZoneLabel ? (
+                <p>{order.fulfillment.deliveryZoneLabel}</p>
+              ) : null}
+              <p>Delivery fee {money(order.fulfillment.finalDeliveryFeeMinor)}</p>
+            </>
+          ) : (
+            <p>No fulfillment details</p>
+          )}
+        </section>
+      </div>
+
+      <section
+        id="order-detail-items"
+        className="admin-order-detail__card"
+        aria-labelledby="admin-order-items-title"
+      >
         <h3 id="admin-order-items-title">Items</h3>
         <div className="admin-order-detail__list">
           {order.items.map((item) => {
@@ -154,40 +250,11 @@ export function OrderDetailPage({
         </div>
       </section>
 
-      <div className="admin-order-detail__grid">
-        <section className="admin-order-detail__card" aria-labelledby="admin-order-customer-title">
-          <h3 id="admin-order-customer-title">Customer</h3>
-          {order.customer ? (
-            <>
-              <strong>{order.customer.name ?? 'Unnamed customer'}</strong>
-              {order.customer.normalizedPhone ? <p>{order.customer.normalizedPhone}</p> : null}
-            </>
-          ) : (
-            <p>Walk-in customer</p>
-          )}
-        </section>
-
-        <section
-          className="admin-order-detail__card"
-          aria-labelledby="admin-order-fulfillment-title"
-        >
-          <h3 id="admin-order-fulfillment-title">Fulfillment</h3>
-          {order.fulfillment ? (
-            <>
-              <strong>{order.fulfillment.orderTypeLabel}</strong>
-              {order.fulfillment.address ? <p>{order.fulfillment.address}</p> : null}
-              {order.fulfillment.deliveryZoneLabel ? (
-                <p>{order.fulfillment.deliveryZoneLabel}</p>
-              ) : null}
-              <p>Delivery fee {money(order.fulfillment.finalDeliveryFeeMinor)}</p>
-            </>
-          ) : (
-            <p>No fulfillment details</p>
-          )}
-        </section>
-      </div>
-
-      <section className="admin-order-detail__card" aria-label="Order financial breakdown">
+      <details
+        className="admin-order-detail__card admin-order-detail__disclosure"
+        aria-label="Order financial breakdown"
+      >
+        <summary>Financial reconciliation breakdown</summary>
         <h3>Order financial breakdown</h3>
         <dl>
           <dt>Items subtotal</dt>
@@ -232,7 +299,7 @@ export function OrderDetailPage({
           allocation does not prove external collection, and a posted accounting refund does not
           prove a completed external payout. Return valuation is not a refund.
         </small>
-      </section>
+      </details>
 
       {order.fulfillment?.behavior === 'DELIVERY' ? (
         <section className="admin-order-detail__card" aria-label="Delivery tracking">
@@ -274,7 +341,11 @@ export function OrderDetailPage({
         </section>
       ) : null}
 
-      <section className="admin-order-detail__card" aria-labelledby="admin-order-payments-title">
+      <section
+        id="order-detail-payments"
+        className="admin-order-detail__card"
+        aria-labelledby="admin-order-payments-title"
+      >
         <h3 id="admin-order-payments-title">Payments</h3>
         {order.payments.length === 0 ? (
           <p>No payment records</p>
@@ -408,7 +479,32 @@ export function OrderDetailPage({
         )}
       </section>
 
-      <section className="admin-order-detail__card" aria-labelledby="admin-order-history-title">
+      <details className="admin-order-detail__card admin-order-detail__disclosure">
+        <summary>Full order identity and references</summary>
+        <h3>Order identity</h3>
+        <p>Business day: {order.businessDayId ?? 'Not available'}</p>
+        <p>
+          Unique order reference: <code>{order.id}</code>
+        </p>
+        {order.operatorName ? <p>Operator: {order.operatorName}</p> : null}
+        <p>
+          Created:{' '}
+          <time dateTime={order.createdAt}>
+            {new Intl.DateTimeFormat('en-EG', {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+              timeZone: 'Africa/Cairo',
+            }).format(new Date(order.createdAt))}{' '}
+            (Cairo)
+          </time>
+        </p>
+      </details>
+
+      <section
+        id="order-detail-history"
+        className="admin-order-detail__card"
+        aria-labelledby="admin-order-history-title"
+      >
         <h3 id="admin-order-history-title">Timeline and history</h3>
         {order.statusHistory.length === 0 ? (
           <p>No status history</p>

@@ -25,6 +25,17 @@ function formatValue(field: string, value: CatalogJsonValue | undefined): string
   return String(value);
 }
 
+function imageChangeSummary(change: CatalogPublishEntityChange): string {
+  const before = change.before?.['imageKey'];
+  const after = change.after?.['imageKey'];
+  const hadImage = typeof before === 'string' && before.length > 0;
+  const hasImage = typeof after === 'string' && after.length > 0;
+  if (!hadImage && hasImage) return 'Photo added';
+  if (hadImage && !hasImage) return 'Photo removed';
+  if (hadImage && hasImage) return 'Photo replaced';
+  return 'No photo';
+}
+
 function title(change: CatalogPublishEntityChange): string {
   const preferred = change.after?.['name'] ?? change.before?.['name'];
   return typeof preferred === 'string' && preferred ? preferred : change.id;
@@ -64,8 +75,14 @@ export function PublishReviewChanges({
                   <div className="admin-settings-row" key={field}>
                     <strong>{fieldLabels[field] ?? field}</strong>
                     <span>
-                      {formatValue(field, change.before?.[field])} →{' '}
-                      {formatValue(field, change.after?.[field])}
+                      {field === 'imageKey' ? (
+                        imageChangeSummary(change)
+                      ) : (
+                        <>
+                          {formatValue(field, change.before?.[field])} →{' '}
+                          {formatValue(field, change.after?.[field])}
+                        </>
+                      )}
                     </span>
                   </div>
                 ))}

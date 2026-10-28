@@ -6,7 +6,7 @@ import type {
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { CustomerDetailPage } from './CustomerDetailPage';
+import { CustomerActivityPanel, CustomerDetailPage } from './CustomerDetailPage';
 import { LoyaltyPanel } from './LoyaltyPanel';
 import { PromotionEditor } from '../promotions/PromotionEditor';
 
@@ -116,6 +116,85 @@ describe('Plan 5 CRM and promotion controls', () => {
     expect(html).not.toContain('>Maadi<');
   });
 
+  it('CRM2 approved profile shows three factual KPIs and contact/loyalty details', () => {
+    const html = renderToStaticMarkup(
+      <CustomerDetailPage
+        customer={customer}
+        loyalty={<p>Scoped loyalty</p>}
+        canMerge
+        onMerge={vi.fn()}
+      />,
+    );
+    for (const value of [
+      'Total orders',
+      'Total spent',
+      'Loyalty points',
+      '12',
+      'EGP 1,500.00',
+      '120',
+      'Contact information',
+      'Loyalty summary',
+      'Phone',
+      'Customer segments',
+      '+201012345678',
+    ]) {
+      expect(html).toContain(value);
+    }
+    expect(html).not.toContain('Recent orders #');
+    expect(html).not.toContain('Fake customer activity');
+  });
+
+  it('CRM2 renders signed, immutable customer loyalty events without inventing order rows', () => {
+    const scoped: AdminCustomerDetail = {
+      ...customer,
+      loyaltyHistory: [
+        ...customer.loyaltyHistory,
+        {
+          ...customer.loyaltyHistory[0]!,
+          id: '70000000-0000-4000-8000-000000000002',
+          eventType: 'REDEEM',
+          pointsDelta: -7,
+          createdAt: '2026-09-21T12:00:00.000Z',
+        },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      <>
+        <CustomerDetailPage
+          customer={scoped}
+          loyalty={<p>Scoped loyalty</p>}
+          canMerge={false}
+          onMerge={vi.fn()}
+        />
+        <CustomerActivityPanel customer={scoped} />
+      </>,
+    );
+    expect(html).toContain('Recent loyalty activity');
+    expect(html).toContain('+20 pts');
+    expect(html).toContain('-7 pts');
+    expect(html).not.toContain('Merge customer');
+    expect(html).not.toContain('View all orders');
+  });
+
+  it('CRM2 loyalty summary uses persisted program values, not speculative defaults', () => {
+    const html = renderToStaticMarkup(
+      <CustomerDetailPage
+        customer={customer}
+        loyalty={<p>Scoped loyalty</p>}
+        program={program}
+        canMerge={false}
+        onMerge={vi.fn()}
+      />,
+    );
+    expect(html).toContain('Earn rate');
+    expect(html).toContain('Point value');
+    expect(html).toContain('1 points / EGP 1');
+    expect(html).toContain('EGP 0.10');
+    expect(html).toContain('Contact information');
+    expect(html).toContain('Email');
+    expect(html).toContain('Notes');
+  });
+
   it('renders immutable loyalty history and permission-gated manual adjustment controls', () => {
     const html = renderToStaticMarkup(
       <LoyaltyPanel
@@ -151,6 +230,51 @@ describe('Plan 5 CRM and promotion controls', () => {
     ]) {
       expect(html).toContain(value);
     }
+  });
+
+  it('CRM2 labels real loyalty event types and retains signed points', () => {
+    const base = customer.loyaltyHistory[0]!;
+    const html = renderToStaticMarkup(
+      <LoyaltyPanel
+        customer={{
+          ...customer,
+          loyaltyHistory: [
+            { ...base, eventType: 'MANUAL_ADJUSTMENT', pointsDelta: -7 },
+            {
+              ...base,
+              id: '70000000-0000-4000-8000-000000000002',
+              eventType: 'REFUND_COMPENSATION',
+              pointsDelta: 3,
+            },
+          ],
+        }}
+        program={program}
+        reasons={[]}
+        canManage={false}
+        saving={false}
+        onAdjust={vi.fn()}
+      />,
+    );
+    expect(html).toContain('Manual adjustment');
+    expect(html).toContain('Refund adjustment');
+    expect(html).toContain('-7');
+    expect(html).toContain('+3');
+    expect(html).not.toContain('Choose a reason');
+  });
+
+  it('CRM3 financial review preserves safe minor-unit values in loyalty policy', () => {
+    const html = renderToStaticMarkup(
+      <LoyaltyPanel
+        customer={customer}
+        program={{ ...program, redemptionMinorPerPoint: Number.MAX_SAFE_INTEGER - 1 }}
+        reasons={[]}
+        canManage={false}
+        saving={false}
+        onAdjust={vi.fn()}
+      />,
+    );
+    expect(html).toContain('1 point = EGP 90071992547409.90');
+    expect(html).not.toContain('1 point = EGP 90071992547409.91');
   });
 
   it('renders the complete promotion contract in the editor', () => {

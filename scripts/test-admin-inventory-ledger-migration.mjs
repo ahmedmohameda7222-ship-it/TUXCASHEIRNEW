@@ -358,6 +358,43 @@ if (!lower.includes("status, 'draft'") && !lower.includes("'draft'")) {
   throw new Error('stocktake begin flow must retain a DRAFT state before posting');
 }
 
+// I3 append-only replay contract: the additive remediation must authorize
+// before any replay lookup, serialize adjustment and waste using one command
+// namespace, and reject changed payloads rather than returning false success.
+const replayIntegrityMigrationPath = resolve(
+  'supabase/migrations/20261027183000_inventory_adjustment_waste_replay_integrity.sql',
+);
+if (!fs.existsSync(replayIntegrityMigrationPath)) {
+  throw new Error('I3 adjustment/waste replay-integrity migration missing');
+}
+const replayIntegritySql = fs.readFileSync(replayIntegrityMigrationPath, 'utf8').toLowerCase();
+const replaySections = [
+  ['post_inventory_adjustment_v1', 'post_inventory_waste_v1', 'p_quantity_delta_micros'],
+  ['post_inventory_waste_v1', '', '-p_quantity_micros'],
+];
+for (const [name, next, signedMicros] of replaySections) {
+  const begin = replayIntegritySql.indexOf('create or replace function public.' + name);
+  const end = next
+    ? replayIntegritySql.indexOf('create or replace function public.' + next, begin + 1)
+    : replayIntegritySql.length;
+  const section = replayIntegritySql.slice(begin, end);
+  const authority = section.indexOf('private.admin_inventory_authority_v1');
+  const replayRead = section.indexOf('from public.inventory_movements m');
+  if (
+    begin < 0 || authority < 0 || replayRead < 0 || authority >= replayRead ||
+    !section.includes("'tux-admin-inventory-command:'") ||
+    !section.includes("m.movement_type in ('admin_adjustment', 'waste')") ||
+    !section.includes('m.inventory_item_id = p_inventory_item_id') ||
+    !section.includes('m.quantity_delta_micros = ' + signedMicros) ||
+    !section.includes('m.admin_employee_id = p_employee_id') ||
+    !section.includes('m.reason_code_id = p_reason_code_id') ||
+    !section.includes('m.emergency_negative_override = coalesce(p_emergency_negative_override, false)') ||
+    !section.includes("'idempotency_conflict'")
+  ) {
+    throw new Error('I3 ' + name + ' must authorize before replay and reject reused IDs with changed payload');
+  }
+}
+
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl) {
   console.log('Admin inventory ledger static invariant passed.');

@@ -2,11 +2,11 @@ import './reorderSuggestions.css';
 import type { AdminInventoryReorderSuggestion } from '@tux/admin-contracts';
 import { useState } from 'react';
 
-function quantity(micros: number, unitLabel: string): string {
-  return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(
-    micros / 1_000_000,
-  )} ${unitLabel}`;
-}
+import { formatPurchaseMicros } from '../purchasing/purchaseOrderDraft';
+import { formatInventoryQuantity } from './InventoryItemPage';
+import { parseStocktakeMicros } from './stocktakeQuantity';
+
+const quantity = formatInventoryQuantity;
 
 type ReplenishmentDraft = {
   parLevelMicros: string;
@@ -32,15 +32,11 @@ const NUMERIC_REPLENISHMENT_FIELDS = [
 ])[];
 
 function quantityInput(micros: number | null): string {
-  return micros === null ? '' : String(micros / 1_000_000);
+  return micros === null ? '' : formatPurchaseMicros(micros);
 }
 
 function quantityMicros(value: string): number | null {
-  if (value.trim() === '') return null;
-  const amount = Number(value);
-  if (!Number.isFinite(amount) || amount < 0) return null;
-  const micros = Math.round(amount * 1_000_000);
-  return Number.isSafeInteger(micros) ? micros : null;
+  return parseStocktakeMicros(value);
 }
 
 export function ReorderSuggestionsPage({

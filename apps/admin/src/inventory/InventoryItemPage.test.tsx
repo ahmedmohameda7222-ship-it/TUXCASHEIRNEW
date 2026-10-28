@@ -1,9 +1,21 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { InventoryItemPage } from './InventoryItemPage';
+import { formatInventoryQuantity, InventoryItemPage } from './InventoryItemPage';
 
 describe('InventoryItemPage', () => {
+  it('does not render nonzero exact micro-unit balances as zero', () => {
+    expect(formatInventoryQuantity(1, 'kg')).toBe('0.000001 kg');
+    expect(formatInventoryQuantity(-1, 'kg')).toBe('-0.000001 kg');
+    expect(formatInventoryQuantity(999, 'kg')).toBe('0.000999 kg');
+    expect(formatInventoryQuantity(1000, 'kg')).toBe('0.001 kg');
+    expect(formatInventoryQuantity(0, 'kg')).toBe('0 kg');
+    expect(formatInventoryQuantity(Number.MAX_SAFE_INTEGER, 'kg')).toBe('9,007,199,254.740991 kg');
+    expect(formatInventoryQuantity(-Number.MAX_SAFE_INTEGER, 'kg')).toBe(
+      '-9,007,199,254.740991 kg',
+    );
+  });
+
   it('shows on-hand, reserved, and available separately', () => {
     const html = renderToStaticMarkup(
       <InventoryItemPage

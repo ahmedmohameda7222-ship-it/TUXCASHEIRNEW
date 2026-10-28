@@ -68,4 +68,81 @@ describe('P02 catalog browse regression', () => {
     expect(html).toContain('Clear filters');
     expect(html).toContain('No products match');
   });
+
+  it('matches the approved C1 browse contract with category shortcuts and factual column headings', () => {
+    const html = renderToStaticMarkup(
+      <ProductList
+        products={[product, { ...product, id: 'p2', name: 'Second Burger', soldOut: true }]}
+        categories={[category]}
+        selectedProductId={null}
+        search=""
+        status="all"
+        categoryId=""
+        onSearchChange={vi.fn()}
+        onStatusChange={vi.fn()}
+        onCategoryChange={vi.fn()}
+        onSelectProduct={vi.fn()}
+      />,
+    );
+    expect(html).toContain('aria-label="Product categories"');
+    expect(html).toContain('All products');
+    expect(html).toContain('data-catalog-product-columns');
+    expect(html).toContain('Product');
+    expect(html).toContain('Category');
+    expect(html).toContain('Price');
+    expect(html).toContain('Availability');
+    expect(html).toContain('<strong>2</strong><span>products</span>');
+  });
+
+  it('C1 keeps category shortcuts outside the bordered products directory', () => {
+    const html = renderToStaticMarkup(
+      <ProductList
+        products={[product]}
+        categories={[category]}
+        selectedProductId={null}
+        search=""
+        status="all"
+        categoryId=""
+        onSearchChange={vi.fn()}
+        onStatusChange={vi.fn()}
+        onCategoryChange={vi.fn()}
+        onSelectProduct={vi.fn()}
+      />,
+    );
+    const categoriesEnd = html.indexOf('</nav>');
+    const directoryStart = html.indexOf('<section class="admin-catalog-list"');
+    expect(categoriesEnd).toBeGreaterThan(0);
+    expect(directoryStart).toBeGreaterThan(categoriesEnd);
+  });
+
+  it('C1 search includes the authorized category label without matching product name or slug', () => {
+    const dailySpecial = {
+      ...product,
+      name: 'Daily Special',
+      slug: 'daily-special',
+      description: null,
+    };
+    expect(filterCatalogProducts([dailySpecial], 'burgers', 'all', '', [category])).toEqual([
+      dailySpecial,
+    ]);
+  });
+
+  it('C1 mobile filter controls declare an accessible collapsed Filters disclosure', () => {
+    const html = renderToStaticMarkup(
+      <ProductList
+        products={[product]}
+        categories={[category]}
+        selectedProductId={null}
+        search=""
+        status="all"
+        categoryId=""
+        onSearchChange={vi.fn()}
+        onStatusChange={vi.fn()}
+        onCategoryChange={vi.fn()}
+        onSelectProduct={vi.fn()}
+      />,
+    );
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('Filters');
+  });
 });

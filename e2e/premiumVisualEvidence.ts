@@ -11,14 +11,26 @@ export const PREMIUM_EVIDENCE_VIEWPORTS = [
   { name: 'phone-320', width: 320, height: 720 },
 ] as const;
 
+/** Owner-approved eight-tab responsive review widths. This is mock-auth evidence only. */
+export const EIGHT_TABS_EVIDENCE_VIEWPORTS = [
+  { name: 'orders-reference-1536', width: 1536, height: 960 },
+  { name: 'desktop-1440', width: 1440, height: 900 },
+  { name: 'tablet-1024', width: 1024, height: 900 },
+  { name: 'tablet-768', width: 768, height: 1024 },
+  { name: 'phone-390', width: 390, height: 844 },
+  { name: 'phone-360', width: 360, height: 800 },
+] as const;
+
 export function premiumVisualViewports<T extends { width: number; height: number; name?: string }>(
   defaults: readonly T[],
 ) {
+  if (process.env['TUX_ADMIN_EIGHT_TABS_CAPTURE'] === '1') return EIGHT_TABS_EVIDENCE_VIEWPORTS;
   return process.env['P04_P07_CAPTURE'] === '1' ? PREMIUM_EVIDENCE_VIEWPORTS : defaults;
 }
 
 export async function capturePremiumScreenshot(page: Page, scene: string): Promise<void> {
-  if (process.env['P04_P07_CAPTURE'] !== '1') return;
+  if (process.env['P04_P07_CAPTURE'] !== '1' && process.env['TUX_ADMIN_EIGHT_TABS_CAPTURE'] !== '1')
+    return;
   mkdirSync('artifacts/p04-p07', { recursive: true });
   const viewport = page.viewportSize();
   if (!viewport) throw new Error('Chromium viewport unavailable');

@@ -106,7 +106,10 @@ export function SettlementsPage() {
         ) : undefined
       }
     >
-      <FinanceSectionNav active="settlements" />
+      <FinanceSectionNav
+        active="settlements"
+        canReconcile={principal.permissions.includes('finance.reconcile')}
+      />
       {operations.settlementsQuery.isLoading ? <LoadingState title="Loading settlements" /> : null}
       {operations.settlementsQuery.isError ? (
         <ErrorState

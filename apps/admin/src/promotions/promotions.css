@@ -1,0 +1,78 @@
+/* CRM4 promotion facts belong to this section, not to the global shell. */
+.admin-crm-promotions-table {
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.admin-crm-promotions-table th,
+.admin-crm-promotions-table td {
+  padding: 0.8rem 0.4rem;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--tux-border-subtle);
+  overflow-wrap: anywhere;
+}
+
+.admin-crm-promotions-table th {
+  color: var(--tux-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.admin-crm-promotions-table th:first-child {
+  width: 46%;
+}
+
+.admin-crm-promotions-table th:nth-child(2) {
+  width: 20%;
+}
+
+.admin-crm-promotions-table th:nth-child(3) {
+  width: 18%;
+}
+
+.admin-crm-promotions-table th:last-child {
+  width: 16%;
+}
+
+.admin-crm-promotions-table td strong,
+.admin-crm-promotions-table td small {
+  display: block;
+  min-width: 0;
+}
+
+.admin-crm-promotions-table td small {
+  color: var(--tux-text-secondary);
+  margin-top: 0.35rem;
+  line-height: 1.35;
+}
+
+.admin-crm-promotions-table__discount {
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-crm-promotions-table__status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--tux-text-secondary);
+}
+
+.admin-crm-promotions-table td .admin-secondary-button {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 480px) {
+  .admin-crm-promotions-table th,
+  .admin-crm-promotions-table td {
+    padding: 0.65rem 0.25rem;
+    font-size: 0.76rem;
+  }
+
+  .admin-crm-promotions-table td .admin-secondary-button {
+    padding: 0.4rem;
+    font-size: 0.76rem;
+  }
+}

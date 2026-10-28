@@ -129,7 +129,7 @@ describe('ProductEditor', () => {
         onSetAvailability={vi.fn()}
       />,
     );
-    expect(expanded).toContain('Recipe / Inventory');
+    expect(expanded).toContain('Inventory usage');
     expect(expanded).toContain('Extras / Modifiers');
     expect(expanded).toContain('Shop Overrides');
     expect(expanded).toContain('History');
@@ -140,6 +140,84 @@ describe('ProductEditor', () => {
     expect(expanded).toContain('Visible in this shop');
     expect(expanded).toContain('Open version history');
     expect(expanded).not.toContain('expanded in the next catalog workflow tasks');
+  });
+
+  it('C3 shows direct Inventory usage with used/unused unit rows before opening More', () => {
+    const bundle: CatalogJsonObject = {
+      ...advancedBundle,
+      inventoryItems: [
+        ...(advancedBundle.inventoryItems as CatalogJsonObject[]),
+        {
+          id: '77777777-7777-4777-8777-777777777777',
+          shopId: fixtureProduct.shopId,
+          name: 'Cheese',
+          unitLabel: 'slice',
+          trackingMode: 'RECIPE_TRACKED',
+          active: true,
+        },
+      ],
+    };
+    const html = renderEditor(
+      <ProductEditor
+        product={fixtureProduct}
+        canEdit
+        canPrice
+        advancedBundle={bundle}
+        onSaveDraft={vi.fn()}
+        onSetAvailability={vi.fn()}
+      />,
+    );
+    expect(html).toContain('Inventory usage');
+    expect(html).toContain('DRAFT ONLY');
+    expect(html).toContain('Used in this product');
+    expect(html).toContain('Other inventory items');
+    expect(html).toContain('1 of 2 in use');
+    expect(html).toContain('Meat');
+    expect(html).toContain('Cheese');
+    expect(html).toContain('slice');
+    expect(html).toContain('0 = not used');
+    expect(html).toContain('Recipe, not stock balance');
+  });
+
+  it('C3 zero quantity unlinks an inventory recipe and untouched micros stay exact', () => {
+    const model = readProductAdvancedModel(advancedBundle, fixtureProduct.id);
+    const recipeState = { '66666666-6666-4666-8666-666666666666': '0' };
+    const removed = buildProductAdvancedDraft({
+      shopId: fixtureProduct.shopId,
+      productId: fixtureProduct.id,
+      model,
+      modifierState: {},
+      comboState: {},
+      recipeState,
+    });
+    expect(removed.recipeLines).toEqual([]);
+    expect(
+      buildProductAdvancedDraft({
+        shopId: fixtureProduct.shopId,
+        productId: fixtureProduct.id,
+        model,
+        modifierState: {},
+        comboState: {},
+        recipeState: { '66666666-6666-4666-8666-666666666666': '0.000' },
+      }).recipeLines,
+    ).toEqual([]);
+
+    const unchanged = buildProductAdvancedDraft({
+      shopId: fixtureProduct.shopId,
+      productId: fixtureProduct.id,
+      model,
+      modifierState: {},
+      comboState: {},
+      recipeState: {},
+    });
+    expect(unchanged.recipeLines).toEqual([
+      {
+        shopId: fixtureProduct.shopId,
+        productId: fixtureProduct.id,
+        inventoryItemId: '66666666-6666-4666-8666-666666666666',
+        quantityMicros: 250_000,
+      },
+    ]);
   });
 
   it('keeps pricing read-only without catalog.pricing', () => {
@@ -183,7 +261,7 @@ describe('ProductEditor', () => {
       />,
     );
 
-    expect(html).toContain('Product image');
+    expect(html).toContain('Product photo');
     expect(html).toContain('Image upload changes remain in Draft until saved and published.');
     expect(html).not.toContain('Image object key');
     expect(html).not.toContain(fixtureProduct.shopId);

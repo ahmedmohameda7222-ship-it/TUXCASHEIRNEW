@@ -66,7 +66,6 @@ export function CatalogPage() {
   const { principal, scope, hasUnsavedDrafts } = useShopScope();
   const session = useAdminSession();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
-  const catalog = useCatalog(shopId);
   const [location, navigate] = useLocation();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<CatalogStatusFilter>('all');
@@ -91,6 +90,7 @@ export function CatalogPage() {
   const selectedProductId =
     scopedUnsavedProduct?.id ?? detailIdFromPath(effectiveLocation, '/catalog/products');
   const mobileEditing = selectedProductId !== null;
+  const catalog = useCatalog(shopId, selectedProductId);
 
   if (!unapprovedRouteChange) routeRef.current = location;
 
@@ -319,11 +319,16 @@ export function CatalogPage() {
 
   return (
     <PageScaffold
-      eyebrow="Catalog control"
       title="Catalog"
       description="Manage products, prices, availability, and changes waiting to be published."
       primaryAction={
-        <div className="admin-catalog-new-product-controls">
+        <div
+          className={
+            definitionsOpen
+              ? 'admin-catalog-new-product-controls is-managing'
+              : 'admin-catalog-new-product-controls'
+          }
+        >
           {canEdit ? (
             <button
               className="admin-secondary-button"
@@ -351,7 +356,7 @@ export function CatalogPage() {
           ) : null}
           {canEdit ? (
             <button
-              className="admin-secondary-button"
+              className="admin-secondary-button admin-catalog-secondary-management"
               type="button"
               disabled={busy}
               onClick={() => {
@@ -369,13 +374,13 @@ export function CatalogPage() {
             </button>
           ) : null}
           <button
-            className="admin-secondary-button"
+            className="admin-secondary-button admin-catalog-secondary-management"
             type="button"
             onClick={() => requestCatalogNavigation('/catalog/products/publishing')}
           >
             Review & Publish ({catalog.compatibleDrafts.length})
           </button>
-          <label>
+          <label className="admin-catalog-category-choice">
             <span>New product category</span>
             <select
               aria-label="New product category"
@@ -391,7 +396,7 @@ export function CatalogPage() {
             </select>
           </label>
           <button
-            className="admin-primary-button"
+            className="admin-primary-button admin-catalog-create-button"
             type="button"
             disabled={!canEdit || !canPrice || !newProductCategoryId || busy}
             title={!canPrice ? 'Creating a product requires catalog.pricing access.' : undefined}
@@ -402,22 +407,24 @@ export function CatalogPage() {
         </div>
       }
     >
-      <div className="admin-catalog-draft-banner" role="status">
-        <div>
-          <strong>
-            {principal.shopSummaries?.find((shop) => shop.id === shopId)?.name ?? 'Selected shop'}
-            {' · '}Published version {catalog.workspaceQuery.data.currentPublishVersion}
-          </strong>
-          <span>
-            Save Draft keeps changes private. Review & Publish, then Publish Now after any required
-            approval, to update Operations and the public menu.
+      {catalog.compatibleDrafts.length > 0 && !catalog.activeDraft ? (
+        <div className="admin-catalog-draft-banner" role="status">
+          <div>
+            <strong>
+              {principal.shopSummaries?.find((shop) => shop.id === shopId)?.name ?? 'Selected shop'}
+              {' · '}Published version {catalog.workspaceQuery.data.currentPublishVersion}
+            </strong>
+            <span>
+              Save Draft is private. Review & Publish, then Publish Now after any required approval,
+              updates Operations and the public menu.
+            </span>
+          </div>
+          <span className="admin-status-pill">
+            {catalog.compatibleDrafts.length} pending{' '}
+            {catalog.compatibleDrafts.length === 1 ? 'draft' : 'drafts'}
           </span>
         </div>
-        <span className="admin-status-pill">
-          {catalog.compatibleDrafts.length} pending{' '}
-          {catalog.compatibleDrafts.length === 1 ? 'draft' : 'drafts'}
-        </span>
-      </div>
+      ) : null}
 
       {draftSaved ? (
         <div className="admin-callout" role="status">
@@ -460,7 +467,14 @@ export function CatalogPage() {
       ) : null}
 
       {catalog.activeDraft ? (
-        <div className="admin-catalog-draft-banner" role="status">
+        <div
+          className={
+            definitionsOpen
+              ? 'admin-catalog-draft-banner is-managing'
+              : 'admin-catalog-draft-banner'
+          }
+          role="status"
+        >
           <div>
             <strong>Draft in progress</strong>
             <span>Your saved changes are not visible to customers yet.</span>
@@ -480,7 +494,7 @@ export function CatalogPage() {
       ) : null}
 
       {pendingNavigation ? (
-        <div className="modal-backdrop" role="presentation">
+        <div className="modal-backdrop admin-catalog-navigation-confirm" role="presentation">
           <section
             className="switch-dialog"
             role="dialog"
@@ -533,18 +547,14 @@ export function CatalogPage() {
         </div>
       ) : null}
 
-      <div className="admin-catalog-scope" role="status">
-        <strong>
-          {principal.shopSummaries?.find((shop) => shop.id === shopId)?.name ?? 'Selected shop'}
-        </strong>
-        <span>
-          {definitionsOpen
-            ? 'Organize catalog definitions'
-            : mobileEditing
-              ? 'Editing product draft'
-              : 'Browse live catalog'}
-        </span>
-      </div>
+      {!definitionsOpen ? (
+        <div className="admin-catalog-scope" role="status">
+          <strong>
+            {principal.shopSummaries?.find((shop) => shop.id === shopId)?.name ?? 'Selected shop'}
+          </strong>
+          <span>{mobileEditing ? 'Editing product draft' : 'Browse live catalog'}</span>
+        </div>
+      ) : null}
 
       {!bulkOpen && !definitionsOpen && scopedProducts.length === 0 ? (
         <CatalogFirstRunGuide
@@ -611,22 +621,77 @@ export function CatalogPage() {
               onCategoryChange={handleCategoryFilterChange}
               onSelectProduct={openProduct}
             />
+            <details className="admin-catalog-mobile-secondary-tools">
+              <summary>More catalog tools</summary>
+              <div className="admin-catalog-mobile-secondary-tools__actions">
+                <button
+                  className="admin-secondary-button admin-catalog-mobile-tool-button"
+                  type="button"
+                  onClick={() => requestCatalogNavigation('/catalog/products/publishing')}
+                >
+                  Review & Publish ({catalog.compatibleDrafts.length})
+                </button>
+                {canEdit ? (
+                  <button
+                    className="admin-secondary-button admin-catalog-mobile-tool-button"
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      if (!canSwitchCatalogEditor()) return;
+                      setModeError(null);
+                      setDefinitionsOpen(false);
+                      setUnsavedProduct(null);
+                      navigate('/catalog/products');
+                      setBulkOpen(true);
+                    }}
+                  >
+                    Bulk Edit
+                  </button>
+                ) : null}
+                <label className="admin-select-field">
+                  <span>New product category</span>
+                  <select
+                    aria-label="Mobile new product category"
+                    value={newProductCategoryId}
+                    disabled={!canEdit || !canPrice || activeCategories.length === 0 || busy}
+                    onChange={(event) => setNewProductCategoryId(event.target.value)}
+                  >
+                    {activeCategories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </details>
           </div>
 
           <div className="admin-catalog-layout__editor">
             {selectedProduct ? (
               <ProductInspector
+                key={selectedProduct.id}
                 product={selectedProduct}
+                isNew={scopedUnsavedProduct?.id === selectedProduct.id}
                 imageRequiresSaveFirst={scopedUnsavedProduct !== null}
                 categories={categories}
                 canEdit={canEdit}
                 canPrice={canPrice}
-                busy={busy}
+                busy={busy || catalog.pendingExistingDraftResume}
+                resumeError={catalog.resumeDraft.isError}
+                onRetryResume={() => {
+                  const existing = catalog.compatibleDrafts[0];
+                  if (existing) void catalog.resumeDraft.mutateAsync(existing.id);
+                }}
                 draftRevision={catalog.activeDraft?.draftRevision ?? null}
-                advancedBundle={catalog.activeDraft?.bundleJson ?? null}
+                advancedBundle={
+                  catalog.activeDraft?.bundleJson ?? catalog.advancedQuery.data ?? null
+                }
+                advancedLoadError={catalog.advancedQuery.isError}
                 onClose={closeEditor}
                 onRequestAdvanced={async () => {
-                  await catalog.prepareProductDraft.mutateAsync(selectedProduct);
+                  const result = await catalog.advancedQuery.refetch();
+                  if (result.isError) throw result.error;
                 }}
                 onReviewPublish={() => requestCatalogNavigation('/catalog/products/publishing')}
                 onSaveDraft={async (draft) => {

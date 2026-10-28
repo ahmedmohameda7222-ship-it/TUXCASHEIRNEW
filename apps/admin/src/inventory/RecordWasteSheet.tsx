@@ -2,13 +2,8 @@ import type { AdminInventoryItem, AdminInventoryReasonCode } from '@tux/admin-co
 import { useMemo, useState } from 'react';
 
 import { AdminDialog } from '../components/overlay/AdminDialog';
-
-function toPositiveMicros(value: string): number | null {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) return null;
-  const micros = Math.round(numeric * 1_000_000);
-  return Number.isSafeInteger(micros) && micros > 0 ? micros : null;
-}
+import { formatInventoryQuantity } from './InventoryItemPage';
+import { parseInventoryMicros } from './inventoryQuantityInput';
 
 export function RecordWasteSheet({
   item,
@@ -35,17 +30,47 @@ export function RecordWasteSheet({
   const [reasonCodeId, setReasonCodeId] = useState(options[0]?.id ?? '');
   const [note, setNote] = useState('');
   const [override, setOverride] = useState(false);
-  const micros = toPositiveMicros(quantity);
+  const micros = parseInventoryMicros(quantity, false);
 
   return (
     <AdminDialog
       open
       variant="sheet"
       title={`Record waste for ${item.name}`}
-      description="Enter the wasted quantity and choose the reason."
+      description={`${item.name} · Available ${formatInventoryQuantity(item.availableMicros, item.unitLabel)}`}
       onOpenChange={(open) => {
         if (!open && !pending) onCancel();
       }}
+      footer={
+        <>
+          <button
+            className="admin-primary-button"
+            type="button"
+            disabled={
+              pending || micros === null || reasonCodeId.length === 0 || (override && !note.trim())
+            }
+            onClick={() => {
+              if (micros === null) return;
+              onSubmit({
+                quantityMicros: micros,
+                reasonCodeId,
+                note: note.trim() || null,
+                emergencyNegativeOverride: override,
+              });
+            }}
+          >
+            Post waste
+          </button>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={pending}
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+        </>
+      }
     >
       <label className="admin-field">
         <span>Waste quantity ({item.unitLabel})</span>
@@ -85,32 +110,6 @@ export function RecordWasteSheet({
           <span>Allow stock to go below zero</span>
         </label>
       ) : null}
-      <button
-        className="admin-primary-button"
-        type="button"
-        disabled={
-          pending || micros === null || reasonCodeId.length === 0 || (override && !note.trim())
-        }
-        onClick={() => {
-          if (micros === null) return;
-          onSubmit({
-            quantityMicros: micros,
-            reasonCodeId,
-            note: note.trim() || null,
-            emergencyNegativeOverride: override,
-          });
-        }}
-      >
-        Post waste
-      </button>
-      <button
-        className="admin-secondary-button"
-        type="button"
-        disabled={pending}
-        onClick={onCancel}
-      >
-        Cancel
-      </button>
     </AdminDialog>
   );
 }

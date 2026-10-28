@@ -73,6 +73,20 @@ export type AdminOrderSummary = {
   orderTypeLabel: string;
 };
 
+/**
+ * Full authorized shop aggregation, independent of any OrderSearchResult cursor/page.
+ * Financial fields are nullable for users without finance.view and when zero paid orders
+ * makes AOV mathematically undefined.
+ */
+export type AdminOrderKpisResult = {
+  shopId: string;
+  orderCount: number;
+  activeOrderCount: number;
+  netSalesMinor: number | null;
+  averageOrderMinor: number | null;
+  denominatorPaidOrderCount: number | null;
+};
+
 export type AdminOrderSearchResult = {
   shopId: string;
   rows: readonly AdminOrderSummary[];

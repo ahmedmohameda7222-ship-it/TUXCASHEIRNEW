@@ -177,6 +177,52 @@ describe('Admin purchasing service', () => {
     expect(receivePurchase).not.toHaveBeenCalled();
   });
 
+  it('P4 restricts supplier lifecycle commands by role, shop, and version', async () => {
+    const manageSupplier = vi.fn().mockResolvedValue({
+      ok: true,
+      supplierId: 'supplier-1',
+      version: 5,
+    });
+    const service = createPurchasingService(store({ manageSupplier }));
+    const input = {
+      type: 'supplier.archive' as const,
+      shopId: 'shop-a',
+      supplierId: 'supplier-1',
+      expectedVersion: 4,
+      payload: {},
+      commandId: 'supplier-archive-1',
+    };
+
+    const manager: AdminSessionPrincipal = { ...buyer, role: 'MANAGER' };
+    const viewer: AdminSessionPrincipal = { ...buyer, permissions: ['purchasing.view'] };
+    const otherShop = { ...input, shopId: 'shop-b' };
+    await expect(service.manageSupplier(input, manager)).rejects.toThrow(/permission_forbidden/);
+    await expect(service.manageSupplier(input, viewer)).rejects.toThrow(/permission_forbidden/);
+    await expect(service.manageSupplier(otherShop, buyer)).rejects.toThrow(/shop_forbidden/);
+    expect(manageSupplier).not.toHaveBeenCalled();
+
+    await expect(service.manageSupplier(input, buyer)).resolves.toMatchObject({
+      ok: true,
+      version: 5,
+    });
+    expect(manageSupplier).toHaveBeenCalledWith({
+      ...input,
+      employeeId: 'employee-1',
+    });
+
+    const restore = {
+      ...input,
+      type: 'supplier.restore' as const,
+      expectedVersion: 5,
+      commandId: 'supplier-restore-1',
+    };
+    await service.manageSupplier(restore, { ...buyer, role: 'ADMIN' });
+    expect(manageSupplier).toHaveBeenLastCalledWith({
+      ...restore,
+      employeeId: 'employee-1',
+    });
+  });
+
   it('keeps purchase returns behind the trusted purchasing.receive boundary', async () => {
     const returnPurchase = vi.fn().mockResolvedValue({
       ok: true,

@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { useAdminSession } from '../auth/useAdminSession';
 import { AdminApiError, adminFetch } from '../lib/adminApi';
 import { createRetainedCommandIds, isPendingApprovalResult } from '../lib/retainedCommandIds';
+import { assertStaffCommandOutcome } from './staffCommandOutcome';
 
 export type StaffApiCommandDraft = Readonly<Record<string, unknown>> & { readonly type: string };
 const SECRET_COMMAND_KEY = /(pin|password|passcode|secret|verifier|lookup|salt)/i;
@@ -93,11 +94,12 @@ export function useStaff(shopId: string | undefined, employeeId: string | null) 
         },
         csrfToken(session),
       );
-      if (!isPendingApprovalResult(result)) {
+      const accepted = assertStaffCommandOutcome(result);
+      if (!isPendingApprovalResult(accepted)) {
         if (seed === null) commandIds.complete(scope, intent);
         else ephemeralCommandIds.complete(seed);
       }
-      return result;
+      return accepted;
     } catch (error) {
       if (staffCommandErrorIsTerminal(error)) {
         if (seed === null) commandIds.complete(scope, intent);

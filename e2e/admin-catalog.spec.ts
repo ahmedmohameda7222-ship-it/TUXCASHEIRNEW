@@ -34,13 +34,16 @@ type FixtureProduct = {
   sortOrder: number;
 };
 
+type C2CategorySnapshot = { name: string; sortOrder: number; active: boolean };
+type C2ModifierSnapshot = { name: string; priceMinor: number };
+
 type CatalogCommandBody = {
   type?: string;
   soldOut?: boolean;
   changes?: Array<{ bundleJson?: Record<string, unknown> }>;
 };
 
-function canonicalBundle(product: FixtureProduct, version: number) {
+function canonicalBundle(product: FixtureProduct, version: number, withRecipe = false) {
   return {
     snapshot: {
       shopId,
@@ -61,18 +64,53 @@ function canonicalBundle(product: FixtureProduct, version: number) {
       modifiers: [],
       productModifierLinks: [],
       comboBeverageOptions: [],
-      recipeLines: [],
+      recipeLines: withRecipe
+        ? [
+            {
+              shopId,
+              productId: product.id,
+              inventoryItemId: '66666666-6666-4666-8666-666666666666',
+              quantityMicros: 250_000,
+            },
+          ]
+        : [],
       orderTypes: [],
       paymentMethods: [],
       deliveryZones: [],
     },
-    inventoryItems: [],
+    inventoryItems: withRecipe
+      ? [
+          {
+            id: '66666666-6666-4666-8666-666666666666',
+            shopId,
+            name: 'Meat',
+            unitLabel: 'g',
+            trackingMode: 'RECIPE_TRACKED',
+            active: true,
+          },
+          {
+            id: '77777777-7777-4777-8777-777777777777',
+            shopId,
+            name: 'Cheese',
+            unitLabel: 'slice',
+            trackingMode: 'RECIPE_TRACKED',
+            active: true,
+          },
+        ]
+      : [],
   };
 }
 
 async function mockCatalog(
   page: Page,
-  options: { allowSecondShop?: boolean; productCount?: number; emptyCatalog?: boolean } = {},
+  options: {
+    allowSecondShop?: boolean;
+    productCount?: number;
+    emptyCatalog?: boolean;
+    permissions?: string[];
+    withRecipe?: boolean;
+    persistedRecipeDraft?: boolean;
+  } = {},
 ) {
   let publishVersion = 48;
   let draftRevision = 1;
@@ -92,8 +130,25 @@ async function mockCatalog(
     isCombo: false,
     sortOrder: 10,
   };
-  let draftBundle = canonicalBundle(liveProduct, publishVersion);
+  let draftBundle = canonicalBundle(liveProduct, publishVersion, options.withRecipe);
   const commands: CatalogCommandBody[] = [];
+  if (options.persistedRecipeDraft) {
+    draftBundle = canonicalBundle(liveProduct, publishVersion, true);
+    draftBundle.snapshot.recipeLines = [
+      {
+        shopId,
+        productId,
+        inventoryItemId: '66666666-6666-4666-8666-666666666666',
+        quantityMicros: 250_000,
+      },
+      {
+        shopId,
+        productId,
+        inventoryItemId: '77777777-7777-4777-8777-777777777777',
+        quantityMicros: 500_000,
+      },
+    ];
+  }
 
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
@@ -103,6 +158,7 @@ async function mockCatalog(
         ...ownerSession,
         principal: {
           ...ownerSession.principal,
+          permissions: options.permissions ?? ownerSession.principal.permissions,
           shopIds: options.allowSecondShop ? [shopId, secondShopId] : [shopId],
           shopSummaries: options.allowSecondShop
             ? [
@@ -132,6 +188,17 @@ async function mockCatalog(
           draftPreviews: [],
           schedules: [],
         }),
+      });
+      return;
+    }
+    if (
+      request.method() === 'GET' &&
+      new URL(request.url()).searchParams.get('view') === 'advanced'
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(draftBundle),
       });
       return;
     }
@@ -170,7 +237,20 @@ async function mockCatalog(
                   }),
                 ),
               ],
-          drafts: [],
+          drafts: options.persistedRecipeDraft
+            ? [
+                {
+                  id: '55555555-5555-4555-8555-555555555555',
+                  shopId,
+                  title: 'Saved recipe',
+                  status: 'DRAFT',
+                  basePublishVersion: publishVersion,
+                  draftRevision,
+                  publishedVersion: null,
+                  updatedAt: '2026-10-26T00:00:00.000Z',
+                },
+              ]
+            : [],
         }),
       });
       return;
@@ -180,9 +260,24 @@ async function mockCatalog(
     const body = request.postDataJSON() as CatalogCommandBody;
     commands.push(body);
 
+    if (body.type === 'draft.resume') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          draftId: '55555555-5555-4555-8555-555555555555',
+          draftRevision,
+          basePublishVersion: publishVersion,
+          bundleJson: draftBundle,
+        }),
+      });
+      return;
+    }
+
     if (body.type === 'draft.create') {
       draftRevision = 1;
-      draftBundle = canonicalBundle(liveProduct, publishVersion);
+      draftBundle = canonicalBundle(liveProduct, publishVersion, options.withRecipe);
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -258,25 +353,386 @@ for (const viewport of ADMIN_WIDE_TABLET_VIEWPORTS) {
       await expect(page).toHaveURL(new RegExp(`/catalog/products/${productId}$`));
       await expect(list).toBeHidden();
       await expect(inspector).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Products' })).toBeVisible();
+      await expect(
+        page.locator('[data-catalog-inspector]').getByRole('button', { name: 'Products' }),
+      ).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Inventory usage' })).toBeVisible();
       await page.getByRole('button', { name: 'More' }).click();
-      await expect(page.getByText('Recipe / Inventory')).toBeVisible();
       await expect(page.getByText('Shop Overrides')).toBeVisible();
       await page.reload();
       await expect(inspector).toBeVisible();
-      await page.getByRole('button', { name: 'Products' }).click();
+      await page
+        .locator('[data-catalog-inspector]')
+        .getByRole('button', { name: 'Products' })
+        .click();
       await expect(page).toHaveURL(/\/catalog\/products$/);
     } else {
       await expect(inspector).toBeHidden();
       await page.getByRole('button', { name: /Classic Smash/ }).click();
       await expect(inspector).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Products' })).toBeVisible();
+      await expect(
+        page.locator('[data-catalog-inspector]').getByRole('button', { name: 'Products' }),
+      ).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Inventory usage' })).toBeVisible();
       await page.getByRole('button', { name: 'More' }).click();
-      await expect(page.getByText('Recipe / Inventory')).toBeVisible();
       await expect(page.getByText('Shop Overrides')).toBeVisible();
     }
   });
 }
+
+test('C2 definitions tabs show the selected collection and protect an open editor', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+
+  const categories = page.getByRole('tab', { name: /Categories/ });
+  const modifiers = page.getByRole('tab', { name: /Modifiers \/ Extras/ });
+  await expect(categories).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'Categories', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Modifiers / extras' })).toHaveCount(0);
+  await expect(page.locator('[data-catalog-definition-columns="categories"]')).toBeHidden();
+  await page.screenshot({ path: 'test-results/catalog-c2-categories-mobile-390.png' });
+
+  await modifiers.click();
+  await expect(modifiers).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'Modifiers / extras' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Categories', exact: true })).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/catalog-c2-modifiers-mobile-390.png' });
+  await page.getByRole('button', { name: 'Add modifier' }).click();
+  await expect(page.getByRole('heading', { name: 'Modifier details' })).toBeVisible();
+  await expect(categories).toBeDisabled();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  await categories.click();
+  await expect(categories).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'Categories', exact: true })).toBeVisible();
+});
+
+test('C2 definitions tabs match accessible desktop collection switching', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+  await expect(page.getByRole('button', { name: 'Add category' })).toBeVisible();
+  const categoryColumns = page.locator('[data-catalog-definition-columns="categories"]');
+  await expect(categoryColumns).toBeVisible();
+  await expect(categoryColumns.locator('span')).toHaveText([
+    'Category',
+    'Status',
+    'Position',
+    'Actions',
+  ]);
+  await page.screenshot({ path: 'test-results/catalog-c2-categories-desktop-1440.png' });
+
+  await page.getByRole('tab', { name: /Modifiers \/ Extras/ }).click();
+  await expect(page.getByRole('button', { name: 'Add modifier' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add category' })).toHaveCount(0);
+  const modifierColumns = page.locator('[data-catalog-definition-columns="modifiers"]');
+  await expect(modifierColumns).toBeVisible();
+  await expect(modifierColumns.locator('span')).toHaveText([
+    'Modifier',
+    'Price',
+    'Status',
+    'Actions',
+  ]);
+  await page.screenshot({ path: 'test-results/catalog-c2-modifiers-desktop-1440.png' });
+});
+
+test('C2 desktop definition data rows use the same four grid columns as their headers', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+
+  const categoryRow = page.locator('.admin-catalog-definition-row--categories').first();
+  await expect(categoryRow).toBeVisible();
+  const categoryGrid = await categoryRow.evaluate(
+    (element) => getComputedStyle(element).gridTemplateColumns.split(' ').length,
+  );
+  expect(categoryGrid).toBe(4);
+
+  await page.getByRole('tab', { name: /Modifiers \/ Extras/ }).click();
+  await page.getByRole('button', { name: 'Add modifier' }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Cheese');
+  await page.getByRole('textbox', { name: 'Extra price (EGP)' }).fill('12.50');
+  await page.getByRole('button', { name: 'Save definition to draft' }).click();
+
+  const modifierRow = page.locator('.admin-catalog-definition-row--modifiers').first();
+  await expect(modifierRow).toBeVisible();
+  const modifierGrid = await modifierRow.evaluate(
+    (element) => getComputedStyle(element).gridTemplateColumns.split(' ').length,
+  );
+  expect(modifierGrid).toBe(4);
+});
+
+test('C2 Manage workspace shows one draft notice and no product creation toolbar', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+
+  await expect(page.getByRole('button', { name: 'Back to products' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New product' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Bulk Edit' })).toHaveCount(0);
+  await expect(page.locator('.admin-catalog-draft-banner')).toHaveCount(1);
+  await expect(page.locator('.admin-catalog-scope')).toHaveCount(0);
+  await expect(page.locator('.admin-catalog-draft-banner')).toHaveCSS(
+    'background-color',
+    'rgb(255, 251, 243)',
+  );
+  await expect(page.locator('.admin-catalog-definition-row')).toHaveCount(1);
+});
+
+test('C2 category creation persists to its shop draft without publication', async ({ page }) => {
+  const fixture = await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+  await page.getByRole('button', { name: 'Add category' }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Sides');
+  await page.getByRole('button', { name: 'Save definition to draft' }).click();
+  const createdCategoryName = page.getByRole('tabpanel').getByText('Sides', { exact: true });
+  await expect(createdCategoryName).toBeVisible();
+
+  expect(fixture.commands.map((command) => command.type)).toEqual(['draft.create', 'draft.save']);
+  const saved = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
+  expect(saved?.snapshot).toMatchObject({ shopId });
+  const definitions = (saved?.snapshot as { categories?: Array<{ shopId: string; name: string }> })
+    ?.categories;
+  expect(definitions).toEqual(
+    expect.arrayContaining([expect.objectContaining({ shopId, name: 'Sides' })]),
+  );
+});
+
+test('C2 category reordering and archive/restore remain atomic unpublished drafts', async ({
+  page,
+}) => {
+  const fixture = await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+  await page.getByRole('button', { name: 'Add category' }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Sides');
+  await page.getByRole('button', { name: 'Save definition to draft' }).click();
+
+  const categoryNames = page.locator('.admin-catalog-definition-row__main strong');
+  await expect(categoryNames).toHaveText(['Burgers', 'Sides']);
+  await page.getByRole('button', { name: 'Move up Sides' }).click();
+  await expect(categoryNames).toHaveText(['Sides', 'Burgers']);
+
+  const reordered = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
+  const orderedSnapshot = reordered?.snapshot as { categories?: C2CategorySnapshot[] };
+  const orderedCategories = orderedSnapshot.categories;
+  expect(orderedCategories?.map(({ name, sortOrder }) => ({ name, sortOrder }))).toEqual([
+    { name: 'Sides', sortOrder: 0 },
+    { name: 'Burgers', sortOrder: 10 },
+  ]);
+
+  await page.getByRole('button', { name: 'Archive Sides' }).click();
+  await expect(page.getByRole('button', { name: 'Restore Sides' })).toBeVisible();
+  await page.getByRole('button', { name: 'Restore Sides' }).click();
+  await expect(page.getByRole('button', { name: 'Archive Sides' })).toBeVisible();
+
+  const restored = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
+  const restoredSnapshot = restored?.snapshot as { categories?: C2CategorySnapshot[] };
+  const restoredCategories = restoredSnapshot.categories;
+  expect(restoredCategories?.find(({ name }) => name === 'Sides')?.active).toBe(true);
+  expect(fixture.commands.map(({ type }) => type)).toEqual([
+    'draft.create',
+    'draft.save',
+    'draft.save',
+    'draft.save',
+    'draft.save',
+  ]);
+});
+
+test('C2 modifier create and authorized price edit persist only in the catalog draft', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const fixture = await mockCatalog(page);
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+  await page.getByRole('tab', { name: /Modifiers \/ Extras/ }).click();
+  await page.getByRole('button', { name: 'Add modifier' }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Cheese');
+  await page.getByRole('textbox', { name: 'Extra price (EGP)' }).fill('12.50');
+  await page.getByRole('button', { name: 'Save definition to draft' }).click();
+  await expect(page.getByRole('button', { name: 'Edit Cheese' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/catalog-c2-created-modifier-mobile-390.png' });
+
+  let changed = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
+  const initialSnapshot = changed?.snapshot as { modifiers?: C2ModifierSnapshot[] };
+  let modifiers = initialSnapshot.modifiers;
+  expect(modifiers?.find(({ name }) => name === 'Cheese')?.priceMinor).toBe(1250);
+
+  await page.getByRole('button', { name: 'Edit Cheese' }).click();
+  await page.getByRole('textbox', { name: 'Extra price (EGP)' }).fill('15.75');
+  await page.getByRole('button', { name: 'Save definition to draft' }).click();
+  await expect(page.locator('.admin-catalog-definition-row')).toContainText('15.75');
+  changed = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
+  const updatedSnapshot = changed?.snapshot as { modifiers?: C2ModifierSnapshot[] };
+  modifiers = updatedSnapshot.modifiers;
+  expect(modifiers?.find(({ name }) => name === 'Cheese')?.priceMinor).toBe(1575);
+  expect(fixture.commands.map(({ type }) => type)).toEqual([
+    'draft.create',
+    'draft.save',
+    'draft.save',
+  ]);
+});
+
+test('C2 read-only viewers cannot manage definitions, and editors without pricing cannot add extras', async ({
+  page,
+}) => {
+  await mockCatalog(page, { permissions: ['catalog.view'] });
+  await page.goto('/catalog/products');
+  await expect(page.getByRole('button', { name: 'Manage categories & extras' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'New product' })).toBeDisabled();
+});
+
+test('C2 catalog.edit alone permits category drafts but no modifier pricing actions', async ({
+  page,
+}) => {
+  const fixture = await mockCatalog(page, {
+    permissions: ['catalog.view', 'catalog.edit'],
+  });
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: 'Manage categories & extras' }).click();
+  await expect(page.getByRole('button', { name: 'Add category' })).toBeVisible();
+  await page.getByRole('tab', { name: /Modifiers \/ Extras/ }).click();
+  await expect(page.getByRole('button', { name: 'Add modifier' })).toHaveCount(0);
+  expect(fixture.commands.map(({ type }) => type)).toEqual(['draft.create']);
+});
+
+test('C3 direct 390px Inventory usage edits preserve focus and persist recipe only to draft', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const fixture = await mockCatalog(page, { withRecipe: true });
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inventory usage' })).toBeVisible();
+  await page.getByRole('button', { name: 'Jump to inventory usage' }).click();
+  await expect(page.getByRole('heading', { name: 'Inventory usage' })).toBeInViewport();
+  const meat = page.getByRole('spinbutton', { name: 'Meat quantity in g' });
+  const cheese = page.getByRole('spinbutton', { name: 'Cheese quantity in slice' });
+  await expect(meat).toHaveValue('0.25');
+  await expect(cheese).toHaveValue('0');
+  await expect(page.getByText('1 of 2 in use')).toBeVisible();
+  const mobileDrawer = await page.locator('[data-catalog-inspector]').boundingBox();
+  expect(mobileDrawer).not.toBeNull();
+  expect(mobileDrawer!.x).toBeLessThanOrEqual(1);
+  expect(mobileDrawer!.width).toBeGreaterThanOrEqual(386);
+
+  await cheese.fill('1');
+  await expect(cheese).toBeFocused();
+  await meat.fill('0');
+  await expect(meat).toBeFocused();
+  await expect(page.getByText('1 of 2 in use')).toBeVisible();
+  await page.getByRole('button', { name: 'Jump to inventory usage' }).click();
+  const headingBox = await page.getByRole('heading', { name: 'Inventory usage' }).boundingBox();
+  expect(headingBox).not.toBeNull();
+  expect(headingBox!.y).toBeLessThan(175);
+  await page.screenshot({ path: 'test-results/catalog-c3-inventory-usage-mobile-390.png' });
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Draft saved — not published')).toBeVisible();
+
+  const saved = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
+  const snapshot = saved?.snapshot as {
+    recipeLines?: Array<{
+      productId: string;
+      inventoryItemId: string;
+      quantityMicros: number;
+    }>;
+  };
+  expect(snapshot.recipeLines).toEqual([
+    expect.objectContaining({
+      productId,
+      inventoryItemId: '77777777-7777-4777-8777-777777777777',
+      quantityMicros: 1_000_000,
+    }),
+  ]);
+  expect(fixture.commands.map(({ type }) => type)).toEqual(['draft.create', 'draft.save']);
+});
+
+test('C3 desktop Inventory usage exposes direct recipe rows in the product editor', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockCatalog(page, { withRecipe: true });
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Meat quantity in g' })).toBeVisible();
+  await expect(page.getByRole('spinbutton', { name: 'Cheese quantity in slice' })).toBeVisible();
+  const drawer = await page.locator('[data-catalog-inspector]').boundingBox();
+  expect(drawer).not.toBeNull();
+  expect(drawer!.x).toBeGreaterThanOrEqual(990);
+  expect(drawer!.width).toBeLessThanOrEqual(450);
+  expect(drawer!.height).toBeGreaterThanOrEqual(850);
+  await expect(page.locator('.admin-catalog-layout__list')).toBeVisible();
+  await page.getByRole('button', { name: 'Jump to inventory usage' }).click();
+  await expect(page.getByRole('heading', { name: 'Inventory usage' })).toBeInViewport();
+  const headingBox = await page.getByRole('heading', { name: 'Inventory usage' }).boundingBox();
+  expect(headingBox).not.toBeNull();
+  expect(headingBox!.y).toBeLessThan(175);
+  await page.screenshot({ path: 'test-results/catalog-c3-inventory-usage-desktop-1440.png' });
+});
+
+test('C3 resumes persisted shop recipes before editing and preserves other draft ingredients', async ({
+  page,
+}) => {
+  const fixture = await mockCatalog(page, { withRecipe: true, persistedRecipeDraft: true });
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  const meat = page.getByRole('spinbutton', { name: 'Meat quantity in g' });
+  const cheese = page.getByRole('spinbutton', { name: 'Cheese quantity in slice' });
+  await expect(cheese).toHaveValue('0.5');
+  expect(fixture.commands.map(({ type }) => type)).toEqual(['draft.resume']);
+  await meat.fill('0.3');
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Draft saved — not published')).toBeVisible();
+  const saved = fixture.commands.at(-1)?.changes?.[0]?.bundleJson;
+  const snapshot = saved?.snapshot as {
+    recipeLines?: Array<{ inventoryItemId: string; quantityMicros: number }>;
+  };
+  expect(snapshot.recipeLines).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        inventoryItemId: '66666666-6666-4666-8666-666666666666',
+        quantityMicros: 300_000,
+      }),
+      expect.objectContaining({
+        inventoryItemId: '77777777-7777-4777-8777-777777777777',
+        quantityMicros: 500_000,
+      }),
+    ]),
+  );
+  expect(fixture.commands.map(({ type }) => type)).toEqual(['draft.resume', 'draft.save']);
+});
+
+test('C3 invalid recipe quantity cannot create a draft; decimal zero is an unlink sentinel', async ({
+  page,
+}) => {
+  const fixture = await mockCatalog(page, { withRecipe: true });
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  const cheese = page.getByRole('spinbutton', { name: 'Cheese quantity in slice' });
+  await expect(cheese).toHaveValue('0');
+  expect(fixture.commands).toEqual([]);
+  await cheese.fill('-1');
+  await expect(cheese).toHaveAttribute('aria-invalid', 'true');
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByRole('alert')).toContainText('positive quantity');
+  expect(fixture.commands).toEqual([]);
+  await cheese.fill('0.000');
+  await expect(cheese).not.toHaveAttribute('aria-invalid', 'true');
+});
 
 test('catalog search filters the live workspace without mutating authority', async ({ page }) => {
   await mockCatalog(page);
@@ -431,14 +887,20 @@ test('unsaved product edits are guarded at both Review & Publish entry points', 
   await page.getByRole('button', { name: /Classic Smash/ }).click();
   const name = page.locator('input[name="name"]');
   await name.fill('Unsaved review navigation value');
-  await page.getByRole('button', { name: /Review & Publish \(/ }).click();
+  await page
+    .locator('[data-catalog-inspector]')
+    .getByRole('button', { name: 'Review & Publish' })
+    .click();
   let dialog = page.getByRole('dialog', { name: 'Discard unsaved product edits?' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Stay and keep editing' }).click();
   await expect(name).toHaveValue('Unsaved review navigation value');
   expect(fixture.commands).toEqual([]);
 
-  await page.getByRole('button', { name: /Review & Publish \(/ }).click();
+  await page
+    .locator('[data-catalog-inspector]')
+    .getByRole('button', { name: 'Review & Publish' })
+    .click();
   dialog = page.getByRole('dialog', { name: 'Discard unsaved product edits?' });
   await dialog.getByRole('button', { name: 'Discard changes and navigate' }).click();
   await expect(page.getByRole('heading', { name: 'Review & publish' })).toBeVisible();
@@ -452,7 +914,10 @@ test('saved product draft permits Review & Publish without false warning', async
   await page.locator('input[name="name"]').fill('Saved review navigation');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft saved — not published')).toBeVisible();
-  await page.getByRole('button', { name: 'Review & Publish', exact: true }).click();
+  await page
+    .locator('[data-catalog-inspector]')
+    .getByRole('button', { name: 'Review & Publish' })
+    .click();
   await expect(page.getByRole('heading', { name: 'Review & publish' })).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Discard unsaved product edits?' })).toHaveCount(0);
 });
@@ -475,3 +940,339 @@ test('version history link and browser Back preserve dirty edits until explicitl
   await dialog.getByRole('button', { name: 'Stay and keep editing' }).click();
   await expect(name).toHaveValue('Keep through browser navigation');
 });
+
+test('C1 products desktop shows approved category shortcuts and factual data columns', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockCatalog(page, { productCount: 12 });
+  await page.goto('/catalog/products');
+
+  const categories = page.getByRole('navigation', { name: 'Product categories' });
+  await expect(categories.getByRole('button', { name: 'All products 12' })).toBeVisible();
+  await expect(categories.getByRole('button', { name: 'Burgers 12' })).toBeVisible();
+  const columns = page.locator('[data-catalog-product-columns]');
+  await expect(columns).toBeVisible();
+  await expect(columns).toContainText('Product');
+  await expect(columns).toContainText('Category');
+  await expect(columns).toContainText('Price');
+  await expect(columns).toContainText('Availability');
+
+  await categories.getByRole('button', { name: 'Burgers 12' }).click();
+  await page.getByRole('searchbox', { name: 'Search products' }).fill('no-match');
+  await expect(page.getByText('No products match these filters.')).toBeVisible();
+  await page.getByRole('button', { name: 'Reset', exact: true }).click();
+  await expect(page.getByRole('button', { name: /Classic Smash/ })).toBeVisible();
+  await expect(categories.getByRole('button', { name: 'All products 12' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.screenshot({ path: 'test-results/catalog-c1-products-desktop-1440.png' });
+});
+
+test('C1 mobile category browse preserves real product routing without horizontal overflow', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCatalog(page, { productCount: 12 });
+  await page.goto('/catalog/products');
+
+  const categories = page.getByRole('navigation', { name: 'Product categories' });
+  await expect(categories.getByRole('button', { name: 'Burgers 12' })).toBeVisible();
+  await expect(page.locator('[data-catalog-product-columns]')).toBeHidden();
+  const filters = page.getByRole('button', { name: 'Filters', exact: true });
+  await expect(filters).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('combobox', { name: 'Status' })).toBeHidden();
+  await filters.click();
+  await expect(page.getByRole('combobox', { name: 'Status' })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Status' }).selectOption('sold-out');
+  await expect(page.getByRole('button', { name: /Classic Smash/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Reset', exact: true }).click();
+  await filters.click();
+  await expect(filters).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('button', { name: /Classic Smash/ })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.screenshot({ path: 'test-results/catalog-c1-products-mobile-390.png' });
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  await expect(page.locator('[data-catalog-inspector]')).toBeVisible();
+  await expect(page).toHaveURL(/\/catalog\/products\/11111111-1111-4111-8111-111111111111$/);
+  await page.getByRole('button', { name: 'Products', exact: true }).click();
+  await expect(page.locator('[data-catalog-list]')).toBeVisible();
+});
+
+test('C1 mobile landing exposes the first real product without scrolling past secondary tools', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCatalog(page, { productCount: 12 });
+  await page.goto('/catalog/products');
+  await expect(page.getByText('0 pending drafts')).toHaveCount(0);
+
+  await expect(page.getByRole('button', { name: 'Manage categories & extras' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New product' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Classic Smash/ })).toBeInViewport({
+    ratio: 0.25,
+  });
+  await page.getByText('More catalog tools', { exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Bulk Edit' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Review & Publish \(/ })).toBeVisible();
+  await expect(page.getByLabel('Mobile new product category')).toBeVisible();
+});
+
+test('C4 changing clean selected products remounts the editor and never carries old photo or name', async ({
+  page,
+}) => {
+  await mockCatalog(page, { productCount: 2 });
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  await expect(page.locator('input[name="name"]')).toHaveValue('Classic Smash');
+  await page.locator('[data-catalog-inspector]').getByRole('button', { name: 'Products' }).click();
+  await page.getByRole('button', { name: /Catalog item 02/ }).click();
+  await expect(page.locator('input[name="name"]')).toHaveValue(
+    'Catalog item 02 · long product name',
+  );
+});
+
+test('C4 approved photo workflow precedes product details at 390 and 1440', async ({ page }) => {
+  await mockCatalog(page);
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await page.goto('/catalog/products');
+    await page.getByRole('button', { name: /Classic Smash/ }).click();
+    const order = await page.locator('form.admin-catalog-editor').evaluate((form) => {
+      const photo = form.querySelector('#catalog-images-heading');
+      const details = form.querySelector('#catalog-general-heading');
+      if (!photo || !details) return false;
+      return Boolean(photo.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    expect(order).toBe(true);
+    await expect(page.getByRole('heading', { name: 'Product photo' })).toBeVisible();
+    await page.screenshot({ path: `test-results/catalog-c4-editor-photo-${width}.png` });
+  }
+});
+
+test('C4 authenticated image upload changes only versioned draft product imageKey', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const fixture = await mockCatalog(page);
+  const uploads: Array<{ shop: string | undefined; product: string | undefined }> = [];
+  const key = `${shopId}/${productId}/uploaded-catalog-photo.png`;
+  await page.route('**/api/admin/catalog-image*', async (route) => {
+    const request = route.request();
+    if (request.method() === 'POST') {
+      uploads.push({
+        shop: request.headers()['x-tux-catalog-shop-id'],
+        product: request.headers()['x-tux-catalog-product-id'],
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          imageKey: key,
+          publicUrl: 'https://images.example.test/uploaded.png',
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ publicUrl: 'https://images.example.test/existing.png' }),
+    });
+  });
+  await page.route('https://images.example.test/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0xoAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    });
+  });
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'burger.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0xoAAAAASUVORK5CYII=',
+      'base64',
+    ),
+  });
+  await page.getByRole('button', { name: 'Upload image' }).click();
+  await expect(page.getByRole('img', { name: 'Selected image for Classic Smash' })).toBeVisible();
+  expect(uploads).toEqual([{ shop: shopId, product: productId }]);
+  expect(fixture.commands).toEqual([]);
+  await page.screenshot({ path: 'test-results/catalog-c4-upload-mobile-390.png' });
+
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Draft saved — not published')).toBeVisible();
+  const save = fixture.commands.find(({ type }) => type === 'draft.save');
+  expect(save?.changes?.[0]?.bundleJson?.snapshot).toMatchObject({
+    products: [expect.objectContaining({ id: productId, imageKey: key })],
+  });
+  expect(fixture.commands.map(({ type }) => type)).toEqual(['draft.create', 'draft.save']);
+  await page.getByRole('button', { name: 'Remove image from draft' }).click();
+  expect(fixture.commands).toHaveLength(2);
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  const removal = fixture.commands.at(-1)?.changes?.[0]?.bundleJson?.snapshot;
+  expect(removal).toMatchObject({
+    products: [expect.objectContaining({ id: productId, imageKey: null })],
+  });
+  expect(fixture.commands.map(({ type }) => type)).toEqual([
+    'draft.create',
+    'draft.save',
+    'draft.save',
+  ]);
+});
+
+test('C4 invalid and unavailable image uploads show local errors without draft writes', async ({
+  page,
+}) => {
+  const fixture = await mockCatalog(page);
+  let postCount = 0;
+  await page.route('**/api/admin/catalog-image*', async (route) => {
+    if (route.request().method() === 'POST') {
+      postCount += 1;
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'image_storage_unavailable' }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ publicUrl: 'https://images.example.test/existing.png' }),
+    });
+  });
+  await page.goto('/catalog/products');
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  const input = page.locator('input[type="file"]');
+  await input.setInputFiles({
+    name: 'oversize.png',
+    mimeType: 'image/png',
+    buffer: Buffer.alloc(2 * 1024 * 1024 + 1),
+  });
+  await page.getByRole('button', { name: 'Upload image' }).click();
+  await expect(page.getByRole('alert')).toContainText('at most 2 MB');
+  expect(postCount).toBe(0);
+  await input.setInputFiles({
+    name: 'valid.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0xoAAAAASUVORK5CYII=',
+      'base64',
+    ),
+  });
+  await page.getByRole('button', { name: 'Upload image' }).click();
+  await expect(page.getByRole('alert')).toContainText('Image upload failed');
+  expect(postCount).toBe(1);
+  expect(fixture.commands).toEqual([]);
+});
+
+test('C1 product browse uses authorized image preview for an existing imageKey', async ({
+  page,
+}) => {
+  await mockCatalog(page);
+  const requestedImages: string[] = [];
+  await page.route('**/api/admin/catalog-image?*', async (route) => {
+    const url = new URL(route.request().url());
+    expect(url.searchParams.get('shopId')).toBe(shopId);
+    requestedImages.push(url.searchParams.get('imageKey') ?? '');
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ publicUrl: 'https://images.example.test/catalog/classic-smash.png' }),
+    });
+  });
+  await page.route('https://images.example.test/catalog/classic-smash.png', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"></svg>',
+    });
+  });
+  await page.goto('/catalog/products');
+
+  const productRow = page.getByRole('button', { name: /Classic Smash/ });
+  const thumbnail = productRow.locator('img');
+  await expect(thumbnail).toHaveAttribute(
+    'src',
+    'https://images.example.test/catalog/classic-smash.png',
+  );
+  await expect(thumbnail).toHaveAttribute('alt', '');
+  expect(requestedImages).toContain('products/classic-smash.png');
+});
+
+test('C1 phone primary management actions span the available page width', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCatalog(page);
+  await page.goto('/catalog/products');
+
+  const manage = page.getByRole('button', { name: 'Manage categories & extras' });
+  const create = page.getByRole('button', { name: 'New product' });
+  await expect(manage).toBeVisible();
+  await expect(create).toBeVisible();
+  const manageBox = await manage.boundingBox();
+  const createBox = await create.boundingBox();
+  if (!manageBox || !createBox) throw new Error('Primary Catalog actions must be laid out');
+
+  expect(manageBox.width).toBeGreaterThanOrEqual(330);
+  expect(createBox.width).toBeGreaterThanOrEqual(330);
+  expect(Math.abs(manageBox.width - createBox.width)).toBeLessThan(3);
+});
+
+test('C1 approved primary Catalog action is green with no redundant eyebrow at desktop and mobile', async ({
+  page,
+}) => {
+  await mockCatalog(page, { productCount: 12 });
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await page.goto('/catalog/products');
+    const action = page.getByRole('button', { name: 'New product' });
+    await expect(action).toBeVisible();
+    await expect(page.getByText('Catalog control', { exact: true })).toHaveCount(0);
+    const rgb = await action.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const color = style.backgroundColor.match(/\d+/g)?.slice(0, 3).map(Number);
+      return color ?? [];
+    });
+    expect(rgb).toHaveLength(3);
+    expect(rgb[1]!).toBeGreaterThan(rgb[0]!);
+    expect(rgb[1]!).toBeGreaterThan(rgb[2]!);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
+});
+
+for (const viewport of [
+  { width: 360, height: 800 },
+  { width: 768, height: 1024 },
+  { width: 1024, height: 900 },
+] as const) {
+  test(`C1 approved browse preserves search, real selection and no overflow at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await mockCatalog(page, { productCount: 12 });
+    await page.goto('/catalog/products');
+    await expect(page.getByRole('heading', { name: 'Catalog' })).toBeVisible();
+    await expect(page.getByRole('searchbox', { name: 'Search products' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Classic Smash/ })).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await page.screenshot({
+      path: `test-results/catalog-c1-browse-${viewport.width}.png`,
+      fullPage: false,
+      animations: 'disabled',
+    });
+  });
+}

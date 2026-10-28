@@ -511,3 +511,24 @@ if (process.env['P04_P07_TARGETED_CAPTURE'] === '1') {
     }
   }
 }
+
+test('approved Finance navigation has three primary sections and reconciliation cannot count or close', async ({
+  page,
+}) => {
+  const commands = await mockFinance(page, 'CLOSED');
+  await page.goto('/finance/reconciliation');
+  await expect(page.getByRole('heading', { name: 'Reconciliation', exact: true })).toBeVisible();
+  const primary = page.getByRole('navigation', { name: 'Finance sections' });
+  await expect(primary.getByRole('link')).toHaveCount(3);
+  await expect(primary.getByRole('link', { name: 'Money' })).toBeVisible();
+  await expect(primary.getByRole('link', { name: 'Expenses' })).toBeVisible();
+  await expect(primary.getByRole('link', { name: 'Reconciliation' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(page.getByText('Physical actual: Not available').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /Record count|Close Business Day/ })).toHaveCount(
+    0,
+  );
+  expect(commands).toHaveLength(0);
+});

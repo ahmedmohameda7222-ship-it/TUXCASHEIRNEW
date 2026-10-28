@@ -119,6 +119,39 @@ describe('Admin catalog service', () => {
     await expect(service.loadCatalogWorkspace('shop-b', owner)).rejects.toThrow(/shop_forbidden/);
   });
 
+  it('C3 reads canonical inventory for an authorized shop without ever creating a draft', async () => {
+    const bundle = {
+      snapshot: {
+        shopId: 'shop-a',
+        products: [],
+        modifiers: [],
+        productModifierLinks: [],
+        comboBeverageOptions: [],
+        recipeLines: [],
+      },
+      inventoryItems: [
+        {
+          id: 'inventory-1',
+          shopId: 'shop-a',
+          name: 'Meat',
+          unitLabel: 'g',
+          trackingMode: 'RECIPE_TRACKED',
+          active: true,
+        },
+      ],
+    };
+    const catalogStore = store({ loadAdvanced: vi.fn().mockResolvedValue(bundle) });
+    const service = createCatalogService(catalogStore);
+    await expect(service.loadCatalogAdvanced('shop-a', owner)).resolves.toEqual(bundle);
+    expect(catalogStore.loadAdvanced).toHaveBeenCalledWith('shop-a', 'business-1');
+    expect(catalogStore.createDraft).not.toHaveBeenCalled();
+    await expect(service.loadCatalogAdvanced('shop-b', owner)).rejects.toThrow(/shop_forbidden/);
+    await expect(
+      service.loadCatalogAdvanced('shop-a', { ...owner, permissions: ['catalog.edit'] }),
+    ).rejects.toThrow(/permission_forbidden/);
+    expect(catalogStore.loadAdvanced).toHaveBeenCalledTimes(1);
+  });
+
   it('creates a draft from the authenticated employee at the expected live version', async () => {
     const catalogStore = store();
     const service = createCatalogService(catalogStore);
@@ -191,6 +224,38 @@ describe('Admin catalog service', () => {
                   products: [{ id: 'product-1', priceMinor: 1500 }],
                 },
               },
+            },
+          ],
+        },
+        editorOnly,
+      ),
+    ).rejects.toThrow(/permission_forbidden/);
+    expect(catalogStore.saveDraftChange).not.toHaveBeenCalled();
+  });
+
+  it('denies a modifier price change without catalog.pricing before draft persistence', async () => {
+    const catalogStore = store();
+    const service = createCatalogService(catalogStore);
+    const editorOnly: AdminSessionPrincipal = {
+      ...owner,
+      permissions: ['catalog.edit'],
+    };
+
+    await expect(
+      service.saveCatalogDraftChange(
+        {
+          draftId: 'draft-1',
+          shopId: 'shop-a',
+          expectedDraftRevision: 1,
+          changes: [
+            {
+              kind: 'bundle.replace',
+              bundleJson: {
+                snapshot: {
+                  modifiers: [{ id: 'modifier-1', shopId: 'shop-a', priceMinor: 1575 }],
+                },
+              },
+              changedPaths: ['modifiers', 'modifiers[].priceMinor'],
             },
           ],
         },

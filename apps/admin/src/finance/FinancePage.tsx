@@ -310,7 +310,10 @@ export function FinancePage() {
         ) : undefined
       }
     >
-      <FinanceSectionNav active="accounts" />
+      <FinanceSectionNav
+        active="accounts"
+        canReconcile={principal.permissions.includes('finance.reconcile')}
+      />
       {actionError ? <InlineError>{actionError}</InlineError> : null}
       {finance.workspaceQuery.isLoading ? <LoadingState title="Loading finance" /> : null}
       {finance.workspaceQuery.isError ? (

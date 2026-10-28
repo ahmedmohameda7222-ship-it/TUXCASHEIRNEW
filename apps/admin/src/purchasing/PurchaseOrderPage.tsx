@@ -5,7 +5,7 @@ import type {
   AdminPurchasingInventoryItem,
 } from '@tux/admin-contracts';
 import { DraftPurchaseOrderLinesEditor } from './DraftPurchaseOrderLinesEditor';
-import { formatPurchaseMicros } from './purchaseOrderDraft';
+import { formatPurchaseMicros, formatPurchaseMoneyMinor } from './purchaseOrderDraft';
 import {
   expectedOrderValueMinor,
   formatExpectedOrderValue,
@@ -293,7 +293,7 @@ export function PurchaseOrderPage({
                     </div>
                     <div>
                       <dt>Expected unit cost</dt>
-                      <dd>{(line.expectedPurchaseUnitCostMinor / 100).toFixed(2)} EGP</dd>
+                      <dd>{formatPurchaseMoneyMinor(line.expectedPurchaseUnitCostMinor)} EGP</dd>
                     </div>
                   </dl>
                 </article>
@@ -385,7 +385,7 @@ export function PurchaseOrderPage({
                             <>
                               {' '}
                               · Actual cost per purchase unit:{' '}
-                              {(line.purchaseUnitCostMinor / 100).toFixed(2)} EGP
+                              {formatPurchaseMoneyMinor(line.purchaseUnitCostMinor)} EGP
                             </>
                           ) : null}
                         </li>

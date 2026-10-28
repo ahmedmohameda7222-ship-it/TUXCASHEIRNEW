@@ -277,3 +277,19 @@
     min-width: 0;
   }
 }
+
+/* Purchasing-only receipt/return limits remain readable without sideways phone scrolling. */
+.admin-purchasing-line-balance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+  color: var(--tux-text-secondary);
+  font-size: 12px;
+}
+
+.admin-purchasing-line-balance strong {
+  color: var(--tux-text-primary);
+  font-size: inherit;
+  overflow-wrap: anywhere;
+}

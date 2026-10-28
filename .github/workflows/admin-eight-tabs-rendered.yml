@@ -1,0 +1,76 @@
+name: TUX Admin eight-tab rendered acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/admin/src/finance/**'
+      - 'apps/admin/src/customers/**'
+      - 'apps/admin/src/reports/**'
+      - 'apps/admin/src/staff/**'
+      - 'apps/admin/src/orders/**'
+      - 'apps/admin/src/inventory/**'
+      - 'apps/admin/src/components/layout/**'
+      - 'apps/admin/src/app/routes.tsx'
+      - 'e2e/admin-finance.spec.ts'
+      - 'e2e/admin-customers-promotions.spec.ts'
+      - 'e2e/admin-reports.spec.ts'
+      - 'e2e/admin-workforce.spec.ts'
+      - 'e2e/admin-orders.spec.ts'
+      - 'e2e/admin-inventory.spec.ts'
+      - '.github/workflows/admin-eight-tabs-rendered.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-eight-tabs-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rendered:
+    name: Orders, Inventory, Finance, CRM, Reports and Staff browser acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      TUX_ADMIN_EIGHT_TABS_CAPTURE: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Typecheck and build Admin
+        run: |
+          npm run typecheck:admin
+          npm run build:admin
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run rendered acceptance
+        run: npx playwright test --config playwright.admin.config.ts e2e/admin-orders.spec.ts e2e/admin-inventory.spec.ts e2e/admin-finance.spec.ts e2e/admin-customers-promotions.spec.ts e2e/admin-reports.spec.ts e2e/admin-workforce.spec.ts
+      - name: Assert approved-width mock-auth screenshot evidence
+        if: success()
+        run: |
+          set -euo pipefail
+          for scene in orders inventory finance crm reports workforce-list; do
+            for size in 1536x960 1440x900 1024x900 768x1024 390x844 360x800; do
+              test -s "artifacts/p04-p07/${scene}-${size}.png"
+            done
+          done
+      - name: Preserve browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-eight-tabs-rendered-evidence
+          path: |
+            playwright-report-admin
+            test-results
+            artifacts/p04-p07
+          if-no-files-found: warn
+          retention-days: 14

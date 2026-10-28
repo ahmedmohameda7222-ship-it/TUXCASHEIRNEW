@@ -150,3 +150,481 @@
     break-inside: avoid;
   }
 }
+
+/* Selected Orders hierarchy: search always visible; advanced filters stay secondary. */
+.admin-orders-toolbar {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: var(--tux-space-4);
+}
+
+.admin-orders-search-persistent {
+  flex: 1 1 340px;
+  min-width: 0;
+}
+
+.admin-orders-search-persistent input {
+  width: 100%;
+  min-height: var(--tux-touch-target);
+}
+
+.admin-orders-toolbar .admin-orders-filters {
+  flex: 0 1 auto;
+  min-width: 180px;
+  max-width: 100%;
+  margin: 0;
+}
+
+.admin-orders-toolbar .admin-orders-filters[open] {
+  flex: 1 1 100%;
+}
+
+.admin-orders-toolbar .admin-order-task-section {
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+}
+
+@media (max-width: 620px) {
+  .admin-orders-toolbar {
+    flex-direction: column;
+  }
+
+  .admin-orders-search-persistent,
+  .admin-orders-toolbar .admin-orders-filters {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+}
+
+/* Approved desktop order directory: factual columns without synthetic bulk actions. */
+.admin-orders-list {
+  --admin-orders-grid: minmax(0, 0.72fr) minmax(0, 1.45fr) minmax(0, 0.86fr) minmax(0, 0.73fr)
+    minmax(0, 0.95fr) minmax(0, 0.85fr) minmax(0, 1.22fr);
+}
+
+.admin-orders-list__columns,
+.admin-order-row {
+  display: grid;
+  grid-template-columns: var(--admin-orders-grid);
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.admin-orders-list__columns {
+  padding: 0.65rem 0.7rem;
+  border-bottom: 1px solid var(--tux-border-subtle);
+  color: var(--tux-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.admin-order-row {
+  min-height: 72px;
+  padding: 0.7rem;
+}
+
+.admin-order-row__number,
+.admin-order-row__customer {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-order-row__customer small {
+  color: var(--tux-text-secondary);
+  font-size: 0.7rem;
+}
+
+.admin-order-row__type,
+.admin-order-row__source,
+.admin-order-row__amount,
+.admin-order-row__time {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.76rem;
+}
+
+.admin-order-row__status {
+  width: max-content;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.admin-order-row__time {
+  color: var(--tux-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1279px) {
+  .admin-orders-list__columns {
+    display: none;
+  }
+
+  .admin-order-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'number amount'
+      'customer customer'
+      'type source'
+      'status time';
+    gap: 0.45rem 0.75rem;
+  }
+
+  .admin-order-row__number {
+    grid-area: number;
+  }
+
+  .admin-order-row__customer {
+    grid-area: customer;
+  }
+
+  .admin-order-row__type {
+    grid-area: type;
+  }
+
+  .admin-order-row__source {
+    grid-area: source;
+  }
+
+  .admin-order-row__amount {
+    grid-area: amount;
+    text-align: end;
+  }
+
+  .admin-order-row__status {
+    grid-area: status;
+  }
+
+  .admin-order-row__time {
+    grid-area: time;
+    text-align: end;
+  }
+}
+
+/* O3 — the six inspector destinations are in-document anchors, not hidden panels:
+   payment corrections, inventory effects and audit remain accessible at all widths. */
+.admin-order-detail__nav {
+  display: flex;
+  flex-wrap: nowrap;
+  max-width: 100%;
+  gap: 0.25rem;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  border-bottom: 1px solid var(--tux-border-subtle);
+  scrollbar-width: thin;
+}
+
+.admin-order-detail__nav a {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: var(--tux-touch-target);
+  padding: 0.5rem 0.8rem;
+  color: var(--tux-text-secondary);
+  font-size: 0.79rem;
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+
+.admin-order-detail__nav a:hover,
+.admin-order-detail__nav a:focus-visible {
+  color: var(--tux-text-primary);
+  border-bottom-color: var(--tux-accent);
+}
+
+.admin-order-detail__nav a:focus-visible {
+  outline: 2px solid var(--tux-accent);
+  outline-offset: -2px;
+}
+
+.admin-order-detail__facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  gap: 0.5rem;
+}
+
+.admin-order-detail__facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.8rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
+
+.admin-order-detail__facts dt {
+  color: var(--tux-text-secondary);
+  font-size: 0.72rem;
+}
+
+.admin-order-detail__facts dd {
+  margin: 0;
+  color: var(--tux-text-primary);
+  font-size: 0.9rem;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-order-detail [id^='order-detail-'] {
+  scroll-margin-block-start: 0.75rem;
+}
+
+@media (max-width: 620px) {
+  .admin-order-detail__facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-order-detail__nav a {
+    padding-inline: 0.65rem;
+  }
+}
+
+@media print {
+  .admin-order-detail__nav {
+    display: none;
+  }
+}
+
+/* The selected Orders layout switches from 60/40 to a dedicated detail
+   surface at 1100px; shared Catalog/Staff master-detail keeps its own breakpoint. */
+@media (min-width: 48rem) and (max-width: 1100px) {
+  .admin-master-detail.admin-orders-master-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-orders-master-detail[data-detail-active='false'] .admin-master-detail__detail,
+  .admin-orders-master-detail[data-detail-active='true'] .admin-master-detail__list {
+    display: none;
+  }
+
+  .admin-orders-master-detail[data-detail-active='true'] .admin-master-detail__detail {
+    display: block;
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .admin-orders-master-detail .admin-master-detail__back {
+    display: inline-flex;
+  }
+}
+
+/* O4 approved compact inspector: the immutable print action and legal
+   explanation are separate, readable controls instead of inline text. */
+.admin-order-detail__print-action {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.admin-order-detail__print-action small {
+  display: block;
+  flex: 1 1 180px;
+  min-width: 0;
+  line-height: 1.45;
+  font-size: 0.75rem;
+  color: var(--tux-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 620px) {
+  .admin-order-detail__print-action {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-order-detail__print-action small {
+    flex: 0 0 auto;
+  }
+}
+
+/* Approved Orders: authenticated context and online-request access remain visible,
+   but must not consume two full-height banners above the KPI strip. */
+.admin-orders-context-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.45rem 1rem;
+  min-width: 0;
+  margin-bottom: 0.4rem;
+}
+
+.admin-orders-context-bar .admin-orders-shop-context {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.55rem;
+  padding: 0.2rem 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.admin-orders-context-bar .admin-orders-shop-context > span:last-child {
+  display: none;
+}
+
+.admin-orders-context-bar nav.admin-orders-shop-context {
+  flex: 0 1 auto;
+}
+
+.admin-orders-context-bar .admin-secondary-button {
+  min-height: 34px;
+  padding: 0.35rem 0.6rem;
+}
+
+@media (max-width: 620px) {
+  .admin-orders-context-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-orders-context-bar nav.admin-orders-shop-context {
+    width: 100%;
+  }
+}
+
+/* O3: keep the high-value customer, fulfillment, item and payment facts ahead
+   of archival identity and reconciliation details in the approved inspector. */
+.admin-order-detail__summary time {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--tux-text-secondary);
+  font-size: 0.75rem;
+}
+
+.admin-order-detail__disclosure {
+  overflow-wrap: anywhere;
+}
+
+.admin-order-detail__disclosure > summary {
+  min-height: var(--tux-touch-target);
+  display: list-item;
+  padding-block: 0.7rem;
+  list-style-position: inside;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.83rem;
+}
+
+.admin-order-detail__disclosure > summary:focus-visible {
+  outline: 2px solid var(--tux-accent);
+  outline-offset: 2px;
+}
+
+.admin-order-detail__disclosure[open] > summary {
+  margin-bottom: 0.75rem;
+}
+
+.admin-order-detail__disclosure code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 1280px) {
+  .admin-orders-list .admin-order-row {
+    min-height: 58px;
+    padding-block: 0.55rem;
+  }
+}
+
+/* The printable Admin summary must include the immutable ledger details even
+   if the on-screen archival disclosures are closed. These selectors override
+   the UA details:not([open]) rule only in print media. */
+@media print {
+  .admin-order-detail__disclosure > summary {
+    display: none !important;
+  }
+
+  .admin-order-detail__disclosure > :not(summary) {
+    display: block !important;
+    visibility: visible !important;
+  }
+}
+
+/* Approved 1536px composition: KPI strip, filters and canonical rows occupy
+   the left ~60%, while the real order inspector begins beside the KPI strip.
+   At smaller widths use the existing responsive stack/full-width detail. */
+@media (min-width: 1280px) {
+  .admin-orders-canonical-view {
+    position: relative;
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: calc(100vh - 250px);
+    padding-right: calc(40% + 12px);
+  }
+
+  .admin-orders-canonical-view > .admin-orders-master-detail {
+    display: contents;
+  }
+
+  .admin-orders-canonical-view .admin-master-detail__list {
+    display: block;
+    min-width: 0;
+  }
+
+  .admin-orders-canonical-view .admin-master-detail__detail {
+    position: absolute;
+    display: block;
+    top: 0;
+    right: 0;
+    width: 40%;
+    max-height: calc(100vh - 130px);
+    overflow: auto;
+  }
+
+  .admin-orders-canonical-view .admin-master-detail__back {
+    display: none;
+  }
+}
+
+/* Protect dense 60/40 desktop layout from numeric and status wrapping. */
+@media (min-width: 1280px) {
+  .admin-orders-canonical-view .admin-metric-strip__tile {
+    padding: 0.75rem;
+  }
+
+  .admin-orders-canonical-view .admin-metric-strip__tile dd {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    font-size: clamp(0.94rem, 1.05vw, 1.06rem);
+    letter-spacing: -0.02em;
+  }
+
+  .admin-orders-canonical-view .admin-metric-strip__tile small {
+    font-size: 0.7rem;
+  }
+
+  .admin-orders-canonical-view .admin-order-row__status {
+    font-size: 0.69rem;
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
+}
+
+.admin-order-detail__row > span:last-child {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.admin-order-detail__row > span:last-child small {
+  display: block;
+  text-align: right;
+  white-space: normal;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}

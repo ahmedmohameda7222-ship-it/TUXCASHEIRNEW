@@ -1,0 +1,265 @@
+import { spawnSync } from 'node:child_process';
+import { resolve } from 'node:path';
+
+const databaseUrl = process.env.TEST_DATABASE_URL;
+if (!databaseUrl) throw new Error('TEST_DATABASE_URL is required for Orders O2 acceptance');
+const dbHost = new URL(databaseUrl).hostname;
+if (!['localhost', '127.0.0.1', '::1'].includes(dbHost)) {
+  throw new Error('Orders KPI fixture must run only against isolated loopback PostgreSQL');
+}
+
+function run(sql, label) {
+  const result = spawnSync('psql', [databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', '-At', '-c', sql], {
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) {
+    process.stderr.write(result.stdout ?? '');
+    process.stderr.write(result.stderr ?? '');
+    throw new Error(`${label} failed (exit ${result.status ?? 'unknown'})`);
+  }
+  return result.stdout.trim();
+}
+function queryJson(sql, label) {
+  return JSON.parse(run(`select (${sql})::text`, label));
+}
+const SHOP = '51000000-0000-4000-8000-000000000001';
+const DAY = '54000000-0000-4000-8000-000000000001';
+const BUSINESS = '00000000-0000-4000-8000-000000000001';
+const ACTOR = '52000000-0000-4000-8000-000000000001';
+const WORKER = '53000000-0000-4000-8000-000000000001';
+const METHOD = '58000000-0000-4000-8000-000000000001';
+const TYPE = '57000000-0000-4000-8000-000000000001';
+
+const migration = spawnSync(
+  'psql',
+  [
+    databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', '-f',
+    resolve('supabase/migrations/20261026000000_orders_authoritative_kpis.sql'),
+  ],
+  { encoding: 'utf8' },
+);
+if (migration.status !== 0) {
+  process.stderr.write(migration.stdout ?? '');
+  process.stderr.write(migration.stderr ?? '');
+  throw new Error('Orders KPI migration failed on isolated PostgreSQL');
+}
+
+const privileges = queryJson(`jsonb_build_object(
+  'anonymous', has_function_privilege('anon', 'public.admin_orders_kpis_v1(uuid,uuid,timestamptz,timestamptz)', 'EXECUTE'),
+  'authenticated', has_function_privilege('authenticated', 'public.admin_orders_kpis_v1(uuid,uuid,timestamptz,timestamptz)', 'EXECUTE'),
+  'service', has_function_privilege('service_role', 'public.admin_orders_kpis_v1(uuid,uuid,timestamptz,timestamptz)', 'EXECUTE')
+)`, 'RPC execution grants');
+if (privileges.anonymous || privileges.authenticated || !privileges.service) {
+  throw new Error(`Orders KPI RPC permission exposure: ${JSON.stringify(privileges)}`);
+}
+
+// Set up a valid Operations-device identity and pending Menu requests first.
+// The online materialization trigger must remain ENABLED throughout the test;
+// it accepts each synthetic ONLINE order only against its exact reservation.
+run(`insert into auth.users(id)
+  values ('68000000-0000-4000-8000-000000000001'::uuid);
+insert into public.shop_memberships(id,shop_id,auth_user_id,role,active)
+  values (
+    '68000000-0000-4000-8000-000000000002'::uuid,
+    '${SHOP}'::uuid,
+    '68000000-0000-4000-8000-000000000001'::uuid,
+    'OPERATIONS_DEVICE',true
+  );
+insert into public.devices(id,shop_id,label,active,auth_user_id)
+  values (
+    '68000000-0000-4000-8000-000000000003'::uuid,
+    '${SHOP}'::uuid,'KPI Origin Device',true,
+    '68000000-0000-4000-8000-000000000001'::uuid
+  );
+
+insert into public.online_order_requests(
+  id,shop_id,idempotency_key,request_sha256,catalog_revision,status,
+  fulfillment_preference,payment_preference,customer_name,normalized_phone,
+  delivery_address,trusted_items,items_subtotal_minor,order_note
+)
+select
+  md5('kpi-fixture-request-'||g)::uuid,
+  '${SHOP}'::uuid,
+  md5('kpi-fixture-request-key-'||g)::uuid,
+  repeat('a',64), repeat('b',64), 'PENDING',
+  'PICKUP','CASH','Orders KPI customer',null,null,
+  '[{"productId":"56000000-0000-4000-8000-000000000001","quantity":1}]'::jsonb,
+  1000,null
+from generate_series(1,64) g where g%2=1;
+
+insert into private.online_order_processing_reservations(
+  processing_order_id,request_id,shop_id,origin_device_id,reserved_at
+)
+select
+  md5('kpi-fixture-order-'||g)::uuid,
+  md5('kpi-fixture-request-'||g)::uuid,
+  '${SHOP}'::uuid,
+  '68000000-0000-4000-8000-000000000003'::uuid,
+  now()
+from generate_series(1,64) g where g%2=1;`,
+'Seed 32 legitimate pending Menu requests with durable Operations-device order reservations');
+
+run(`insert into public.orders(
+  id, shop_id, business_day_id, display_order_no, idempotency_key, source, status,
+  operator_worker_id, operator_name_snapshot, order_type_id, order_type_label_snapshot,
+  order_type_behavior_snapshot, configured_delivery_fee_minor, final_delivery_fee_minor,
+  items_subtotal_minor, discount_minor, total_minor, order_note, created_at, updated_at
+)
+select md5('kpi-fixture-order-' || g)::uuid, '${SHOP}', '${DAY}', 1000+g, 'kpi-fixture-' || g,
+  case when g%2=0 then 'POS' else 'ONLINE' end,
+  case when g%4=0 then 'ACTIVE' else 'DONE' end,
+  '${WORKER}', 'Fixture worker', '${TYPE}', 'Take Away',
+  'TAKE_AWAY', 0, 0, 1000, 0, 1000, null,
+  '2026-09-23T05:10:00Z'::timestamptz + g*interval '1 minute',
+  '2026-09-23T05:10:00Z'::timestamptz + g*interval '1 minute'
+from generate_series(1,64) g;
+
+insert into public.payments(
+  id,shop_id,order_id,part_index,payment_method_id,payment_method_label_snapshot,
+  logic_type_snapshot,allocated_minor,received_minor,change_minor,created_at
+)
+select md5('kpi-fixture-payment-'||g||'-1')::uuid, '${SHOP}',
+  md5('kpi-fixture-order-'||g)::uuid, 1, '${METHOD}', 'Card', 'CARD',
+  case when g%8=1 then 600 else 1000 end, null, null,
+  '2026-09-23T05:10:00Z'::timestamptz + g*interval '1 minute'
+from generate_series(1,64) g where g%8<>0;
+
+insert into public.payments(
+  id,shop_id,order_id,part_index,payment_method_id,payment_method_label_snapshot,
+  logic_type_snapshot,allocated_minor,received_minor,change_minor,created_at
+)
+select md5('kpi-fixture-payment-'||g||'-2')::uuid, '${SHOP}',
+  md5('kpi-fixture-order-'||g)::uuid, 2,
+  '58000000-0000-4000-8000-000000000092', 'Test Cash', 'CASH',
+  400, 400, 0, '2026-09-23T05:10:00Z'::timestamptz + g*interval '1 minute'
+from generate_series(1,64) g where g%8=1;`, 'Insert 64 mixed POS/ONLINE canonical orders with split payments');
+
+
+ 
+// The trusted KPI must subtract only POSTED refunds, at the refund event
+// timestamp. A pending refund does not lower recognized sales.
+run(`insert into public.admin_reason_codes(
+  id,business_id,shop_id,reason_key,family,label,active,version,updated_by_employee_id
+) values (
+  '59000000-0000-4000-8000-000000000001', '${BUSINESS}', '${SHOP}',
+  'KPI_REFUND_FIXTURE','REFUND_RETURN','KPI refund verification',true,1,'${ACTOR}'
+);
+
+insert into public.admin_order_refunds(
+  id,business_id,shop_id,order_id,payment_id,amount_minor,
+  reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,
+  reason_config_version,note,state,command_id,created_by_employee_id,created_at
+) values (
+  '59000000-0000-4000-8000-000000000002','${BUSINESS}','${SHOP}',
+  md5('kpi-fixture-order-2')::uuid,md5('kpi-fixture-payment-2-1')::uuid,250,
+  '59000000-0000-4000-8000-000000000001','KPI_REFUND_FIXTURE',
+  'KPI refund verification','REFUND_RETURN',1,'Posted following the placement day',
+  'POSTED','kpi-posted-refund-2','${ACTOR}','2026-09-24T06:00:00Z'
+),(
+  '59000000-0000-4000-8000-000000000003','${BUSINESS}','${SHOP}',
+  md5('kpi-fixture-order-3')::uuid,md5('kpi-fixture-payment-3-1')::uuid,100,
+  '59000000-0000-4000-8000-000000000001','KPI_REFUND_FIXTURE',
+  'KPI refund verification','REFUND_RETURN',1,'Not posted or recognized',
+  'PENDING_APPROVAL','kpi-pending-refund-3','${ACTOR}','2026-09-24T06:05:00Z'
+);`, 'Post a real refund ledger event and retain one pending request in disposable PostgreSQL');
+
+const seededRefundState = queryJson(`jsonb_build_object(
+  'posted', (select sum(amount_minor) from public.admin_order_refunds
+    where command_id='kpi-posted-refund-2' and state='POSTED'),
+  'pending', (select sum(amount_minor) from public.admin_order_refunds
+    where command_id='kpi-pending-refund-3' and state='PENDING_APPROVAL')
+)`, 'Verify fixture posted-vs-pending amounts');
+if (Number(seededRefundState.posted) !== 250 || Number(seededRefundState.pending) !== 100) {
+  throw new Error(`Nonzero refund fixture did not persist: ${JSON.stringify(seededRefundState)}`);
+}
+
+
+const acceptedOnline = queryJson(`jsonb_build_object(
+  'accepted', (select count(*) from public.online_order_requests
+    where shop_id='${SHOP}'::uuid and status='ACCEPTED'
+      and id::text in (select md5('kpi-fixture-request-'||g)::uuid::text
+        from generate_series(1,64) g where g%2=1)),
+  'triggers_enabled', (select bool_and(t.tgenabled <> 'D')
+    from pg_trigger t join pg_proc p on p.oid=t.tgfoid
+    where t.tgrelid='public.orders'::regclass
+      and p.proname='resolve_tux_online_order_request_from_order_v1')
+)`, 'Prove 32 genuine Menu request acceptances with intact trigger');
+if (acceptedOnline.accepted !== 32 || acceptedOnline.triggers_enabled !== true) {
+  throw new Error(`Online acceptance integration incorrectly seeded: ${JSON.stringify(acceptedOnline)}`);
+}
+
+const kpis = (from='null', to='null', actor=ACTOR, shop=SHOP) =>
+  queryJson(`public.admin_orders_kpis_v1('${actor}'::uuid,'${shop}'::uuid,
+    ${from}::timestamptz,${to}::timestamptz)`, 'Authoritative Orders KPI RPC');
+
+const full = kpis();
+if (full.ok !== true || full.shopId !== SHOP || Number(full.orderCount) < 67) {
+  throw new Error(`Aggregate excluded canonical orders beyond cursor 50: ${JSON.stringify(full)}`);
+}
+const expected = queryJson(`jsonb_build_object(
+    'allOrders', (select count(*) from public.orders where shop_id='${SHOP}'),
+    'activeOrders', (select count(*) from public.orders
+      where shop_id='${SHOP}' and status='ACTIVE'),
+    'paidOrders', (select count(distinct p.order_id) from public.payments p
+      where p.shop_id='${SHOP}' and p.allocated_minor>0),
+    'allocated', (select coalesce(sum(allocated_minor),0) from public.payments
+      where shop_id='${SHOP}'),
+    'refunds', (select coalesce(sum(amount_minor),0) from public.admin_order_refunds
+      where business_id='${BUSINESS}' and shop_id='${SHOP}' and state='POSTED')
+)`, 'Independent expected PostgreSQL ledger facts');
+const amount = Number(expected.allocated) - Number(expected.refunds);
+const average = expected.paidOrders ? Math.round(amount / Number(expected.paidOrders)) : null;
+if (
+  full.orderCount !== Number(expected.allOrders) ||
+  full.activeOrderCount !== Number(expected.activeOrders) ||
+  full.netSalesMinor !== amount ||
+  full.averageOrderMinor !== average ||
+  full.denominatorPaidOrderCount !== Number(expected.paidOrders)
+) {
+  throw new Error(`Full-shop financial/cursor mismatch: ${JSON.stringify({ full, expected, amount, average })}`);
+}
+const timed = kpis("'2026-09-23T05:10:30Z'", "'2026-09-23T05:18:30Z'");
+if (timed.ok !== true || timed.orderCount !== 8) {
+  throw new Error(`UTC instant filter mismatch (Cairo UI conversion): ${JSON.stringify(timed)}`);
+}
+const refundDay = kpis("'2026-09-24T00:00:00Z'", "'2026-09-25T00:00:00Z'");
+if (refundDay.ok !== true || refundDay.orderCount !== 0 ||
+  refundDay.netSalesMinor !== -250 || refundDay.averageOrderMinor !== null ||
+  refundDay.denominatorPaidOrderCount !== 0) {
+  throw new Error(`Posted refund event must net -250 on its actual date, excluding pending approvals: ${JSON.stringify(refundDay)}`);
+}
+if (Number(expected.refunds) < 250) {
+  throw new Error(`KPI amount baseline contains no posted refund deduction: ${JSON.stringify(expected)}`);
+}
+const emptyPeriod = kpis("'2026-01-01T00:00:00Z'", "'2026-01-02T00:00:00Z'");
+if (emptyPeriod.ok !== true || emptyPeriod.orderCount !== 0 ||
+    emptyPeriod.netSalesMinor !== 0 || emptyPeriod.averageOrderMinor !== null ||
+    emptyPeriod.denominatorPaidOrderCount !== 0) {
+  throw new Error(`Zero-denominator contract failure: ${JSON.stringify(emptyPeriod)}`);
+}
+for (const result of [
+  kpis('null','null','66000000-0000-4000-8000-000000000001'),
+  kpis('null','null',ACTOR,'67000000-0000-4000-8000-000000000001'),
+]) {
+  if (result.ok !== false || result.code !== 'permission_forbidden') {
+    throw new Error(`Unassigned actor or foreign shop exposed totals: ${JSON.stringify(result)}`);
+  }
+}
+const reversed = kpis("'2026-09-25T00:00:00Z'", "'2026-09-23T00:00:00Z'");
+if (reversed.ok !== false || reversed.code !== 'orders_kpi_range_invalid') {
+  throw new Error(`Invalid range returned metrics: ${JSON.stringify(reversed)}`);
+}
+console.log(JSON.stringify({
+  test: 'Orders O2 real PostgreSQL shop-wide, split payment, posted refund and access acceptance',
+  result: 'PASS',
+  orders: full.orderCount,
+  active: full.activeOrderCount,
+  netSalesMinor: full.netSalesMinor,
+  averageOrderMinor: full.averageOrderMinor,
+  paidDenominator: full.denominatorPaidOrderCount,
+  postedRefundMinor: Number(seededRefundState.posted),
+  pendingExcludedMinor: Number(seededRefundState.pending),
+  refundDayNetSalesMinor: refundDay.netSalesMinor,
+  filteredOrders: timed.orderCount,
+  privilegeCheck: privileges,
+}));

@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { useAdminSession } from '../auth/useAdminSession';
 import { AdminApiError, adminFetch } from '../lib/adminApi';
 import { createRetainedCommandIds } from '../lib/retainedCommandIds';
+import { validReportDateRange } from './reportDateRange';
 
 export type ReportFact = {
   readonly id: string;
@@ -129,7 +130,9 @@ export function useReports(
   const commandIds = useMemo(() => createRetainedCommandIds(namespace), [namespace]);
   const reportQuery = useQuery({
     queryKey: ['admin', 'reports', namespace, 'report', shopId, filters],
-    enabled: Boolean(shopId && filters.shopIds.length > 0),
+    enabled:
+      Boolean(shopId && filters.shopIds.length > 0) &&
+      validReportDateRange(filters.fromDate, filters.toDate),
     queryFn: () => {
       const params = new URLSearchParams({
         shopId: shopId!,
