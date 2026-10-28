@@ -154,6 +154,26 @@ async function selectEmployee(page: Page, name: string) {
   await expect(page.getByRole('heading', { name })).toBeVisible();
 }
 
+test('S1 selected desktop employee keeps directory and inspector adjacent at 1440px', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockWorkforce(page);
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  const list = page.locator('.admin-staff-workspace .admin-master-detail__list');
+  const detail = page.locator('.admin-staff-workspace .admin-master-detail__detail');
+  await expect(list).toBeVisible();
+  await expect(detail).toBeVisible();
+  const listBounds = await list.boundingBox();
+  const detailBounds = await detail.boundingBox();
+  expect(listBounds).not.toBeNull();
+  expect(detailBounds).not.toBeNull();
+  expect(listBounds!.x + listBounds!.width).toBeLessThan(detailBounds!.x + 32);
+  expect(Math.abs(listBounds!.y - detailBounds!.y)).toBeLessThan(32);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
 test('staff profile exposes Operations setup and posts payment only to a trusted account', async ({
   page,
 }) => {
