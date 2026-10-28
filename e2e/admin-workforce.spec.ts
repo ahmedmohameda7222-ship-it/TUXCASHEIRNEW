@@ -930,3 +930,122 @@ test('new employee sheet persists actual hire date and notes through the trusted
     role: 'STAFF',
   });
 });
+
+
+test('S3 leave rejection preserves the request sheet, values and retry identity on phone', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  let attempts = 0;
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'POST' || request.postDataJSON()?.type !== 'leave.create') {
+      await route.fallback();
+      return;
+    }
+    attempts += 1;
+    if (attempts === 1) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: false, code: 'leave_temporarily_unavailable' }),
+      });
+      return;
+    }
+    await route.fallback();
+  });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Leave' }).click();
+  await page.getByRole('button', { name: 'New leave request' }).click();
+  const sheet = page.getByRole('dialog', { name: 'New leave request' });
+  await sheet.getByLabel('Start date').fill('2026-11-03');
+  await sheet.getByLabel('End date').fill('2026-11-05');
+  await sheet.getByLabel('Note').fill('Family event');
+  await sheet.getByRole('button', { name: 'Request leave' }).click();
+  await expect.poll(() => attempts).toBe(1);
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByLabel('Note')).toHaveValue('Family event');
+  await sheet.getByRole('button', { name: 'Request leave' }).click();
+  await expect.poll(() => attempts).toBe(2);
+  await expect(sheet).toHaveCount(0);
+  expect(commands.filter((command) => command.type === 'leave.create')).toHaveLength(1);
+});
+
+test('S4 refused role change keeps PIN confirmation open and never claims success', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  let attempts = 0;
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'POST' || request.postDataJSON()?.type !== 'employee.role') {
+      await route.fallback();
+      return;
+    }
+    attempts += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        attempts === 1
+          ? { ok: false, code: 'role_approval_denied' }
+          : { ok: true, replayed: false },
+      ),
+    });
+  });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Access & Permissions' }).click();
+  await page.getByRole('button', { name: 'Change role' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Change role' });
+  await sheet.getByLabel('New role').selectOption('MANAGER');
+  await sheet.getByLabel('Admin PIN for staff changes').fill('1234');
+  await sheet.getByRole('button', { name: 'Confirm change' }).click();
+  await expect.poll(() => attempts).toBe(1);
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByLabel('New role')).toHaveValue('MANAGER');
+  await sheet.getByRole('button', { name: 'Confirm change' }).click();
+  await expect.poll(() => attempts).toBe(2);
+  await expect(sheet).toHaveCount(0);
+});
+
+test('S3 leave list hides requests scoped to other shops but keeps business-wide leave', async ({
+  page,
+}) => {
+  const otherShopId = '99999999-9999-4999-8999-999999999999';
+  await mockWorkforce(page);
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'GET' || !new URL(request.url()).searchParams.has('employeeId')) {
+      await route.fallback();
+      return;
+    }
+    const current = employee();
+    const leave = (id: string, requestedShopId: string | null, note: string) => ({
+      id, employeeId, shopId: requestedShopId, leaveType: 'VACATION',
+      startsOn: '2026-11-01', endsOn: '2026-11-02', note,
+      status: 'PENDING', requesterEmployeeId: employeeId,
+      decidedByEmployeeId: null, decisionReason: null, decidedAt: null,
+      version: 1, createdAt: '2026-10-28T00:00:00Z', updatedAt: '2026-10-28T00:00:00Z',
+    });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        employee: {
+          ...current,
+          leaveRequests: [
+            leave('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', shopId, 'Local leave'),
+            leave('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', otherShopId, 'Other shop leave'),
+            leave('cccccccc-cccc-4ccc-8ccc-cccccccccccc', null, 'Business-wide leave'),
+          ],
+        },
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Leave' }).click();
+  await expect(page.getByText('Local leave')).toBeVisible();
+  await expect(page.getByText('Business-wide leave')).toBeVisible();
+  await expect(page.getByText('Other shop leave')).toHaveCount(0);
+});
