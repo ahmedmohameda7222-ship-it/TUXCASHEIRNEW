@@ -683,6 +683,7 @@ test('S2 owner configures employee PIN and real Operations worker during Add emp
   await page.goto('/staff');
   await page.getByRole('button', { name: 'Add employee' }).click();
   const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await capturePremiumScreenshot(page, 'staff-new-employee');
   await sheet.getByLabel('Name').fill('Amira Full Setup');
   await sheet.getByRole('button', { name: 'Continue' }).click();
   await sheet.getByRole('button', { name: 'Continue' }).click();
@@ -737,6 +738,7 @@ test('S1 selected employee inspector uses approved non-overlapping cards on mobi
     await page.getByRole('tab', { name: 'Access & Permissions' }).click();
     const inspector = page.locator('.admin-staff-employee');
     await expect(inspector).toBeVisible();
+    await capturePremiumScreenshot(page, 'staff-selected-access');
     const result = await inspector.evaluate((root) => {
       const entries = [
         ...root.querySelectorAll<HTMLElement>(
