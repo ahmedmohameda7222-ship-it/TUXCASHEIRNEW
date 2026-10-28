@@ -370,6 +370,43 @@ test('S3 rejected shift creation retains original draft and retries without a du
   await expect(sheet).toHaveCount(0);
 });
 
+test('S4 payroll requires successful Admin PIN reauth before protected payment command', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  let reauthRequests = 0;
+  await page.route('**/api/admin/reauth', async (route) => {
+    reauthRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, reauthenticatedAt: '2026-10-28T09:00:00.000Z' }),
+    });
+  });
+  await page.goto('/staff');
+  await selectEmployee(page, 'Mona Ali');
+  await page.getByRole('tab', { name: 'Pay / Compensation' }).click();
+  await page.getByLabel('Pay period start').fill('2026-10-01');
+  await page.getByLabel('Pay period end').fill('2026-10-31');
+  await page.getByLabel('Expected amount (EGP)').fill('500.00');
+  await page.getByLabel('Paid amount (EGP)').fill('500.00');
+  await page.getByLabel('Payment date').fill('2026-10-31');
+  const record = page.getByRole('button', { name: 'Record payment' });
+  await expect(record).toBeDisabled();
+  expect(commands).toHaveLength(0);
+  await page.getByLabel('Admin PIN for staff payment').fill('1234');
+  await record.click();
+  await expect.poll(() => reauthRequests).toBe(1);
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toMatchObject({
+    type: 'payment.record',
+    expectedAmountMinor: 50000,
+    paidAmountMinor: 50000,
+    requesterPin: '1234',
+  });
+});
+
 test('S3 payment records exact safe minor units without floating-point rounding on phone', async ({
   page,
 }) => {
