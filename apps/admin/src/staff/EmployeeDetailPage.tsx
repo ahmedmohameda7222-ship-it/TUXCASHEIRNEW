@@ -282,7 +282,7 @@ export function EmployeeDetailPage({
         shopId={shopId}
         canPay={canPay}
         financeAccounts={financeAccounts}
-        onCommand={onCommand}
+        onSensitiveCommand={onSensitiveCommand}
       />
     </>
   );
