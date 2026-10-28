@@ -180,7 +180,8 @@ export function SchedulePage({
                   setEditingShiftId(null);
                   setShiftOpen(false);
                 } catch (error) {
-                  const message = error instanceof Error ? error.message : 'Shift could not be saved';
+                  const message =
+                    error instanceof Error ? error.message : 'Shift could not be saved';
                   setShiftError(message.replaceAll('_', ' '));
                 } finally {
                   setSavingShift(false);
