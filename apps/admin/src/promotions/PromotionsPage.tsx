@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react';
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
 import { createRetainedCommandIds } from '../lib/retainedCommandIds';
+import { requireSuccessfulCrmMutation } from '../customers/crmMutationGuard';
 import { PromotionEditor } from './PromotionEditor';
 
 function csrfToken(session: ReturnType<typeof useAdminSession>): string {
@@ -64,8 +65,9 @@ export function PromotionsPage({ shopId }: { shopId: string }) {
         },
         csrfToken(session),
       );
+      const accepted = requireSuccessfulCrmMutation(result);
       commandIds.complete('promotion.upsert', intent);
-      return result;
+      return accepted;
     },
     onSuccess: async () => {
       setCreating(false);
@@ -134,6 +136,7 @@ export function PromotionsPage({ shopId }: { shopId: string }) {
           products={catalogQuery.data?.products ?? []}
           categories={catalogQuery.data?.categories ?? []}
           saving={savePromotion.isPending}
+          error={savePromotion.isError}
           onCancel={() => {
             setCreating(false);
             setEditing(null);
@@ -142,7 +145,6 @@ export function PromotionsPage({ shopId }: { shopId: string }) {
         />
       ) : null}
 
-      {savePromotion.isError ? <p role="alert">Promotion could not be saved.</p> : null}
     </section>
   );
 }
