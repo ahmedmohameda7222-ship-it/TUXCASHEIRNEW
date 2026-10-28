@@ -1120,7 +1120,6 @@ test('S2 interrupted onboarding survives reload without creating a duplicate emp
   expect(creates).toBe(1);
 });
 
-
 test('S4 payroll pending second-person approval does not claim a posted staff payment', async ({
   page,
 }) => {
@@ -1160,7 +1159,6 @@ test('S4 payroll pending second-person approval does not claim a posted staff pa
   await expect(page.getByLabel('Paid amount (EGP)')).toHaveValue('500.00');
   await expect(page.getByLabel('Admin PIN for staff payment')).toHaveValue('');
 });
-
 
 test('S4 role change pending approval is shown as not applied', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
