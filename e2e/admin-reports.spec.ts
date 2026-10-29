@@ -136,6 +136,46 @@ test('R1 approved actions sit in the report header and beside the selected repor
   ).toBeVisible();
 });
 
+for (const width of [390, 1440] as const) {
+  test(`Reports actions have consistent rounded corners at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await mockReports(page);
+    await page.route('**/api/admin/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...session,
+          principal: {
+            ...session.principal,
+            permissions: [...session.principal.permissions, 'finance.view'],
+          },
+        }),
+      });
+    });
+    await page.goto('/reports');
+    const labels = [
+      'Saved views',
+      'Save this report view',
+      'Owner summary',
+      'Set target',
+      'Download report PDF',
+      'All 22 reports (1 PDF)',
+      'Reset',
+    ];
+    for (const label of labels) {
+      const button = page.getByRole('button', { name: label, exact: true });
+      await expect(button).toBeVisible();
+      const radius = await button.evaluate((element) =>
+        Number.parseFloat(getComputedStyle(element).borderTopLeftRadius),
+      );
+      expect(radius, `${label} should have rounded corners at ${width}px`).toBeGreaterThanOrEqual(
+        10,
+      );
+    }
+  });
+}
+
 test('R1 Owner summary action is gated by finance view and opens the read-only section', async ({
   page,
 }) => {
