@@ -109,7 +109,6 @@ export function StaffPage() {
     readPendingOnboarding(search, shopId),
   );
   const [assignedShopIds, setAssignedShopIds] = useState<string[]>([]);
-  const [provisionedShopIds, setProvisionedShopIds] = useState<string[]>([]);
   const [employeePinApplied, setEmployeePinApplied] = useState(false);
   const [compensationConfigured, setCompensationConfigured] = useState(false);
   const [newEmployeePin, setNewEmployeePin] = useState('');
@@ -359,7 +358,6 @@ export function StaffPage() {
           'Operations access is not confirmed for every assigned shop. Employee setup remains incomplete; verify worker links and retry.',
         );
       }
-      setProvisionedShopIds([...onboardingShopIds]);
       // Verify every requested elevated access change against the server's authoritative
       // employee version. Pending second-person approvals must not complete the creation flow.
       const overrides = Object.entries(newEmployeePermissionOverrides).filter(
@@ -455,7 +453,6 @@ export function StaffPage() {
       setOnboardingStep('identity');
       setCreatedEmployeeId(null);
       setAssignedShopIds([]);
-      setProvisionedShopIds([]);
       setEmployeePinApplied(false);
       setCompensationConfigured(false);
       setNewEmployeePin('');
@@ -556,11 +553,6 @@ export function StaffPage() {
                   .map((assignment) => assignment.shopId);
                 setOnboardingShopIds([...new Set([shopId, ...linked])]);
                 setAssignedShopIds(linked.filter((id) => id !== shopId));
-                setProvisionedShopIds(
-                  pending.operationsIdentities
-                    .filter((identity) => identity.kind === 'LINKED' && identity.workerActive)
-                    .map((identity) => identity.shopId),
-                );
                 setCompensationConfigured(pending.compensation.length > 0);
                 setNewEmployeeRate('');
                 setNewEmployeeEffectiveFrom('');
