@@ -117,6 +117,9 @@ export function ReportsPage() {
         onChange={setFilters}
         canCompareShops={principal.role === 'OWNER'}
         allShopIds={principal.shopIds}
+        shopNames={Object.fromEntries(
+          (principal.shopSummaries ?? []).map((shop) => [shop.id, shop.name]),
+        )}
         options={reports.optionsQuery.data?.options ?? {}}
         onExpand={() => setFilterOptionsExpanded(true)}
       />
