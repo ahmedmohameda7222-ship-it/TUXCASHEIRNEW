@@ -126,6 +126,9 @@ export function ReportsPage() {
         </p>
       ) : null}
       <ReportView
+        shopNames={Object.fromEntries(
+          (principal.shopSummaries ?? []).map((shop) => [shop.id, shop.name]),
+        )}
         exportActions={
     <ReportExportActions
             filters={scopedFilters}
