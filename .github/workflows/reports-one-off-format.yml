@@ -1,4 +1,4 @@
-name: Reports one-time format and lock dependency
+name: Reports one-time format and lock dependency (final)
 on:
   push:
     branches:
@@ -39,6 +39,11 @@ jobs:
             apps/admin/src/reports/reports.css \
             apps/admin/server/reports/reportPdfExport.ts \
             apps/admin/server/reports/reportPdfExport.test.ts \
+            apps/admin/server/reports/reportPdfRenderer.ts \
+            apps/admin/server/reports/reportPdfRenderer.test.ts \
+            apps/admin/server/reports/reportApi.ts \
+            apps/admin/src/reports/ReportExportActions.tsx \
+            apps/admin/src/reports/ReportExportActions.test.ts \
             e2e/admin-reports.spec.ts
       - name: Commit formatted exact Reports files
         run: |
