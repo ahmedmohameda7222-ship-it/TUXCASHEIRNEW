@@ -8,24 +8,29 @@ function sampleExport(rows = 120): AuthorizedExport {
     toDate: '2026-10-29',
     selectedShops: ['11111111-1111-4111-8111-111111111111'],
     requestedAreaCount: 22,
-    sections: [{
-      area: 'refunds',
-      summary: {
-        eventCount: rows, orderCount: 2, totalAmountMinor: -1000,
-        totalQuantity: rows, incompleteCostEvents: 2,
-        coverageNote: 'Two refund costs not available',
+    sections: [
+      {
+        area: 'refunds',
+        summary: {
+          eventCount: rows,
+          orderCount: 2,
+          totalAmountMinor: -1000,
+          totalQuantity: rows,
+          incompleteCostEvents: 2,
+          coverageNote: 'Two refund costs not available',
+        },
+        rows: Array.from({ length: rows }, (_, index) => ({
+          id: `refund-${index + 1}`,
+          shopId: '11111111-1111-4111-8111-111111111111',
+          occurredAt: '2026-10-29T10:00:00.000Z',
+          label: index === rows - 1 ? 'LAST AUTHORITATIVE RECORD' : 'Refund',
+          sourceKind: 'refund',
+          amountMinor: -1000,
+          quantity: 1,
+          costMissing: index < 2,
+        })),
       },
-      rows: Array.from({ length: rows }, (_, index) => ({
-        id: `refund-${index + 1}`,
-        shopId: '11111111-1111-4111-8111-111111111111',
-        occurredAt: '2026-10-29T10:00:00.000Z',
-        label: index === rows - 1 ? 'LAST AUTHORITATIVE RECORD' : 'Refund',
-        sourceKind: 'refund',
-        amountMinor: -1000,
-        quantity: 1,
-        costMissing: index < 2,
-      })),
-    }],
+    ],
   };
 }
 
@@ -62,9 +67,11 @@ describe('R4 multi-page canonical report PDF', () => {
   it('fails closed for non-encodable record text rather than silently corrupting names', () => {
     const report = sampleExport(1);
     report.sections[0]!.rows[0]!.label = 'مبيعات';
-    expect(() => renderAuthorizedReportPdf(report, {
-      generatedAt: '2026-10-29T10:00:00.000Z',
-      shopNames: {},
-    })).toThrow('report_export_font_unsupported');
+    expect(() =>
+      renderAuthorizedReportPdf(report, {
+        generatedAt: '2026-10-29T10:00:00.000Z',
+        shopNames: {},
+      }),
+    ).toThrow('report_export_font_unsupported');
   });
 });

@@ -128,7 +128,9 @@ export function ReportsPage() {
       <ReportExportActions
         filters={scopedFilters}
         shopId={shopId}
-        csrfToken={session.state.status === 'authenticated' ? session.state.session.csrfToken : null}
+        csrfToken={
+          session.state.status === 'authenticated' ? session.state.session.csrfToken : null
+        }
       />
       <ReportView
         data={reports.reportQuery.data}

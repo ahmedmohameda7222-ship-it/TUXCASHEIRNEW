@@ -51,32 +51,39 @@ const area = z.enum([
   'segments',
   'attendance',
 ]);
-const exportContextSchema = z.object({
-  orderTypeId: uuid.optional(),
-  paymentMethodId: uuid.optional(),
-  workerId: uuid.optional(),
-  employeeId: uuid.optional(),
-  customerId: uuid.optional(),
-  productId: uuid.optional(),
-  categoryId: uuid.optional(),
-  promotionId: uuid.optional(),
-  supplierId: uuid.optional(),
-  deliveryZoneId: uuid.optional(),
-  status: z.string().regex(/^[A-Z_]{2,40}$/).optional(),
-}).strict();
-const exportRequestSchema = z.object({
-  view: z.literal('pdf-export'),
-  kind: z.enum(['current', 'all-authorized']),
-  shopId: uuid,
-  shopIds: z.array(uuid).min(1).max(50),
-  area,
-  fromDate: isoDate,
-  toDate: isoDate,
-  source: z.enum(['POS', 'ONLINE']).nullable(),
-  context: exportContextSchema,
-  comparePrevious: z.boolean().default(false),
-  comparisonRange: z.enum(['previous', 'week', 'month', 'year']).optional(),
-}).strict();
+const exportContextSchema = z
+  .object({
+    orderTypeId: uuid.optional(),
+    paymentMethodId: uuid.optional(),
+    workerId: uuid.optional(),
+    employeeId: uuid.optional(),
+    customerId: uuid.optional(),
+    productId: uuid.optional(),
+    categoryId: uuid.optional(),
+    promotionId: uuid.optional(),
+    supplierId: uuid.optional(),
+    deliveryZoneId: uuid.optional(),
+    status: z
+      .string()
+      .regex(/^[A-Z_]{2,40}$/)
+      .optional(),
+  })
+  .strict();
+const exportRequestSchema = z
+  .object({
+    view: z.literal('pdf-export'),
+    kind: z.enum(['current', 'all-authorized']),
+    shopId: uuid,
+    shopIds: z.array(uuid).min(1).max(50),
+    area,
+    fromDate: isoDate,
+    toDate: isoDate,
+    source: z.enum(['POS', 'ONLINE']).nullable(),
+    context: exportContextSchema,
+    comparePrevious: z.boolean().default(false),
+    comparisonRange: z.enum(['previous', 'week', 'month', 'year']).optional(),
+  })
+  .strict();
 
 const commandSchema = z.discriminatedUnion('type', [
   z
@@ -122,11 +129,9 @@ function respondError(response: AdminResponse, error: unknown, request: AdminReq
   else if (error instanceof Error && error.message.startsWith('report_export_')) {
     const status = error.message === 'report_export_too_large' ? 413 : 422;
     sendJson(response, status, { error: error.message });
-  }
-  else if (error instanceof Error && error.message === 'report_range_invalid') {
+  } else if (error instanceof Error && error.message === 'report_range_invalid') {
     sendJson(response, 400, { error: 'report_range_invalid' });
-  }
-  else if (error instanceof AdminSupabaseError) {
+  } else if (error instanceof AdminSupabaseError) {
     console.error('Report database failure', {
       resource: 'reports',
       operation: adminRequestOperation(request),

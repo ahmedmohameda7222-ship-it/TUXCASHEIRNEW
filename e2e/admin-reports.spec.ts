@@ -257,7 +257,9 @@ test('Reports blocks an inverted date range instead of sending a misleading quer
   ).toBe(false);
 });
 
-test('R4 current and all-authorized exports download real PDF responses with correct scope', async ({ page }) => {
+test('R4 current and all-authorized exports download real PDF responses with correct scope', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockReports(page);
   const payloads: Array<Record<string, unknown>> = [];
@@ -288,16 +290,34 @@ test('R4 current and all-authorized exports download real PDF responses with cor
   await page.getByRole('button', { name: 'All 22 reports (1 PDF)' }).click();
   expect((await second).suggestedFilename()).toMatch(/tux-reports-all-authorized-.*\\.pdf/);
   expect(payloads).toHaveLength(2);
-  expect(payloads[0]).toMatchObject({ view: 'pdf-export', kind: 'current', area: 'sales', shopIds: [shopId] });
-  expect(payloads[1]).toMatchObject({ view: 'pdf-export', kind: 'all-authorized', context: {}, source: null });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(payloads[0]).toMatchObject({
+    view: 'pdf-export',
+    kind: 'current',
+    area: 'sales',
+    shopIds: [shopId],
+  });
+  expect(payloads[1]).toMatchObject({
+    view: 'pdf-export',
+    kind: 'all-authorized',
+    context: {},
+    source: null,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
 });
 
 test('R4 reversed report dates disable PDF export before any request', async ({ page }) => {
   await mockReports(page);
   await page.goto('/reports');
-  await page.getByRole('region', { name: 'Report filters' }).getByLabel('From', { exact: true }).fill('2026-10-31');
-  await page.getByRole('region', { name: 'Report filters' }).getByLabel('To', { exact: true }).fill('2026-10-01');
+  await page
+    .getByRole('region', { name: 'Report filters' })
+    .getByLabel('From', { exact: true })
+    .fill('2026-10-31');
+  await page
+    .getByRole('region', { name: 'Report filters' })
+    .getByLabel('To', { exact: true })
+    .fill('2026-10-01');
   await expect(page.getByRole('button', { name: 'Download report PDF' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'All 22 reports (1 PDF)' })).toBeDisabled();
 });

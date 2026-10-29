@@ -47,7 +47,7 @@ export function ReportExportActions({
           fromDate: filters.fromDate,
           toDate: filters.toDate,
           source: kind === 'current' ? filters.source : null,
-          context: kind === 'current' ? filters.context ?? {} : {},
+          context: kind === 'current' ? (filters.context ?? {}) : {},
           comparePrevious: kind === 'current' && filters.comparePrevious,
           comparisonRange: filters.comparisonRange ?? 'previous',
         }),
@@ -71,7 +71,9 @@ export function ReportExportActions({
       window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
     } catch (cause) {
       if (!abort.signal.aborted) {
-        setError(cause instanceof Error ? cause.message.replaceAll('_', ' ') : 'Report export failed');
+        setError(
+          cause instanceof Error ? cause.message.replaceAll('_', ' ') : 'Report export failed',
+        );
       }
     } finally {
       if (controller.current === abort) controller.current = null;
@@ -98,11 +100,19 @@ export function ReportExportActions({
         {busy === 'all-authorized' ? 'Preparing all authorized reports…' : 'All 22 reports (1 PDF)'}
       </button>
       {busy ? (
-        <button type="button" className="admin-secondary-button" onClick={() => controller.current?.abort()}>
+        <button
+          type="button"
+          className="admin-secondary-button"
+          onClick={() => controller.current?.abort()}
+        >
           Cancel
         </button>
       ) : null}
-      {error ? <p role="alert" className="admin-inline-error">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="admin-inline-error">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
