@@ -1,4 +1,4 @@
-name: Reports trend format once
+name: Reports save form format once
 on:
   push:
     branches:
