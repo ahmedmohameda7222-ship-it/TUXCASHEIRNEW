@@ -167,7 +167,12 @@ async function mockWorkforce(page: Page, withAccount = true) {
       assignedShops.add(command.shopId);
     }
     if (command.type === 'employee.provision-worker' && typeof command.shopId === 'string') {
-      provisionedWorkers.set(command.shopId, 'dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+      provisionedWorkers.set(
+        command.shopId,
+        command.shopId === shopId
+          ? 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+          : 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      );
     }
 
     if (command.type === 'payment.record' && command.financeAccountId !== accountId) {
@@ -190,7 +195,10 @@ async function mockWorkforce(page: Page, withAccount = true) {
           : {}),
         ...(command.type === 'employee.provision-worker'
           ? {
-              workerId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              workerId:
+                command.shopId === shopId
+                  ? 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+                  : 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
               shopId: command.shopId,
             }
           : {}),
@@ -824,23 +832,7 @@ test('S2 onboarding reviews authorized shops before creating and assigning emplo
     }
     const command = request.postDataJSON() as Record<string, unknown>;
     commands.push(command);
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ok: true,
-        replayed: false,
-        ...(command.type === 'employee.create'
-          ? { employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }
-          : {}),
-        ...(command.type === 'employee.provision-worker'
-          ? {
-              workerId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-              shopId: command.shopId,
-            }
-          : {}),
-      }),
-    });
+    await route.fallback();
   });
   await page.goto('/staff');
   await page.getByRole('button', { name: 'Add employee' }).click();
