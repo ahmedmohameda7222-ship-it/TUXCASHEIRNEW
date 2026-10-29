@@ -405,7 +405,9 @@ export function EmployeeDetailPage({
             >
               {operationsHealthy && employee.active
                 ? 'Operations ready'
-                : employee.active ? 'PIN required' : 'Access disabled'}
+                : employee.active
+                  ? 'PIN required'
+                  : 'Access disabled'}
             </span>
           </div>
         </div>

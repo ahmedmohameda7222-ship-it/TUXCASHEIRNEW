@@ -84,7 +84,6 @@ describe('shop-explicit first-browser bootstrap', () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
-
   it('reports a server-authorized PIN collision without asking to connect a device', async () => {
     vi.stubGlobal('window', {
       location: { hostname: 'ops.example', origin: 'https://ops.example' },

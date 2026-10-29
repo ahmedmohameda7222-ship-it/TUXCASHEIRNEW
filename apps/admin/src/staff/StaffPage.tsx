@@ -384,7 +384,6 @@ export function StaffPage() {
       setOnboardingStep('identity');
       setCreatedEmployeeId(null);
       setAssignedShopIds([]);
-      setProvisionedShopIds([]);
       setEmployeePinApplied(false);
       setCompensationConfigured(false);
       setNewEmployeePin('');
