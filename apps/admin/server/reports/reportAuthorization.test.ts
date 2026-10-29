@@ -104,10 +104,18 @@ describe('Plan 7 report domain permissions', () => {
 
   it('rejects restricted customer and employee filters nested in a saved view payload', () => {
     expect(() =>
-      requireReportContextPermissions(staff, { context: { customerId: 'secret-customer' } }, shopId),
+      requireReportContextPermissions(
+        staff,
+        { context: { customerId: 'secret-customer' } },
+        shopId,
+      ),
     ).toThrow(AdminAuthorizationError);
     expect(() =>
-      requireReportContextPermissions(staff, { context: { employeeId: 'secret-employee' } }, shopId),
+      requireReportContextPermissions(
+        staff,
+        { context: { employeeId: 'secret-employee' } },
+        shopId,
+      ),
     ).toThrow(AdminAuthorizationError);
   });
 
