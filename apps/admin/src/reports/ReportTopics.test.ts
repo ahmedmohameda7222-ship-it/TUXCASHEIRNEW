@@ -4,7 +4,7 @@ import { ReportFilters as ReportFiltersView } from './ReportFilters';
 import { ADMIN_REPORT_AREAS } from '@tux/admin-contracts';
 import { describe, expect, it } from 'vitest';
 import { REPORT_LABELS, REPORT_TOPICS } from './ReportFilters';
-import { chooseReportArea } from './reportAreaTransition';
+import { chooseReportArea, compatibleReportContext } from './reportAreaTransition';
 import type { ReportFilters } from './useReports';
 
 describe('report topic picker', () => {
@@ -77,5 +77,27 @@ describe('approved report-first picker', () => {
     expect(html.indexOf('Choose a report')).toBeLessThan(html.indexOf('Report area'));
     const reportSelect = html.match(/<select[^>]*id="tux-report-area"[^>]*>(.*?)<\\/select>/s);
     expect(reportSelect?.[1]?.match(/<option value="/g)).toHaveLength(22);
+  });
+});
+
+describe('R2 saved-view area context compatibility', () => {
+  it('does not bring unrelated supplier, finance or employee filters into Sales', () => {
+    expect(
+      compatibleReportContext('sales', {
+        supplierId: 'secret-supplier',
+        employeeId: 'private-employee',
+        paymentMethodId: 'permitted-method',
+        status: 'DONE',
+      }),
+    ).toEqual({ paymentMethodId: 'permitted-method', status: 'DONE' });
+  });
+  it('does not bring Sales source filters into an Inventory report', () => {
+    expect(
+      compatibleReportContext('waste', {
+        customerId: 'private-customer',
+        workerId: 'private-staff',
+        productId: 'product',
+      }),
+    ).toEqual({});
   });
 });
