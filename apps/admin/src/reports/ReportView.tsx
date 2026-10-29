@@ -77,7 +77,11 @@ export function ReportView({
         <p>
           {filters.fromDate} – {filters.toDate} · {filters.shopIds.length}{' '}
           {filters.shopIds.length === 1 ? 'shop' : 'shops'} ·{' '}
-          {filters.source === 'POS' ? 'POS only' : filters.source === 'ONLINE' ? 'Online only' : 'All sources'}
+          {filters.source === 'POS'
+            ? 'POS only'
+            : filters.source === 'ONLINE'
+              ? 'Online only'
+              : 'All sources'}
         </p>
       </header>
       <div className="tux-report-metrics">

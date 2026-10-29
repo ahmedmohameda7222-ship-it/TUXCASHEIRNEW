@@ -66,14 +66,22 @@ describe('R3 canonical full-record export collector', () => {
       return {
         ok: true,
         summary: {
-          eventCount: total, orderCount: 1, totalAmountMinor: -2500,
-          totalQuantity: total, incompleteCostEvents: 0, coverageNote: null,
+          eventCount: total,
+          orderCount: 1,
+          totalAmountMinor: -2500,
+          totalQuantity: total,
+          incompleteCostEvents: 0,
+          coverageNote: null,
         },
         rows: Array.from({ length: size }, (_, index) => ({
           id: 'event-' + (args.offset + index + 1),
-          shopId: shop, occurredAt: '2026-10-29T09:00:00.000Z',
-          label: 'Refund', sourceKind: 'refund', amountMinor: -2500,
-          quantity: 1, costMissing: false,
+          shopId: shop,
+          occurredAt: '2026-10-29T09:00:00.000Z',
+          label: 'Refund',
+          sourceKind: 'refund',
+          amountMinor: -2500,
+          quantity: 1,
+          costMissing: false,
         })),
         nextOffset: args.offset + size < total ? args.offset + size : null,
       };
