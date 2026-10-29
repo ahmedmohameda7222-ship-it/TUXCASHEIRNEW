@@ -1,10 +1,10 @@
-import {
-  ADMIN_REPORT_AREAS,
-  type AdminReportArea,
-  type AdminSessionPrincipal,
-} from '@tux/admin-contracts';
+import type { AdminReportArea, AdminSessionPrincipal } from '@tux/admin-contracts';
 import { AdminAuthorizationError } from '../authorization.js';
-import { requireReportArea, requireReportContextPermissions } from './reportAuthorization.js';
+import {
+  REPORT_AREA_PERMISSION,
+  requireReportArea,
+  requireReportContextPermissions,
+} from './reportAuthorization.js';
 
 export type ExportFact = {
   id: string;
@@ -165,7 +165,12 @@ export async function collectAuthorizedReportExport(
     requireReportArea(principal, 'sales', shopId);
   }
 
-  const areas = input.kind === 'all-authorized' ? ADMIN_REPORT_AREAS : [input.area];
+  // Derived from the exhaustive typed authorization map: the package's .ts
+  // runtime entrypoint is not shipped in the Admin Vercel function bundle.
+  const areas =
+    input.kind === 'all-authorized'
+      ? (Object.keys(REPORT_AREA_PERMISSION) as AdminReportArea[])
+      : [input.area];
   const sections: ExportSection[] = [];
   let totalRows = 0;
   for (const area of areas) {

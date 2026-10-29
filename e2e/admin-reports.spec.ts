@@ -281,6 +281,36 @@ test('R2 failed Set Target keeps target dialog open and preserves date window', 
   await expect(dialog.getByRole('alert')).toBeVisible();
 });
 
+for (const width of [360, 390, 414] as const) {
+  test(`R1 ${width}px date inputs do not overlap`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await mockReports(page);
+    await page.goto('/reports');
+    const filters = page.getByRole('region', { name: 'Report filters' });
+    const from = filters.getByLabel('From', { exact: true });
+    const to = filters.getByLabel('To', { exact: true });
+    await expect(from).toBeVisible();
+    await expect(to).toBeVisible();
+    const bounds = await page.evaluate(() => {
+      const from = document.querySelector<HTMLInputElement>('.tux-report-date-start input');
+      const to = document.querySelector<HTMLInputElement>('.tux-report-date-end input');
+      if (!from || !to) throw new Error('Missing report date controls');
+      return {
+        fromRight: from.getBoundingClientRect().right,
+        toLeft: to.getBoundingClientRect().left,
+        toRight: to.getBoundingClientRect().right,
+        viewport: window.innerWidth,
+        fromSizing: getComputedStyle(from).boxSizing,
+        toSizing: getComputedStyle(to).boxSizing,
+      };
+    });
+    expect(bounds.fromSizing).toBe('border-box');
+    expect(bounds.toSizing).toBe('border-box');
+    expect(bounds.fromRight).toBeLessThan(bounds.toLeft);
+    expect(bounds.toRight).toBeLessThanOrEqual(bounds.viewport);
+  });
+}
+
 test('phone report presentation', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockReports(page);

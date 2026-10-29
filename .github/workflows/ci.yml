@@ -166,6 +166,11 @@ jobs:
             if [[ "$API" == true ]]; then npx tsc --noEmit -p tsconfig.api.json; fi
             if [[ "$E2E" == true ]]; then npm run typecheck:e2e; fi
           fi
+          # Every affected Admin change must prove the Node ESM Vercel
+          # function import contract, not merely pass TypeScript/Vite checks.
+          if [[ "$ADMIN" == true || "$SHARED" == true ]]; then
+            npm run test:admin-deployment
+          fi
 
   security:
     name: Relevant security contracts

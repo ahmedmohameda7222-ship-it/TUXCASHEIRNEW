@@ -1,4 +1,6 @@
 import type { AdminSessionPrincipal } from '@tux/admin-contracts';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { collectAuthorizedReportExport } from './reportPdfExport';
@@ -22,6 +24,18 @@ const request = {
 };
 
 describe('R3 canonical full-record export collector', () => {
+  it('has no runtime imports from source-only Admin contracts in serverless Node ESM', () => {
+    const source = readFileSync(new URL('./reportPdfExport.ts', import.meta.url), 'utf8');
+    const output = ts.transpileModule(source, {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ES2022,
+        verbatimModuleSyntax: true,
+      },
+    }).outputText;
+    expect(output).not.toMatch(/from ['"]@tux\/admin-contracts['"]/);
+  });
+
   it('includes row 120 even though the interactive report only shows 50 per page', async () => {
     const offsets: number[] = [];
     const result = await collectAuthorizedReportExport(request, principal, async (args) => {
