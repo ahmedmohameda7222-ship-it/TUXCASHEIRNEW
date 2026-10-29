@@ -77,13 +77,16 @@ export class OperationsSessionService {
   readonly #pinVerifier: PinVerifier;
   readonly #runtime: SessionRuntime;
   #tail: Promise<void> = Promise.resolve();
+  readonly #requireActivatedConfiguration: boolean;
 
   constructor(
     database: OperationsDatabase,
     readModel: OperatorSessionReadModel,
     pinVerifier: PinVerifier,
     runtime: SessionRuntime,
+    options: { readonly requireActivatedConfiguration?: boolean } = {},
   ) {
+    this.#requireActivatedConfiguration = options.requireActivatedConfiguration ?? true;
     this.#database = database;
     this.#readModel = readModel;
     this.#pinVerifier = pinVerifier;
@@ -105,7 +108,7 @@ export class OperationsSessionService {
         if (shop === null) {
           return ok(configurationState('This device is not assigned to exactly one active shop.'));
         }
-        if (!(await this.#hasActivatedConfiguration(shop.id))) {
+        if (this.#requireActivatedConfiguration && !(await this.#hasActivatedConfiguration(shop.id))) {
           return ok(
             configurationState('This device does not have an activated Operations configuration.'),
           );
@@ -142,7 +145,7 @@ export class OperationsSessionService {
         if (shop === null) {
           return ok(configurationState('This device is not assigned to exactly one active shop.'));
         }
-        if (!(await this.#hasActivatedConfiguration(shop.id))) {
+        if (this.#requireActivatedConfiguration && !(await this.#hasActivatedConfiguration(shop.id))) {
           return ok(
             configurationState('This device does not have an activated Operations configuration.'),
           );
@@ -181,7 +184,7 @@ export class OperationsSessionService {
         if (shop === null) {
           return ok(configurationState('This device is not assigned to exactly one active shop.'));
         }
-        if (!(await this.#hasActivatedConfiguration(shop.id))) {
+        if (this.#requireActivatedConfiguration && !(await this.#hasActivatedConfiguration(shop.id))) {
           return ok(
             configurationState('This device does not have an activated Operations configuration.'),
           );
@@ -383,7 +386,7 @@ export class OperationsSessionService {
       if (shop === null) {
         return ok(configurationState('This device is not assigned to exactly one active shop.'));
       }
-      if (!(await this.#hasActivatedConfiguration(shop.id))) {
+      if (this.#requireActivatedConfiguration && !(await this.#hasActivatedConfiguration(shop.id))) {
         return ok(
           configurationState('This device does not have an activated Operations configuration.'),
         );

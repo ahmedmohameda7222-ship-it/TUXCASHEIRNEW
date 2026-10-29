@@ -14,20 +14,20 @@ function functionBody(name: string, nextName: string): string {
 }
 
 describe('Operations browser security session flow', () => {
-  it('does not persist first-use identity until configuration installation succeeds', () => {
+  it('keeps first-use server authentication before any local worker session and never gates on configuration', () => {
     const bootstrap = functionBody('bootstrapWithPin', 'submitPin');
-    const configurationSync = bootstrap.indexOf('configurationService.sync(bootstrap.shopId)');
+    const remotePin = bootstrap.indexOf('remoteGateway.bootstrap(pin, shopId)');
     const persistBoth = bootstrap.indexOf(
       'selectBrowserShop(database, readModel, bootstrap.shop, bootstrap.worker)',
     );
     const localPin = bootstrap.indexOf('session.submitPin(pin)');
+    const backgroundSync = bootstrap.indexOf('void configurationService.sync(signedIn.value.shopId)');
 
-    expect(configurationSync).toBeGreaterThanOrEqual(0);
-    // The new multi-shop helper only runs after configuration has been installed.
-    expect(persistBoth).toBeGreaterThan(configurationSync);
+    expect(remotePin).toBeGreaterThanOrEqual(0);
+    expect(persistBoth).toBeGreaterThan(remotePin);
     expect(localPin).toBeGreaterThan(persistBoth);
-    // The helper itself must atomically persist the authorized shop and worker,
-    // never before checking their active status and matching shop identity.
+    expect(backgroundSync).toBeGreaterThan(localPin);
+    expect(bootstrap).not.toContain('Could not install the Operations configuration');
     expect(shopScopeSource).toContain('worker.shopId !== shop.id');
     expect(shopScopeSource).toContain('transaction.shops.put(shop)');
     expect(shopScopeSource).toContain('transaction.workers.put(worker)');

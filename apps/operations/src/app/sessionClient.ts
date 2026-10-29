@@ -392,6 +392,9 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         pinVerifier,
         runtime,
         coordinator,
+        // Browser credentials and branch selection are authenticated by the
+        // remote bootstrap authority. Catalog hydration is NOT a login gate.
+        { requireActivatedConfiguration: false },
       );
       // Do not start background syncing the previously selected shop on a signed-out
       // browser. The next PIN login may choose a different branch.
@@ -645,28 +648,6 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         try {
           const bootstrap = await remoteGateway.bootstrap(pin, shopId);
           if (activeSyncShopId !== bootstrap.shopId) stopRemoteRuntime();
-          const configuration = await configurationService.sync(bootstrap.shopId);
-          if (
-            configuration.status === 'REMOTE_UNAVAILABLE' ||
-            (configuration.status === 'UP_TO_DATE' && configuration.version === null)
-          ) {
-            return err({
-              code: 'REMOTE_SYNC_ERROR',
-              message: 'PIN accepted, but the Operations configuration is unavailable.',
-            });
-          }
-          if (
-            configuration.status === 'INVALID_REMOTE_CONFIGURATION' ||
-            configuration.status === 'LOCAL_PERSISTENCE_ERROR'
-          ) {
-            return err({
-              code:
-                configuration.status === 'LOCAL_PERSISTENCE_ERROR'
-                  ? 'LOCAL_PERSISTENCE_ERROR'
-                  : 'REMOTE_SYNC_ERROR',
-              message: 'Could not install the Operations configuration on this browser.',
-            });
-          }
           await selectBrowserShop(database, readModel, bootstrap.shop, bootstrap.worker);
           await checkDayBeforeLogin(bootstrap.shopId);
           const signedIn = await session.submitPin(pin);
@@ -674,6 +655,9 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           // background sync is permitted to run under this shop.
           if (signedIn.ok && signedIn.value.status === 'ACTIVE') {
             startRemoteRuntime(signedIn.value.shopId);
+            // Load menu, inventory and shop settings after verified sign-in.
+            // Failure must not bounce an authenticated worker into setup.
+            void configurationService.sync(signedIn.value.shopId).catch(() => undefined);
           }
           return signedIn;
         } catch (cause) {
