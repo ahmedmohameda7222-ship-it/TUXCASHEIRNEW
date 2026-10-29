@@ -160,94 +160,94 @@ export function ReportView({
       {summary.coverageNote ? <p className="tux-report-caveat">{summary.coverageNote}</p> : null}
       <section className="tux-report-source-card" aria-label="Source activity">
         <header className="tux-report-results__heading">
-        <h3>Source activity</h3>
-        <small>{summary.eventCount.toLocaleString('en-EG')} matching records</small>
-      </header>
-      {data.rows.length === 0 ? (
-        <EmptyState
-          title="No report events"
-          description="There are no matching records for this shop and date range."
-        />
-      ) : (
-        <div className="tux-report-results">
-          <ul className="tux-report-mobile-entries" aria-label="Report entries">
-            {data.rows.map((fact) => {
-              const href = reportDrilldownHref(fact.drilldown);
-              return (
-                <li key={`mobile:${fact.sourceKind}:${fact.id}`}>
-                  <div className="tux-report-mobile-entries__top">
-                    <p>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</p>
-                    <strong>
-                      {fact.amountMinor === null ? 'Not available' : amountLabel(fact.amountMinor)}
-                    </strong>
-                  </div>
-                  <small>
-                    {new Date(fact.occurredAt).toLocaleDateString('en-EG', {
-                      timeZone: 'Africa/Cairo',
-                    })}{' '}
-                    · {fact.sourceKind.replaceAll('-', ' ')} ·{' '}
-                    {shopNames[fact.shopId] ?? fact.shopId}
-                  </small>
-                </li>
-              );
-            })}
-          </ul>
-          <div className="tux-report-table-wrap">
-            <table className="tux-report-table">
-              <thead>
-                <tr>
-                  <th scope="col">Date</th>
-                  <th scope="col">Record</th>
-                  <th scope="col">Source</th>
-                  <th scope="col">Shop</th>
-                  <th scope="col">Amount (EGP)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.rows.map((fact) => {
-                  const href = reportDrilldownHref(fact.drilldown);
-                  return (
-                    <tr key={`${fact.sourceKind}:${fact.id}`}>
-                      <td>
-                        {new Date(fact.occurredAt).toLocaleDateString('en-EG', {
-                          timeZone: 'Africa/Cairo',
-                        })}
-                      </td>
-                      <td>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</td>
-                      <td>{fact.sourceKind.replaceAll('-', ' ')}</td>
-                      <td>{shopNames[fact.shopId] ?? fact.shopId}</td>
-                      <td>
-                        {fact.amountMinor === null
-                          ? 'Not available'
-                          : amountLabel(fact.amountMinor)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <h3>Source activity</h3>
+          <small>{summary.eventCount.toLocaleString('en-EG')} matching records</small>
+        </header>
+        {data.rows.length === 0 ? (
+          <EmptyState
+            title="No report events"
+            description="There are no matching records for this shop and date range."
+          />
+        ) : (
+          <div className="tux-report-results">
+            <ul className="tux-report-mobile-entries" aria-label="Report entries">
+              {data.rows.map((fact) => {
+                const href = reportDrilldownHref(fact.drilldown);
+                return (
+                  <li key={`mobile:${fact.sourceKind}:${fact.id}`}>
+                    <div className="tux-report-mobile-entries__top">
+                      <p>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</p>
+                      <strong>
+                        {fact.amountMinor === null ? 'Not available' : amountLabel(fact.amountMinor)}
+                      </strong>
+                    </div>
+                    <small>
+                      {new Date(fact.occurredAt).toLocaleDateString('en-EG', {
+                        timeZone: 'Africa/Cairo',
+                      })}{' '}
+                      · {fact.sourceKind.replaceAll('-', ' ')} ·{' '}
+                      {shopNames[fact.shopId] ?? fact.shopId}
+                    </small>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="tux-report-table-wrap">
+              <table className="tux-report-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Date</th>
+                    <th scope="col">Record</th>
+                    <th scope="col">Source</th>
+                    <th scope="col">Shop</th>
+                    <th scope="col">Amount (EGP)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.rows.map((fact) => {
+                    const href = reportDrilldownHref(fact.drilldown);
+                    return (
+                      <tr key={`${fact.sourceKind}:${fact.id}`}>
+                        <td>
+                          {new Date(fact.occurredAt).toLocaleDateString('en-EG', {
+                            timeZone: 'Africa/Cairo',
+                          })}
+                        </td>
+                        <td>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</td>
+                        <td>{fact.sourceKind.replaceAll('-', ' ')}</td>
+                        <td>{shopNames[fact.shopId] ?? fact.shopId}</td>
+                        <td>
+                          {fact.amountMinor === null
+                            ? 'Not available'
+                            : amountLabel(fact.amountMinor)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
-      <nav className="tux-report-pagination" aria-label="Report pages">
-        <button
-          type="button"
-          className="admin-secondary-button"
-          disabled={filters.offset === 0}
-          onClick={() => onOffset(Math.max(0, filters.offset - 50))}
-        >
-          Previous
-        </button>
-        <span>{reportPaginationLabel(filters.offset, data.rows.length, summary.eventCount)}</span>
-        <button
-          type="button"
-          className="admin-secondary-button"
-          disabled={data.nextOffset === null}
-          onClick={() => onOffset(data.nextOffset ?? filters.offset)}
-        >
-          Next
-        </button>
-      </nav>
+        )}
+        <nav className="tux-report-pagination" aria-label="Report pages">
+          <button
+            type="button"
+            className="admin-secondary-button"
+            disabled={filters.offset === 0}
+            onClick={() => onOffset(Math.max(0, filters.offset - 50))}
+          >
+            Previous
+          </button>
+          <span>{reportPaginationLabel(filters.offset, data.rows.length, summary.eventCount)}</span>
+          <button
+            type="button"
+            className="admin-secondary-button"
+            disabled={data.nextOffset === null}
+            onClick={() => onOffset(data.nextOffset ?? filters.offset)}
+          >
+            Next
+          </button>
+        </nav>
       </section>
     </section>
   );
