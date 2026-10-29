@@ -216,13 +216,23 @@ export function ReportFilters({
               <span className="tux-report-visually-hidden">Shops</span>
               <select
                 aria-label="Shops"
-                value={value.shopIds.length === allShopIds.length ? 'ALL' : 'SELECTED'}
+                value={
+                  value.shopIds.length === allShopIds.length
+                    ? 'ALL'
+                    : value.shopIds.length === 1
+                      ? value.shopIds[0]
+                      : 'ALL'
+                }
                 onChange={(event) =>
-                  set('shopIds', event.target.value === 'ALL' ? allShopIds : [allShopIds[0]!])
+                  set('shopIds', event.target.value === 'ALL' ? allShopIds : [event.target.value])
                 }
               >
                 <option value="ALL">All authorized shops</option>
-                <option value="SELECTED">{shopNames[allShopIds[0]!] ?? 'First shop'}</option>
+                {allShopIds.map((id) => (
+                  <option key={id} value={id}>
+                    {shopNames[id] ?? id}
+                  </option>
+                ))}
               </select>
             </label>
           ) : (
