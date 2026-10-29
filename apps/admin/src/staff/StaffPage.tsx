@@ -1,3 +1,4 @@
+import { ADMIN_PERMISSIONS, type AdminPermission, type EmployeeDetail } from '@tux/admin-contracts';
 import { useMemo, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
 
@@ -9,9 +10,11 @@ import { detailIdFromPath, detailPath } from '../components/layout/detailRoute';
 import { AdminDialog } from '../components/overlay/AdminDialog';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { isPendingApprovalResult } from '../lib/retainedCommandIds';
+import { adminFetch } from '../lib/adminApi';
 import { EmployeeDetailPage, type StaffDetailSection } from './EmployeeDetailPage';
 import { staffSummaryMetrics } from './staffSummaryMetrics';
 import { parseStaffMoneyMinor } from './staffMoney';
+import { businessLocalDateTimeToIso } from './businessTime';
 import { useStaff, type StaffApiCommandDraft } from './useStaff';
 import './staff.css';
 
@@ -63,6 +66,27 @@ function optionalCompensationMinor(raw: string): number | null {
   return minor;
 }
 
+function validateInitialShift(
+  starts: string,
+  ends: string,
+  breaks: string,
+): { startsAt: string; endsAt: string; plannedBreakMinutes: number } | null {
+  if (!starts && !ends) return null;
+  if (!starts || !ends) throw new Error('Both initial shift times are required');
+  const startsAt = businessLocalDateTimeToIso(starts);
+  const endsAt = businessLocalDateTimeToIso(ends);
+  const minutes = Number(breaks);
+  if (
+    !/^\d+$/.test(breaks) ||
+    !Number.isSafeInteger(minutes) ||
+    Date.parse(endsAt) <= Date.parse(startsAt) ||
+    minutes >= (Date.parse(endsAt) - Date.parse(startsAt)) / 60000
+  ) {
+    throw new Error('Invalid initial shift times or break minutes');
+  }
+  return { startsAt, endsAt, plannedBreakMinutes: minutes };
+}
+
 function readPendingOnboarding(search: string, shopId: string | undefined): string | null {
   const params = new URLSearchParams(search);
   const employeeId = params.get('pendingEmployee');
@@ -95,11 +119,19 @@ export function StaffPage() {
   const [onboardingBusy, setOnboardingBusy] = useState(false);
   const [onboardingError, setOnboardingError] = useState<string | null>(null);
   const [approvalNotice, setApprovalNotice] = useState<string | null>(null);
+  const [newEmployeeRole, setNewEmployeeRole] = useState<'STAFF' | 'MANAGER' | 'ADMIN'>('STAFF');
+  const [newEmployeePermissionOverrides, setNewEmployeePermissionOverrides] = useState<
+    Partial<Record<AdminPermission, 'ALLOW' | 'DENY'>>
+  >({});
   const [newEmployeeCompensationType, setNewEmployeeCompensationType] = useState<
     'MONTHLY' | 'HOURLY'
   >('MONTHLY');
   const [newEmployeeRate, setNewEmployeeRate] = useState('');
   const [newEmployeeEffectiveFrom, setNewEmployeeEffectiveFrom] = useState('');
+  const [initialShiftStartsAt, setInitialShiftStartsAt] = useState('');
+  const [initialShiftEndsAt, setInitialShiftEndsAt] = useState('');
+  const [initialShiftBreakMinutes, setInitialShiftBreakMinutes] = useState('0');
+  const [initialShiftCreated, setInitialShiftCreated] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -182,6 +214,11 @@ export function StaffPage() {
     setOnboardingError(null);
     try {
       const rateMinor = optionalCompensationMinor(newEmployeeRate);
+      const initialShift = validateInitialShift(
+        initialShiftStartsAt,
+        initialShiftEndsAt,
+        initialShiftBreakMinutes,
+      );
       if (rateMinor !== null && !newEmployeeEffectiveFrom) {
         throw new Error('compensation_effective_date_required');
       }
@@ -274,6 +311,97 @@ export function StaffPage() {
         provisioned.add(assignedShopId);
         setProvisionedShopIds([...provisioned]);
       }
+      // Verify every requested elevated access change against the server's authoritative
+      // employee version. Pending second-person approvals must not complete the creation flow.
+      const overrides = Object.entries(newEmployeePermissionOverrides).filter(
+        (entry): entry is [AdminPermission, 'ALLOW' | 'DENY'] =>
+          entry[1] === 'ALLOW' || entry[1] === 'DENY',
+      );
+      if (newEmployeeRole !== 'STAFF' || overrides.length > 0) {
+        const readAccess = async (): Promise<EmployeeDetail> => {
+          const result = await adminFetch<{ employee: EmployeeDetail }>(
+            `/api/admin/staff?shopId=${encodeURIComponent(shopId)}&employeeId=${encodeURIComponent(employeeId)}`,
+          );
+          return result.employee;
+        };
+        let actual = await readAccess();
+        if (actual.role !== newEmployeeRole) {
+          const result = await staff.sensitiveCommand.mutateAsync({
+            draft: {
+              type: 'employee.role',
+              employeeId,
+              shopId,
+              role: newEmployeeRole,
+              expectedVersion: actual.profileVersion,
+            },
+            pin: setupAdminPin,
+          });
+          if (!result.ok || isPendingApprovalResult(result)) {
+            throw new Error('Role change awaiting second-person approval');
+          }
+          actual = await readAccess();
+          if (actual.role !== newEmployeeRole) {
+            throw new Error('Employee role is not yet confirmed by the server');
+          }
+        }
+        for (const [permissionKey, effect] of overrides) {
+          const currentEffect = actual.customPermissions.includes(permissionKey)
+            ? 'ALLOW'
+            : actual.customDeniedPermissions?.includes(permissionKey)
+              ? 'DENY'
+              : 'INHERIT';
+          if (currentEffect === effect) continue;
+          const result = await staff.sensitiveCommand.mutateAsync({
+            draft: {
+              type: 'employee.permission',
+              employeeId,
+              shopId,
+              permissionKey,
+              effect,
+              expectedVersion: actual.profileVersion,
+            },
+            pin: setupAdminPin,
+          });
+          if (!result.ok || isPendingApprovalResult(result)) {
+            throw new Error('Permission change awaiting second-person approval');
+          }
+          actual = await readAccess();
+          const confirmed =
+            effect === 'ALLOW'
+              ? actual.customPermissions.includes(permissionKey)
+              : actual.customDeniedPermissions?.includes(permissionKey);
+          if (!confirmed) {
+            throw new Error('Employee permission is not yet confirmed by the server');
+          }
+        }
+      }
+
+      if (initialShift && !initialShiftCreated) {
+        const detail = await adminFetch<{ employee: EmployeeDetail }>(
+          `/api/admin/staff?shopId=${encodeURIComponent(shopId)}&employeeId=${encodeURIComponent(employeeId)}`,
+        );
+        const alreadyScheduled = detail.employee.shifts.some(
+          (shift) =>
+            shift.shopId === shopId &&
+            shift.status !== 'CANCELLED' &&
+            shift.startsAt === initialShift.startsAt &&
+            shift.endsAt === initialShift.endsAt &&
+            shift.plannedBreakMinutes === initialShift.plannedBreakMinutes,
+        );
+        if (!alreadyScheduled) {
+          const result = await staff.command.mutateAsync({
+            type: 'shift.create',
+            employeeId,
+            shopId,
+            ...initialShift,
+          });
+          if (!result.ok || isPendingApprovalResult(result)) {
+            throw new Error('Initial shift setup unconfirmed');
+          }
+        }
+        setInitialShiftCreated(true);
+      }
+
       setCreateOpen(false);
       setOnboardingStep('identity');
       setCreatedEmployeeId(null);
@@ -285,12 +413,18 @@ export function StaffPage() {
       setConfirmEmployeePin('');
       setSetupAdminPin('');
       setNewEmployeePinCommandId(crypto.randomUUID());
+      setNewEmployeeRole('STAFF');
+      setNewEmployeePermissionOverrides({});
       setNewEmployeeName('');
       setNewEmployeePhone('');
       setNewEmployeeHireDate('');
       setNewEmployeeNotes('');
       setNewEmployeeRate('');
       setNewEmployeeEffectiveFrom('');
+      setInitialShiftStartsAt('');
+      setInitialShiftEndsAt('');
+      setInitialShiftBreakMinutes('0');
+      setInitialShiftCreated(false);
       // Clear the incomplete-onboarding marker only after every trusted setup
       // command succeeds. Back navigation must not resurrect a completed draft.
       window.history.replaceState(window.history.state, '', '/staff');
@@ -316,6 +450,7 @@ export function StaffPage() {
     } else if (onboardingStep === 'employment') {
       try {
         const rate = optionalCompensationMinor(newEmployeeRate);
+        validateInitialShift(initialShiftStartsAt, initialShiftEndsAt, initialShiftBreakMinutes);
         if (rate !== null && !newEmployeeEffectiveFrom) {
           throw new Error('compensation_effective_date_required');
         }
@@ -380,6 +515,10 @@ export function StaffPage() {
                 setCompensationConfigured(pending.compensation.length > 0);
                 setNewEmployeeRate('');
                 setNewEmployeeEffectiveFrom('');
+                setInitialShiftStartsAt('');
+                setInitialShiftEndsAt('');
+                setInitialShiftBreakMinutes('0');
+                setInitialShiftCreated(false);
                 setEmployeePinApplied(false);
                 setSetupAdminPin('');
                 setNewEmployeePin('');
@@ -397,8 +536,14 @@ export function StaffPage() {
                 return;
               }
               setOnboardingStep('identity');
+              setNewEmployeeRole('STAFF');
+              setNewEmployeePermissionOverrides({});
               setOnboardingShopIds([shopId]);
               setAssignedShopIds([]);
+              setInitialShiftStartsAt('');
+              setInitialShiftEndsAt('');
+              setInitialShiftBreakMinutes('0');
+              setInitialShiftCreated(false);
               setOnboardingError(null);
               setCreateOpen(true);
             }}
@@ -660,7 +805,8 @@ export function StaffPage() {
                   />
                 </label>
                 <p>
-                  New employees start as Staff. Elevated access requires an approved role change.
+                  New employees start as Staff. Any selected elevated role is applied through a
+                  protected approval command during the same Save.
                 </p>
               </>
             ) : null}
@@ -724,6 +870,39 @@ export function StaffPage() {
                     onChange={(event) => setNewEmployeeEffectiveFrom(event.target.value)}
                   />
                 </label>
+                <fieldset className="admin-staff-onboarding-shops">
+                  <legend>Initial shift (optional)</legend>
+                  <p>Schedule the first shift in Cairo local time during Add employee.</p>
+                  <label className="admin-field">
+                    <span>Initial shift starts</span>
+                    <input
+                      type="datetime-local"
+                      value={initialShiftStartsAt}
+                      disabled={Boolean(createdEmployeeId && initialShiftCreated)}
+                      onChange={(event) => setInitialShiftStartsAt(event.currentTarget.value)}
+                    />
+                  </label>
+                  <label className="admin-field">
+                    <span>Initial shift ends</span>
+                    <input
+                      type="datetime-local"
+                      value={initialShiftEndsAt}
+                      disabled={Boolean(createdEmployeeId && initialShiftCreated)}
+                      onChange={(event) => setInitialShiftEndsAt(event.currentTarget.value)}
+                    />
+                  </label>
+                  <label className="admin-field">
+                    <span>Initial shift break minutes</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={initialShiftBreakMinutes}
+                      disabled={Boolean(createdEmployeeId && initialShiftCreated)}
+                      onChange={(event) => setInitialShiftBreakMinutes(event.currentTarget.value)}
+                    />
+                  </label>
+                </fieldset>
                 <section
                   className="admin-staff-onboarding-security"
                   aria-label="Operations access setup"
@@ -783,6 +962,65 @@ export function StaffPage() {
                     </p>
                   ) : null}
                 </section>
+                {canProvisionWorker ? (
+                  <fieldset className="admin-staff-onboarding-access">
+                    <legend>Role and module access</legend>
+                    <label className="admin-field">
+                      <span>Employee role</span>
+                      <select
+                        value={newEmployeeRole}
+                        onChange={(event) =>
+                          setNewEmployeeRole(
+                            event.currentTarget.value as 'STAFF' | 'MANAGER' | 'ADMIN',
+                          )
+                        }
+                      >
+                        <option value="STAFF">Staff</option>
+                        <option value="MANAGER">Manager</option>
+                        <option value="ADMIN">Administrator</option>
+                      </select>
+                    </label>
+                    <details>
+                      <summary>Customize module permissions</summary>
+                      <div className="admin-staff-onboarding-permissions">
+                        {ADMIN_PERMISSIONS.map((permission) => {
+                          const [module = 'Other', action = 'View'] = permission.split('.');
+                          return (
+                            <label className="admin-field" key={permission}>
+                              <span>
+                                {module.charAt(0).toUpperCase() + module.slice(1)} ·{' '}
+                                {(action ?? '')
+                                  .replaceAll('_', ' ')
+                                  .replace(/^./, (c) => c.toUpperCase())}
+                              </span>
+                              <select
+                                value={newEmployeePermissionOverrides[permission] ?? 'INHERIT'}
+                                onChange={(event) => {
+                                  const effect = event.currentTarget.value;
+                                  setNewEmployeePermissionOverrides((current) => {
+                                    const next = { ...current };
+                                    if (effect === 'INHERIT') delete next[permission];
+                                    else next[permission] = effect as 'ALLOW' | 'DENY';
+                                    return next;
+                                  });
+                                }}
+                              >
+                                <option value="INHERIT">Role default</option>
+                                <option value="ALLOW">Allowed</option>
+                                <option value="DENY">Not allowed</option>
+                              </select>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </details>
+                    <p>
+                      The Admin PIN authorizes requested role and module changes. Configured
+                      second-person approvals remain mandatory; Save does not claim completion
+                      before the effective access is confirmed.
+                    </p>
+                  </fieldset>
+                ) : null}
               </>
             ) : null}
             {onboardingStep === 'review' ? (
@@ -792,7 +1030,7 @@ export function StaffPage() {
               >
                 <h3>Review employee setup</h3>
                 <p>
-                  <strong>{newEmployeeName.trim()}</strong> · Staff
+                  <strong>{newEmployeeName.trim()}</strong> · {newEmployeeRole}
                 </p>
                 <p>{newEmployeePhone.trim() || 'No phone provided'}</p>
                 <p>{newEmployeeHireDate || 'Hire date not provided'}</p>
@@ -811,9 +1049,21 @@ export function StaffPage() {
                     : 'Compensation will be configured later.'}
                 </p>
                 <p>
+                  Initial shift:{' '}
+                  {initialShiftStartsAt && initialShiftEndsAt
+                    ? 'Scheduled within this Save'
+                    : 'No initial shift requested'}
+                  .
+                </p>
+                <p>
                   Operations access will be ready in all selected shops after the employee PIN is
                   verified and workers are provisioned. If approval or setup fails, save remains
                   incomplete and the draft can be resumed without creating a second employee.
+                </p>
+                <p>
+                  Requested role: {newEmployeeRole}. Explicit module permissions:{' '}
+                  {Object.keys(newEmployeePermissionOverrides).length}. These changes are confirmed
+                  against the server before Save finishes.
                 </p>
                 {createdEmployeeId ? (
                   <p>

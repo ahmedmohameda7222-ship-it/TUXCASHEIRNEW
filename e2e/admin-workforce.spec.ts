@@ -1503,3 +1503,165 @@ test('S2 employee Save does not claim Operations ready without a confirmed provi
   await expect(sheet).toBeVisible();
   expect(commands.filter((command) => command.type === 'employee.create')).toHaveLength(1);
 });
+
+test('S2 Add employee applies requested role and permission before reporting save complete', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  const commands: Array<Record<string, unknown>> = [];
+  let profileVersion = 2;
+  let role = 'STAFF';
+  let denied = false;
+  const newId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === 'GET' && url.searchParams.has('employeeId')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          employee: {
+            ...employee(),
+            id: newId,
+            displayName: 'Ready Access',
+            role,
+            profileVersion,
+            customDeniedPermissions: denied ? ['orders.view'] : [],
+          },
+        }),
+      });
+      return;
+    }
+    if (request.method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const command = request.postDataJSON() as Record<string, unknown>;
+    commands.push(command);
+    if (command.type === 'employee.role') {
+      expect(command.expectedVersion).toBe(2);
+      role = 'MANAGER';
+      profileVersion += 1;
+    }
+    if (command.type === 'employee.permission') {
+      expect(command.expectedVersion).toBe(3);
+      expect(command.permissionKey).toBe('orders.view');
+      expect(command.effect).toBe('DENY');
+      denied = true;
+      profileVersion += 1;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        state: 'APPLIED',
+        ...(command.type === 'employee.create' ? { employeeId: newId } : {}),
+        ...(command.type === 'employee.provision-worker'
+          ? { workerId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', shopId: command.shopId }
+          : {}),
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Ready Access');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await fillEmployeeOperationsSetup(page);
+  await sheet.getByLabel('Employee role').selectOption('MANAGER');
+  await sheet.getByText('Customize module permissions').click();
+  await sheet.getByLabel('Orders · View').selectOption('DENY');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  expect(commands).toHaveLength(0);
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect(sheet).toHaveCount(0);
+  expect(commands.map((command) => command.type)).toEqual([
+    'employee.create',
+    'employee.pin',
+    'employee.provision-worker',
+    'employee.role',
+    'employee.permission',
+  ]);
+  for (const sensitive of commands.filter((command) =>
+    ['employee.pin', 'employee.role', 'employee.permission'].includes(String(command.type)),
+  )) {
+    expect(sensitive.requesterPin).toBe('1234');
+  }
+});
+
+test('S2 Add employee holds access-pending approval open without granting unverified permissions', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkforce(page);
+  const commands: string[] = [];
+  await page.route('**/api/admin/staff**', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const draft = route.request().postDataJSON() as { type: string; shopId: string };
+    commands.push(draft.type);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        draft.type === 'employee.create'
+          ? { ok: true, employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }
+          : draft.type === 'employee.provision-worker'
+            ? { ok: true, workerId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', shopId: draft.shopId }
+            : draft.type === 'employee.role'
+              ? { ok: true, state: 'PENDING_APPROVAL' }
+              : { ok: true, state: 'APPLIED' },
+      ),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Pending Role');
+  await advanceStaffOnboardingToReview(page);
+  await sheet.getByRole('button', { name: 'Back' }).click();
+  await sheet.getByLabel('Employee role').selectOption('MANAGER');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole('alert')).toContainText(/approval/i);
+  expect(commands).toContain('employee.role');
+});
+
+test('S2 initial shift is included in Add employee before Operations-ready save', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('First Shift Ready');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  await fillEmployeeOperationsSetup(page);
+  await sheet.getByLabel('Initial shift starts').fill('2026-10-29T09:00');
+  await sheet.getByLabel('Initial shift ends').fill('2026-10-29T17:00');
+  await sheet.getByLabel('Initial shift break minutes').fill('30');
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+  expect(commands).toHaveLength(0);
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect(sheet).toHaveCount(0);
+  expect(commands.map((command) => command.type)).toEqual([
+    'employee.create',
+    'employee.pin',
+    'employee.provision-worker',
+    'shift.create',
+  ]);
+  expect(commands[3]).toMatchObject({
+    startsAt: '2026-10-29T06:00:00.000Z',
+    endsAt: '2026-10-29T14:00:00.000Z',
+    plannedBreakMinutes: 30,
+  });
+});
