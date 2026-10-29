@@ -282,12 +282,13 @@ test('R2 failed Set Target keeps target dialog open and preserves date window', 
 });
 
 for (const width of [360, 390, 414] as const) {
-  test(`R1 mobile date filters fit within their own columns at ${width}px`, async ({ page }) => {
+  test(`R1 ${width}px date inputs do not overlap`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await mockReports(page);
     await page.goto('/reports');
-    const from = page.getByRole('region', { name: 'Report filters' }).getByLabel('From', { exact: true });
-    const to = page.getByRole('region', { name: 'Report filters' }).getByLabel('To', { exact: true });
+    const filters = page.getByRole('region', { name: 'Report filters' });
+    const from = filters.getByLabel('From', { exact: true });
+    const to = filters.getByLabel('To', { exact: true });
     await expect(from).toBeVisible();
     await expect(to).toBeVisible();
     const bounds = await page.evaluate(() => {
