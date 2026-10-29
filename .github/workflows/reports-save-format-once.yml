@@ -1,0 +1,31 @@
+name: Reports save-view format once
+on:
+  push:
+    branches:
+      - feat/admin-reports-r1-r5-report-first-20261029
+    paths:
+      - .github/workflows/reports-save-format-once.yml
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npx prettier --write apps/admin/src/reports/SavedViews.tsx e2e/admin-reports.spec.ts
+      - name: Commit two formatted files
+        run: |
+          if ! git diff --quiet -- apps/admin/src/reports/SavedViews.tsx e2e/admin-reports.spec.ts; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add apps/admin/src/reports/SavedViews.tsx e2e/admin-reports.spec.ts
+            git commit -m "style(reports): format confirmed-save flows"
+            git push
+          fi
