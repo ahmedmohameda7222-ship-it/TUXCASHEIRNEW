@@ -1,0 +1,31 @@
+name: Reports PDF chart source format
+on:
+  push:
+    branches:
+      - feat/admin-reports-r1-r5-report-first-20261029
+    paths:
+      - .github/workflows/reports-chart-format-once.yml
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npx prettier --write apps/admin/server/reports/reportPdfRenderer.ts
+      - name: Commit formatted PDF chart
+        run: |
+          if ! git diff --quiet -- apps/admin/server/reports/reportPdfRenderer.ts; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add apps/admin/server/reports/reportPdfRenderer.ts
+            git commit -m "style(reports): normalize PDF chart using Prettier"
+            git push
+          fi
