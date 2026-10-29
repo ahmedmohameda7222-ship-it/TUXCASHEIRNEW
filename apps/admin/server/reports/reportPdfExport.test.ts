@@ -226,6 +226,62 @@ describe('R3 canonical full-record export collector', () => {
     ).rejects.toThrow('report_export_snapshot_changed');
   });
 
+  it('R3 rejects skipped source-record pages even when the reported total matches', async () => {
+    const result = collectAuthorizedReportExport(request, principal, async (args) => {
+      const rows = Array.from({ length: 50 }, (_, index) => ({
+        id: `record-${args.offset + index}`,
+        shopId: shop,
+        occurredAt: '2026-10-29T09:00:00.000Z',
+        label: 'Payment',
+        sourceKind: 'payment',
+        amountMinor: 100,
+        quantity: 1,
+        costMissing: false,
+      }));
+      return {
+        ok: true,
+        summary: {
+          eventCount: 100,
+          orderCount: 1,
+          totalAmountMinor: 10000,
+          totalQuantity: 100,
+          incompleteCostEvents: 0,
+          coverageNote: null,
+        },
+        rows,
+        nextOffset: args.offset === 0 ? 100 : null,
+      };
+    });
+    await expect(result).rejects.toThrow('report_export_pagination_invalid');
+  });
+
+  it('R3 rejects an invalid canonical amount before it reaches PDF generation', async () => {
+    await expect(
+      collectAuthorizedReportExport(request, principal, async () => ({
+        ok: true,
+        summary: {
+          eventCount: 1,
+          orderCount: 1,
+          totalAmountMinor: 100,
+          totalQuantity: 1,
+          incompleteCostEvents: 0,
+          coverageNote: null,
+        },
+        rows: [{
+          id: 'record-1',
+          shopId: shop,
+          occurredAt: '2026-10-29T09:00:00.000Z',
+          label: 'Payment',
+          sourceKind: 'payment',
+          amountMinor: Number.NaN,
+          quantity: 1,
+          costMissing: false,
+        }],
+        nextOffset: null,
+      })),
+    ).rejects.toThrow('report_export_source_invalid');
+  });
+
   it('refuses oversized exports rather than returning a partial PDF as complete', async () => {
     await expect(
       collectAuthorizedReportExport(request, principal, async () => ({
