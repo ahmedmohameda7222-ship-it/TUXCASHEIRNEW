@@ -8,7 +8,7 @@ import { OwnerSummaryCard } from '../dashboard/OwnerSummaryCard';
 import { useShopScope } from '../shops/ShopScopeProvider';
 
 import { REPORT_LABELS, ReportFilters } from './ReportFilters';
-import { validReportDateRange } from './reportDateRange';
+import { cairoReportToday, reportDatePreset, validReportDateRange } from './reportDateRange';
 import { scopeReportFilters } from './reportScope';
 import { ReportView } from './ReportView';
 import { SavedViews } from './SavedViews';
@@ -19,24 +19,13 @@ import {
 } from './useReports';
 import './reports.css';
 
-function cairoToday(): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Africa/Cairo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date());
-  const get = (kind: string) => parts.find((item) => item.type === kind)?.value ?? '';
-  return `${get('year')}-${get('month')}-${get('day')}`;
-}
 
 export function ReportsPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : principal.shopIds[0];
   const [filters, setFilters] = useState<ReportFilterState>(() => ({
     area: 'sales',
-    fromDate: cairoToday(),
-    toDate: cairoToday(),
+    ...reportDatePreset(cairoReportToday(), 7),
     source: null,
     shopIds: scope.kind === 'all-shops' ? principal.shopIds : shopId ? [shopId] : [],
     comparePrevious: false,
@@ -88,8 +77,8 @@ export function ReportsPage() {
     const iso = /^\d{4}-\d{2}-\d{2}$/;
     setFilters({
       area: area as AdminReportArea,
-      fromDate: typeof fromDate === 'string' && iso.test(fromDate) ? fromDate : cairoToday(),
-      toDate: typeof toDate === 'string' && iso.test(toDate) ? toDate : cairoToday(),
+      fromDate: typeof fromDate === 'string' && iso.test(fromDate) ? fromDate : cairoReportToday(),
+      toDate: typeof toDate === 'string' && iso.test(toDate) ? toDate : cairoReportToday(),
       source: source === 'POS' || source === 'ONLINE' ? source : null,
       shopIds: savedShops.length > 0 ? savedShops : [shopId!],
       comparePrevious: view.filters['comparePrevious'] === true,
@@ -119,7 +108,7 @@ export function ReportsPage() {
     <PageScaffold
       eyebrow="Business intelligence"
       title="Reports"
-      description="Canonical performance reports with saved filters, targets and source activity."
+      description="See what's changing, understand why, and open the original source records."
     >
       <ReportFilters
         value={scopedFilters}
