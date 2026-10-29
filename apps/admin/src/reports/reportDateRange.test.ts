@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {validReportDateRange, reportPresetRange} from './reportDateRange';
+import { reportPresetRange, validReportDateRange } from './reportDateRange';
 
 describe('report range safety', () => {
   it('accepts equal dates and a bounded ascending Cairo calendar range', () => {
