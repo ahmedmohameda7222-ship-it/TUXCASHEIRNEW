@@ -11,13 +11,7 @@ export function matchingTargetForPeriod<
     readonly periodStart: string;
     readonly periodEnd: string;
   },
->(
-  targets: readonly T[],
-  shopId: string,
-  metric: string,
-  from: string,
-  to: string,
-): T | undefined {
+>(targets: readonly T[], shopId: string, metric: string, from: string, to: string): T | undefined {
   return targets.find(
     (target) =>
       target.shopId === shopId &&

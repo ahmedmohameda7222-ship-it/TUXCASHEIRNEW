@@ -19,7 +19,6 @@ import {
 } from './useReports';
 import './reports.css';
 
-
 export function ReportsPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : principal.shopIds[0];

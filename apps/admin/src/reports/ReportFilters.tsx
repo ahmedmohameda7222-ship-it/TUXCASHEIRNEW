@@ -208,134 +208,136 @@ export function ReportFilters({
             </button>
           ))}
         </div>
-      <label>
-        From
-        <input
-          type="date"
-          value={value.fromDate}
-          onChange={(event) => set('fromDate', event.target.value)}
-        />
-      </label>
-      <label>
-        To
-        <input
-          type="date"
-          value={value.toDate}
-          onChange={(event) => set('toDate', event.target.value)}
-        />
-      </label>
-      <label>
-        Order source
-        <select
-          value={value.source ?? 'ALL'}
-          onChange={(event) =>
-            set(
-              'source',
-              event.target.value === 'ALL' ? null : (event.target.value as 'POS' | 'ONLINE'),
-            )
-          }
-        >
-          <option value="ALL">All sources</option>
-          <option value="POS">POS</option>
-          <option value="ONLINE">Online</option>
-        </select>
-      </label>
-      {canCompareShops && allShopIds.length > 1 ? (
         <label>
-          Shops
+          From
+          <input
+            type="date"
+            value={value.fromDate}
+            onChange={(event) => set('fromDate', event.target.value)}
+          />
+        </label>
+        <label>
+          To
+          <input
+            type="date"
+            value={value.toDate}
+            onChange={(event) => set('toDate', event.target.value)}
+          />
+        </label>
+        <label>
+          Order source
           <select
-            value={value.shopIds.length === allShopIds.length ? 'ALL' : 'SELECTED'}
+            value={value.source ?? 'ALL'}
             onChange={(event) =>
-              set('shopIds', event.target.value === 'ALL' ? allShopIds : [allShopIds[0]!])
+              set(
+                'source',
+                event.target.value === 'ALL' ? null : (event.target.value as 'POS' | 'ONLINE'),
+              )
             }
           >
-            <option value="ALL">All authorized shops</option>
-            <option value="SELECTED">First shop</option>
+            <option value="ALL">All sources</option>
+            <option value="POS">POS</option>
+            <option value="ONLINE">Online</option>
           </select>
         </label>
-      ) : null}
-      <label className="tux-report-filters__check">
-        <input
-          type="checkbox"
-          checked={value.comparePrevious}
-          onChange={(event) => set('comparePrevious', event.target.checked)}
-        />
-        Compare previous period
-      </label>
-      {value.comparePrevious ? (
-        <label>
-          Comparison range
-          <select
-            value={value.comparisonRange ?? 'previous'}
-            onChange={(event) =>
-              set('comparisonRange', event.target.value as 'previous' | 'week' | 'month' | 'year')
-            }
+        {canCompareShops && allShopIds.length > 1 ? (
+          <label>
+            Shops
+            <select
+              value={value.shopIds.length === allShopIds.length ? 'ALL' : 'SELECTED'}
+              onChange={(event) =>
+                set('shopIds', event.target.value === 'ALL' ? allShopIds : [allShopIds[0]!])
+              }
+            >
+              <option value="ALL">All authorized shops</option>
+              <option value="SELECTED">First shop</option>
+            </select>
+          </label>
+        ) : null}
+        <label className="tux-report-filters__check">
+          <input
+            type="checkbox"
+            checked={value.comparePrevious}
+            onChange={(event) => set('comparePrevious', event.target.checked)}
+          />
+          Compare previous period
+        </label>
+        {value.comparePrevious ? (
+          <label>
+            Comparison range
+            <select
+              value={value.comparisonRange ?? 'previous'}
+              onChange={(event) =>
+                set('comparisonRange', event.target.value as 'previous' | 'week' | 'month' | 'year')
+              }
+            >
+              <option value="previous">Previous equivalent period</option>
+              <option value="week">Previous week</option>
+              <option value="month">Previous calendar month</option>
+              <option value="year">Previous calendar year</option>
+            </select>
+          </label>
+        ) : null}
+        {extraFields.length > 0 || statuses.length > 0 ? (
+          <details
+            className="tux-report-context"
+            onToggle={(event) => {
+              if (event.currentTarget.open) onExpand();
+            }}
           >
-            <option value="previous">Previous equivalent period</option>
-            <option value="week">Previous week</option>
-            <option value="month">Previous calendar month</option>
-            <option value="year">Previous calendar year</option>
-          </select>
-        </label>
-      ) : null}
-      {extraFields.length > 0 || statuses.length > 0 ? (
-        <details
-          className="tux-report-context"
-          onToggle={(event) => {
-            if (event.currentTarget.open) onExpand();
-          }}
-        >
-          <summary>More filters</summary>
-          <div className="tux-report-context__fields">
-            {extraFields
-              .filter((field) => (options[field.optionsKey] ?? []).length > 0)
-              .map((field) => (
-                <label key={field.key}>
-                  {field.label}
+            <summary>More filters</summary>
+            <div className="tux-report-context__fields">
+              {extraFields
+                .filter((field) => (options[field.optionsKey] ?? []).length > 0)
+                .map((field) => (
+                  <label key={field.key}>
+                    {field.label}
+                    <select
+                      value={value.context?.[field.key] ?? ''}
+                      onChange={(event) => setContext(field.key, event.target.value)}
+                    >
+                      <option value="">All {field.label.toLowerCase()}s</option>
+                      {(options[field.optionsKey] ?? []).map((entry) => (
+                        <option key={entry.id} value={entry.id}>
+                          {entry.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              {statuses.length > 0 ? (
+                <label>
+                  Status
                   <select
-                    value={value.context?.[field.key] ?? ''}
-                    onChange={(event) => setContext(field.key, event.target.value)}
+                    value={value.context?.status ?? ''}
+                    onChange={(event) => setContext('status', event.target.value)}
                   >
-                    <option value="">All {field.label.toLowerCase()}s</option>
-                    {(options[field.optionsKey] ?? []).map((entry) => (
-                      <option key={entry.id} value={entry.id}>
-                        {entry.label}
+                    <option value="">All statuses</option>
+                    {statuses.map(([code, label]) => (
+                      <option key={code} value={code}>
+                        {label}
                       </option>
                     ))}
                   </select>
                 </label>
-              ))}
-            {statuses.length > 0 ? (
-              <label>
-                Status
-                <select
-                  value={value.context?.status ?? ''}
-                  onChange={(event) => setContext('status', event.target.value)}
-                >
-                  <option value="">All statuses</option>
-                  {statuses.map(([code, label]) => (
-                    <option key={code} value={code}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-          </div>
-        </details>
-      ) : null}
+              ) : null}
+            </div>
+          </details>
+        ) : null}
         <button
           type="button"
           className="admin-secondary-button tux-report-reset"
-          onClick={() => onChange({
-            ...value,
-            ...reportDatePreset(cairoReportToday(), 7),
-            source: null,
-            comparePrevious: false,
-            comparisonRange: 'previous',
-            context: {},
-            offset: 0,
-          })}
+          onClick={() =>
+            onChange({
+              ...value,
+              ...reportDatePreset(cairoReportToday(), 7),
+              source: null,
+              comparePrevious: false,
+              comparisonRange: 'previous',
+              context: {},
+              offset: 0,
+            })
+          }
         >
           Reset
         </button>

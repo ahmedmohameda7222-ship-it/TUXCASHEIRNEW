@@ -11,11 +11,36 @@ describe('R2 report target window integrity', () => {
 
   it('only updates a target matching shop, metric and exact period', () => {
     const targets = [
-      { id: 'a', shopId: 'shop-a', metric: 'NET_SALES', periodStart: '2026-10-01', periodEnd: '2026-10-07', version: 4 },
-      { id: 'b', shopId: 'shop-a', metric: 'NET_SALES', periodStart: '2026-10-08', periodEnd: '2026-10-14', version: 5 },
-      { id: 'c', shopId: 'shop-b', metric: 'NET_SALES', periodStart: '2026-10-01', periodEnd: '2026-10-07', version: 2 },
+      {
+        id: 'a',
+        shopId: 'shop-a',
+        metric: 'NET_SALES',
+        periodStart: '2026-10-01',
+        periodEnd: '2026-10-07',
+        version: 4,
+      },
+      {
+        id: 'b',
+        shopId: 'shop-a',
+        metric: 'NET_SALES',
+        periodStart: '2026-10-08',
+        periodEnd: '2026-10-14',
+        version: 5,
+      },
+      {
+        id: 'c',
+        shopId: 'shop-b',
+        metric: 'NET_SALES',
+        periodStart: '2026-10-01',
+        periodEnd: '2026-10-07',
+        version: 2,
+      },
     ] as const;
-    expect(matchingTargetForPeriod(targets, 'shop-a', 'NET_SALES', '2026-10-08', '2026-10-14')?.id).toBe('b');
-    expect(matchingTargetForPeriod(targets, 'shop-a', 'NET_SALES', '2026-10-15', '2026-10-21')).toBeUndefined();
+    expect(
+      matchingTargetForPeriod(targets, 'shop-a', 'NET_SALES', '2026-10-08', '2026-10-14')?.id,
+    ).toBe('b');
+    expect(
+      matchingTargetForPeriod(targets, 'shop-a', 'NET_SALES', '2026-10-15', '2026-10-21'),
+    ).toBeUndefined();
   });
 });

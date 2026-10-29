@@ -67,8 +67,12 @@ describe('R3 canonical full-record export collector', () => {
         return {
           ok: true,
           summary: {
-            eventCount: 0, orderCount: 0, totalAmountMinor: 0,
-            totalQuantity: 0, incompleteCostEvents: 0, coverageNote: null,
+            eventCount: 0,
+            orderCount: 0,
+            totalAmountMinor: 0,
+            totalQuantity: 0,
+            incompleteCostEvents: 0,
+            coverageNote: null,
           },
           rows: [],
           nextOffset: null,
@@ -100,8 +104,12 @@ describe('R3 canonical full-record export collector', () => {
       collectAuthorizedReportExport(request, principal, async () => ({
         ok: true,
         summary: {
-          eventCount: 999999, orderCount: 999999, totalAmountMinor: 999999,
-          totalQuantity: 999999, incompleteCostEvents: 0, coverageNote: null,
+          eventCount: 999999,
+          orderCount: 999999,
+          totalAmountMinor: 999999,
+          totalQuantity: 999999,
+          incompleteCostEvents: 0,
+          coverageNote: null,
         },
         rows: [],
         nextOffset: 100,

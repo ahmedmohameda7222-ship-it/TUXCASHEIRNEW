@@ -1,4 +1,8 @@
-import { ADMIN_REPORT_AREAS, type AdminReportArea, type AdminSessionPrincipal } from '@tux/admin-contracts';
+import {
+  ADMIN_REPORT_AREAS,
+  type AdminReportArea,
+  type AdminSessionPrincipal,
+} from '@tux/admin-contracts';
 import { AdminAuthorizationError } from '../authorization.js';
 import { requireReportArea, requireReportContextPermissions } from './reportAuthorization.js';
 
