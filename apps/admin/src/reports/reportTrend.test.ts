@@ -58,4 +58,12 @@ describe('R1 truthful report trend', () => {
   it('returns unavailable on longer ranges to prevent unbounded day chart rendering', () => {
     expect(completeReportDailyActivity(report, { ...filters, fromDate: '2020-01-01' })).toBeNull();
   });
+  it('does not label a mismatched canonical source date as zero activity', () => {
+    const outOfWindow = {
+      ...report,
+      rows: [entry('1', '2026-10-19T12:00:00.000Z'), entry('2', '2026-10-19T14:00:00.000Z')],
+    };
+    expect(completeReportDailyActivity(outOfWindow, filters)).toBeNull();
+  });
+
 });

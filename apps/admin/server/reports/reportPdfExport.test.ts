@@ -301,4 +301,34 @@ describe('R3 canonical full-record export collector', () => {
       })),
     ).rejects.toThrow('report_export_too_large');
   });
+  it('rejects duplicated source records across canonical pagination boundaries', async () => {
+    await expect(
+      collectAuthorizedReportExport(request, principal, async (args) => {
+        const rows = Array.from({ length: args.offset === 0 ? 100 : 1 }, (_, index) => ({
+          id: args.offset === 0 ? `record-${index + 1}` : 'record-1',
+          shopId: shop,
+          occurredAt: '2026-10-29T09:00:00.000Z',
+          label: 'Payment',
+          sourceKind: 'payment',
+          amountMinor: 100,
+          quantity: 1,
+          costMissing: false,
+        }));
+        return {
+          ok: true,
+          summary: {
+            eventCount: 101,
+            orderCount: 1,
+            totalAmountMinor: 10100,
+            totalQuantity: 101,
+            incompleteCostEvents: 0,
+            coverageNote: null,
+          },
+          rows,
+          nextOffset: args.offset === 0 ? 100 : null,
+        };
+      }),
+    ).rejects.toThrow('report_export_duplicate_record');
+  });
+
 });
