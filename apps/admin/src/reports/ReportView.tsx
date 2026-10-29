@@ -115,10 +115,17 @@ export function ReportView({
           </div>
         </div>
         {activity ? (
-          <div className="tux-report-trend__bars" role="img" aria-label={activity.map((day) => `${day.date}: ${day.count} events`).join(', ')}>
+          <div
+            className="tux-report-trend__bars"
+            role="img"
+            aria-label={activity.map((day) => `${day.date}: ${day.count} events`).join(', ')}
+          >
             {activity.map((day) => (
               <div key={day.date} className="tux-report-trend__day">
-                <div className="tux-report-trend__bar" style={{ height: `${Math.max(2, (day.count / peak) * 100)}%` }} />
+                <div
+                  className="tux-report-trend__bar"
+                  style={{ height: `${Math.max(2, (day.count / peak) * 100)}%` }}
+                />
                 <small>{day.date.slice(5)}</small>
               </div>
             ))}

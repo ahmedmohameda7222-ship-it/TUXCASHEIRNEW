@@ -374,8 +374,12 @@
   padding: 1rem;
   background: var(--tux-surface-panel);
 }
-.tux-report-trend__header h3 { margin: 0; font-size: 1rem; }
-.tux-report-trend__header small, .tux-report-trend__unavailable {
+.tux-report-trend__header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.tux-report-trend__header small,
+.tux-report-trend__unavailable {
   color: var(--tux-text-secondary);
   font-size: 0.78rem;
 }
@@ -409,6 +413,10 @@
   white-space: nowrap;
 }
 @media (max-width: 639px) {
-  .tux-report-trend__bars { height: 110px; }
-  .tux-report-trend__day small { font-size: 0.6rem; }
+  .tux-report-trend__bars {
+    height: 110px;
+  }
+  .tux-report-trend__day small {
+    font-size: 0.6rem;
+  }
 }
