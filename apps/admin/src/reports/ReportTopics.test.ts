@@ -1,3 +1,6 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { ReportFilters } from './ReportFilters';
 import { ADMIN_REPORT_AREAS } from '@tux/admin-contracts';
 import { describe, expect, it } from 'vitest';
 import { REPORT_LABELS, REPORT_TOPICS } from './ReportFilters';
@@ -44,5 +47,35 @@ describe('selected report-first contract', () => {
       comparePrevious: true,
     });
     expect(chooseReportArea(filters, 'customers')).toBe(filters);
+  });
+});
+
+
+describe('approved report-first picker', () => {
+  it('renders quick report choices before the 22-area report select', () => {
+    const html = renderToStaticMarkup(
+      createElement(ReportFilters, {
+        value: {
+          area: 'sales',
+          fromDate: '2026-10-22',
+          toDate: '2026-10-29',
+          source: null,
+          shopIds: ['11111111-1111-4111-8111-111111111111'],
+          comparePrevious: false,
+          offset: 0,
+        },
+        onChange: () => {},
+        canCompareShops: false,
+        allShopIds: ['11111111-1111-4111-8111-111111111111'],
+        options: {},
+        onExpand: () => {},
+      }),
+    );
+    expect(html).toContain('Choose a report');
+    expect(html).toContain('Quick reports');
+    expect(html).toContain('All reports');
+    expect(html).toContain('Last 7 days');
+    expect(html.indexOf('Choose a report')).toBeLessThan(html.indexOf('Report area'));
+    expect(html.match(/<option value="/g)).toHaveLength(23);
   });
 });
