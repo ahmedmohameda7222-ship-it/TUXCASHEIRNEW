@@ -178,7 +178,9 @@ export function ReportView({
                     <div className="tux-report-mobile-entries__top">
                       <p>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</p>
                       <strong>
-                        {fact.amountMinor === null ? 'Not available' : amountLabel(fact.amountMinor)}
+                        {fact.amountMinor === null
+                          ? 'Not available'
+                          : amountLabel(fact.amountMinor)}
                       </strong>
                     </div>
                     <small>
