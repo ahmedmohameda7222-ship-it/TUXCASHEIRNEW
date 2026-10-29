@@ -67,6 +67,10 @@ export type AuthorizedExport = {
   fromDate: string;
   toDate: string;
   requestedAreaCount: number;
+  appliedFilters?: {
+    source: 'POS' | 'ONLINE' | null;
+    context: Readonly<Record<string, string>>;
+  };
 };
 
 function previousWindow(
@@ -237,5 +241,9 @@ export async function collectAuthorizedReportExport(
     fromDate: input.fromDate,
     toDate: input.toDate,
     requestedAreaCount: areas.length,
+    appliedFilters: {
+      source: input.kind === 'current' ? input.source : null,
+      context: input.kind === 'current' ? input.context : {},
+    },
   };
 }
