@@ -74,7 +74,14 @@ export function ReportView({
         }
       />
     );
-  if (!data) return null;
+  // An invalid date range disables the report query. Keep the export controls
+  // mounted so users can see why downloading is unavailable and correct dates.
+  if (!data)
+    return (
+      <section className="tux-report-view" aria-label="Report results">
+        {exportActions}
+      </section>
+    );
   const summary = data.summary;
   const activity = completeReportDailyActivity(data, filters);
   const peak = Math.max(1, ...(activity?.map((day) => day.count) ?? []));
