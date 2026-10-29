@@ -50,6 +50,7 @@ export function ReportView({
   error,
   retry,
   exportActions,
+  shopNames = {},
 }: {
   data: ReportResponse | undefined;
   filters: ReportFilters;
@@ -58,6 +59,7 @@ export function ReportView({
   error: boolean;
   retry(): void;
   exportActions?: ReactNode;
+  shopNames?: Readonly<Record<string, string>>;
 }) {
   if (loading)
     return <LoadingState title="Building report" description="Reading canonical data…" />;
@@ -166,17 +168,16 @@ export function ReportView({
               return (
                 <li key={`mobile:${fact.sourceKind}:${fact.id}`}>
                   <div className="tux-report-mobile-entries__top">
-                    <span>
-                      {new Date(fact.occurredAt).toLocaleDateString('en-EG', {
-                        timeZone: 'Africa/Cairo',
-                      })}
-                    </span>
+                    <p>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</p>
                     <strong>
                       {fact.amountMinor === null ? 'Not available' : amountLabel(fact.amountMinor)}
                     </strong>
                   </div>
-                  <small>{fact.sourceKind.replaceAll('-', ' ')}</small>
-                  <p>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</p>
+                  <small>
+                    {new Date(fact.occurredAt).toLocaleDateString('en-EG', {
+                      timeZone: 'Africa/Cairo',
+                    })} · {fact.sourceKind.replaceAll('-', ' ')} · {shopNames[fact.shopId] ?? fact.shopId}
+                  </small>
                 </li>
               );
             })}
@@ -186,8 +187,9 @@ export function ReportView({
               <thead>
                 <tr>
                   <th scope="col">Date</th>
+                  <th scope="col">Record</th>
                   <th scope="col">Source</th>
-                  <th scope="col">Description</th>
+                  <th scope="col">Shop</th>
                   <th scope="col">Amount (EGP)</th>
                 </tr>
               </thead>
@@ -201,8 +203,9 @@ export function ReportView({
                           timeZone: 'Africa/Cairo',
                         })}
                       </td>
-                      <td>{fact.sourceKind.replaceAll('-', ' ')}</td>
                       <td>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</td>
+                      <td>{fact.sourceKind.replaceAll('-', ' ')}</td>
+                      <td>{shopNames[fact.shopId] ?? fact.shopId}</td>
                       <td>
                         {fact.amountMinor === null
                           ? 'Not available'
