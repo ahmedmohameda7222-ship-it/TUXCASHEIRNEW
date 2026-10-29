@@ -75,6 +75,7 @@ describe('approved report-first picker', () => {
     expect(html).toContain('All reports');
     expect(html).toContain('Last 7 days');
     expect(html.indexOf('Choose a report')).toBeLessThan(html.indexOf('Report area'));
-    expect(html.match(/<option value="/g)).toHaveLength(25);
+    const reportSelect = html.match(/<select[^>]*id="tux-report-area"[^>]*>(.*?)<\\/select>/s);
+    expect(reportSelect?.[1]?.match(/<option value="/g)).toHaveLength(22);
   });
 });
