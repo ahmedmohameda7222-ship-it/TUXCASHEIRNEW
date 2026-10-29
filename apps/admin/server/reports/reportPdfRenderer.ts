@@ -136,15 +136,15 @@ export async function renderReportPdf(data: ReportExportData): Promise<Buffer> {
 
   function renderRow(row: ReportExportRow, sectionName: string): void {
     const labelFont = fontForText(row.label, latin, arabic);
-    const labelLines = splitWrapped(row.label, 253, 9, labelFont);
+    const labelLines = splitWrapped(row.label, 218, 9, labelFont);
     const height = Math.max(32, labelLines.length * 13 + 17);
     ensureRoom(height + 10, sectionName);
     const top = y;
     drawLine(displayDate(row.occurredAt), MARGIN, top, 8, muted);
-    drawLine(row.sourceKind.replaceAll('-', ' '), 138, top, 8, muted);
-    labelLines.forEach((part, index) => drawLine(part, 240, top - index * 13, 9));
-    drawLine(money(row.amountMinor), 475, top, 8, ink);
-    drawLine(`ID ${row.id} | Qty ${row.quantity}`, 240, top - labelLines.length * 13, 7, muted);
+    drawLine(row.sourceKind.replaceAll('-', ' '), 132, top, 8, muted);
+    labelLines.forEach((part, index) => drawLine(part, 233, top - index * 13, 9));
+    drawLine(money(row.amountMinor), 473, top, 8, ink);
+    drawLine(`ID ${row.id} | Qty ${row.quantity}`, 233, top - labelLines.length * 13, 7, muted);
     if (row.costMissing) drawLine('Cost incomplete', MARGIN, top - 15, 7, muted);
     y -= height;
     page.drawLine({
@@ -170,6 +170,12 @@ export async function renderReportPdf(data: ReportExportData): Promise<Buffer> {
     );
     if (data.kind === 'current' && Object.keys(data.context).length) {
       paragraph(`Filters: ${JSON.stringify(data.context)}`, 8);
+    }
+    if (data.kind === 'current' && data.comparison) {
+      paragraph(
+        `Comparison ${data.comparison.periodStart} to ${data.comparison.periodEnd}: ${money(data.comparison.summary.totalAmountMinor)} (${data.comparison.summary.eventCount} records)`,
+        8,
+      );
     }
     paragraph(
       `Recorded amount: ${money(section.summary.totalAmountMinor)} | Events: ${section.summary.eventCount} | Orders: ${section.summary.orderCount} | Quantity: ${section.summary.totalQuantity}`,
