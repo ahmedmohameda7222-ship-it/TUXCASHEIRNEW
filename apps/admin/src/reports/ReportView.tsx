@@ -6,6 +6,7 @@ import { formatEgp } from '../finance/money';
 
 import type { ReportFilters, ReportResponse } from './useReports';
 import { REPORT_LABELS } from './reportLabels';
+import { completeReportDailyActivity } from './reportTrend';
 
 function amountLabel(amount: number | null): string {
   return amount === null ? 'Cost data incomplete' : formatEgp(amount);
@@ -70,6 +71,8 @@ export function ReportView({
     );
   if (!data) return null;
   const summary = data.summary;
+  const activity = completeReportDailyActivity(data, filters);
+  const peak = Math.max(1, ...(activity?.map((day) => day.count) ?? []));
   return (
     <section className="tux-report-view" aria-label="Report results">
       <header className="tux-report-view__intro">
@@ -93,6 +96,10 @@ export function ReportView({
           <small>Source events</small>
           <strong>{summary.eventCount.toLocaleString('en-EG')}</strong>
         </div>
+        <div>
+          <small>Total quantity</small>
+          <strong>{summary.totalQuantity.toLocaleString('en-EG')}</strong>
+        </div>
         {data.comparison ? (
           <div>
             <small>Previous period recorded amount</small>
@@ -100,6 +107,28 @@ export function ReportView({
           </div>
         ) : null}
       </div>
+      <section className="tux-report-trend" aria-label="Activity over time">
+        <div className="tux-report-trend__header">
+          <div>
+            <h3>Activity over time</h3>
+            <small>Based on complete matching source events in the Cairo calendar</small>
+          </div>
+        </div>
+        {activity ? (
+          <div className="tux-report-trend__bars" role="img" aria-label={activity.map((day) => `${day.date}: ${day.count} events`).join(', ')}>
+            {activity.map((day) => (
+              <div key={day.date} className="tux-report-trend__day">
+                <div className="tux-report-trend__bar" style={{ height: `${Math.max(2, (day.count / peak) * 100)}%` }} />
+                <small>{day.date.slice(5)}</small>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="tux-report-trend__unavailable">
+            Trend unavailable: the loaded source page is not the complete date-range dataset.
+          </p>
+        )}
+      </section>
       {summary.incompleteCostEvents > 0 ? (
         <p role="status" className="tux-report-caveat">
           {summary.incompleteCostEvents} source event(s) lack a verified unit cost. An incomplete
