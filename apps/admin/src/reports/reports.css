@@ -41,6 +41,13 @@
   gap: 1rem;
   margin-top: 1rem;
 }
+.tux-report-view,
+.tux-report-results {
+  /* Allow report source tables to scroll inside the result panel on tablets.
+     Grid items otherwise retain the table's 680px min-content width. */
+  min-width: 0;
+  max-width: 100%;
+}
 .tux-report-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
