@@ -1,6 +1,7 @@
 import type { AdminReportArea } from '@tux/admin-contracts';
 
 import { chooseReportArea } from './reportAreaTransition';
+import { reportPresetRange } from './reportDateRange';
 import type { ReportContext, ReportFilters as ReportQueryFilters } from './useReports';
 
 export const REPORT_LABELS: Readonly<Record<AdminReportArea, string>> = {
@@ -141,11 +142,81 @@ export function ReportFilters({
               ['RETURNED', 'Returned'],
             ]
           : [];
+  const quickAreas: readonly AdminReportArea[] = [
+    'sales',
+    'products',
+    'inventory-consumption',
+    'customers',
+    'expenses',
+  ];
   return (
     <section className="tux-report-filters" aria-label="Report filters">
+      <div className="tux-report-picker">
+        <div className="tux-report-picker__heading">
+          <h2>Choose a report</h2>
+          <span>22 available to authorized users</span>
+        </div>
+        <nav className="tux-report-picker__quick" aria-label="Quick reports">
+          <span className="tux-report-picker__sr-label">Quick reports</span>
+          {quickAreas.map((area) => (
+            <button
+              key={area}
+              type="button"
+              aria-pressed={value.area === area}
+              className={value.area === area ? 'is-selected' : ''}
+              onClick={() => onChange(chooseReportArea(value, area))}
+            >
+              {area === 'inventory-consumption' ? 'Inventory' : REPORT_LABELS[area]}
+            </button>
+          ))}
+          <details className="tux-report-picker__all">
+            <summary>All reports (22)</summary>
+            <div className="tux-report-picker__all-options">
+              {REPORT_TOPICS.map((topic) => (
+                <div key={topic.label}>
+                  <strong>{topic.label}</strong>
+                  {topic.areas.map((area) => (
+                    <button
+                      key={area}
+                      type="button"
+                      aria-pressed={value.area === area}
+                      onClick={() => onChange(chooseReportArea(value, area))}
+                    >
+                      {REPORT_LABELS[area]}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </details>
+        </nav>
+      </div>
+      <div className="tux-report-range-presets" role="group" aria-label="Date range presets">
+        {([
+          ['Today', 1],
+          ['Last 7 days', 7],
+          ['Last 30 days', 30],
+        ] as const).map(([label, days]) => (
+          <button
+            key={days}
+            type="button"
+            onClick={() =>
+              onChange({
+                ...value,
+                ...reportPresetRange(value.toDate, days),
+                offset: 0,
+              })
+            }
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <label>
-        Report
+        Report area
         <select
+          aria-label="Report area"
+          id="tux-report-area"
           value={value.area}
           onChange={(event) =>
             onChange(chooseReportArea(value, event.target.value as AdminReportArea))
