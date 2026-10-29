@@ -190,6 +190,8 @@ jobs:
         run: |
           set -euo pipefail
           npm run test:admin-security
+          # Execute the Vercel Node ESM import/packaging guard for Admin API changes.
+          npm run test:admin-deployment
           if [[ "$WHATSAPP" == true ]]; then
             npm run test:whatsapp-security
             npm run test:whatsapp-architecture
