@@ -94,6 +94,8 @@ function employee(): EmployeeDetail {
 
 async function mockWorkforce(page: Page, withAccount = true) {
   const commands: Record<string, unknown>[] = [];
+  const assignedShops = new Set<string>([shopId]);
+  const provisionedWorkers = new Map<string, string>();
 
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
@@ -118,10 +120,34 @@ async function mockWorkforce(page: Page, withAccount = true) {
     if (request.method() === 'GET') {
       expect(url.searchParams.get('shopId')).toBe(shopId);
       if (url.searchParams.get('employeeId')) {
+        const requestedId = url.searchParams.get('employeeId');
+        const createdId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        const created = requestedId === createdId;
+        const detail: EmployeeDetail = created
+          ? {
+              ...employee(),
+              id: createdId,
+              displayName: 'New Employee',
+              assignments: [...assignedShops].map((id) => ({ shopId: id, assigned: true })),
+              operationsIdentities: [...assignedShops].map((id) => {
+                const linkedWorkerId = provisionedWorkers.get(id);
+                return linkedWorkerId
+                  ? {
+                      kind: 'LINKED' as const,
+                      shopId: id,
+                      workerId: linkedWorkerId,
+                      workerName: 'New Employee',
+                      workerActive: true,
+                      credentialVersion: 1,
+                    }
+                  : { kind: 'SETUP_REQUIRED' as const, shopId: id };
+              }),
+            }
+          : employee();
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ employee: employee() }),
+          body: JSON.stringify({ employee: detail }),
         });
         return;
       }
@@ -137,6 +163,17 @@ async function mockWorkforce(page: Page, withAccount = true) {
     expect(request.headers()['x-tux-admin-csrf']).toBe(csrfToken);
     const command = request.postDataJSON() as Record<string, unknown>;
     commands.push(command);
+    if (command.type === 'employee.assign-shop' && typeof command.shopId === 'string') {
+      assignedShops.add(command.shopId);
+    }
+    if (command.type === 'employee.provision-worker' && typeof command.shopId === 'string') {
+      provisionedWorkers.set(
+        command.shopId,
+        command.shopId === shopId
+          ? 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+          : 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      );
+    }
 
     if (command.type === 'payment.record' && command.financeAccountId !== accountId) {
       await route.fulfill({
@@ -158,7 +195,10 @@ async function mockWorkforce(page: Page, withAccount = true) {
           : {}),
         ...(command.type === 'employee.provision-worker'
           ? {
-              workerId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              workerId:
+                command.shopId === shopId
+                  ? 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+                  : 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
               shopId: command.shopId,
             }
           : {}),
@@ -792,23 +832,7 @@ test('S2 onboarding reviews authorized shops before creating and assigning emplo
     }
     const command = request.postDataJSON() as Record<string, unknown>;
     commands.push(command);
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ok: true,
-        replayed: false,
-        ...(command.type === 'employee.create'
-          ? { employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }
-          : {}),
-        ...(command.type === 'employee.provision-worker'
-          ? {
-              workerId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-              shopId: command.shopId,
-            }
-          : {}),
-      }),
-    });
+    await route.fallback();
   });
   await page.goto('/staff');
   await page.getByRole('button', { name: 'Add employee' }).click();
@@ -1167,22 +1191,6 @@ test('S2 interrupted onboarding survives reload without creating a duplicate emp
   let compensationAttempts = 0;
   await page.route('**/api/admin/staff**', async (route) => {
     if (route.request().method() === 'GET') {
-      const url = new URL(route.request().url());
-      if (url.searchParams.get('employeeId') === 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            employee: {
-              ...employee(),
-              id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-              displayName: 'Amira Resumable',
-              credentialVersion: 1,
-            },
-          }),
-        });
-        return;
-      }
       await route.fallback();
       return;
     }
@@ -1513,6 +1521,7 @@ test('S2 Add employee applies requested role and permission before reporting sav
   let profileVersion = 2;
   let role = 'STAFF';
   let denied = false;
+  let workerLinked = false;
   const newId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   await page.route('**/api/admin/staff**', async (route) => {
     const request = route.request();
@@ -1528,6 +1537,18 @@ test('S2 Add employee applies requested role and permission before reporting sav
             displayName: 'Ready Access',
             role,
             profileVersion,
+            operationsIdentities: workerLinked
+              ? [
+                  {
+                    kind: 'LINKED',
+                    shopId,
+                    workerId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+                    workerName: 'Ready Access',
+                    workerActive: true,
+                    credentialVersion: 1,
+                  },
+                ]
+              : [{ kind: 'SETUP_REQUIRED', shopId }],
             customDeniedPermissions: denied ? ['orders.view'] : [],
           },
         }),
@@ -1540,6 +1561,7 @@ test('S2 Add employee applies requested role and permission before reporting sav
     }
     const command = request.postDataJSON() as Record<string, unknown>;
     commands.push(command);
+    if (command.type === 'employee.provision-worker') workerLinked = true;
     if (command.type === 'employee.role') {
       expect(command.expectedVersion).toBe(2);
       role = 'MANAGER';
@@ -1599,13 +1621,42 @@ test('S2 Add employee holds access-pending approval open without granting unveri
   await page.setViewportSize({ width: 390, height: 844 });
   await mockWorkforce(page);
   const commands: string[] = [];
+  let workerLinked = false;
   await page.route('**/api/admin/staff**', async (route) => {
-    if (route.request().method() !== 'POST') {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === 'GET' && url.searchParams.has('employeeId')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          employee: {
+            ...employee(),
+            id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            operationsIdentities: workerLinked
+              ? [
+                  {
+                    kind: 'LINKED',
+                    shopId,
+                    workerId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+                    workerName: 'Pending Role',
+                    workerActive: true,
+                    credentialVersion: 1,
+                  },
+                ]
+              : [{ kind: 'SETUP_REQUIRED', shopId }],
+          },
+        }),
+      });
+      return;
+    }
+    if (request.method() !== 'POST') {
       await route.fallback();
       return;
     }
-    const draft = route.request().postDataJSON() as { type: string; shopId: string };
+    const draft = request.postDataJSON() as { type: string; shopId: string };
     commands.push(draft.type);
+    if (draft.type === 'employee.provision-worker') workerLinked = true;
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -1664,4 +1715,45 @@ test('S2 initial shift is included in Add employee before Operations-ready save'
     endsAt: '2026-10-29T14:00:00.000Z',
     plannedBreakMinutes: 30,
   });
+});
+
+test('S2 Add employee must not close when provision succeeded but Operations link is still missing', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  await page.route('**/api/admin/staff**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (
+      request.method() !== 'GET' ||
+      url.searchParams.get('employeeId') !== 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    ) {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        employee: {
+          ...employee(),
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          operationsIdentities: [{ kind: 'SETUP_REQUIRED', shopId }],
+        },
+      }),
+    });
+  });
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Unlinked New Staff');
+  await advanceStaffOnboardingToReview(page);
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole('alert')).toContainText('Operations access is not confirmed');
+  expect(commands.filter((command) => command.type === 'employee.create')).toHaveLength(1);
+  expect(commands.filter((command) => command.type === 'employee.provision-worker')).toHaveLength(
+    1,
+  );
 });
