@@ -290,9 +290,32 @@ export function StaffPage() {
         }
         setEmployeePinApplied(true);
       }
-      const provisioned = new Set(provisionedShopIds);
+      // The provisioning RPC receipt is not proof that Operations can load a
+      // linked, active worker. Read the authoritative employee/shop identities
+      // before and after provisioning, including across retries and shop switches.
+      const readOperationsDetail = async (): Promise<EmployeeDetail> => {
+        const result = await adminFetch<{ employee: EmployeeDetail }>(
+          `/api/admin/staff?shopId=${encodeURIComponent(shopId)}&employeeId=${encodeURIComponent(employeeId)}`,
+          { cache: 'no-store' },
+        );
+        return result.employee;
+      };
+      const beforeProvision = await readOperationsDetail();
+      const expectedWorkers = new Map<string, string>();
       for (const assignedShopId of onboardingShopIds) {
-        if (provisioned.has(assignedShopId)) continue;
+        const assigned = beforeProvision.assignments.some(
+          (assignment) => assignment.shopId === assignedShopId && assignment.assigned,
+        );
+        if (!assigned) {
+          throw new Error('Operations access is not confirmed: shop assignment is missing.');
+        }
+        const linked = beforeProvision.operationsIdentities.find(
+          (identity) => identity.shopId === assignedShopId,
+        );
+        if (linked?.kind === 'LINKED' && linked.workerActive) {
+          expectedWorkers.set(assignedShopId, linked.workerId);
+          continue;
+        }
         const result = await staff.command.mutateAsync({
           type: 'employee.provision-worker',
           employeeId,
@@ -308,9 +331,29 @@ export function StaffPage() {
             'Operations worker identity not confirmed for every assigned shop. Retry setup.',
           );
         }
-        provisioned.add(assignedShopId);
-        setProvisionedShopIds([...provisioned]);
+        expectedWorkers.set(assignedShopId, result.workerId);
       }
+      const confirmedDetail = await readOperationsDetail();
+      const allOperationsReady = onboardingShopIds.every((assignedShopId) => {
+        const assigned = confirmedDetail.assignments.some(
+          (assignment) => assignment.shopId === assignedShopId && assignment.assigned,
+        );
+        const linked = confirmedDetail.operationsIdentities.find(
+          (identity) => identity.shopId === assignedShopId,
+        );
+        return (
+          assigned &&
+          linked?.kind === 'LINKED' &&
+          linked.workerActive &&
+          linked.workerId === expectedWorkers.get(assignedShopId)
+        );
+      });
+      if (!allOperationsReady) {
+        throw new Error(
+          'Operations access is not confirmed for every assigned shop. Employee setup remains incomplete; verify worker links and retry.',
+        );
+      }
+      setProvisionedShopIds([...onboardingShopIds]);
       // Verify every requested elevated access change against the server's authoritative
       // employee version. Pending second-person approvals must not complete the creation flow.
       const overrides = Object.entries(newEmployeePermissionOverrides).filter(
