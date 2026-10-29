@@ -58,6 +58,7 @@ describe('R1 selected report evidence presentation', () => {
     );
     expect(html).toContain('Sales');
     expect(html).toContain('Source activity');
+    expect(html).toContain('tux-report-source-card');
     expect(html).toContain('Recorded amount');
     expect(html).not.toContain('Employee sales leaderboard');
   });
