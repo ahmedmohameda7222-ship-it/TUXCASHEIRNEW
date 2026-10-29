@@ -459,7 +459,22 @@ export async function handleReportsRequest(
         sendJson(response, 400, { error: 'report_shop_scope_invalid' });
         return;
       }
-      const exported = await collectAuthorizedReportExport(input, principal, async (args) => {
+      const exportInput = {
+        kind: input.kind,
+        area: input.area,
+        shopIds: input.shopIds,
+        fromDate: input.fromDate,
+        toDate: input.toDate,
+        source: input.source,
+        comparePrevious: input.comparePrevious,
+        ...(input.comparisonRange ? { comparisonRange: input.comparisonRange } : {}),
+        context: Object.fromEntries(
+          Object.entries(input.context).filter(
+            (entry): entry is [string, string] => typeof entry[1] === 'string',
+          ),
+        ),
+      };
+      const exported = await collectAuthorizedReportExport(exportInput, principal, async (args) => {
         const result = await client.rpc<Record<string, unknown>>('admin_finance_report_query_v2', {
           p_actor_employee_id: principal.employeeId,
           p_shop_ids: args.shopIds,
