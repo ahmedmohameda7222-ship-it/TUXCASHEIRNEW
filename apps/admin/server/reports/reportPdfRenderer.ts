@@ -1,4 +1,5 @@
 import { REPORT_LABELS } from '../../src/reports/reportLabels.js';
+import { renderUnicodeAuthorizedReportPdf } from './reportPdfUnicodeRenderer.js';
 import type { AuthorizedExport, ExportFact, ExportSummary } from './reportPdfExport.js';
 
 type PdfOptions = {
@@ -237,4 +238,21 @@ export function renderAuthorizedReportPdf(
   const result = Buffer.concat(chunks);
   if (result.byteLength > MAX_PDF_BYTES) throw new Error('report_export_too_large');
   return result;
+}
+
+/** Preserve the fast compatible ASCII PDF; fall back to embedded Arabic fonts
+ * for authorized source text and shop names that the core font cannot encode.
+ */
+export async function renderAuthorizedReportPdfDocument(
+  exportData: AuthorizedExport,
+  options: PdfOptions & { kind: 'current' | 'all-authorized' },
+): Promise<Buffer> {
+  try {
+    return renderAuthorizedReportPdf(exportData, options);
+  } catch (cause) {
+    if (!(cause instanceof Error) || cause.message !== 'report_export_font_unsupported') {
+      throw cause;
+    }
+    return renderUnicodeAuthorizedReportPdf(exportData, options);
+  }
 }
