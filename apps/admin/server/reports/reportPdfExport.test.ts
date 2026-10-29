@@ -84,6 +84,29 @@ describe('R3 canonical full-record export collector', () => {
     expect(result.sections).toHaveLength(2);
   });
 
+  it('retains server-calculated comparison summary for the prior equivalent window', async () => {
+    const calls: Array<{ fromDate: string; toDate: string; pageSize: number }> = [];
+    const result = await collectAuthorizedReportExport(
+      { ...request, fromDate: '2026-10-21', toDate: '2026-10-27', comparePrevious: true, comparisonRange: 'previous' },
+      principal,
+      async (args) => {
+        calls.push({ fromDate: args.fromDate, toDate: args.toDate, pageSize: args.pageSize });
+        const comparison = args.pageSize === 1;
+        return {
+          ok: true,
+          summary: { eventCount: comparison ? 1 : 0, orderCount: 0, totalAmountMinor: comparison ? -500 : 0, totalQuantity: 0, incompleteCostEvents: 0, coverageNote: null },
+          rows: [],
+          nextOffset: null,
+        };
+      },
+    );
+    expect(calls).toEqual([
+      { fromDate: '2026-10-21', toDate: '2026-10-27', pageSize: 100 },
+      { fromDate: '2026-10-14', toDate: '2026-10-20', pageSize: 1 },
+    ]);
+    expect(result.sections[0]?.comparison?.summary.totalAmountMinor).toBe(-500);
+  });
+
   it('rejects requests for an unauthorized shop before making any backend query', async () => {
     let queried = false;
     await expect(
