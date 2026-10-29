@@ -95,7 +95,6 @@ async function expectReloadRemainsUnactivated(
   await readModel.close();
 }
 
-
 describe('browser server-authorized PIN flow without manual configuration installation', () => {
   it('opens an authorized local session without a configuration snapshot', async () => {
     const { database, databasePath } = await fixture();

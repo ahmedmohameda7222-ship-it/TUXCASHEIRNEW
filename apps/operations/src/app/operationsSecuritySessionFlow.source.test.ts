@@ -14,22 +14,24 @@ function functionBody(name: string, nextName: string): string {
 }
 
 describe('Operations browser security session flow', () => {
-  it('keeps first-use server authentication before any local worker session and never gates on configuration', () => {
+  it('requires remote PIN before opening an unconfigured browser session', () => {
     const bootstrap = functionBody('bootstrapWithPin', 'submitPin');
     const remotePin = bootstrap.indexOf('remoteGateway.bootstrap(pin, shopId)');
     const persistBoth = bootstrap.indexOf(
       'selectBrowserShop(database, readModel, bootstrap.shop, bootstrap.worker)',
     );
     const localPin = bootstrap.indexOf('session.submitPin(pin)');
-    const backgroundSync = bootstrap.indexOf('void configurationService.sync(signedIn.value.shopId)');
+    const backgroundSync = bootstrap.indexOf('startRemoteRuntime(signedIn.value.shopId)');
 
     expect(remotePin).toBeGreaterThanOrEqual(0);
     expect(persistBoth).toBeGreaterThan(remotePin);
     expect(localPin).toBeGreaterThan(persistBoth);
     expect(backgroundSync).toBeGreaterThan(localPin);
     expect(bootstrap).not.toContain('Could not install the Operations configuration');
+    expect(bootstrap).not.toContain('configurationService.sync');
     expect(sessionClientSource).toContain('requireActivatedConfiguration: false');
     expect(sessionClientSource).toContain('tux:operations-menu-ready');
+    expect(sessionClientSource).toContain('void refreshShopMenu(shopId)');
     expect(shopScopeSource).toContain('worker.shopId !== shop.id');
     expect(shopScopeSource).toContain('transaction.shops.put(shop)');
     expect(shopScopeSource).toContain('transaction.workers.put(worker)');

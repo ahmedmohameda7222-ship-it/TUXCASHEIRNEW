@@ -366,6 +366,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           window.addEventListener('online', refreshSessionLease);
           document.addEventListener('visibilitychange', refreshVisibleSessionLease);
           activeSyncShopId = shopId;
+          void refreshShopMenu(shopId);
         }
         if (!preferenceRetryStarted) {
           preferencesRetry.start();
@@ -401,7 +402,6 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       try {
         const remoteSession = await remoteGateway.currentSession();
         if (remoteSession !== null) {
-          await configurationService.sync(remoteSession.shopId);
           recoveredShopId = remoteSession.shopId;
         }
       } catch {
@@ -678,9 +678,6 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           // background sync is permitted to run under this shop.
           if (signedIn.ok && signedIn.value.status === 'ACTIVE') {
             startRemoteRuntime(signedIn.value.shopId);
-            // Load menu, inventory and shop settings after verified sign-in.
-            // Failure must not bounce an authenticated worker into setup.
-            void refreshShopMenu(signedIn.value.shopId);
           }
           return signedIn;
         } catch (cause) {

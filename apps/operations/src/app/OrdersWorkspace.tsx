@@ -1593,7 +1593,11 @@ export function OrdersWorkspace({
       <main className="orders-unavailable">
         <h1>Orders unavailable</h1>
         <p>{globalError ?? 'The Orders workspace is not ready.'}</p>
-        <button type="button" className="primary-action" onClick={() => setMenuRefreshGeneration((value) => value + 1)}>
+        <button
+          type="button"
+          className="primary-action"
+          onClick={() => setMenuRefreshGeneration((value) => value + 1)}
+        >
           Retry menu
         </button>
       </main>
