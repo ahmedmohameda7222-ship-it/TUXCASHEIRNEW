@@ -1497,7 +1497,7 @@ test('S2 employee Save waits for an applied PIN and retries without duplicating 
   await sheet.getByLabel('Name').fill('PIN Application Retry');
   await advanceStaffOnboardingToReview(page);
   await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
-  await expect(sheet.getByRole('alert')).toContainText('Operations access is not ready');
+  await expect(sheet.getByRole('alert')).toContainText('pin application unconfirmed');
   await expect(sheet).toBeVisible();
   expect(commands.filter((command) => command.type === 'employee.create')).toHaveLength(1);
   await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
