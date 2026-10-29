@@ -788,3 +788,38 @@
     left: 0;
   }
 }
+
+/* Approved Report-First header actions use the shared PageScaffold action slot. */
+.tux-reports-header-actions,
+.tux-reports-report-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.tux-reports-header-actions > button,
+.tux-reports-report-actions > button {
+  min-height: 40px;
+  font-size: 0.79rem;
+}
+.tux-reports-report-actions .tux-report-export-actions {
+  margin-top: 0;
+}
+@media (max-width: 639px) {
+  .tux-reports-header-actions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tux-reports-header-actions > button {
+    width: 100%;
+    min-height: 44px;
+  }
+  .tux-reports-report-actions {
+    width: 100%;
+  }
+  .tux-reports-report-actions .tux-report-export-actions {
+    width: 100%;
+  }
+}
