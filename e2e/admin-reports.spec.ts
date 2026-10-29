@@ -120,6 +120,22 @@ async function mockReports(page: Page) {
   return { queries, commands };
 }
 
+test('R1 approved actions sit in the report header and beside the selected report on phone', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockReports(page);
+  await page.goto('/reports');
+  await expect(
+    page.locator('.admin-page__primary-action').getByRole('button', {
+      name: 'Save this report view',
+    }),
+  ).toBeVisible();
+  await expect(
+    page.locator('.tux-report-view__intro').getByRole('button', { name: 'Set target' }),
+  ).toBeVisible();
+});
+
 test('reports preserve source filtering and period comparison on server-side requests', async ({
   page,
 }) => {
