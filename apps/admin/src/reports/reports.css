@@ -896,3 +896,13 @@
     padding: 0.85rem;
   }
 }
+
+/* Reports-only action shape: consistent rounded corners on mobile and desktop. */
+.tux-reports-header-actions > button,
+.tux-reports-report-actions > button,
+.tux-reports-report-actions .tux-report-export-actions > button,
+.tux-report-selector .tux-report-reset,
+.tux-report-selector .tux-report-context > summary,
+.tux-report-source-card .tux-report-pagination > button {
+  border-radius: 12px;
+}
