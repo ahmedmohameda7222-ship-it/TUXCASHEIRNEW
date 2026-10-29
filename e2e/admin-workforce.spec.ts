@@ -335,7 +335,7 @@ test('S1 selected desktop employee keeps directory and inspector adjacent at 144
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
-test('staff profile exposes Operations setup and posts payment only to a trusted account', async ({
+test('staff profile requires only an employee PIN and posts payment to a trusted account', async ({
   page,
 }) => {
   const commands = await mockWorkforce(page);
@@ -348,13 +348,10 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
   await expect(page.locator('#staff-operations-access')).toBeVisible();
   await expect(page.locator('#staff-permission-policy')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Permissions' })).toBeVisible();
-  await expect(page.getByText('Operations setup required', { exact: true })).toBeVisible();
-  const setup = page.locator('.admin-staff-readiness-state').first();
-  await expect(setup).toBeVisible();
-  expect(await setup.evaluate((node) => getComputedStyle(node).display)).toBe('grid');
-  expect(await setup.evaluate((node) => parseFloat(getComputedStyle(node).rowGap))).toBeGreaterThan(
-    0,
-  );
+  await expect(page.getByText('Operations setup required', { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/Staff can sign in from any browser/)).toBeVisible();
+  await expect(page.getByText(/Employee PIN not set/)).toBeVisible();
+  await expect(page.locator('.admin-staff-readiness-state')).toHaveCount(0);
 
   await page.getByRole('tab', { name: 'Pay / Compensation' }).click();
   await expect(page.getByLabel('Payment account')).toHaveValue(accountId);
@@ -829,7 +826,7 @@ test('S2 onboarding reviews authorized shops before creating and assigning emplo
   await expect(sheet.getByText('Review employee setup')).toBeVisible();
   expect(commands).toHaveLength(0);
   await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
-  await expect.poll(() => commands.length).toBe(5);
+  await expect.poll(() => commands.length).toBe(3);
   expect(commands[0]).toMatchObject({
     type: 'employee.create',
     shopId,
@@ -840,12 +837,14 @@ test('S2 onboarding reviews authorized shops before creating and assigning emplo
     employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     shopId: otherShopId,
   });
-  expect(commands.slice(2).map((command) => command.type)).toEqual([
-    'employee.pin',
-    'employee.provision-worker',
-    'employee.provision-worker',
-  ]);
-  expect(commands.slice(3).map((command) => command.shopId)).toEqual([shopId, otherShopId]);
+  expect(commands[2]).toMatchObject({
+    type: 'employee.pin',
+    employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    shopId,
+    newPin: '246810',
+    requesterPin: '1234',
+  });
+  expect(commands.some((command) => command.type === 'employee.provision-worker')).toBe(false);
   await expect(sheet).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
@@ -1325,7 +1324,7 @@ test('S4 role change pending approval is shown as not applied', async ({ page })
   await expect(page.getByRole('article', { name: 'Employee Mona Ali' })).toContainText('Staff');
 });
 
-test('S2 new employee saves worker PIN and provisions Operations before closing Add employee', async ({
+test('S2 new employee saves the PIN without provisioning an Operations worker', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -1343,19 +1342,12 @@ test('S2 new employee saves worker PIN and provisions Operations before closing 
   await expect(sheet).toContainText('Operations access will be ready');
   await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
   await expect(sheet).toHaveCount(0);
-  expect(commands.map((item) => item.type)).toEqual([
-    'employee.create',
-    'employee.pin',
-    'employee.provision-worker',
-  ]);
+  expect(commands.map((item) => item.type)).toEqual(['employee.create', 'employee.pin']);
   expect(commands[1]).toMatchObject({
     employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    shopId,
     newPin: '246810',
     requesterPin: '1234',
-  });
-  expect(commands[2]).toMatchObject({
-    employeeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-    shopId,
   });
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
@@ -1473,35 +1465,45 @@ test('S2 shop manager cannot promise immediate Operations readiness without prov
   expect(commands).toHaveLength(0);
 });
 
-test('S2 employee Save does not claim Operations ready without a confirmed provisioned worker id', async ({
+test('S2 employee Save waits for an applied PIN and retries without duplicating the employee', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const commands = await mockWorkforce(page);
+  let pinAttempts = 0;
   await page.route('**/api/admin/staff**', async (route) => {
     const command =
       route.request().method() === 'POST'
         ? (route.request().postDataJSON() as { type?: string })
         : null;
-    if (command?.type !== 'employee.provision-worker') {
+    if (command?.type !== 'employee.pin') {
+      await route.fallback();
+      return;
+    }
+    pinAttempts += 1;
+    if (pinAttempts > 1) {
       await route.fallback();
       return;
     }
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ ok: true, replayed: false }),
+      body: JSON.stringify({ ok: false, code: 'pin_application_unconfirmed' }),
     });
   });
   await page.goto('/staff');
   await page.getByRole('button', { name: 'Add employee' }).click();
   const sheet = page.getByRole('dialog', { name: 'Add employee' });
-  await sheet.getByLabel('Name').fill('Unconfirmed Worker');
+  await sheet.getByLabel('Name').fill('PIN Application Retry');
   await advanceStaffOnboardingToReview(page);
   await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
-  await expect(sheet.getByRole('alert')).toContainText('worker identity not confirmed');
+  await expect(sheet.getByRole('alert')).toContainText('Operations access is not ready');
   await expect(sheet).toBeVisible();
   expect(commands.filter((command) => command.type === 'employee.create')).toHaveLength(1);
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect(sheet).toHaveCount(0);
+  expect(pinAttempts).toBe(2);
+  expect(commands.map((command) => command.type)).toEqual(['employee.create', 'employee.pin']);
 });
 
 test('S2 Add employee applies requested role and permission before reporting save complete', async ({
@@ -1582,7 +1584,6 @@ test('S2 Add employee applies requested role and permission before reporting sav
   expect(commands.map((command) => command.type)).toEqual([
     'employee.create',
     'employee.pin',
-    'employee.provision-worker',
     'employee.role',
     'employee.permission',
   ]);
@@ -1656,10 +1657,9 @@ test('S2 initial shift is included in Add employee before Operations-ready save'
   expect(commands.map((command) => command.type)).toEqual([
     'employee.create',
     'employee.pin',
-    'employee.provision-worker',
     'shift.create',
   ]);
-  expect(commands[3]).toMatchObject({
+  expect(commands[2]).toMatchObject({
     startsAt: '2026-10-29T06:00:00.000Z',
     endsAt: '2026-10-29T14:00:00.000Z',
     plannedBreakMinutes: 30,
