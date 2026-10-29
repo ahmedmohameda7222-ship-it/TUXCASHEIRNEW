@@ -49,6 +49,7 @@ export function ReportExportActions({
           source: kind === 'current' ? filters.source : null,
           context: kind === 'current' ? filters.context ?? {} : {},
           comparePrevious: kind === 'current' && filters.comparePrevious,
+          comparisonRange: filters.comparisonRange ?? 'previous',
         }),
       });
       if (!response.ok) {
@@ -102,7 +103,6 @@ export function ReportExportActions({
         </button>
       ) : null}
       {error ? <p role="alert" className="admin-inline-error">{error}</p> : null}
-      {filters.comparePrevious ? <small>Comparison export is not yet supported by the server.</small> : null}
     </div>
   );
 }
