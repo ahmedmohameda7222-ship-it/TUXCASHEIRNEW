@@ -31,7 +31,7 @@ export function SavedViews({
   canSetTargets: boolean;
   pending: boolean;
   error: unknown;
-  onCommand(draft: ReportConfigDraft): void;
+  onCommand(draft: ReportConfigDraft): Promise<void>;
   onApply(view: SavedReportViewRow): void;
 }) {
   const [showSave, setShowSave] = useState(false);
@@ -43,12 +43,14 @@ export function SavedViews({
   const [targetEnd, setTargetEnd] = useState(filters.toDate);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  function saveView() {
+  async function saveView() {
     if (!name.trim()) {
       setLocalError('Enter a view name.');
       return;
     }
-    onCommand({
+    setLocalError(null);
+    try {
+      await onCommand({
       type: 'report.view.save',
       shopId,
       id: null,
@@ -66,12 +68,15 @@ export function SavedViews({
         context: filters.context ?? {},
       },
       layout: {},
-    });
-    setShowSave(false);
-    setName('');
-    setLocalError(null);
+      });
+      setShowSave(false);
+      setName('');
+      setLocalError(null);
+    } catch {
+      setLocalError('Unable to save report view. Your report has not been saved. Retry.');
+    }
   }
-  function saveTarget() {
+  async function saveTarget() {
     try {
       if (!validReportTargetPeriod(targetStart, targetEnd)) {
         throw new Error('Select a valid target From/To period in ascending order.');
@@ -96,7 +101,7 @@ export function SavedViews({
         targetStart,
         targetEnd,
       );
-      onCommand({
+      await onCommand({
         type: 'report.target.set',
         shopId,
         metric: targetMetric,
@@ -108,7 +113,7 @@ export function SavedViews({
       setShowTarget(false);
       setLocalError(null);
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : 'Invalid target amount');
+      setLocalError(err instanceof Error ? err.message : 'Unable to save target. Retry.');
     }
   }
 
@@ -153,13 +158,13 @@ export function SavedViews({
                 type="button"
                 disabled={pending}
                 aria-label={`Delete view ${view.name}`}
-                onClick={() =>
-                  onCommand({
+                onClick={() => {
+                  void onCommand({
                     type: 'report.view.delete',
                     shopId,
                     id: view.id,
                     expectedVersion: view.version,
-                  })
+                  }).catch(() => undefined);
                 }
               >
                 Delete
@@ -208,7 +213,7 @@ export function SavedViews({
               className="admin-primary-button"
               type="button"
               disabled={pending}
-              onClick={saveView}
+              onClick={() => void saveView()}
             >
               Save view
             </button>
@@ -239,7 +244,7 @@ export function SavedViews({
               className="admin-primary-button"
               type="button"
               disabled={pending}
-              onClick={saveTarget}
+              onClick={() => void saveTarget()}
             >
               Save target
             </button>
