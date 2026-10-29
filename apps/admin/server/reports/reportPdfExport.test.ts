@@ -170,6 +170,43 @@ describe('R3 canonical full-record export collector', () => {
     expect(queried).toBe(false);
   });
 
+  it('rejects cross-shop rows returned by a broken RPC before serializing PDF', async () => {
+    await expect(
+      collectAuthorizedReportExport(request, principal, async () => ({
+        ok: true,
+        summary: {
+          eventCount: 1, orderCount: 1, totalAmountMinor: 500,
+          totalQuantity: 1, incompleteCostEvents: 0, coverageNote: null,
+        },
+        rows: [{
+          id: 'leaked', shopId: '44444444-4444-4444-8444-444444444444',
+          occurredAt: '2026-10-29T09:00:00.000Z', label: 'Secret from other shop',
+          amountMinor: 500, quantity: 1, sourceKind: 'payment', costMissing: false,
+        }],
+        nextOffset: null,
+      })),
+    ).rejects.toThrow('report_export_scope_mismatch');
+  });
+
+  it('fails rather than exporting two pages from inconsistent changing summaries', async () => {
+    await expect(
+      collectAuthorizedReportExport(request, principal, async (args) => ({
+        ok: true,
+        summary: {
+          eventCount: args.offset === 0 ? 101 : 102,
+          orderCount: 1, totalAmountMinor: 500,
+          totalQuantity: 101, incompleteCostEvents: 0, coverageNote: null,
+        },
+        rows: Array.from({ length: args.offset === 0 ? 100 : 1 }, (_, index) => ({
+          id: 'event-' + (args.offset + index), shopId: shop,
+          occurredAt: '2026-10-29T09:00:00.000Z', label: 'Payment',
+          amountMinor: 500, quantity: 1, sourceKind: 'payment', costMissing: false,
+        })),
+        nextOffset: args.offset === 0 ? 100 : null,
+      })),
+    ).rejects.toThrow('report_export_snapshot_changed');
+  });
+
   it('refuses oversized exports rather than returning a partial PDF as complete', async () => {
     await expect(
       collectAuthorizedReportExport(request, principal, async () => ({
