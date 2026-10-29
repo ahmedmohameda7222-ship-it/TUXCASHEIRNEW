@@ -103,6 +103,10 @@ export function ReportView({
         </p>
       ) : null}
       {summary.coverageNote ? <p className="tux-report-caveat">{summary.coverageNote}</p> : null}
+      <header className="tux-report-results__heading">
+        <h3>Source activity</h3>
+        <small>{summary.eventCount.toLocaleString('en-EG')} matching records</small>
+      </header>
       {data.rows.length === 0 ? (
         <EmptyState
           title="No report events"
@@ -110,10 +114,6 @@ export function ReportView({
         />
       ) : (
         <div className="tux-report-results">
-          <header className="tux-report-results__heading">
-            <h3>Source activity</h3>
-            <small>{summary.eventCount.toLocaleString('en-EG')} matching records</small>
-          </header>
           <ul className="tux-report-mobile-entries" aria-label="Report entries">
             {data.rows.map((fact) => {
               const href = reportDrilldownHref(fact.drilldown);
