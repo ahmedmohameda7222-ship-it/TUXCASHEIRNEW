@@ -102,37 +102,25 @@ describe('Plan 7 report domain permissions', () => {
     );
   });
 
-  it('rejects restricted customer and employee filters nested in a saved view payload', () => {
-    expect(() =>
-      requireReportContextPermissions(
-        staff,
-        { context: { customerId: 'secret-customer' } },
-        shopId,
-      ),
-    ).toThrow(AdminAuthorizationError);
-    expect(() =>
-      requireReportContextPermissions(
-        staff,
-        { context: { employeeId: 'secret-employee' } },
-        shopId,
-      ),
-    ).toThrow(AdminAuthorizationError);
+  it('rejects restricted filters nested in a saved report view', () => {
+    const customer = { context: { customerId: 'secret' } };
+    const employee = { context: { employeeId: 'secret' } };
+    expect(() => requireReportContextPermissions(staff, customer, shopId)).toThrow(
+      AdminAuthorizationError,
+    );
+    expect(() => requireReportContextPermissions(staff, employee, shopId)).toThrow(
+      AdminAuthorizationError,
+    );
   });
 
-  it('does not expose saved views with inaccessible report domains or filter scopes', () => {
-    const safe = {
-      id: 'safe',
-      shopId,
-      reportArea: 'sales',
-      filters: { shopIds: [shopId], context: {} },
-    };
-    const views = [
-      safe,
-      { ...safe, id: 'customer', filters: { context: { customerId: 'private' } } },
-      { ...safe, id: 'finance', reportArea: 'profit' },
-      { ...safe, id: 'foreign', shopId: 'other-shop' },
-      { ...safe, id: 'foreign-filter', filters: { shopIds: ['other-shop'] } },
-    ];
-    expect(filterAuthorizedReportSavedViews(staff, views, shopId)).toEqual([safe]);
+  it('hides saved views with foreign shops or restricted data', () => {
+    const safe = { reportArea: 'sales', shopId, filters: {} };
+    const foreign = { ...safe, shopId: 'other-shop' };
+    const finance = { ...safe, reportArea: 'profit' };
+    const customer = { ...safe, filters: { context: { customerId: 'secret' } } };
+    const foreignFilter = { ...safe, filters: { shopIds: ['other-shop'] } };
+    const views = [safe, foreign, finance, customer, foreignFilter];
+    const visible = filterAuthorizedReportSavedViews(staff, views, shopId);
+    expect(visible).toEqual([safe]);
   });
 });
