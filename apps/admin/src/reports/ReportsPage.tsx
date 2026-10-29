@@ -2,12 +2,14 @@ import type { AdminReportArea } from '@tux/admin-contracts';
 import { useEffect, useRef, useState } from 'react';
 
 import { ErrorState, LoadingState } from '../components/feedback/AdminStates';
+import { useAdminSession } from '../auth/useAdminSession';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { TargetsPanel } from '../dashboard/TargetsPanel';
 import { OwnerSummaryCard } from '../dashboard/OwnerSummaryCard';
 import { useShopScope } from '../shops/ShopScopeProvider';
 
 import { REPORT_LABELS, ReportFilters } from './ReportFilters';
+import { ReportExportActions } from './ReportExportActions';
 import { cairoReportToday, reportDatePreset, validReportDateRange } from './reportDateRange';
 import { scopeReportFilters } from './reportScope';
 import { ReportView } from './ReportView';
@@ -20,6 +22,7 @@ import {
 import './reports.css';
 
 export function ReportsPage() {
+  const session = useAdminSession();
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : principal.shopIds[0];
   const [filters, setFilters] = useState<ReportFilterState>(() => ({
@@ -122,6 +125,11 @@ export function ReportsPage() {
           Select a valid From/To date range in ascending order, no longer than 730 days.
         </p>
       ) : null}
+      <ReportExportActions
+        filters={scopedFilters}
+        shopId={shopId}
+        csrfToken={session.state.status === 'authenticated' ? session.state.session.csrfToken : null}
+      />
       <ReportView
         data={reports.reportQuery.data}
         filters={scopedFilters}
