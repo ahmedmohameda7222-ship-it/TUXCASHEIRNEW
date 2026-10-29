@@ -172,6 +172,28 @@ jobs:
             npm run test:admin-deployment
           fi
 
+  operations-sign-in-browser:
+    name: Operations branch and PIN browser acceptance
+    needs: changes
+    if: needs.changes.outputs.operations == 'true' && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      TUX_OPERATIONS_BRANCH_E2E: '1'
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Verify branch PIN login without local menu setup
+        run: npx playwright test e2e/operations-branch-login.e2e.ts --project=mobile-browser-fallback
+
   security:
     name: Relevant security contracts
     needs: changes
@@ -276,7 +298,7 @@ jobs:
   required-quality-gate:
     name: Required quality gate
     if: always()
-    needs: [changes, style, unit, types, security, migrations, edge]
+    needs: [changes, style, unit, types, security, migrations, edge, operations-sign-in-browser]
     runs-on: ubuntu-latest
     timeout-minutes: 3
     env:
@@ -287,11 +309,12 @@ jobs:
       SECURITY: ${{ needs.security.result }}
       MIGRATIONS: ${{ needs.migrations.result }}
       EDGE: ${{ needs.edge.result }}
+      OPERATIONS_BROWSER: ${{ needs.operations-sign-in-browser.result }}
     steps:
       - name: Reject failures but accept intentionally skipped checks
         shell: bash
         run: |
           test "$DETECT" = success
-          for outcome in "$STYLE" "$UNIT" "$TYPES" "$SECURITY" "$MIGRATIONS" "$EDGE"; do
+          for outcome in "$STYLE" "$UNIT" "$TYPES" "$SECURITY" "$MIGRATIONS" "$EDGE" "$OPERATIONS_BROWSER"; do
             [[ "$outcome" == success || "$outcome" == skipped ]] || exit 1
           done
