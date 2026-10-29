@@ -83,15 +83,15 @@ export function ReportView({
       <header className="tux-report-view__intro">
         <div className="tux-report-view__title">
           <h2>{REPORT_LABELS[data.area]}</h2>
-        <p>
-          {filters.fromDate} – {filters.toDate} · {filters.shopIds.length}{' '}
-          {filters.shopIds.length === 1 ? 'shop' : 'shops'} ·{' '}
-          {filters.source === 'POS'
-            ? 'POS only'
-            : filters.source === 'ONLINE'
-              ? 'Online only'
-              : 'All sources'}
-        </p>
+          <p>
+            {filters.fromDate} – {filters.toDate} · {filters.shopIds.length}{' '}
+            {filters.shopIds.length === 1 ? 'shop' : 'shops'} ·{' '}
+            {filters.source === 'POS'
+              ? 'POS only'
+              : filters.source === 'ONLINE'
+                ? 'Online only'
+                : 'All sources'}
+          </p>
         </div>
         {exportActions}
       </header>
@@ -176,7 +176,9 @@ export function ReportView({
                   <small>
                     {new Date(fact.occurredAt).toLocaleDateString('en-EG', {
                       timeZone: 'Africa/Cairo',
-                    })} · {fact.sourceKind.replaceAll('-', ' ')} · {shopNames[fact.shopId] ?? fact.shopId}
+                    })}{' '}
+                    · {fact.sourceKind.replaceAll('-', ' ')} ·{' '}
+                    {shopNames[fact.shopId] ?? fact.shopId}
                   </small>
                 </li>
               );

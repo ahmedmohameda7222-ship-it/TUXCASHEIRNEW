@@ -486,7 +486,9 @@
   font-size: clamp(0.93rem, 1.35vw, 1.5rem);
   line-height: 1.25;
 }
-.tux-report-table { min-width: 680px; }
+.tux-report-table {
+  min-width: 680px;
+}
 .tux-report-table th,
 .tux-report-table td {
   padding: 0.7rem 0.85rem;

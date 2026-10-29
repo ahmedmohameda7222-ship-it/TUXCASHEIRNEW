@@ -130,7 +130,7 @@ export function ReportsPage() {
           (principal.shopSummaries ?? []).map((shop) => [shop.id, shop.name]),
         )}
         exportActions={
-    <ReportExportActions
+          <ReportExportActions
             filters={scopedFilters}
             shopId={shopId}
             csrfToken={

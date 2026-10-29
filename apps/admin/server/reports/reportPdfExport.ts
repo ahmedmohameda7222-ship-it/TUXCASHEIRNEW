@@ -181,23 +181,28 @@ export async function collectAuthorizedReportExport(
           throw new Error('report_export_too_large');
         }
       }
-      if (summary && (
-        result.summary.eventCount !== summary.eventCount ||
-        result.summary.totalAmountMinor !== summary.totalAmountMinor ||
-        result.summary.totalQuantity !== summary.totalQuantity ||
-        result.summary.incompleteCostEvents !== summary.incompleteCostEvents ||
-        result.summary.orderCount !== summary.orderCount ||
-        result.summary.coverageNote !== summary.coverageNote
-      )) {
+      if (
+        summary &&
+        (result.summary.eventCount !== summary.eventCount ||
+          result.summary.totalAmountMinor !== summary.totalAmountMinor ||
+          result.summary.totalQuantity !== summary.totalQuantity ||
+          result.summary.incompleteCostEvents !== summary.incompleteCostEvents ||
+          result.summary.orderCount !== summary.orderCount ||
+          result.summary.coverageNote !== summary.coverageNote)
+      ) {
         throw new Error('report_export_snapshot_changed');
       }
-      if (result.rows.some((row) =>
-        !row || !input.shopIds.includes(row.shopId) ||
-        typeof row.id !== 'string' ||
-        typeof row.label !== 'string' ||
-        typeof row.sourceKind !== 'string' ||
-        typeof row.occurredAt !== 'string'
-      )) {
+      if (
+        result.rows.some(
+          (row) =>
+            !row ||
+            !input.shopIds.includes(row.shopId) ||
+            typeof row.id !== 'string' ||
+            typeof row.label !== 'string' ||
+            typeof row.sourceKind !== 'string' ||
+            typeof row.occurredAt !== 'string',
+        )
+      ) {
         throw new Error('report_export_scope_mismatch');
       }
       if (
