@@ -88,7 +88,7 @@ async function mockReports(page: Page) {
           {
             id: '44444444-4444-4444-8444-444444444444',
             shopId,
-            occurredAt: '2026-10-08T09:00:00.000Z',
+            occurredAt: `${url.searchParams.get('to') ?? '2026-10-29'}T09:00:00.000Z`,
             sourceKind: 'payment',
             label: 'Cash payment',
             amountMinor: 12500,
@@ -264,6 +264,7 @@ test('phone report presentation', async ({ page }) => {
   await mockReports(page);
   await page.goto('/reports');
   await expect(page.getByRole('list', { name: 'Report entries' })).toBeVisible();
+  await expect(page.getByRole('img', { name: /events/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );

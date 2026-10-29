@@ -824,6 +824,26 @@
   }
 }
 
+/* On phone, the approved report actions occupy the full header width. */
+@media (max-width: 639px) {
+  .admin-page__header:has(.tux-reports-header-actions) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-page__primary-action:has(.tux-reports-header-actions) {
+    width: 100%;
+    min-width: 0;
+  }
+  .tux-reports-header-actions > button:first-child {
+    width: auto;
+    min-width: 150px;
+    justify-self: end;
+  }
+  .tux-reports-header-actions > button:last-child {
+    width: 100%;
+  }
+}
+
 /* One read-only source activity panel as approved in Reports (R1). */
 .tux-report-source-card {
   grid-column: 1 / -1;
