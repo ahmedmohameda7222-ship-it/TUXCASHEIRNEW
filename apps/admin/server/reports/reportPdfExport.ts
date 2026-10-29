@@ -111,6 +111,21 @@ export function cairoReportSourceDate(occurredAt: string): string {
   return get('year') + '-' + get('month') + '-' + get('day');
 }
 
+/** Reject corrupt RPC aggregates before they can enter a report document. */
+function validExportSummary(summary: ExportSummary): boolean {
+  return (
+    Number.isSafeInteger(summary.eventCount) &&
+    summary.eventCount >= 0 &&
+    Number.isSafeInteger(summary.orderCount) &&
+    summary.orderCount >= 0 &&
+    (summary.totalAmountMinor === null || Number.isSafeInteger(summary.totalAmountMinor)) &&
+    Number.isFinite(summary.totalQuantity) &&
+    Number.isSafeInteger(summary.incompleteCostEvents) &&
+    summary.incompleteCostEvents >= 0 &&
+    (summary.coverageNote === null || typeof summary.coverageNote === 'string')
+  );
+}
+
 export const REPORT_EXPORT_MAX_ROWS_PER_AREA = 1500;
 export const REPORT_EXPORT_MAX_TOTAL_ROWS = 5000;
 
@@ -185,6 +200,9 @@ export async function collectAuthorizedReportExport(
       });
       if (!result.ok || !result.summary || !Array.isArray(result.rows)) {
         throw new Error('report_export_query_failed');
+      }
+      if (!validExportSummary(result.summary)) {
+        throw new Error('report_export_summary_invalid');
       }
       if (!summary) {
         summary = result.summary;
@@ -289,6 +307,9 @@ export async function collectAuthorizedReportExport(
         offset: 0,
       });
       if (!result.ok || !result.summary) throw new Error('report_export_query_failed');
+      if (!validExportSummary(result.summary)) {
+        throw new Error('report_export_summary_invalid');
+      }
       comparison = {
         periodStart: previous.fromDate,
         periodEnd: previous.toDate,
