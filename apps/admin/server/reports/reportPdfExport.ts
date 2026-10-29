@@ -69,6 +69,11 @@ export type ReportExportData = Readonly<{
   totalCanonicalAreas: number;
   skippedUnauthorizedCount: number;
   sections: readonly ReportExportSection[];
+  comparison?: {
+    periodStart: string;
+    periodEnd: string;
+    summary: ReportExportSummary;
+  };
 }>;
 
 export type ReportExportInput = Readonly<{
@@ -80,6 +85,7 @@ export type ReportExportInput = Readonly<{
   toDate: string;
   source: 'POS' | 'ONLINE' | null;
   context: Readonly<Record<string, unknown>>;
+  compare?: 'previous' | 'week' | 'month' | 'year' | null;
   query: ReportExportQuery;
 }>;
 
@@ -90,6 +96,36 @@ function calendarMs(isoDate: string): number | null {
     new Date(milliseconds).toISOString().slice(0, 10) === isoDate
     ? milliseconds
     : null;
+}
+
+/** Shared comparison policy with the live Reports endpoint, using Cairo calendar dates. */
+export function previousReportWindow(
+  fromDate: string,
+  toDate: string,
+  compare: 'previous' | 'week' | 'month' | 'year',
+): { periodStart: string; periodEnd: string } {
+  const from = calendarMs(fromDate);
+  const to = calendarMs(toDate);
+  if (from === null || to === null || to < from) {
+    throw new ReportExportError('report_export_range_invalid');
+  }
+  const day = 86400000;
+  const label = (value: number) => new Date(value).toISOString().slice(0, 10);
+  const days = Math.round((to - from) / day) + 1;
+  let previousFrom = from - days * day;
+  let previousTo = from - day;
+  if (compare === 'week') {
+    previousFrom = from - 7 * day;
+  } else if (compare === 'month') {
+    const calendar = new Date(from);
+    previousFrom = Date.UTC(calendar.getUTCFullYear(), calendar.getUTCMonth() - 1, 1);
+    previousTo = Date.UTC(calendar.getUTCFullYear(), calendar.getUTCMonth(), 1) - day;
+  } else if (compare === 'year') {
+    const year = new Date(from).getUTCFullYear() - 1;
+    previousFrom = Date.UTC(year, 0, 1);
+    previousTo = Date.UTC(year, 11, 31);
+  }
+  return { periodStart: label(previousFrom), periodEnd: label(previousTo) };
 }
 
 function validateInput(input: ReportExportInput): void {
@@ -255,6 +291,27 @@ export async function collectAuthorizedReportExport(
     totalRows += rows.length;
     sections.push({ area, summary, rows });
   }
+  let comparison: ReportExportData['comparison'];
+  if (input.kind === 'current' && input.compare) {
+    const period = previousReportWindow(input.fromDate, input.toDate, input.compare);
+    const previous = await input.query({
+      p_actor_employee_id: input.principal.employeeId,
+      p_shop_ids: input.shopIds,
+      p_area: input.area,
+      p_start_date: period.periodStart,
+      p_end_date: period.periodEnd,
+      p_page_limit: 1,
+      p_offset: 0,
+      p_source: source,
+      p_context: context,
+    });
+    if (previous['ok'] !== true) {
+      throw new ReportExportError(
+        typeof previous['code'] === 'string' ? previous['code'] : 'report_export_comparison_failed',
+      );
+    }
+    comparison = { ...period, summary: readSummary(previous['summary']) };
+  }
   return {
     kind: input.kind,
     fromDate: input.fromDate,
@@ -265,5 +322,6 @@ export async function collectAuthorizedReportExport(
     totalCanonicalAreas: ADMIN_REPORT_AREAS.length,
     skippedUnauthorizedCount: ADMIN_REPORT_AREAS.length - areas.length,
     sections,
+    ...(comparison ? { comparison } : {}),
   };
 }
