@@ -1,9 +1,8 @@
 name: Reports PDF parser smoke
 on:
-  push:
-    branches:
-      - feat/admin-reports-r1-r5-report-first-20261029
+  pull_request:
     paths:
+      - apps/admin/server/reports/**
       - .github/workflows/reports-pdf-parser-smoke.yml
 permissions:
   contents: read
