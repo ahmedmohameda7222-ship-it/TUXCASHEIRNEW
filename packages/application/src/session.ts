@@ -109,9 +109,9 @@ export class OperationsSessionService {
           return ok(configurationState('This device is not assigned to exactly one active shop.'));
         }
         if (
-          this.#requireActivatedConfiguration &&
-          !(await this.#hasActivatedConfiguration(shop.id))
-        ) {
+        this.#requireActivatedConfiguration &&
+        !(await this.#hasActivatedConfiguration(shop.id))
+      ) {
           return ok(
             configurationState('This device does not have an activated Operations configuration.'),
           );
@@ -290,7 +290,9 @@ export class OperationsSessionService {
           (configuration.shopId !== shop.id ||
             !Number.isSafeInteger(configuration.version) ||
             configuration.version <= 0);
-        if ((configuration === null && this.#requireActivatedConfiguration) || invalidConfiguration) {
+        const missingRequiredConfiguration =
+          configuration === null && this.#requireActivatedConfiguration;
+        if (missingRequiredConfiguration || invalidConfiguration) {
           throw new Error('Shop menu data is not ready to open the Business Day.');
         }
 
