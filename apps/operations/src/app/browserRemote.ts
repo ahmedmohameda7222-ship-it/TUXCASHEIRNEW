@@ -325,7 +325,10 @@ export class VercelBrowserRemoteGateway
       if (response.status === 429) {
         throw new Error('Too many PIN attempts. Wait a few minutes and try again.');
       }
-      throw new Error('Could not connect this TUX Operations browser.');
+      if (response.status === 409) {
+        throw new Error('This PIN is already assigned to another worker in this shop.');
+      }
+      throw new Error('Sign-in is temporarily unavailable. Try again shortly.');
     }
     return parseBootstrap(await jsonObject(response, 'Worker sign-in'));
   }
