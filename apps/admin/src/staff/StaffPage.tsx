@@ -301,6 +301,9 @@ export function StaffPage() {
         return result.employee;
       };
       const beforeProvision = await readOperationsDetail();
+      if (beforeProvision.id !== employeeId) {
+        throw new Error('Operations access is not confirmed: employee identity mismatch.');
+      }
       const expectedWorkers = new Map<string, string>();
       for (const assignedShopId of onboardingShopIds) {
         const assigned = beforeProvision.assignments.some(
@@ -334,6 +337,9 @@ export function StaffPage() {
         expectedWorkers.set(assignedShopId, result.workerId);
       }
       const confirmedDetail = await readOperationsDetail();
+      if (confirmedDetail.id !== employeeId) {
+        throw new Error('Operations access is not confirmed: employee identity mismatch.');
+      }
       const allOperationsReady = onboardingShopIds.every((assignedShopId) => {
         const assigned = confirmedDetail.assignments.some(
           (assignment) => assignment.shopId === assignedShopId && assignment.assigned,
