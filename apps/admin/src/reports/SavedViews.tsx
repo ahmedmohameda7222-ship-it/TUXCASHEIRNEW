@@ -51,23 +51,23 @@ export function SavedViews({
     setLocalError(null);
     try {
       await onCommand({
-      type: 'report.view.save',
-      shopId,
-      id: null,
-      expectedVersion: 0,
-      name: name.trim(),
-      reportArea: filters.area,
-      filters: {
-        area: filters.area,
-        fromDate: filters.fromDate,
-        toDate: filters.toDate,
-        source: filters.source,
-        shopIds: filters.shopIds,
-        comparePrevious: filters.comparePrevious,
-        comparisonRange: filters.comparisonRange ?? 'previous',
-        context: filters.context ?? {},
-      },
-      layout: {},
+        type: 'report.view.save',
+        shopId,
+        id: null,
+        expectedVersion: 0,
+        name: name.trim(),
+        reportArea: filters.area,
+        filters: {
+          area: filters.area,
+          fromDate: filters.fromDate,
+          toDate: filters.toDate,
+          source: filters.source,
+          shopIds: filters.shopIds,
+          comparePrevious: filters.comparePrevious,
+          comparisonRange: filters.comparisonRange ?? 'previous',
+          context: filters.context ?? {},
+        },
+        layout: {},
       });
       setShowSave(false);
       setName('');
