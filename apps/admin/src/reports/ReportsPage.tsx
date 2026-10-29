@@ -36,6 +36,8 @@ export function ReportsPage() {
     offset: 0,
   }));
   const [filterOptionsExpanded, setFilterOptionsExpanded] = useState(false);
+  const [saveOpenRequest, setSaveOpenRequest] = useState(0);
+  const [targetOpenRequest, setTargetOpenRequest] = useState(0);
   const scopeKey = scope.kind === 'shop' ? `shop:${scope.shopId}` : 'all-shops';
   const previousScopeKey = useRef(scopeKey);
   const scopeChanged = previousScopeKey.current !== scopeKey;
@@ -111,6 +113,27 @@ export function ReportsPage() {
       eyebrow="Business intelligence"
       title="Reports"
       description="See what's changing, understand why, and open the original source records."
+      primaryAction={
+        <div className="tux-reports-header-actions">
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={!config}
+            onClick={() => document.getElementById('tux-reports-saved-views')?.scrollIntoView()}
+          >
+            Saved views
+          </button>
+          <button
+            className="admin-primary-button"
+            type="button"
+            aria-label="Save this report view"
+            disabled={!config}
+            onClick={() => setSaveOpenRequest((value) => value + 1)}
+          >
+            Save report
+          </button>
+        </div>
+      }
     >
       <ReportFilters
         value={scopedFilters}
@@ -133,13 +156,24 @@ export function ReportsPage() {
           (principal.shopSummaries ?? []).map((shop) => [shop.id, shop.name]),
         )}
         exportActions={
-          <ReportExportActions
-            filters={scopedFilters}
-            shopId={shopId}
-            csrfToken={
-              session.state.status === 'authenticated' ? session.state.session.csrfToken : null
-            }
-          />
+          <div className="tux-reports-report-actions">
+            {config && principal.permissions.includes('settings.manage') ? (
+              <button
+                type="button"
+                className="admin-secondary-button"
+                onClick={() => setTargetOpenRequest((value) => value + 1)}
+              >
+                Set target
+              </button>
+            ) : null}
+            <ReportExportActions
+              filters={scopedFilters}
+              shopId={shopId}
+              csrfToken={
+                session.state.status === 'authenticated' ? session.state.session.csrfToken : null
+              }
+            />
+          </div>
         }
         data={reports.reportQuery.data}
         filters={scopedFilters}
@@ -176,6 +210,8 @@ export function ReportsPage() {
       {config ? (
         <SavedViews
           shopId={shopId}
+          saveOpenRequest={saveOpenRequest}
+          targetOpenRequest={targetOpenRequest}
           views={config.savedViews}
           targets={config.targets}
           filters={scopedFilters}
