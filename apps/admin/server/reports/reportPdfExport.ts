@@ -206,6 +206,17 @@ export async function collectAuthorizedReportExport(
         throw new Error('report_export_scope_mismatch');
       }
       if (
+        result.rows.some(
+          (row) =>
+            (row.amountMinor !== null && !Number.isSafeInteger(row.amountMinor)) ||
+            !Number.isFinite(row.quantity) ||
+            typeof row.costMissing !== 'boolean' ||
+            !Number.isFinite(Date.parse(row.occurredAt)),
+        )
+      ) {
+        throw new Error('report_export_source_invalid');
+      }
+      if (
         result.rows.length > 100 ||
         rows.length + result.rows.length > REPORT_EXPORT_MAX_ROWS_PER_AREA ||
         totalRows + rows.length + result.rows.length > REPORT_EXPORT_MAX_TOTAL_ROWS
@@ -217,6 +228,7 @@ export async function collectAuthorizedReportExport(
       if (
         !Number.isSafeInteger(result.nextOffset) ||
         result.nextOffset <= offset ||
+        result.nextOffset !== offset + result.rows.length ||
         result.nextOffset > 20000 ||
         result.rows.length === 0
       ) {
