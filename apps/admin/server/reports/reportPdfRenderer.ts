@@ -1,4 +1,5 @@
 import { REPORT_LABELS } from '../../src/reports/reportLabels.js';
+import { cairoReportSourceDate } from './reportPdfExport.js';
 import type { AuthorizedExport, ExportFact, ExportSummary } from './reportPdfExport.js';
 
 type PdfOptions = {
@@ -26,7 +27,7 @@ function sourceRows(row: ExportFact, index: number, shop: string): string[] {
   return [
     String(index + 1) +
       '. ' +
-      row.occurredAt.slice(0, 10) +
+      cairoReportSourceDate(row.occurredAt) +
       ' | ' +
       row.sourceKind +
       ' | ' +

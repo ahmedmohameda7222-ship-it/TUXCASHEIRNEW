@@ -97,6 +97,20 @@ function previousWindow(
   return { fromDate: dateLabel(previousFrom), toDate: dateLabel(previousTo) };
 }
 
+const cairoSourceFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Africa/Cairo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/** Canonical business day for a source instant; export and PDF use the same Cairo policy. */
+export function cairoReportSourceDate(occurredAt: string): string {
+  const parts = cairoSourceFormatter.formatToParts(new Date(occurredAt));
+  const get = (kind: string) => parts.find((part) => part.type === kind)?.value ?? '';
+  return get('year') + '-' + get('month') + '-' + get('day');
+}
+
 export const REPORT_EXPORT_MAX_ROWS_PER_AREA = 1500;
 export const REPORT_EXPORT_MAX_TOTAL_ROWS = 5000;
 
@@ -214,6 +228,14 @@ export async function collectAuthorizedReportExport(
             typeof row.costMissing !== 'boolean' ||
             !Number.isFinite(Date.parse(row.occurredAt)),
         )
+      ) {
+        throw new Error('report_export_source_invalid');
+      }
+      if (
+        result.rows.some((row) => {
+          const businessDate = cairoReportSourceDate(row.occurredAt);
+          return businessDate < input.fromDate || businessDate > input.toDate;
+        })
       ) {
         throw new Error('report_export_source_invalid');
       }
