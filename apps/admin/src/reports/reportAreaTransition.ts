@@ -14,13 +14,28 @@ export function chooseReportArea(filters: ReportFilters, area: AdminReportArea):
 }
 
 const ORDER_CONTEXT_AREAS: readonly AdminReportArea[] = [
-  'sales', 'payments', 'products', 'customers', 'delivery', 'tax', 'refunds',
-  'shop-comparison', 'loyalty', 'promotions',
+  'sales',
+  'payments',
+  'products',
+  'customers',
+  'delivery',
+  'tax',
+  'refunds',
+  'shop-comparison',
+  'loyalty',
+  'promotions',
 ];
 
 const ORDER_CONTEXT_FIELDS = [
-  'orderTypeId', 'paymentMethodId', 'workerId', 'customerId', 'productId',
-  'categoryId', 'promotionId', 'deliveryZoneId', 'status',
+  'orderTypeId',
+  'paymentMethodId',
+  'workerId',
+  'customerId',
+  'productId',
+  'categoryId',
+  'promotionId',
+  'deliveryZoneId',
+  'status',
 ];
 
 export function compatibleReportContext(

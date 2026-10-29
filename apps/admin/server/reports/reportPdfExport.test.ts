@@ -70,12 +70,14 @@ describe('Reports complete authorized reader', () => {
 
   it('full export uses canonical 22-domain order but never queries unauthorized areas', async () => {
     const queried: string[] = [];
-    const query = vi.fn(async (args: { p_area: string; p_context: Record<string, unknown>; p_source: unknown }) => {
-      queried.push(args.p_area);
-      expect(args.p_context).toEqual({});
-      expect(args.p_source).toBeNull();
-      return { ok: true as const, summary: summary(0), rows: [], nextOffset: null };
-    });
+    const query = vi.fn(
+      async (args: { p_area: string; p_context: Record<string, unknown>; p_source: unknown }) => {
+        queried.push(args.p_area);
+        expect(args.p_context).toEqual({});
+        expect(args.p_source).toBeNull();
+        return { ok: true as const, summary: summary(0), rows: [], nextOffset: null };
+      },
+    );
     const result = await collectAuthorizedReportExport({
       kind: 'all-authorized',
       area: 'sales',
@@ -127,16 +129,20 @@ describe('Reports complete authorized reader', () => {
       context: {},
       query,
     };
-    await expect(collectAuthorizedReportExport({
-      ...base,
-      fromDate: '2026-10-29',
-      toDate: '2026-10-01',
-    })).rejects.toMatchObject({ code: 'report_export_range_invalid' });
+    await expect(
+      collectAuthorizedReportExport({
+        ...base,
+        fromDate: '2026-10-29',
+        toDate: '2026-10-01',
+      }),
+    ).rejects.toMatchObject({ code: 'report_export_range_invalid' });
     expect(query).not.toHaveBeenCalled();
-    await expect(collectAuthorizedReportExport({
-      ...base,
-      fromDate: '2026-10-01',
-      toDate: '2026-10-29',
-    })).rejects.toBeInstanceOf(ReportExportError);
+    await expect(
+      collectAuthorizedReportExport({
+        ...base,
+        fromDate: '2026-10-01',
+        toDate: '2026-10-29',
+      }),
+    ).rejects.toBeInstanceOf(ReportExportError);
   });
 });

@@ -273,6 +273,8 @@ for (const width of [390, 1440]) {
     await expect(page.getByLabel('From', { exact: true })).toHaveValue('2026-10-23');
     await quick.locator('summary', { hasText: 'All reports' }).click();
     await expect(quick.getByRole('button', { name: 'Staff attendance' })).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
   });
 }

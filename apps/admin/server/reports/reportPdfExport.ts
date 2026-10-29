@@ -5,10 +5,7 @@ import {
 } from '@tux/admin-contracts';
 
 import { AdminAuthorizationError, requirePermission } from '../authorization.js';
-import {
-  requireReportArea,
-  requireReportContextPermissions,
-} from './reportAuthorization.js';
+import { requireReportArea, requireReportContextPermissions } from './reportAuthorization.js';
 
 /** Fixed-size pages prevent the browser's 50-row window from clipping exports. */
 export const REPORT_EXPORT_PAGE_SIZE = 100;
@@ -151,7 +148,7 @@ function readSummary(value: unknown): ReportExportSummary {
     }
   }
   const amount = data['totalAmountMinor'];
-  if (amount !== null && (!Number.isSafeInteger(amount))) {
+  if (amount !== null && !Number.isSafeInteger(amount)) {
     throw new ReportExportError('report_export_backend_contract_invalid');
   }
   const coverageNote = data['coverageNote'];

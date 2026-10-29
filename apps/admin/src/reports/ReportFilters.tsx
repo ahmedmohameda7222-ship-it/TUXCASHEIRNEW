@@ -192,11 +192,13 @@ export function ReportFilters({
         </nav>
       </div>
       <div className="tux-report-range-presets" role="group" aria-label="Date range presets">
-        {([
-          ['Today', 1],
-          ['Last 7 days', 7],
-          ['Last 30 days', 30],
-        ] as const).map(([label, days]) => (
+        {(
+          [
+            ['Today', 1],
+            ['Last 7 days', 7],
+            ['Last 30 days', 30],
+          ] as const
+        ).map(([label, days]) => (
           <button
             key={days}
             type="button"
