@@ -19,13 +19,13 @@ jobs:
       - run: npm ci --ignore-scripts
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      - run: npx prettier --write apps/admin/src/reports/ReportView.tsx apps/admin/src/reports/reportTrend.ts apps/admin/src/reports/reportTrend.test.ts apps/admin/src/reports/reports.css
+      - run: npx prettier --write apps/admin/src/reports/SavedViews.tsx e2e/admin-reports.spec.ts
       - name: Commit formatted files
         run: |
-          if ! git diff --quiet -- apps/admin/src/reports; then
+          if ! git diff --quiet -- apps/admin/src/reports/SavedViews.tsx e2e/admin-reports.spec.ts; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add apps/admin/src/reports/ReportView.tsx apps/admin/src/reports/reportTrend.ts apps/admin/src/reports/reportTrend.test.ts apps/admin/src/reports/reports.css
-            git commit -m "style(reports): align trend and chart files with Prettier"
+            git add apps/admin/src/reports/SavedViews.tsx e2e/admin-reports.spec.ts
+            git commit -m "style(reports): normalize saved-views and PDF browser tests"
             git push
           fi
