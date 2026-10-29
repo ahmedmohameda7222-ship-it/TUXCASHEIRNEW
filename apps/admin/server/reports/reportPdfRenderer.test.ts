@@ -46,6 +46,8 @@ describe('R4 multi-page canonical report PDF', () => {
     expect(text).toContain('-10.00');
     expect(text).toContain('Cost data incomplete');
     expect(text).toContain('TUX Maadi');
+    expect(text).toContain('Activity over time (source events; Africa/Cairo):');
+    expect(text).toContain('2026-10-29 | ######################### (120)');
     expect(text).toContain('/Type /Pages');
     expect(text).toContain('xref');
     expect(text).toContain('Page 2 /');
