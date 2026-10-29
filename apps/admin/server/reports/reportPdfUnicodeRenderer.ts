@@ -173,7 +173,10 @@ export async function renderUnicodeAuthorizedReportPdf(
       `Period (Cairo calendar): ${data.fromDate} to ${data.toDate} | Shops: ${data.selectedShops.length}`,
       9,
     );
-    paragraph(`Source: ${data.appliedFilters?.source ?? 'All'} | Scope: ${data.selectedShops.map((id) => options.shopNames[id] ?? id).join(', ')}`, 8);
+    paragraph(`Source: ${data.appliedFilters?.source ?? 'All'}`, 8);
+    for (const id of data.selectedShops) {
+      paragraph(options.shopNames[id] ?? id, 8);
+    }
     if (options.kind === 'current' && Object.keys(data.appliedFilters?.context ?? {}).length) {
       paragraph(`Filters: ${JSON.stringify(data.appliedFilters?.context ?? {})}`, 8);
     }
