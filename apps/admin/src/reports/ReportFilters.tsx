@@ -1,6 +1,7 @@
 import type { AdminReportArea } from '@tux/admin-contracts';
 
 import { chooseReportArea } from './reportAreaTransition';
+import { cairoReportToday, reportDatePreset } from './reportDateRange';
 import type { ReportContext, ReportFilters as ReportQueryFilters } from './useReports';
 
 export const REPORT_LABELS: Readonly<Record<AdminReportArea, string>> = {
@@ -141,27 +142,72 @@ export function ReportFilters({
               ['RETURNED', 'Returned'],
             ]
           : [];
+  const quickReports = [
+    'sales',
+    'products',
+    'inventory-consumption',
+    'customers',
+    'expenses',
+  ] as const satisfies readonly AdminReportArea[];
+  function applyPreset(days: 1 | 7 | 30) {
+    onChange({
+      ...value,
+      ...reportDatePreset(cairoReportToday(), days),
+      offset: 0,
+    });
+  }
   return (
-    <section className="tux-report-filters" aria-label="Report filters">
-      <label>
-        Report
-        <select
-          value={value.area}
-          onChange={(event) =>
-            onChange(chooseReportArea(value, event.target.value as AdminReportArea))
-          }
-        >
-          {REPORT_TOPICS.map((topic) => (
-            <optgroup label={topic.label} key={topic.label}>
-              {topic.areas.map((area) => (
-                <option key={area} value={area}>
-                  {REPORT_LABELS[area]}
-                </option>
-              ))}
-            </optgroup>
+    <section className="tux-report-selector" aria-label="Choose a report">
+      <header className="tux-report-selector__header">
+        <h2>Choose a report</h2>
+        <span>22 available</span>
+      </header>
+      <nav className="tux-report-quick" aria-label="Quick reports">
+        {quickReports.map((area) => (
+          <button
+            key={area}
+            type="button"
+            className={area === value.area ? 'tux-report-quick__active' : ''}
+            aria-pressed={area === value.area}
+            onClick={() => onChange(chooseReportArea(value, area))}
+          >
+            {area === 'inventory-consumption' ? 'Inventory' : REPORT_LABELS[area]}
+          </button>
+        ))}
+        <label className="tux-report-all">
+          <span>All reports</span>
+          <select
+            aria-label="All reports"
+            value={value.area}
+            onChange={(event) =>
+              onChange(chooseReportArea(value, event.target.value as AdminReportArea))
+            }
+          >
+            {REPORT_TOPICS.map((topic) => (
+              <optgroup label={topic.label} key={topic.label}>
+                {topic.areas.map((area) => (
+                  <option key={area} value={area}>
+                    {REPORT_LABELS[area]}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+      </nav>
+      <div className="tux-report-filters" aria-label="Report filters">
+        <div className="tux-report-presets" role="group" aria-label="Date presets">
+          {([1, 7, 30] as const).map((days) => (
+            <button
+              key={days}
+              type="button"
+              className="admin-secondary-button"
+              onClick={() => applyPreset(days)}
+            >
+              {days === 1 ? 'Today' : `${days} days`}
+            </button>
           ))}
-        </select>
-      </label>
+        </div>
       <label>
         From
         <input
@@ -278,6 +324,22 @@ export function ReportFilters({
           </div>
         </details>
       ) : null}
+        <button
+          type="button"
+          className="admin-secondary-button tux-report-reset"
+          onClick={() => onChange({
+            ...value,
+            ...reportDatePreset(cairoReportToday(), 7),
+            source: null,
+            comparePrevious: false,
+            comparisonRange: 'previous',
+            context: {},
+            offset: 0,
+          })}
+        >
+          Reset
+        </button>
+      </div>
     </section>
   );
 }
