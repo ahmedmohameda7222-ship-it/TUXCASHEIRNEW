@@ -118,18 +118,13 @@ describe('Plan 7 report domain permissions', () => {
       reportArea: 'sales',
       filters: { shopIds: [shopId], context: {} },
     };
-    expect(
-      filterAuthorizedReportSavedViews(
-        staff,
-        [
-          safe,
-          { ...safe, id: 'customer', filters: { context: { customerId: 'private' } } },
-          { ...safe, id: 'finance', reportArea: 'profit' },
-          { ...safe, id: 'foreign', shopId: 'other-shop' },
-          { ...safe, id: 'foreign-filter', filters: { shopIds: ['other-shop'] } },
-        ],
-        shopId,
-      ),
-    ).toEqual([safe]);
+    const views = [
+      safe,
+      { ...safe, id: 'customer', filters: { context: { customerId: 'private' } } },
+      { ...safe, id: 'finance', reportArea: 'profit' },
+      { ...safe, id: 'foreign', shopId: 'other-shop' },
+      { ...safe, id: 'foreign-filter', filters: { shopIds: ['other-shop'] } },
+    ];
+    expect(filterAuthorizedReportSavedViews(staff, views, shopId)).toEqual([safe]);
   });
 });
