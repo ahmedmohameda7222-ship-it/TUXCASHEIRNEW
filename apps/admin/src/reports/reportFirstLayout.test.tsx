@@ -75,6 +75,14 @@ describe('R1 approved Report-First layout', () => {
     expect(markup).not.toContain('What would you like to know');
   });
 
+  it('places source filtering inside the compact Filter disclosure and provides responsive date and shop anchors', () => {
+    const markup = renderPicker();
+    expect(markup).toContain('tux-report-date-start');
+    expect(markup).toContain('tux-report-date-end');
+    expect(markup).toContain('tux-report-shop');
+    expect(markup.indexOf('Order source')).toBeGreaterThan(markup.indexOf('<details'));
+  });
+
   it('offers fast Cairo date presets and an explicit reset without losing report selection', () => {
     const markup = renderPicker('refunds');
     expect(markup).toContain('Today');
