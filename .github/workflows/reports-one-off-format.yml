@@ -1,0 +1,44 @@
+name: Reports one-time format
+on:
+  push:
+    branches:
+      - feat/reports-r1-r5-report-first-pdf-20261029
+    paths:
+      - .github/workflows/reports-one-off-format.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: |
+          npx prettier --write \
+            apps/admin/src/reports/ReportFilters.tsx \
+            apps/admin/src/reports/ReportTopics.test.ts \
+            apps/admin/src/reports/reportDateRange.ts \
+            apps/admin/src/reports/reportDateRange.test.ts \
+            apps/admin/src/reports/reports.css \
+            apps/admin/server/reports/reportPdfExport.ts \
+            apps/admin/server/reports/reportPdfExport.test.ts \
+            e2e/admin-reports.spec.ts
+      - name: Commit formatted exact Reports files
+        run: |
+          if ! git diff --quiet -- apps/admin/src/reports apps/admin/server/reports e2e/admin-reports.spec.ts; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add apps/admin/src/reports apps/admin/server/reports e2e/admin-reports.spec.ts
+            git commit -m "style(reports): apply repository Prettier"
+            git push
+          fi
