@@ -536,9 +536,7 @@ psql(
            id,business_id,display_name,role,pin_lookup_hash,pin_hash,active
          ) values
            (e,b,'Assigned employee','STAFF',repeat('a',64),
-            'pbkdf2-sha256$210000
-||repeat('a',32)||'
-||repeat('a',64),true),
+            'pbkdf2-sha256' || chr(36) || '210000' || chr(36) || repeat('a',32) || chr(36) || repeat('a',64),true),
            (e2,b,'No PIN','STAFF',null,null,true);
          insert into public.employee_shop_assignments(business_id,employee_id,shop_id)
          values(b,e,s),(b,e2,s);
