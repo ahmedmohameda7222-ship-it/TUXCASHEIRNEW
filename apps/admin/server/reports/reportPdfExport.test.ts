@@ -330,4 +330,32 @@ describe('R3 canonical full-record export collector', () => {
       }),
     ).rejects.toThrow('report_export_duplicate_record');
   });
+  it('fails closed when a canonical RPC returns records outside the Cairo report dates', async () => {
+    await expect(
+      collectAuthorizedReportExport(request, principal, async () => ({
+        ok: true,
+        summary: {
+          eventCount: 1,
+          orderCount: 1,
+          totalAmountMinor: 100,
+          totalQuantity: 1,
+          incompleteCostEvents: 0,
+          coverageNote: null,
+        },
+        rows: [
+          {
+            id: 'outside-period',
+            shopId: shop,
+            occurredAt: '2026-11-01T10:00:00.000Z',
+            label: 'Payment',
+            sourceKind: 'payment',
+            amountMinor: 100,
+            quantity: 1,
+            costMissing: false,
+          },
+        ],
+        nextOffset: null,
+      })),
+    ).rejects.toThrow('report_export_source_invalid');
+  });
 });

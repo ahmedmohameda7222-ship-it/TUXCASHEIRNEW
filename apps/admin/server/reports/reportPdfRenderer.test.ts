@@ -91,4 +91,14 @@ describe('R4 multi-page canonical report PDF', () => {
       }),
     ).toThrow('report_export_font_unsupported');
   });
+  it('prints source record dates in the Cairo calendar at midnight boundaries', () => {
+    const report = sampleExport(1);
+    report.sections[0]!.rows[0]!.occurredAt = '2026-10-28T22:30:00.000Z';
+    const pdf = renderAuthorizedReportPdf(report, {
+      generatedAt: '2026-10-29T10:00:00.000Z',
+      shopNames: {},
+    }).toString('latin1');
+    expect(pdf).toContain('1. 2026-10-29');
+    expect(pdf).not.toContain('1. 2026-10-28');
+  });
 });
