@@ -5,6 +5,7 @@ import { AdminDialog } from '../components/overlay/AdminDialog';
 import { parseEgpMinor, formatEgp } from '../finance/money';
 
 import { REPORT_LABELS } from './ReportFilters';
+import { matchingTargetForPeriod, validReportTargetPeriod } from './reportTargetPeriod';
 import type {
   ReportConfigDraft,
   ReportFilters,
@@ -72,6 +73,9 @@ export function SavedViews({
   }
   function saveTarget() {
     try {
+      if (!validReportTargetPeriod(targetStart, targetEnd)) {
+        throw new Error('Select a valid target From/To period in ascending order.');
+      }
       const targetValue =
         targetMetric === 'NET_SALES' || targetMetric === 'WASTE'
           ? parseEgpMinor(targetAmount)
@@ -85,11 +89,12 @@ export function SavedViews({
       ) {
         throw new Error('Enter a valid nonnegative target.');
       }
-      const existing = targets.find(
-        (target) =>
-          target.metric === targetMetric &&
-          target.periodStart === targetStart &&
-          target.periodEnd === targetEnd,
+      const existing = matchingTargetForPeriod(
+        targets,
+        shopId,
+        targetMetric,
+        targetStart,
+        targetEnd,
       );
       onCommand({
         type: 'report.target.set',
@@ -117,7 +122,12 @@ export function SavedViews({
           <button
             className="admin-secondary-button"
             type="button"
-            onClick={() => setShowTarget(true)}
+            onClick={() => {
+              setTargetStart(filters.fromDate);
+              setTargetEnd(filters.toDate);
+              setLocalError(null);
+              setShowTarget(true);
+            }}
           >
             Set target
           </button>
