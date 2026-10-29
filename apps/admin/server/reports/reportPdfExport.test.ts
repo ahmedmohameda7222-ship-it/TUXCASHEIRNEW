@@ -36,7 +36,6 @@ describe('R3 canonical full-record export collector', () => {
     expect(output).not.toMatch(/from ['"]@tux\/admin-contracts['"]/);
   });
 
-
   it('includes row 120 even though the interactive report only shows 50 per page', async () => {
     const offsets: number[] = [];
     const result = await collectAuthorizedReportExport(request, principal, async (args) => {

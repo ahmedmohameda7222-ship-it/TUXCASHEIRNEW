@@ -167,7 +167,10 @@ export async function collectAuthorizedReportExport(
 
   // Derived from the exhaustive typed authorization map: the package's .ts
   // runtime entrypoint is not shipped in the Admin Vercel function bundle.
-  const areas = input.kind === 'all-authorized' ? (Object.keys(REPORT_AREA_PERMISSION) as AdminReportArea[]) : [input.area];
+  const areas =
+    input.kind === 'all-authorized'
+      ? (Object.keys(REPORT_AREA_PERMISSION) as AdminReportArea[])
+      : [input.area];
   const sections: ExportSection[] = [];
   let totalRows = 0;
   for (const area of areas) {
