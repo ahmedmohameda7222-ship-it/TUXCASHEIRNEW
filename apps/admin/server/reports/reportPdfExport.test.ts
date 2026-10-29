@@ -284,6 +284,57 @@ describe('R3 canonical full-record export collector', () => {
     ).rejects.toThrow('report_export_source_invalid');
   });
 
+  it('rejects nonfinite canonical summary amounts before generating a PDF', async () => {
+    await expect(
+      collectAuthorizedReportExport(request, principal, async () => ({
+        ok: true,
+        summary: {
+          eventCount: 1,
+          orderCount: 1,
+          totalAmountMinor: 100,
+          totalQuantity: Number.NaN,
+          incompleteCostEvents: 0,
+          coverageNote: null,
+        },
+        rows: [
+          {
+            id: 'payment-1',
+            shopId: shop,
+            occurredAt: '2026-10-29T09:00:00.000Z',
+            label: 'Payment',
+            sourceKind: 'payment',
+            amountMinor: 100,
+            quantity: 1,
+            costMissing: false,
+          },
+        ],
+        nextOffset: null,
+      })),
+    ).rejects.toThrow('report_export_summary_invalid');
+  });
+
+  it('rejects invalid comparison summaries rather than printing a fake previous period', async () => {
+    await expect(
+      collectAuthorizedReportExport(
+        { ...request, comparePrevious: true },
+        principal,
+        async (args) => ({
+          ok: true,
+          summary: {
+            eventCount: 0,
+            orderCount: args.pageSize === 1 ? Number.NaN : 0,
+            totalAmountMinor: 0,
+            totalQuantity: 0,
+            incompleteCostEvents: 0,
+            coverageNote: null,
+          },
+          rows: [],
+          nextOffset: null,
+        }),
+      ),
+    ).rejects.toThrow('report_export_summary_invalid');
+  });
+
   it('refuses oversized exports rather than returning a partial PDF as complete', async () => {
     await expect(
       collectAuthorizedReportExport(request, principal, async () => ({
