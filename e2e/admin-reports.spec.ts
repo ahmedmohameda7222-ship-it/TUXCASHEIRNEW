@@ -136,7 +136,7 @@ test('reports preserve source filtering and period comparison on server-side req
     )
     .toBe(true);
   await expect(page.getByText('Previous period recorded amount')).toBeVisible();
-  await page.locator('.tux-report-filters select').first().selectOption('expenses');
+  await page.getByLabel('All reports').selectOption('expenses');
   await expect.poll(() => queries.some((query) => query.get('area') === 'expenses')).toBe(true);
 });
 
