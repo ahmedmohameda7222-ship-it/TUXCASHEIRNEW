@@ -1,9 +1,6 @@
 import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
-import {
-  renderAuthorizedReportPdf,
-  renderAuthorizedReportPdfDocument,
-} from './reportPdfRenderer';
+import { renderAuthorizedReportPdf, renderAuthorizedReportPdfDocument } from './reportPdfRenderer';
 import type { AuthorizedExport } from './reportPdfExport';
 
 function sampleExport(rows = 120): AuthorizedExport {
