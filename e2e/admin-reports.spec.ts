@@ -208,6 +208,36 @@ test('R2 failed Save View keeps modal and name until the server confirms persist
   await expect(dialog.getByRole('alert')).toContainText('Unable to save');
 });
 
+test('R2 failed Set Target keeps target dialog open and preserves date window', async ({ page }) => {
+  await mockReports(page);
+  await page.route('**/api/admin/reports**', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const payload = route.request().postDataJSON() as { type?: string };
+    if (payload.type !== 'report.target.set') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'report_target_conflict' }),
+    });
+  });
+  await page.goto('/reports');
+  await page.getByRole('button', { name: 'Set target' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Configure report target' });
+  await dialog.getByLabel('From').fill('2026-10-01');
+  await dialog.getByLabel('To').fill('2026-10-31');
+  await dialog.getByRole('button', { name: 'Save target' }).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('From')).toHaveValue('2026-10-01');
+  await expect(dialog.getByLabel('To')).toHaveValue('2026-10-31');
+  await expect(dialog.getByRole('alert')).toBeVisible();
+});
+
 test('phone report presentation', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockReports(page);
