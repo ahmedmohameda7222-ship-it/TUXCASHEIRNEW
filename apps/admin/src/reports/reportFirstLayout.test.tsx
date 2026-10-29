@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { ReportFilters } from './ReportFilters';
+import { ReportView } from './ReportView';
 import type { ReportFilters as ReportQueryFilters } from './useReports';
 
 const filters: ReportQueryFilters = {
@@ -29,6 +30,34 @@ function renderPicker(area: AdminReportArea = 'sales') {
     />,
   );
 }
+
+describe('R1 selected report evidence presentation', () => {
+  it('titles the selected report above its canonical summary and source events', () => {
+    const html = renderToStaticMarkup(
+      <ReportView
+        data={{
+          ok: true,
+          area: 'sales',
+          summary: {
+            eventCount: 1, orderCount: 1, totalAmountMinor: 12345,
+            totalQuantity: 2, incompleteCostEvents: 0, coverageNote: null,
+          },
+          rows: [],
+          nextOffset: null,
+        }}
+        filters={filters}
+        onOffset={() => undefined}
+        loading={false}
+        error={false}
+        retry={() => undefined}
+      />,
+    );
+    expect(html).toContain('Sales');
+    expect(html).toContain('Source activity');
+    expect(html).toContain('Recorded amount');
+    expect(html).not.toContain('Employee sales leaderboard');
+  });
+});
 
 describe('R1 approved Report-First layout', () => {
   it('starts with Choose a report and all 22 canonical reports, without question-first tiles', () => {
