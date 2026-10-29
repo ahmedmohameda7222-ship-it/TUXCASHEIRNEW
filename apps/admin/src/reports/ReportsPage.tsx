@@ -125,14 +125,16 @@ export function ReportsPage() {
           Select a valid From/To date range in ascending order, no longer than 730 days.
         </p>
       ) : null}
-      <ReportExportActions
-        filters={scopedFilters}
-        shopId={shopId}
-        csrfToken={
-          session.state.status === 'authenticated' ? session.state.session.csrfToken : null
-        }
-      />
       <ReportView
+        exportActions={
+    <ReportExportActions
+            filters={scopedFilters}
+            shopId={shopId}
+            csrfToken={
+              session.state.status === 'authenticated' ? session.state.session.csrfToken : null
+            }
+          />
+        }
         data={reports.reportQuery.data}
         filters={scopedFilters}
         loading={reports.reportQuery.isLoading}
