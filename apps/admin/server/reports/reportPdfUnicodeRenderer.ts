@@ -238,9 +238,9 @@ export async function renderUnicodeAuthorizedReportPdf(
       );
     }
     if (section.summary.coverageNote) paragraph(section.summary.coverageNote, 8);
-    dailyActivityLines(section.rows, data.fromDate, data.toDate).forEach((line) =>
-      paragraph(line, 8),
-    );
+    for (const line of dailyActivityLines(section.rows, data.fromDate, data.toDate)) {
+      paragraph(line, 8);
+    }
     y -= 10;
     paragraph(`Source records - ${section.rows.length} matching rows`, 10, ink);
     if (section.rows.length === 0) {
