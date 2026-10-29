@@ -366,3 +366,49 @@
 .tux-report-results__heading small {
   color: var(--tux-text-secondary);
 }
+
+.tux-report-trend {
+  min-width: 0;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 16px;
+  padding: 1rem;
+  background: var(--tux-surface-panel);
+}
+.tux-report-trend__header h3 { margin: 0; font-size: 1rem; }
+.tux-report-trend__header small, .tux-report-trend__unavailable {
+  color: var(--tux-text-secondary);
+  font-size: 0.78rem;
+}
+.tux-report-trend__bars {
+  display: flex;
+  align-items: end;
+  height: 144px;
+  gap: clamp(0.25rem, 1vw, 0.75rem);
+  padding-top: 1rem;
+  overflow-x: auto;
+}
+.tux-report-trend__day {
+  flex: 1 0 16px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  height: 100%;
+  justify-content: flex-end;
+}
+.tux-report-trend__bar {
+  width: min(100%, 36px);
+  border-radius: 4px 4px 0 0;
+  background: #a6cdb3;
+  min-height: 2px;
+}
+.tux-report-trend__day small {
+  color: var(--tux-text-secondary);
+  font-size: 0.64rem;
+  white-space: nowrap;
+}
+@media (max-width: 639px) {
+  .tux-report-trend__bars { height: 110px; }
+  .tux-report-trend__day small { font-size: 0.6rem; }
+}
