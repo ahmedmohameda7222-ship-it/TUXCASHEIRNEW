@@ -41,6 +41,7 @@ describe('R4 multi-page canonical report PDF', () => {
       shopNames: { '11111111-1111-4111-8111-111111111111': 'TUX Maadi' },
     });
     const text = buffer.toString('latin1');
+    const unescapedText = text.replaceAll('\\\\(', '(').replaceAll('\\\\)', ')');
     expect(text.startsWith('%PDF-1.4')).toBe(true);
     expect(text).toContain('LAST AUTHORITATIVE RECORD');
     expect(text).toContain('-10.00');
@@ -48,7 +49,7 @@ describe('R4 multi-page canonical report PDF', () => {
     expect(text).toContain('TUX Maadi');
     expect(text).toContain('Activity over time');
     expect(text).toContain('Africa/Cairo');
-    expect(text).toContain('2026-10-29 | ######################### (120)');
+    expect(unescapedText).toContain('2026-10-29 | ######################### (120)');
     expect(text).toContain('/Type /Pages');
     expect(text).toContain('xref');
     expect(text).toContain('Page 2 /');
