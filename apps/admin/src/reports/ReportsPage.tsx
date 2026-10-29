@@ -8,6 +8,7 @@ import { OwnerSummaryCard } from '../dashboard/OwnerSummaryCard';
 import { useShopScope } from '../shops/ShopScopeProvider';
 
 import { REPORT_LABELS, ReportFilters } from './ReportFilters';
+import { ReportExportActions } from './ReportExportActions';
 import { validReportDateRange } from './reportDateRange';
 import { compatibleReportContext } from './reportAreaTransition';
 import { scopeReportFilters } from './reportScope';
@@ -138,6 +139,7 @@ export function ReportsPage() {
           Select a valid From/To date range in ascending order, no longer than 730 days.
         </p>
       ) : null}
+      <ReportExportActions shopId={shopId} filters={scopedFilters} />
       <ReportView
         data={reports.reportQuery.data}
         filters={scopedFilters}
