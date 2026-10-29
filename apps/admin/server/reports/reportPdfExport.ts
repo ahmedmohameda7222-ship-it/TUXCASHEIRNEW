@@ -170,7 +170,7 @@ export async function collectAuthorizedReportExport(
     sections.push({ area, rows, summary });
   }
   if (sections.length === 0) {
-    throw new AdminAuthorizationError('report_area_forbidden');
+    throw new AdminAuthorizationError('permission_forbidden');
   }
   return {
     sections,
