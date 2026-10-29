@@ -64,6 +64,15 @@ function render(
 }
 
 describe('EmployeeDetailPage', () => {
+  it('requires only shop assignment and a staff PIN, not Operations setup or worker linking', () => {
+    const html = render(employee(), true, [], 'permissions', true);
+    expect(html).toContain('Operations access');
+    expect(html).toContain('employee PIN');
+    expect(html).not.toContain('Operations setup required');
+    expect(html).not.toContain('Complete Operations setup');
+    expect(html).not.toContain('Provision and link Operations worker');
+  });
+
   it('keeps Profile focused and moves access work into its own tab', () => {
     const html = render(employee());
     expect(html).toContain('Mona Ali');
