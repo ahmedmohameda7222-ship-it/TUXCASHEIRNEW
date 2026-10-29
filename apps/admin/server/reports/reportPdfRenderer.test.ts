@@ -64,6 +64,20 @@ describe('R4 multi-page canonical report PDF', () => {
     expect(text).not.toContain('Finance bank account details');
   });
 
+  it('keeps long source labels within printable A4 text width at 9pt Courier', () => {
+    const report = sampleExport(1);
+    report.sections[0]!.rows[0]!.label = 'LONG ' + 'X'.repeat(310);
+    const pdf = renderAuthorizedReportPdf(report, {
+      generatedAt: '2026-10-29T10:00:00.000Z',
+      shopNames: {},
+    }).toString('latin1');
+    // PDF Courier at 9pt: printable A4 width ~= 523pt, max 96 characters.
+    const lines = [...pdf.matchAll(/ Td \((.*?)\) Tj ET/g)].map((match) => match[1]!);
+    expect(lines.length).toBeGreaterThan(8);
+    expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(94);
+    expect(lines.join('')).toContain('X'.repeat(90));
+  });
+
   it('fails closed for non-encodable record text rather than silently corrupting names', () => {
     const report = sampleExport(1);
     report.sections[0]!.rows[0]!.label = 'مبيعات';
