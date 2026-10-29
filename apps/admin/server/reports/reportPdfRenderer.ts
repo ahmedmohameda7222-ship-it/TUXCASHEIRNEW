@@ -5,7 +5,7 @@ type PdfOptions = {
   generatedAt: string;
   shopNames: Readonly<Record<string, string>>;
 };
-const LINE_WIDTH = 102;
+const LINE_WIDTH = 90;
 const LINES_PER_PAGE = 56;
 const MAX_PDF_BYTES = 12 * 1024 * 1024;
 
