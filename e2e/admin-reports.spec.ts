@@ -136,6 +136,28 @@ test('R1 approved actions sit in the report header and beside the selected repor
   ).toBeVisible();
 });
 
+test('R1 Owner summary action is gated by finance view and opens the read-only section', async ({
+  page,
+}) => {
+  await mockReports(page);
+  await page.route('**/api/admin/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...session,
+        principal: {
+          ...session.principal,
+          permissions: [...session.principal.permissions, 'finance.view'],
+        },
+      }),
+    });
+  });
+  await page.goto('/reports');
+  await page.getByRole('button', { name: 'Owner summary' }).click();
+  await expect(page.locator('#tux-reports-owner-summary')).toBeVisible();
+});
+
 test('reports preserve source filtering and period comparison on server-side requests', async ({
   page,
 }) => {

@@ -157,6 +157,17 @@ export function ReportsPage() {
         )}
         exportActions={
           <div className="tux-reports-report-actions">
+            {principal.permissions.includes('finance.view') ? (
+              <button
+                type="button"
+                className="admin-secondary-button"
+                onClick={() =>
+                  document.getElementById('tux-reports-owner-summary')?.scrollIntoView()
+                }
+              >
+                Owner summary
+              </button>
+            ) : null}
             {config && principal.permissions.includes('settings.manage') ? (
               <button
                 type="button"
@@ -206,7 +217,11 @@ export function ReportsPage() {
           summary={reports.reportQuery.data?.summary}
         />
       ) : null}
-      {principal.permissions.includes('finance.view') ? <OwnerSummaryCard shopId={shopId} /> : null}
+      {principal.permissions.includes('finance.view') ? (
+        <div id="tux-reports-owner-summary">
+          <OwnerSummaryCard shopId={shopId} />
+        </div>
+      ) : null}
       {config ? (
         <SavedViews
           shopId={shopId}
