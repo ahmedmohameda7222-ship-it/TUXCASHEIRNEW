@@ -155,6 +155,7 @@ export async function collectAuthorizedReportExport(
     }
 
     const rows: ExportFact[] = [];
+    const seenRecordKeys = new Set<string>();
     let summary: ExportSummary | null = null;
     let offset = 0;
     while (true) {
@@ -222,6 +223,13 @@ export async function collectAuthorizedReportExport(
         totalRows + rows.length + result.rows.length > REPORT_EXPORT_MAX_TOTAL_ROWS
       ) {
         throw new Error('report_export_too_large');
+      }
+      for (const row of result.rows) {
+        const recordKey = JSON.stringify([row.shopId, row.sourceKind, row.id]);
+        if (seenRecordKeys.has(recordKey)) {
+          throw new Error('report_export_duplicate_record');
+        }
+        seenRecordKeys.add(recordKey);
       }
       rows.push(...result.rows);
       if (result.nextOffset === null) break;

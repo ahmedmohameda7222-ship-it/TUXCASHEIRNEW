@@ -38,7 +38,8 @@ export function completeReportDailyActivity(
     const parts = cairoDate.formatToParts(at);
     const get = (kind: string) => parts.find((part) => part.type === kind)?.value ?? '';
     const key = get('year') + '-' + get('month') + '-' + get('day');
-    if (counts.has(key)) counts.set(key, counts.get(key)! + 1);
+    if (!counts.has(key)) return null;
+    counts.set(key, counts.get(key)! + 1);
   }
   return [...counts].map(([date, count]) => ({ date, count }));
 }

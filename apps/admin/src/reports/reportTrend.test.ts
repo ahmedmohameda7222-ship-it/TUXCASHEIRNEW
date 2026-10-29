@@ -65,5 +65,4 @@ describe('R1 truthful report trend', () => {
     };
     expect(completeReportDailyActivity(outOfWindow, filters)).toBeNull();
   });
-
 });

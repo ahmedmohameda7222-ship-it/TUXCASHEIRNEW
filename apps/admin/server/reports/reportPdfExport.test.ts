@@ -330,5 +330,4 @@ describe('R3 canonical full-record export collector', () => {
       }),
     ).rejects.toThrow('report_export_duplicate_record');
   });
-
 });
