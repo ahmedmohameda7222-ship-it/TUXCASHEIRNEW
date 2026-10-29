@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link } from 'wouter';
 import type { ReportDrilldown } from '@tux/admin-contracts';
 
@@ -5,6 +6,8 @@ import { EmptyState, ErrorState, LoadingState } from '../components/feedback/Adm
 import { formatEgp } from '../finance/money';
 
 import type { ReportFilters, ReportResponse } from './useReports';
+import { REPORT_LABELS } from './reportLabels';
+import { completeReportDailyActivity } from './reportTrend';
 
 function amountLabel(amount: number | null): string {
   return amount === null ? 'Cost data incomplete' : formatEgp(amount);
@@ -46,6 +49,8 @@ export function ReportView({
   loading,
   error,
   retry,
+  exportActions,
+  shopNames = {},
 }: {
   data: ReportResponse | undefined;
   filters: ReportFilters;
@@ -53,6 +58,8 @@ export function ReportView({
   loading: boolean;
   error: boolean;
   retry(): void;
+  exportActions?: ReactNode;
+  shopNames?: Readonly<Record<string, string>>;
 }) {
   if (loading)
     return <LoadingState title="Building report" description="Reading canonical data…" />;
@@ -67,10 +74,34 @@ export function ReportView({
         }
       />
     );
-  if (!data) return null;
+  // An invalid date range disables the report query. Keep the export controls
+  // mounted so users can see why downloading is unavailable and correct dates.
+  if (!data)
+    return (
+      <section className="tux-report-view" aria-label="Report results">
+        {exportActions}
+      </section>
+    );
   const summary = data.summary;
+  const activity = completeReportDailyActivity(data, filters);
+  const peak = Math.max(1, ...(activity?.map((day) => day.count) ?? []));
   return (
     <section className="tux-report-view" aria-label="Report results">
+      <header className="tux-report-view__intro">
+        <div className="tux-report-view__title">
+          <h2>{REPORT_LABELS[data.area]}</h2>
+          <p>
+            {filters.fromDate} – {filters.toDate} · {filters.shopIds.length}{' '}
+            {filters.shopIds.length === 1 ? 'shop' : 'shops'} ·{' '}
+            {filters.source === 'POS'
+              ? 'POS only'
+              : filters.source === 'ONLINE'
+                ? 'Online only'
+                : 'All sources'}
+          </p>
+        </div>
+        {exportActions}
+      </header>
       <div className="tux-report-metrics">
         <div>
           <small>Recorded amount</small>
@@ -80,6 +111,10 @@ export function ReportView({
           <small>Source events</small>
           <strong>{summary.eventCount.toLocaleString('en-EG')}</strong>
         </div>
+        <div>
+          <small>Total quantity</small>
+          <strong>{summary.totalQuantity.toLocaleString('en-EG')}</strong>
+        </div>
         {data.comparison ? (
           <div>
             <small>Previous period recorded amount</small>
@@ -87,6 +122,35 @@ export function ReportView({
           </div>
         ) : null}
       </div>
+      <section className="tux-report-trend" aria-label="Activity over time">
+        <div className="tux-report-trend__header">
+          <div>
+            <h3>Activity over time</h3>
+            <small>Based on complete matching source events in the Cairo calendar</small>
+          </div>
+        </div>
+        {activity ? (
+          <div
+            className="tux-report-trend__bars"
+            role="img"
+            aria-label={activity.map((day) => `${day.date}: ${day.count} events`).join(', ')}
+          >
+            {activity.map((day) => (
+              <div key={day.date} className="tux-report-trend__day">
+                <div
+                  className="tux-report-trend__bar"
+                  style={{ height: `${Math.max(2, (day.count / peak) * 100)}%` }}
+                />
+                <small>{day.date.slice(5)}</small>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="tux-report-trend__unavailable">
+            Trend unavailable: the loaded source page is not the complete date-range dataset.
+          </p>
+        )}
+      </section>
       {summary.incompleteCostEvents > 0 ? (
         <p role="status" className="tux-report-caveat">
           {summary.incompleteCostEvents} source event(s) lack a verified unit cost. An incomplete
@@ -94,88 +158,99 @@ export function ReportView({
         </p>
       ) : null}
       {summary.coverageNote ? <p className="tux-report-caveat">{summary.coverageNote}</p> : null}
-      {data.rows.length === 0 ? (
-        <EmptyState
-          title="No report events"
-          description="There are no matching records for this shop and date range."
-        />
-      ) : (
-        <div className="tux-report-results">
-          <ul className="tux-report-mobile-entries" aria-label="Report entries">
-            {data.rows.map((fact) => {
-              const href = reportDrilldownHref(fact.drilldown);
-              return (
-                <li key={`mobile:${fact.sourceKind}:${fact.id}`}>
-                  <div className="tux-report-mobile-entries__top">
-                    <span>
-                      {new Date(fact.occurredAt).toLocaleDateString('en-EG', {
-                        timeZone: 'Africa/Cairo',
-                      })}
-                    </span>
-                    <strong>
-                      {fact.amountMinor === null ? 'Not available' : amountLabel(fact.amountMinor)}
-                    </strong>
-                  </div>
-                  <small>{fact.sourceKind.replaceAll('-', ' ')}</small>
-                  <p>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</p>
-                </li>
-              );
-            })}
-          </ul>
-          <div className="tux-report-table-wrap">
-            <table className="tux-report-table">
-              <thead>
-                <tr>
-                  <th scope="col">Date</th>
-                  <th scope="col">Source</th>
-                  <th scope="col">Description</th>
-                  <th scope="col">Amount (EGP)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.rows.map((fact) => {
-                  const href = reportDrilldownHref(fact.drilldown);
-                  return (
-                    <tr key={`${fact.sourceKind}:${fact.id}`}>
-                      <td>
-                        {new Date(fact.occurredAt).toLocaleDateString('en-EG', {
-                          timeZone: 'Africa/Cairo',
-                        })}
-                      </td>
-                      <td>{fact.sourceKind.replaceAll('-', ' ')}</td>
-                      <td>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</td>
-                      <td>
+      <section className="tux-report-source-card" aria-label="Source activity">
+        <header className="tux-report-results__heading">
+          <h3>Source activity</h3>
+          <small>{summary.eventCount.toLocaleString('en-EG')} matching records</small>
+        </header>
+        {data.rows.length === 0 ? (
+          <EmptyState
+            title="No report events"
+            description="There are no matching records for this shop and date range."
+          />
+        ) : (
+          <div className="tux-report-results">
+            <ul className="tux-report-mobile-entries" aria-label="Report entries">
+              {data.rows.map((fact) => {
+                const href = reportDrilldownHref(fact.drilldown);
+                return (
+                  <li key={`mobile:${fact.sourceKind}:${fact.id}`}>
+                    <div className="tux-report-mobile-entries__top">
+                      <p>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</p>
+                      <strong>
                         {fact.amountMinor === null
                           ? 'Not available'
                           : amountLabel(fact.amountMinor)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </strong>
+                    </div>
+                    <small>
+                      {new Date(fact.occurredAt).toLocaleDateString('en-EG', {
+                        timeZone: 'Africa/Cairo',
+                      })}{' '}
+                      · {fact.sourceKind.replaceAll('-', ' ')} ·{' '}
+                      {shopNames[fact.shopId] ?? fact.shopId}
+                    </small>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="tux-report-table-wrap">
+              <table className="tux-report-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Date</th>
+                    <th scope="col">Record</th>
+                    <th scope="col">Source</th>
+                    <th scope="col">Shop</th>
+                    <th scope="col">Amount (EGP)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.rows.map((fact) => {
+                    const href = reportDrilldownHref(fact.drilldown);
+                    return (
+                      <tr key={`${fact.sourceKind}:${fact.id}`}>
+                        <td>
+                          {new Date(fact.occurredAt).toLocaleDateString('en-EG', {
+                            timeZone: 'Africa/Cairo',
+                          })}
+                        </td>
+                        <td>{href ? <Link href={href}>{fact.label}</Link> : fact.label}</td>
+                        <td>{fact.sourceKind.replaceAll('-', ' ')}</td>
+                        <td>{shopNames[fact.shopId] ?? fact.shopId}</td>
+                        <td>
+                          {fact.amountMinor === null
+                            ? 'Not available'
+                            : amountLabel(fact.amountMinor)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
-      <nav className="tux-report-pagination" aria-label="Report pages">
-        <button
-          type="button"
-          className="admin-secondary-button"
-          disabled={filters.offset === 0}
-          onClick={() => onOffset(Math.max(0, filters.offset - 50))}
-        >
-          Previous
-        </button>
-        <span>{reportPaginationLabel(filters.offset, data.rows.length, summary.eventCount)}</span>
-        <button
-          type="button"
-          className="admin-secondary-button"
-          disabled={data.nextOffset === null}
-          onClick={() => onOffset(data.nextOffset ?? filters.offset)}
-        >
-          Next
-        </button>
-      </nav>
+        )}
+        <nav className="tux-report-pagination" aria-label="Report pages">
+          <button
+            type="button"
+            className="admin-secondary-button"
+            disabled={filters.offset === 0}
+            onClick={() => onOffset(Math.max(0, filters.offset - 50))}
+          >
+            Previous
+          </button>
+          <span>{reportPaginationLabel(filters.offset, data.rows.length, summary.eventCount)}</span>
+          <button
+            type="button"
+            className="admin-secondary-button"
+            disabled={data.nextOffset === null}
+            onClick={() => onOffset(data.nextOffset ?? filters.offset)}
+          >
+            Next
+          </button>
+        </nav>
+      </section>
     </section>
   );
 }

@@ -1,6 +1,6 @@
 import type { AdminPermission, AdminReportArea, AdminSessionPrincipal } from '@tux/admin-contracts';
 
-import { requirePermission } from '../authorization.js';
+import { AdminAuthorizationError, requirePermission } from '../authorization.js';
 
 // An additional domain grant is required even when reports.view is allowed.
 // Custom role overrides are respected: neither role names nor UI visibility grant access.
@@ -76,11 +76,73 @@ export function requireReportContextPermissions(
   context: Readonly<Record<string, unknown>>,
   shopId: string,
 ): void {
-  for (const [key, permission] of Object.entries(CONTEXT_PERMISSIONS)) {
-    if (context[key] !== undefined && context[key] !== null && context[key] !== '') {
-      requirePermission(principal, permission, shopId);
+  // Saved report views put protected context IDs under filters.context.
+  // Never authorize only the outer filters object.
+  const nested = context['context'];
+  if (
+    nested !== undefined &&
+    (nested === null || typeof nested !== 'object' || Array.isArray(nested))
+  ) {
+    throw new AdminAuthorizationError('permission_forbidden');
+  }
+  const candidates: Readonly<Record<string, unknown>>[] = [context];
+  if (nested) candidates.push(nested as Readonly<Record<string, unknown>>);
+  for (const candidate of candidates) {
+    for (const [key, permission] of Object.entries(CONTEXT_PERMISSIONS)) {
+      if (candidate[key] !== undefined && candidate[key] !== null && candidate[key] !== '') {
+        requirePermission(principal, permission, shopId);
+      }
     }
   }
+}
+
+/** Hide saved views with stale grants, restricted filter contexts or foreign-shop scopes. */
+export function filterAuthorizedReportSavedViews(
+  principal: AdminSessionPrincipal,
+  savedViews: unknown,
+  shopId: string,
+): readonly Record<string, unknown>[] {
+  if (!Array.isArray(savedViews)) return [];
+  return savedViews.filter((view): view is Record<string, unknown> => {
+    if (!view || typeof view !== 'object' || Array.isArray(view)) return false;
+    const row = view as Record<string, unknown>;
+    const area = row['reportArea'];
+    const viewShop = row['shopId'];
+    const filters = row['filters'];
+    if (
+      typeof area !== 'string' ||
+      !(area in REPORT_AREA_PERMISSION) ||
+      (viewShop != null && viewShop !== shopId) ||
+      !filters ||
+      typeof filters !== 'object' ||
+      Array.isArray(filters)
+    ) {
+      return false;
+    }
+    const filterData = filters as Record<string, unknown>;
+    const selected = filterData['shopIds'];
+    if (
+      selected !== undefined &&
+      (!Array.isArray(selected) ||
+        selected.length === 0 ||
+        selected.some((id) => typeof id !== 'string'))
+    ) {
+      return false;
+    }
+    try {
+      const reportArea = area as AdminReportArea;
+      requireReportArea(principal, reportArea, shopId);
+      for (const id of (selected as string[] | undefined) ?? []) {
+        requireReportArea(principal, reportArea, id);
+        requireReportContextPermissions(principal, filterData, id);
+      }
+      requireReportContextPermissions(principal, filterData, shopId);
+      return true;
+    } catch (error) {
+      if (error instanceof AdminAuthorizationError) return false;
+      throw error;
+    }
+  });
 }
 
 /** BFF defense in depth for read models already filtered by the trusted RPC. */

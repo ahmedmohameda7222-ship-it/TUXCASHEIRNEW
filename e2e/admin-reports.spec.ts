@@ -88,7 +88,7 @@ async function mockReports(page: Page) {
           {
             id: '44444444-4444-4444-8444-444444444444',
             shopId,
-            occurredAt: '2026-10-08T09:00:00.000Z',
+            occurredAt: `${url.searchParams.get('to') ?? '2026-10-29'}T09:00:00.000Z`,
             sourceKind: 'payment',
             label: 'Cash payment',
             amountMinor: 12500,
@@ -120,6 +120,44 @@ async function mockReports(page: Page) {
   return { queries, commands };
 }
 
+test('R1 approved actions sit in the report header and beside the selected report on phone', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockReports(page);
+  await page.goto('/reports');
+  await expect(
+    page.locator('.admin-page__primary-action').getByRole('button', {
+      name: 'Save this report view',
+    }),
+  ).toBeVisible();
+  await expect(
+    page.locator('.tux-report-view__intro').getByRole('button', { name: 'Set target' }),
+  ).toBeVisible();
+});
+
+test('R1 Owner summary action is gated by finance view and opens the read-only section', async ({
+  page,
+}) => {
+  await mockReports(page);
+  await page.route('**/api/admin/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...session,
+        principal: {
+          ...session.principal,
+          permissions: [...session.principal.permissions, 'finance.view'],
+        },
+      }),
+    });
+  });
+  await page.goto('/reports');
+  await page.getByRole('button', { name: 'Owner summary' }).click();
+  await expect(page.locator('#tux-reports-owner-summary')).toBeVisible();
+});
+
 test('reports preserve source filtering and period comparison on server-side requests', async ({
   page,
 }) => {
@@ -127,6 +165,7 @@ test('reports preserve source filtering and period comparison on server-side req
   await page.goto('/reports');
   await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
   await expect(page.getByRole('table')).toBeVisible();
+  await page.getByText('Filters', { exact: true }).click();
   await page.getByLabel('Order source').selectOption('POS');
   await expect.poll(() => queries.some((query) => query.get('source') === 'POS')).toBe(true);
   await page.getByLabel('Compare previous period').check();
@@ -136,14 +175,14 @@ test('reports preserve source filtering and period comparison on server-side req
     )
     .toBe(true);
   await expect(page.getByText('Previous period recorded amount')).toBeVisible();
-  await page.locator('.tux-report-filters select').first().selectOption('expenses');
+  await page.getByLabel('All reports').selectOption('expenses');
   await expect.poll(() => queries.some((query) => query.get('area') === 'expenses')).toBe(true);
 });
 
 test('contextual payment-method filter and comparison presets reach server', async ({ page }) => {
   const { queries } = await mockReports(page);
   await page.goto('/reports');
-  await page.getByText('More filters').click();
+  await page.getByText('Filters', { exact: true }).click();
   await page.getByLabel('Payment method').selectOption('66666666-6666-4666-8666-666666666666');
   await expect
     .poll(() =>
@@ -180,11 +219,74 @@ test('saved report views send one authorized CSRF-protected versioned command', 
   );
 });
 
+test('R2 failed Save View keeps modal and name until the server confirms persistence', async ({
+  page,
+}) => {
+  await mockReports(page);
+  await page.route('**/api/admin/reports**', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const payload = route.request().postDataJSON() as { type?: string };
+    if (payload.type !== 'report.view.save') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'report_version_conflict' }),
+    });
+  });
+  await page.goto('/reports');
+  await page.getByRole('button', { name: 'Save this report view' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Save report view' });
+  await dialog.getByLabel('View name').fill('Weekly owner review');
+  await dialog.getByRole('button', { name: 'Save view' }).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('View name')).toHaveValue('Weekly owner review');
+  await expect(dialog.getByRole('alert')).toContainText('Unable to save');
+});
+
+test('R2 failed Set Target keeps target dialog open and preserves date window', async ({
+  page,
+}) => {
+  await mockReports(page);
+  await page.route('**/api/admin/reports**', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const payload = route.request().postDataJSON() as { type?: string };
+    if (payload.type !== 'report.target.set') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'report_target_conflict' }),
+    });
+  });
+  await page.goto('/reports');
+  await page.getByRole('button', { name: 'Set target' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Configure report target' });
+  await dialog.getByLabel('From').fill('2026-10-01');
+  await dialog.getByLabel('To').fill('2026-10-31');
+  await dialog.getByRole('button', { name: 'Save target' }).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('From')).toHaveValue('2026-10-01');
+  await expect(dialog.getByLabel('To')).toHaveValue('2026-10-31');
+  await expect(dialog.getByRole('alert')).toBeVisible();
+});
+
 test('phone report presentation', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockReports(page);
   await page.goto('/reports');
   await expect(page.getByRole('list', { name: 'Report entries' })).toBeVisible();
+  await expect(page.getByRole('img', { name: /events/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
@@ -255,4 +357,69 @@ test('Reports blocks an inverted date range instead of sending a misleading quer
         params.get('to') !== null,
     ),
   ).toBe(false);
+});
+
+test('R4 current and all-authorized exports download real PDF responses with correct scope', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockReports(page);
+  const payloads: Array<Record<string, unknown>> = [];
+  await page.route('**/api/admin/reports**', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    if (body.view !== 'pdf-export') {
+      await route.fallback();
+      return;
+    }
+    payloads.push(body);
+    expect(route.request().headers()['x-tux-admin-csrf']).toBe(csrfToken);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/pdf',
+      headers: { 'content-disposition': 'attachment; filename="tux-report.pdf"' },
+      body: '%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF',
+    });
+  });
+  await page.goto('/reports');
+  const first = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download report PDF' }).click();
+  expect((await first).suggestedFilename()).toMatch(/tux-reports-current-.*\.pdf/);
+  const second = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'All 22 reports (1 PDF)' }).click();
+  expect((await second).suggestedFilename()).toMatch(/tux-reports-all-authorized-.*\.pdf/);
+  expect(payloads).toHaveLength(2);
+  expect(payloads[0]).toMatchObject({
+    view: 'pdf-export',
+    kind: 'current',
+    area: 'sales',
+    shopIds: [shopId],
+  });
+  expect(payloads[1]).toMatchObject({
+    view: 'pdf-export',
+    kind: 'all-authorized',
+    context: {},
+    source: null,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
+test('R4 reversed report dates disable PDF export before any request', async ({ page }) => {
+  await mockReports(page);
+  await page.goto('/reports');
+  await page
+    .getByRole('region', { name: 'Report filters' })
+    .getByLabel('From', { exact: true })
+    .fill('2026-10-31');
+  await page
+    .getByRole('region', { name: 'Report filters' })
+    .getByLabel('To', { exact: true })
+    .fill('2026-10-01');
+  await expect(page.getByRole('button', { name: 'Download report PDF' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'All 22 reports (1 PDF)' })).toBeDisabled();
 });

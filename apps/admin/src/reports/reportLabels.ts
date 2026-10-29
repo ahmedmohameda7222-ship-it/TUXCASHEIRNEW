@@ -1,0 +1,26 @@
+import type { AdminReportArea } from '@tux/admin-contracts';
+
+export const REPORT_LABELS: Readonly<Record<AdminReportArea, string>> = {
+  sales: 'Sales',
+  profit: 'Estimated profit and COGS',
+  products: 'Product performance',
+  'inventory-consumption': 'Inventory consumption',
+  waste: 'Waste',
+  'theoretical-variance': 'Inventory variance events',
+  'margin-variance': 'Recorded cost movements',
+  purchasing: 'Purchasing',
+  customers: 'Customers',
+  payments: 'Payments',
+  expenses: 'Expenses',
+  staff: 'Staff and attendance',
+  delivery: 'Delivery',
+  refunds: 'Refunds and returns',
+  tax: 'Tax and service charges',
+  'end-day': 'Financial Z history',
+  'bank-cash': 'Bank and cash movements',
+  'shop-comparison': 'Shop comparison',
+  loyalty: 'Customer loyalty activity',
+  promotions: 'Promotion usage',
+  segments: 'Customer segments',
+  attendance: 'Staff attendance',
+};

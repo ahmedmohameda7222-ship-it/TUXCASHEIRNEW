@@ -2,13 +2,15 @@ import type { AdminReportArea } from '@tux/admin-contracts';
 import { useEffect, useRef, useState } from 'react';
 
 import { ErrorState, LoadingState } from '../components/feedback/AdminStates';
+import { useAdminSession } from '../auth/useAdminSession';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { TargetsPanel } from '../dashboard/TargetsPanel';
 import { OwnerSummaryCard } from '../dashboard/OwnerSummaryCard';
 import { useShopScope } from '../shops/ShopScopeProvider';
 
 import { REPORT_LABELS, ReportFilters } from './ReportFilters';
-import { validReportDateRange } from './reportDateRange';
+import { ReportExportActions } from './ReportExportActions';
+import { cairoReportToday, reportDatePreset, validReportDateRange } from './reportDateRange';
 import { scopeReportFilters } from './reportScope';
 import { ReportView } from './ReportView';
 import { SavedViews } from './SavedViews';
@@ -19,24 +21,13 @@ import {
 } from './useReports';
 import './reports.css';
 
-function cairoToday(): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Africa/Cairo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date());
-  const get = (kind: string) => parts.find((item) => item.type === kind)?.value ?? '';
-  return `${get('year')}-${get('month')}-${get('day')}`;
-}
-
 export function ReportsPage() {
+  const session = useAdminSession();
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : principal.shopIds[0];
   const [filters, setFilters] = useState<ReportFilterState>(() => ({
     area: 'sales',
-    fromDate: cairoToday(),
-    toDate: cairoToday(),
+    ...reportDatePreset(cairoReportToday(), 7),
     source: null,
     shopIds: scope.kind === 'all-shops' ? principal.shopIds : shopId ? [shopId] : [],
     comparePrevious: false,
@@ -45,6 +36,8 @@ export function ReportsPage() {
     offset: 0,
   }));
   const [filterOptionsExpanded, setFilterOptionsExpanded] = useState(false);
+  const [saveOpenRequest, setSaveOpenRequest] = useState(0);
+  const [targetOpenRequest, setTargetOpenRequest] = useState(0);
   const scopeKey = scope.kind === 'shop' ? `shop:${scope.shopId}` : 'all-shops';
   const previousScopeKey = useRef(scopeKey);
   const scopeChanged = previousScopeKey.current !== scopeKey;
@@ -88,8 +81,8 @@ export function ReportsPage() {
     const iso = /^\d{4}-\d{2}-\d{2}$/;
     setFilters({
       area: area as AdminReportArea,
-      fromDate: typeof fromDate === 'string' && iso.test(fromDate) ? fromDate : cairoToday(),
-      toDate: typeof toDate === 'string' && iso.test(toDate) ? toDate : cairoToday(),
+      fromDate: typeof fromDate === 'string' && iso.test(fromDate) ? fromDate : cairoReportToday(),
+      toDate: typeof toDate === 'string' && iso.test(toDate) ? toDate : cairoReportToday(),
       source: source === 'POS' || source === 'ONLINE' ? source : null,
       shopIds: savedShops.length > 0 ? savedShops : [shopId!],
       comparePrevious: view.filters['comparePrevious'] === true,
@@ -119,13 +112,37 @@ export function ReportsPage() {
     <PageScaffold
       eyebrow="Business intelligence"
       title="Reports"
-      description="Canonical performance reports with saved filters, targets and source activity."
+      description="See what's changing, understand why, and open the original source records."
+      primaryAction={
+        <div className="tux-reports-header-actions">
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={!config}
+            onClick={() => document.getElementById('tux-reports-saved-views')?.scrollIntoView()}
+          >
+            Saved views
+          </button>
+          <button
+            className="admin-primary-button"
+            type="button"
+            aria-label="Save this report view"
+            disabled={!config}
+            onClick={() => setSaveOpenRequest((value) => value + 1)}
+          >
+            Save report
+          </button>
+        </div>
+      }
     >
       <ReportFilters
         value={scopedFilters}
         onChange={setFilters}
         canCompareShops={principal.role === 'OWNER'}
         allShopIds={principal.shopIds}
+        shopNames={Object.fromEntries(
+          (principal.shopSummaries ?? []).map((shop) => [shop.id, shop.name]),
+        )}
         options={reports.optionsQuery.data?.options ?? {}}
         onExpand={() => setFilterOptionsExpanded(true)}
       />
@@ -135,6 +152,40 @@ export function ReportsPage() {
         </p>
       ) : null}
       <ReportView
+        shopNames={Object.fromEntries(
+          (principal.shopSummaries ?? []).map((shop) => [shop.id, shop.name]),
+        )}
+        exportActions={
+          <div className="tux-reports-report-actions">
+            {principal.permissions.includes('finance.view') ? (
+              <button
+                type="button"
+                className="admin-secondary-button"
+                onClick={() =>
+                  document.getElementById('tux-reports-owner-summary')?.scrollIntoView()
+                }
+              >
+                Owner summary
+              </button>
+            ) : null}
+            {config && principal.permissions.includes('settings.manage') ? (
+              <button
+                type="button"
+                className="admin-secondary-button"
+                onClick={() => setTargetOpenRequest((value) => value + 1)}
+              >
+                Set target
+              </button>
+            ) : null}
+            <ReportExportActions
+              filters={scopedFilters}
+              shopId={shopId}
+              csrfToken={
+                session.state.status === 'authenticated' ? session.state.session.csrfToken : null
+              }
+            />
+          </div>
+        }
         data={reports.reportQuery.data}
         filters={scopedFilters}
         loading={reports.reportQuery.isLoading}
@@ -166,17 +217,25 @@ export function ReportsPage() {
           summary={reports.reportQuery.data?.summary}
         />
       ) : null}
-      {principal.permissions.includes('finance.view') ? <OwnerSummaryCard shopId={shopId} /> : null}
+      {principal.permissions.includes('finance.view') ? (
+        <div id="tux-reports-owner-summary">
+          <OwnerSummaryCard shopId={shopId} />
+        </div>
+      ) : null}
       {config ? (
         <SavedViews
           shopId={shopId}
+          saveOpenRequest={saveOpenRequest}
+          targetOpenRequest={targetOpenRequest}
           views={config.savedViews}
           targets={config.targets}
           filters={scopedFilters}
           canSetTargets={principal.permissions.includes('settings.manage')}
           pending={reports.command.isPending}
           error={reports.command.error}
-          onCommand={(draft) => reports.command.mutate(draft)}
+          onCommand={async (draft) => {
+            await reports.command.mutateAsync(draft);
+          }}
           onApply={applySavedView}
         />
       ) : null}

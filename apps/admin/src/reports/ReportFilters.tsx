@@ -1,32 +1,11 @@
 import type { AdminReportArea } from '@tux/admin-contracts';
+import { REPORT_LABELS } from './reportLabels';
 
 import { chooseReportArea } from './reportAreaTransition';
+import { cairoReportToday, reportDatePreset } from './reportDateRange';
 import type { ReportContext, ReportFilters as ReportQueryFilters } from './useReports';
 
-export const REPORT_LABELS: Readonly<Record<AdminReportArea, string>> = {
-  sales: 'Sales',
-  profit: 'Estimated profit and COGS',
-  products: 'Product performance',
-  'inventory-consumption': 'Inventory consumption',
-  waste: 'Waste',
-  'theoretical-variance': 'Inventory variance events',
-  'margin-variance': 'Recorded cost movements',
-  purchasing: 'Purchasing',
-  customers: 'Customers',
-  payments: 'Payments',
-  expenses: 'Expenses',
-  staff: 'Staff and attendance',
-  delivery: 'Delivery',
-  refunds: 'Refunds and returns',
-  tax: 'Tax and service charges',
-  'end-day': 'Financial Z history',
-  'bank-cash': 'Bank and cash movements',
-  'shop-comparison': 'Shop comparison',
-  loyalty: 'Customer loyalty activity',
-  promotions: 'Promotion usage',
-  segments: 'Customer segments',
-  attendance: 'Staff attendance',
-};
+export { REPORT_LABELS } from './reportLabels';
 export const REPORT_TOPICS = [
   {
     label: 'Sales & customers',
@@ -67,6 +46,7 @@ export function ReportFilters({
   onChange,
   canCompareShops,
   allShopIds,
+  shopNames = {},
   options,
   onExpand,
 }: {
@@ -74,6 +54,7 @@ export function ReportFilters({
   onChange(next: ReportQueryFilters): void;
   canCompareShops: boolean;
   allShopIds: readonly string[];
+  shopNames?: Readonly<Record<string, string>>;
   options: Readonly<Record<string, readonly { id: string; label: string }[]>>;
   onExpand(): void;
 }) {
@@ -141,106 +122,177 @@ export function ReportFilters({
               ['RETURNED', 'Returned'],
             ]
           : [];
+  const quickReports = [
+    'sales',
+    'products',
+    'inventory-consumption',
+    'customers',
+    'expenses',
+  ] as const satisfies readonly AdminReportArea[];
+  const today = cairoReportToday();
+  const activePreset = ([1, 7, 30] as const).find((days) => {
+    const period = reportDatePreset(today, days);
+    return period.fromDate === value.fromDate && period.toDate === value.toDate;
+  });
+  function applyPreset(days: 1 | 7 | 30) {
+    onChange({
+      ...value,
+      ...reportDatePreset(cairoReportToday(), days),
+      offset: 0,
+    });
+  }
   return (
-    <section className="tux-report-filters" aria-label="Report filters">
-      <label>
-        Report
-        <select
-          value={value.area}
-          onChange={(event) =>
-            onChange(chooseReportArea(value, event.target.value as AdminReportArea))
-          }
-        >
-          {REPORT_TOPICS.map((topic) => (
-            <optgroup label={topic.label} key={topic.label}>
-              {topic.areas.map((area) => (
-                <option key={area} value={area}>
-                  {REPORT_LABELS[area]}
-                </option>
-              ))}
-            </optgroup>
+    <section className="tux-report-selector" aria-label="Choose a report">
+      <header className="tux-report-selector__header">
+        <h2>Choose a report</h2>
+        <span>22 available</span>
+      </header>
+      <nav className="tux-report-quick" aria-label="Quick reports">
+        {quickReports.map((area) => (
+          <button
+            key={area}
+            type="button"
+            className={area === value.area ? 'tux-report-quick__active' : ''}
+            aria-pressed={area === value.area}
+            onClick={() => onChange(chooseReportArea(value, area))}
+          >
+            {area === 'inventory-consumption' ? 'Inventory' : REPORT_LABELS[area]}
+          </button>
+        ))}
+        <label className="tux-report-all">
+          <span>All reports</span>
+          <select
+            aria-label="All reports"
+            value={value.area}
+            onChange={(event) =>
+              onChange(chooseReportArea(value, event.target.value as AdminReportArea))
+            }
+          >
+            {REPORT_TOPICS.map((topic) => (
+              <optgroup label={topic.label} key={topic.label}>
+                {topic.areas.map((area) => (
+                  <option key={area} value={area}>
+                    {REPORT_LABELS[area]}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+      </nav>
+      <section className="tux-report-filters" aria-label="Report filters">
+        <div className="tux-report-presets" role="group" aria-label="Date presets">
+          {([1, 7, 30] as const).map((days) => (
+            <button
+              key={days}
+              type="button"
+              className="admin-secondary-button"
+              aria-pressed={activePreset === days}
+              onClick={() => applyPreset(days)}
+            >
+              {days === 1 ? 'Today' : `${days} days`}
+            </button>
           ))}
-        </select>
-      </label>
-      <label>
-        From
-        <input
-          type="date"
-          value={value.fromDate}
-          onChange={(event) => set('fromDate', event.target.value)}
-        />
-      </label>
-      <label>
-        To
-        <input
-          type="date"
-          value={value.toDate}
-          onChange={(event) => set('toDate', event.target.value)}
-        />
-      </label>
-      <label>
-        Order source
-        <select
-          value={value.source ?? 'ALL'}
-          onChange={(event) =>
-            set(
-              'source',
-              event.target.value === 'ALL' ? null : (event.target.value as 'POS' | 'ONLINE'),
-            )
-          }
-        >
-          <option value="ALL">All sources</option>
-          <option value="POS">POS</option>
-          <option value="ONLINE">Online</option>
-        </select>
-      </label>
-      {canCompareShops && allShopIds.length > 1 ? (
-        <label>
-          Shops
-          <select
-            value={value.shopIds.length === allShopIds.length ? 'ALL' : 'SELECTED'}
-            onChange={(event) =>
-              set('shopIds', event.target.value === 'ALL' ? allShopIds : [allShopIds[0]!])
-            }
-          >
-            <option value="ALL">All authorized shops</option>
-            <option value="SELECTED">First shop</option>
-          </select>
+        </div>
+        <label className="tux-report-date-start">
+          From
+          <input
+            type="date"
+            value={value.fromDate}
+            onChange={(event) => set('fromDate', event.target.value)}
+          />
         </label>
-      ) : null}
-      <label className="tux-report-filters__check">
-        <input
-          type="checkbox"
-          checked={value.comparePrevious}
-          onChange={(event) => set('comparePrevious', event.target.checked)}
-        />
-        Compare previous period
-      </label>
-      {value.comparePrevious ? (
-        <label>
-          Comparison range
-          <select
-            value={value.comparisonRange ?? 'previous'}
-            onChange={(event) =>
-              set('comparisonRange', event.target.value as 'previous' | 'week' | 'month' | 'year')
-            }
-          >
-            <option value="previous">Previous equivalent period</option>
-            <option value="week">Previous week</option>
-            <option value="month">Previous calendar month</option>
-            <option value="year">Previous calendar year</option>
-          </select>
+        <label className="tux-report-date-end">
+          To
+          <input
+            type="date"
+            value={value.toDate}
+            onChange={(event) => set('toDate', event.target.value)}
+          />
         </label>
-      ) : null}
-      {extraFields.length > 0 || statuses.length > 0 ? (
+        <div className="tux-report-shop">
+          {canCompareShops && allShopIds.length > 1 ? (
+            <label>
+              <span className="tux-report-visually-hidden">Shops</span>
+              <select
+                aria-label="Shops"
+                value={
+                  value.shopIds.length === allShopIds.length
+                    ? 'ALL'
+                    : value.shopIds.length === 1
+                      ? value.shopIds[0]
+                      : 'ALL'
+                }
+                onChange={(event) =>
+                  set('shopIds', event.target.value === 'ALL' ? allShopIds : [event.target.value])
+                }
+              >
+                <option value="ALL">All authorized shops</option>
+                {allShopIds.map((id) => (
+                  <option key={id} value={id}>
+                    {shopNames[id] ?? id}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <span className="tux-report-shop__name">
+              {shopNames[value.shopIds[0] ?? ''] ?? 'Current shop'}
+            </span>
+          )}
+        </div>
+        <label className="tux-report-filters__check">
+          <input
+            type="checkbox"
+            checked={value.comparePrevious}
+            onChange={(event) => set('comparePrevious', event.target.checked)}
+            aria-label="Compare previous period"
+          />
+          Compare
+        </label>
         <details
           className="tux-report-context"
           onToggle={(event) => {
             if (event.currentTarget.open) onExpand();
           }}
         >
-          <summary>More filters</summary>
+          <summary>Filters</summary>
           <div className="tux-report-context__fields">
+            <label>
+              Order source
+              <select
+                value={value.source ?? 'ALL'}
+                onChange={(event) =>
+                  set(
+                    'source',
+                    event.target.value === 'ALL' ? null : (event.target.value as 'POS' | 'ONLINE'),
+                  )
+                }
+              >
+                <option value="ALL">All sources</option>
+                <option value="POS">POS</option>
+                <option value="ONLINE">Online</option>
+              </select>
+            </label>
+            {value.comparePrevious ? (
+              <label>
+                Comparison range
+                <select
+                  value={value.comparisonRange ?? 'previous'}
+                  onChange={(event) =>
+                    set(
+                      'comparisonRange',
+                      event.target.value as 'previous' | 'week' | 'month' | 'year',
+                    )
+                  }
+                >
+                  <option value="previous">Previous equivalent period</option>
+                  <option value="week">Previous week</option>
+                  <option value="month">Previous calendar month</option>
+                  <option value="year">Previous calendar year</option>
+                </select>
+              </label>
+            ) : null}
             {extraFields
               .filter((field) => (options[field.optionsKey] ?? []).length > 0)
               .map((field) => (
@@ -277,7 +329,24 @@ export function ReportFilters({
             ) : null}
           </div>
         </details>
-      ) : null}
+        <button
+          type="button"
+          className="admin-secondary-button tux-report-reset"
+          onClick={() =>
+            onChange({
+              ...value,
+              ...reportDatePreset(cairoReportToday(), 7),
+              source: null,
+              comparePrevious: false,
+              comparisonRange: 'previous',
+              context: {},
+              offset: 0,
+            })
+          }
+        >
+          Reset
+        </button>
+      </section>
     </section>
   );
 }

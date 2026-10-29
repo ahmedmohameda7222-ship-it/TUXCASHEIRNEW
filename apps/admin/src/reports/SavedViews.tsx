@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { InlineError } from '../components/feedback/AdminStates';
 import { AdminDialog } from '../components/overlay/AdminDialog';
 import { parseEgpMinor, formatEgp } from '../finance/money';
 
 import { REPORT_LABELS } from './ReportFilters';
+import { matchingTargetForPeriod, validReportTargetPeriod } from './reportTargetPeriod';
 import type {
   ReportConfigDraft,
   ReportFilters,
@@ -14,6 +15,8 @@ import type {
 
 export function SavedViews({
   shopId,
+  saveOpenRequest,
+  targetOpenRequest,
   views,
   targets,
   filters,
@@ -24,13 +27,15 @@ export function SavedViews({
   onApply,
 }: {
   shopId: string;
+  saveOpenRequest: number;
+  targetOpenRequest: number;
   views: readonly SavedReportViewRow[];
   targets: readonly ReportTargetRow[];
   filters: ReportFilters;
   canSetTargets: boolean;
   pending: boolean;
   error: unknown;
-  onCommand(draft: ReportConfigDraft): void;
+  onCommand(draft: ReportConfigDraft): Promise<void>;
   onApply(view: SavedReportViewRow): void;
 }) {
   const [showSave, setShowSave] = useState(false);
@@ -41,37 +46,64 @@ export function SavedViews({
   const [targetStart, setTargetStart] = useState(filters.fromDate);
   const [targetEnd, setTargetEnd] = useState(filters.toDate);
   const [localError, setLocalError] = useState<string | null>(null);
+  const previousSaveRequest = useRef(saveOpenRequest);
+  const previousTargetRequest = useRef(targetOpenRequest);
 
-  function saveView() {
+  useEffect(() => {
+    if (previousSaveRequest.current === saveOpenRequest) return;
+    previousSaveRequest.current = saveOpenRequest;
+    setLocalError(null);
+    setShowSave(true);
+  }, [saveOpenRequest]);
+
+  useEffect(() => {
+    if (previousTargetRequest.current === targetOpenRequest) return;
+    previousTargetRequest.current = targetOpenRequest;
+    if (!canSetTargets) return;
+    setTargetStart(filters.fromDate);
+    setTargetEnd(filters.toDate);
+    setLocalError(null);
+    setShowTarget(true);
+  }, [targetOpenRequest, canSetTargets, filters.fromDate, filters.toDate]);
+
+  async function saveView() {
     if (!name.trim()) {
       setLocalError('Enter a view name.');
       return;
     }
-    onCommand({
-      type: 'report.view.save',
-      shopId,
-      id: null,
-      expectedVersion: 0,
-      name: name.trim(),
-      reportArea: filters.area,
-      filters: {
-        area: filters.area,
-        fromDate: filters.fromDate,
-        toDate: filters.toDate,
-        source: filters.source,
-        shopIds: filters.shopIds,
-        comparePrevious: filters.comparePrevious,
-        comparisonRange: filters.comparisonRange ?? 'previous',
-        context: filters.context ?? {},
-      },
-      layout: {},
-    });
-    setShowSave(false);
-    setName('');
     setLocalError(null);
-  }
-  function saveTarget() {
     try {
+      await onCommand({
+        type: 'report.view.save',
+        shopId,
+        id: null,
+        expectedVersion: 0,
+        name: name.trim(),
+        reportArea: filters.area,
+        filters: {
+          area: filters.area,
+          fromDate: filters.fromDate,
+          toDate: filters.toDate,
+          source: filters.source,
+          shopIds: filters.shopIds,
+          comparePrevious: filters.comparePrevious,
+          comparisonRange: filters.comparisonRange ?? 'previous',
+          context: filters.context ?? {},
+        },
+        layout: {},
+      });
+      setShowSave(false);
+      setName('');
+      setLocalError(null);
+    } catch {
+      setLocalError('Unable to save report view. Your report has not been saved. Retry.');
+    }
+  }
+  async function saveTarget() {
+    try {
+      if (!validReportTargetPeriod(targetStart, targetEnd)) {
+        throw new Error('Select a valid target From/To period in ascending order.');
+      }
       const targetValue =
         targetMetric === 'NET_SALES' || targetMetric === 'WASTE'
           ? parseEgpMinor(targetAmount)
@@ -85,13 +117,14 @@ export function SavedViews({
       ) {
         throw new Error('Enter a valid nonnegative target.');
       }
-      const existing = targets.find(
-        (target) =>
-          target.metric === targetMetric &&
-          target.periodStart === targetStart &&
-          target.periodEnd === targetEnd,
+      const existing = matchingTargetForPeriod(
+        targets,
+        shopId,
+        targetMetric,
+        targetStart,
+        targetEnd,
       );
-      onCommand({
+      await onCommand({
         type: 'report.target.set',
         shopId,
         metric: targetMetric,
@@ -103,28 +136,14 @@ export function SavedViews({
       setShowTarget(false);
       setLocalError(null);
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : 'Invalid target amount');
+      setLocalError(err instanceof Error ? err.message : 'Unable to save target. Retry.');
     }
   }
 
   return (
     <section className="tux-reports-config" aria-label="Saved reports and targets">
-      <div className="tux-reports-config__actions">
-        <button className="admin-secondary-button" type="button" onClick={() => setShowSave(true)}>
-          Save this report view
-        </button>
-        {canSetTargets ? (
-          <button
-            className="admin-secondary-button"
-            type="button"
-            onClick={() => setShowTarget(true)}
-          >
-            Set target
-          </button>
-        ) : null}
-      </div>
       {error ? <InlineError>Unable to update report settings. Please retry.</InlineError> : null}
-      <h2>Saved views</h2>
+      <h2 id="tux-reports-saved-views">Saved views</h2>
       {views.length === 0 ? (
         <p>No saved report views yet.</p>
       ) : (
@@ -143,14 +162,14 @@ export function SavedViews({
                 type="button"
                 disabled={pending}
                 aria-label={`Delete view ${view.name}`}
-                onClick={() =>
-                  onCommand({
+                onClick={() => {
+                  void onCommand({
                     type: 'report.view.delete',
                     shopId,
                     id: view.id,
                     expectedVersion: view.version,
-                  })
-                }
+                  }).catch(() => undefined);
+                }}
               >
                 Delete
               </button>
@@ -198,7 +217,7 @@ export function SavedViews({
               className="admin-primary-button"
               type="button"
               disabled={pending}
-              onClick={saveView}
+              onClick={() => void saveView()}
             >
               Save view
             </button>
@@ -229,7 +248,7 @@ export function SavedViews({
               className="admin-primary-button"
               type="button"
               disabled={pending}
-              onClick={saveTarget}
+              onClick={() => void saveTarget()}
             >
               Save target
             </button>
