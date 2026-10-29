@@ -190,17 +190,15 @@ describe('EmployeeDetailPage', () => {
       'permissions',
       true,
     );
-    expect(html).toContain('Operations ready');
+    expect(html).toContain('Operations access');
     expect(html).toContain('Other shop');
     expect(html).not.toContain('Operations setup needed');
   });
 
-  it('exposes first-worker provisioning only to authorized administrators when no eligible worker exists', () => {
-    const enabled = render(employee(), true, [], 'permissions', true);
-    expect(enabled).toContain('Provision and link Operations worker');
-    expect(enabled).toContain('reset it first');
-    const manager = render(employee(), true, [], 'permissions', false);
-    expect(manager).not.toContain('Provision and link Operations worker');
+  it('shows staff PIN readiness without provisioning a worker', () => {
+    const html = render(employee({ pinConfigured: false }), true, [], 'permissions', true);
+    expect(html).toContain('Employee PIN not set');
+    expect(html).not.toContain('Provision and link Operations worker');
   });
 
   it('displays the URL-selected Attendance and Pay tab for an exact employee', () => {

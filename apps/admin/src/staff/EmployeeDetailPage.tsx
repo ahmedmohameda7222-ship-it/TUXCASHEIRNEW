@@ -86,12 +86,6 @@ export function EmployeeDetailPage({
   const [newPin, setNewPin] = useState('');
   const [pinCommandId, setPinCommandId] = useState(() => crypto.randomUUID());
   const [roleDraft, setRoleDraft] = useState<AdminRole>(employee.role);
-  const availableWorkers = workers.filter(
-    (worker) =>
-      worker.shopId === shopId &&
-      (worker.linkedEmployeeId === null || worker.linkedEmployeeId === employee.id),
-  );
-  const [workerId, setWorkerId] = useState(availableWorkers[0]?.id ?? '');
   const [displayName, setDisplayName] = useState(employee.displayName);
   const [phone, setPhone] = useState(employee.phone ?? '');
   const [hireDate, setHireDate] = useState(employee.hireDate ?? '');
@@ -110,20 +104,13 @@ export function EmployeeDetailPage({
     (candidate) => !employee.assignments.some((assignment) => assignment.shopId === candidate),
   );
   const [assignShopId, setAssignShopId] = useState(unassignedShopIds[0] ?? '');
-  const setupRequired = employee.operationsIdentities.filter(
-    (identity) => identity.kind === 'SETUP_REQUIRED',
-  );
-  const currentShopSetupRequired = setupRequired.some((identity) => identity.shopId === shopId);
-  const otherShopSetupRequired = setupRequired.filter((identity) => identity.shopId !== shopId);
   const inactiveOperationsIdentities = employee.operationsIdentities.filter(
     isInactiveLinkedOperationsIdentity,
   );
   // The readiness chip describes this shop; other shops retain independent setup notices.
-  const currentShopIdentity = employee.operationsIdentities.find(
-    (identity) => identity.shopId === shopId,
-  );
   const operationsHealthy =
-    employee.active && currentShopIdentity?.kind === 'LINKED' && currentShopIdentity.workerActive;
+    employee.active && Boolean(employee.pinConfigured) &&
+    !inactiveOperationsIdentities.some((identity) => identity.shopId === shopId);
   const shopName = (id: string) => shops.find((shop) => shop.id === id)?.name ?? 'Authorized shop';
   const initials = employee.displayName
     .trim()
@@ -306,72 +293,16 @@ export function EmployeeDetailPage({
     <>
       <header className="admin-staff-access-heading">
         <h3>Access &amp; permissions</h3>
-        <p>Operations readiness, role defaults and explicit permission overrides</p>
+        <p>Shop assignments, PIN access and explicit permission overrides</p>
       </header>
       <section className="admin-staff-section" aria-labelledby="staff-operations-access">
         <h3 id="staff-operations-access">Operations access</h3>
-        {setupRequired.length > 0 ? (
-          <div className="admin-staff-readiness-state">
-            <strong>Operations setup required</strong>
-            <span>
-              A linked Operations worker is missing for{' '}
-              {setupRequired.map((identity) => shopName(identity.shopId)).join(', ')}.
-            </span>
-            {currentShopSetupRequired && canManage && availableWorkers.length > 0 ? (
-              <>
-                <label className="admin-field">
-                  <span>Operations worker</span>
-                  <select value={workerId} onChange={(event) => setWorkerId(event.target.value)}>
-                    {availableWorkers.map((worker) => (
-                      <option key={worker.id} value={worker.id}>
-                        {worker.displayName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  disabled={!workerId}
-                  onClick={() =>
-                    onCommand({
-                      type: 'employee.link-worker',
-                      employeeId: employee.id,
-                      shopId,
-                      workerId,
-                    })
-                  }
-                >
-                  Complete Operations setup
-                </button>
-              </>
-            ) : currentShopSetupRequired && canProvisionWorker && employee.active ? (
-              <>
-                <span>
-                  No unlinked Operations worker exists. Provision one using this employee's
-                  established Admin PIN verifier. If the employee has no PIN, reset it first.
-                </span>
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  onClick={() =>
-                    onCommand({
-                      type: 'employee.provision-worker',
-                      employeeId: employee.id,
-                      shopId,
-                    })
-                  }
-                >
-                  Provision and link Operations worker
-                </button>
-              </>
-            ) : currentShopSetupRequired && canManage ? (
-              <span>No unlinked active Operations worker is available for this shop.</span>
-            ) : null}
-            {canManage && otherShopSetupRequired.length > 0 ? (
-              <span>Switch to that shop to complete Operations setup.</span>
-            ) : null}
-          </div>
+        <p>
+          Staff can sign in from any browser: select an assigned shop and enter the employee PIN.
+          No Operations setup or device registration is needed.
+        </p>
+        {!employee.pinConfigured && canManage ? (
+          <p>Employee PIN not set. Use Reset employee PIN to enable sign in.</p>
         ) : null}
 
         {inactiveOperationsIdentities.length > 0 ? (

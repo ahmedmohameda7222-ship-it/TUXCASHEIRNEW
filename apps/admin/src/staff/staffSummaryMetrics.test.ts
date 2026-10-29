@@ -4,9 +4,9 @@ import { staffSummaryMetrics } from './staffSummaryMetrics';
 
 const currentShop = 'shop-a';
 const rows = [
-  { active: true, operationsSetupRequiredShopIds: ['shop-a'] },
-  { active: false, operationsSetupRequiredShopIds: [] },
-  { active: true, operationsSetupRequiredShopIds: ['shop-b'] },
+  { active: true, pinConfigured: false },
+  { active: false, pinConfigured: false },
+  { active: true, pinConfigured: true },
 ];
 
 describe('Staff directory summary', () => {
@@ -15,7 +15,7 @@ describe('Staff directory summary', () => {
     expect(metrics.map((metric) => metric.label)).toEqual([
       'Employees',
       'Active staff',
-      'Setup required',
+      'PIN required',
       'Pending leave',
     ]);
     expect(metrics.map((metric) => metric.value)).toEqual([3, 2, 1, 4]);
