@@ -9,6 +9,7 @@ import { useShopScope } from '../shops/ShopScopeProvider';
 
 import { REPORT_LABELS, ReportFilters } from './ReportFilters';
 import { validReportDateRange } from './reportDateRange';
+import { compatibleReportContext } from './reportAreaTransition';
 import { scopeReportFilters } from './reportScope';
 import { ReportView } from './ReportView';
 import { SavedViews } from './SavedViews';
@@ -99,7 +100,7 @@ export function ReportsPage() {
         view.filters['comparisonRange'] === 'year'
           ? view.filters['comparisonRange']
           : 'previous',
-      context: Object.fromEntries(
+      context: compatibleReportContext(area as AdminReportArea, Object.fromEntries(
         Object.entries(
           view.filters['context'] &&
             typeof view.filters['context'] === 'object' &&
@@ -110,7 +111,7 @@ export function ReportsPage() {
           (entry): entry is [string, string] =>
             typeof entry[1] === 'string' && /^(?:[0-9a-f-]{36}|[A-Z_]{2,40})$/i.test(entry[1]),
         ),
-      ),
+      )),
       offset: 0,
     });
   }
