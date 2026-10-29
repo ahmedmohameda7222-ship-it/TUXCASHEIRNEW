@@ -102,6 +102,7 @@ describe('R4 multi-page canonical report PDF', () => {
       }),
     ).toThrow('report_export_font_unsupported');
   });
+
   it('prints source record dates in the Cairo calendar at midnight boundaries', () => {
     const report = sampleExport(1);
     report.sections[0]!.rows[0]!.occurredAt = '2026-10-28T22:30:00.000Z';

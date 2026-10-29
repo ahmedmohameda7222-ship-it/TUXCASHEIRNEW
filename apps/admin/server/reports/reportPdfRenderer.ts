@@ -117,20 +117,29 @@ export function renderAuthorizedReportPdf(
   if (exportData.sections.length === 0) throw new Error('report_export_no_sections');
   const pages: string[][] = [];
   let current: string[] = [];
+  let continuationHeader: readonly string[] = [];
   const newPage = () => {
     if (current.length > 0) pages.push(current);
     current = [];
   };
   const addLine = (line: string) => {
     for (const part of wrapped(line)) {
-      if (current.length === LINES_PER_PAGE) newPage();
+      if (current.length === LINES_PER_PAGE) {
+        newPage();
+        current.push(...continuationHeader);
+      }
       current.push(part);
     }
   };
   const scope = exportData.selectedShops.map((id) => options.shopNames[id] ?? id).join(', ');
   for (const [i, section] of exportData.sections.entries()) {
     if (i > 0) newPage();
-    addLine('TUX Admin - ' + REPORT_LABELS[section.area]);
+    const sectionTitle = 'TUX Admin - ' + REPORT_LABELS[section.area];
+    continuationHeader = [
+      sectionTitle + ' (continued)',
+      'Period (Africa/Cairo): ' + exportData.fromDate + ' to ' + exportData.toDate,
+    ];
+    addLine(sectionTitle);
     addLine('Report ' + (i + 1) + ' of ' + exportData.sections.length);
     addLine(
       exportData.sections.length + ' authorized sections of ' + exportData.requestedAreaCount,
