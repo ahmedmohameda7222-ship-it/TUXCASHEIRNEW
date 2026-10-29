@@ -152,7 +152,7 @@ async function verifyPin(pin: string, storedHash: string): Promise<boolean> {
   );
   const derived = new Uint8Array(
     await crypto.subtle.deriveBits(
-      { name: 'PBKDF2', hash: 'SHA-256', iterations, salt },
+      { name: 'PBKDF2', hash: 'SHA-256', iterations, salt: new Uint8Array(salt) },
       key,
       DERIVED_KEY_BYTES * 8,
     ),

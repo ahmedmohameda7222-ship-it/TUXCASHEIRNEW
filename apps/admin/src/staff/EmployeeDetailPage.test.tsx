@@ -166,7 +166,7 @@ describe('EmployeeDetailPage', () => {
     expect(html).toContain('Access &amp; Permissions');
     expect(html).not.toContain('Complete Operations setup');
   });
-  it('reports readiness for the selected shop without hiding other-shop setup gaps', () => {
+  it('reports PIN readiness without manual worker setup', () => {
     const html = render(
       employee({
         assignments: [
@@ -191,8 +191,8 @@ describe('EmployeeDetailPage', () => {
       true,
     );
     expect(html).toContain('Operations access');
-    expect(html).toContain('Other shop');
     expect(html).not.toContain('Operations setup needed');
+    expect(html).toContain('PIN required');
   });
 
   it('shows staff PIN readiness without provisioning a worker', () => {

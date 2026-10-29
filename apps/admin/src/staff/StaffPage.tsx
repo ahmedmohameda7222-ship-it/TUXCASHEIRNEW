@@ -442,9 +442,7 @@ export function StaffPage() {
           throw new Error('Admin PIN must be 4–12 digits');
         }
         if (!canProvisionWorker) {
-          throw new Error(
-            'Owner or Admin authorization is required to set an employee PIN',
-          );
+          throw new Error('Owner or Admin authorization is required to set an employee PIN');
         }
         setOnboardingStep('review');
       } catch (error) {

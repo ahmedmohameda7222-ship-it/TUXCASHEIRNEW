@@ -107,9 +107,10 @@ export function EmployeeDetailPage({
   const inactiveOperationsIdentities = employee.operationsIdentities.filter(
     isInactiveLinkedOperationsIdentity,
   );
-  // The readiness chip describes this shop; other shops retain independent setup notices.
+  // Readiness depends only on employee PIN and shop assignment, never worker setup.
   const operationsHealthy =
-    employee.active && Boolean(employee.pinConfigured) &&
+    employee.active &&
+    Boolean(employee.pinConfigured) &&
     !inactiveOperationsIdentities.some((identity) => identity.shopId === shopId);
   const shopName = (id: string) => shops.find((shop) => shop.id === id)?.name ?? 'Authorized shop';
   const initials = employee.displayName
@@ -298,8 +299,8 @@ export function EmployeeDetailPage({
       <section className="admin-staff-section" aria-labelledby="staff-operations-access">
         <h3 id="staff-operations-access">Operations access</h3>
         <p>
-          Staff can sign in from any browser: select an assigned shop and enter the employee PIN.
-          No Operations setup or device registration is needed.
+          Staff can sign in from any browser: select an assigned shop and enter the employee PIN. No
+          Operations setup or device registration is needed.
         </p>
         {!employee.pinConfigured && canManage ? (
           <p>Employee PIN not set. Use Reset employee PIN to enable sign in.</p>
@@ -404,7 +405,7 @@ export function EmployeeDetailPage({
             >
               {operationsHealthy && employee.active
                 ? 'Operations ready'
-                : 'Operations setup needed'}
+                : employee.active ? 'PIN required' : 'Access disabled'}
             </span>
           </div>
         </div>
