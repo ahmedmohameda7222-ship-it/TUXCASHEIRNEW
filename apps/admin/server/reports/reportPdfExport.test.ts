@@ -145,4 +145,29 @@ describe('Reports complete authorized reader', () => {
       }),
     ).rejects.toBeInstanceOf(ReportExportError);
   });
+  it('preserves the server-equivalent previous window in a current-report export', async () => {
+    const calls: string[] = [];
+    const query = vi.fn(async (args: { p_start_date: string }) => {
+      calls.push(args.p_start_date);
+      return { ok: true as const, summary: summary(0), rows: [], nextOffset: null };
+    });
+    const data = await collectAuthorizedReportExport({
+      kind: 'current',
+      area: 'sales',
+      principal: staff,
+      shopIds: [shopId],
+      fromDate: '2026-10-22',
+      toDate: '2026-10-29',
+      source: null,
+      context: {},
+      compare: 'previous',
+      query,
+    });
+    expect(calls).toEqual(['2026-10-22', '2026-10-14']);
+    expect(data.comparison).toMatchObject({
+      periodStart: '2026-10-14',
+      periodEnd: '2026-10-21',
+    });
+  });
+
 });
