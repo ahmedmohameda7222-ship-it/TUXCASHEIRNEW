@@ -129,6 +129,11 @@ export function ReportFilters({
     'customers',
     'expenses',
   ] as const satisfies readonly AdminReportArea[];
+  const today = cairoReportToday();
+  const activePreset = ([1, 7, 30] as const).find((days) => {
+    const period = reportDatePreset(today, days);
+    return period.fromDate === value.fromDate && period.toDate === value.toDate;
+  });
   function applyPreset(days: 1 | 7 | 30) {
     onChange({
       ...value,
@@ -182,6 +187,7 @@ export function ReportFilters({
               key={days}
               type="button"
               className="admin-secondary-button"
+              aria-pressed={activePreset === days}
               onClick={() => applyPreset(days)}
             >
               {days === 1 ? 'Today' : `${days} days`}
@@ -235,80 +241,80 @@ export function ReportFilters({
           Compare
         </label>
         <details
-            className="tux-report-context"
-            onToggle={(event) => {
-              if (event.currentTarget.open) onExpand();
-            }}
-          >
-            <summary>Filters</summary>
-            <div className="tux-report-context__fields">
+          className="tux-report-context"
+          onToggle={(event) => {
+            if (event.currentTarget.open) onExpand();
+          }}
+        >
+          <summary>Filters</summary>
+          <div className="tux-report-context__fields">
+            <label>
+              Order source
+              <select
+                value={value.source ?? 'ALL'}
+                onChange={(event) =>
+                  set(
+                    'source',
+                    event.target.value === 'ALL' ? null : (event.target.value as 'POS' | 'ONLINE'),
+                  )
+                }
+              >
+                <option value="ALL">All sources</option>
+                <option value="POS">POS</option>
+                <option value="ONLINE">Online</option>
+              </select>
+            </label>
+            {value.comparePrevious ? (
               <label>
-                Order source
+                Comparison range
                 <select
-                  value={value.source ?? 'ALL'}
+                  value={value.comparisonRange ?? 'previous'}
                   onChange={(event) =>
-                    set(
-                      'source',
-                      event.target.value === 'ALL' ? null : (event.target.value as 'POS' | 'ONLINE'),
-                    )
+                    set('comparisonRange', event.target.value as 'previous' | 'week' | 'month' | 'year')
                   }
                 >
-                  <option value="ALL">All sources</option>
-                  <option value="POS">POS</option>
-                  <option value="ONLINE">Online</option>
+                  <option value="previous">Previous equivalent period</option>
+                  <option value="week">Previous week</option>
+                  <option value="month">Previous calendar month</option>
+                  <option value="year">Previous calendar year</option>
                 </select>
               </label>
-              {value.comparePrevious ? (
-                <label>
-                  Comparison range
+            ) : null}
+            {extraFields
+              .filter((field) => (options[field.optionsKey] ?? []).length > 0)
+              .map((field) => (
+                <label key={field.key}>
+                  {field.label}
                   <select
-                    value={value.comparisonRange ?? 'previous'}
-                    onChange={(event) =>
-                      set('comparisonRange', event.target.value as 'previous' | 'week' | 'month' | 'year')
-                    }
+                    value={value.context?.[field.key] ?? ''}
+                    onChange={(event) => setContext(field.key, event.target.value)}
                   >
-                    <option value="previous">Previous equivalent period</option>
-                    <option value="week">Previous week</option>
-                    <option value="month">Previous calendar month</option>
-                    <option value="year">Previous calendar year</option>
-                  </select>
-                </label>
-              ) : null}
-              {extraFields
-                .filter((field) => (options[field.optionsKey] ?? []).length > 0)
-                .map((field) => (
-                  <label key={field.key}>
-                    {field.label}
-                    <select
-                      value={value.context?.[field.key] ?? ''}
-                      onChange={(event) => setContext(field.key, event.target.value)}
-                    >
-                      <option value="">All {field.label.toLowerCase()}s</option>
-                      {(options[field.optionsKey] ?? []).map((entry) => (
-                        <option key={entry.id} value={entry.id}>
-                          {entry.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ))}
-              {statuses.length > 0 ? (
-                <label>
-                  Status
-                  <select
-                    value={value.context?.status ?? ''}
-                    onChange={(event) => setContext('status', event.target.value)}
-                  >
-                    <option value="">All statuses</option>
-                    {statuses.map(([code, label]) => (
-                      <option key={code} value={code}>
-                        {label}
+                    <option value="">All {field.label.toLowerCase()}s</option>
+                    {(options[field.optionsKey] ?? []).map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.label}
                       </option>
                     ))}
                   </select>
                 </label>
-              ) : null}
-            </div>
+              ))}
+            {statuses.length > 0 ? (
+              <label>
+                Status
+                <select
+                  value={value.context?.status ?? ''}
+                  onChange={(event) => setContext('status', event.target.value)}
+                >
+                  <option value="">All statuses</option>
+                  {statuses.map(([code, label]) => (
+                    <option key={code} value={code}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+          </div>
         </details>
         <button
           type="button"
