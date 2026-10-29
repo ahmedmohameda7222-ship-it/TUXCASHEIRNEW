@@ -28,6 +28,8 @@ describe('Operations browser security session flow', () => {
     expect(localPin).toBeGreaterThan(persistBoth);
     expect(backgroundSync).toBeGreaterThan(localPin);
     expect(bootstrap).not.toContain('Could not install the Operations configuration');
+    expect(sessionClientSource).toContain('requireActivatedConfiguration: false');
+    expect(sessionClientSource).toContain('tux:operations-menu-ready');
     expect(shopScopeSource).toContain('worker.shopId !== shop.id');
     expect(shopScopeSource).toContain('transaction.shops.put(shop)');
     expect(shopScopeSource).toContain('transaction.workers.put(worker)');

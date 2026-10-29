@@ -277,21 +277,20 @@ export class OperationsSessionService {
       if (currentDay === null) {
         const configuration = await transaction.configuration.getForShop(shop.id);
         if (
-          configuration === null ||
-          configuration.shopId !== shop.id ||
-          !Number.isSafeInteger(configuration.version) ||
-          configuration.version <= 0
+          (configuration === null && this.#requireActivatedConfiguration) ||
+          (configuration !== null &&
+            (configuration.shopId !== shop.id ||
+              !Number.isSafeInteger(configuration.version) ||
+              configuration.version <= 0))
         ) {
-          throw new Error(
-            'Activated Operations configuration is unavailable while opening the Business Day.',
-          );
+          throw new Error('Shop menu data is not ready to open the Business Day.');
         }
 
-        const resetPolicy = configuration.settings?.values['receipt.sequenceResetPolicy'];
+        const resetPolicy = configuration?.settings?.values['receipt.sequenceResetPolicy'];
         if (resetPolicy !== undefined && resetPolicy !== 'BUSINESS_DAY') {
           throw new Error('Unsupported receipt sequence reset policy.');
         }
-        const configuredSequenceStart = configuration.settings?.values['receipt.sequenceStart'];
+        const configuredSequenceStart = configuration?.settings?.values['receipt.sequenceStart'];
         const sequenceStart = configuredSequenceStart === undefined ? 1 : configuredSequenceStart;
         if (
           typeof sequenceStart !== 'number' ||

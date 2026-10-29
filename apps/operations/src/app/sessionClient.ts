@@ -282,6 +282,29 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         if (document.visibilityState === 'visible') refreshSessionLease();
       };
 
+      const refreshShopMenu = async (shopId: ShopId): Promise<void> => {
+        try {
+          const refreshed = await configurationService.sync(shopId);
+          if (
+            (refreshed.status === 'APPLIED' ||
+              (refreshed.status === 'UP_TO_DATE' && refreshed.version !== null)) &&
+            activeSyncShopId === shopId
+          ) {
+            window.dispatchEvent(
+              new CustomEvent('tux:operations-menu-ready', { detail: { shopId } }),
+            );
+          }
+          if (
+            refreshed.status === 'INVALID_REMOTE_CONFIGURATION' ||
+            refreshed.status === 'LOCAL_PERSISTENCE_ERROR'
+          ) {
+            console.warn('[Operations] Menu data refresh failed:', refreshed.status);
+          }
+        } catch {
+          // Login remains valid; the next automatic refresh can recover menu data.
+        }
+      };
+
       const startRemoteRuntime = (shopId: ShopId): void => {
         // A browser can change branches after signing out. Never leave Shop A's
         // outbox, inventory or configuration polls active under Shop B's cookie.
@@ -294,7 +317,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
             rewardClaims: rewardAuthority,
           });
           configurationTimer = window.setInterval(
-            () => void configurationService.sync(shopId),
+            () => void refreshShopMenu(shopId),
             5 * 60 * 1000,
           );
           const heartbeat = async (): Promise<void> => {
@@ -657,7 +680,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
             startRemoteRuntime(signedIn.value.shopId);
             // Load menu, inventory and shop settings after verified sign-in.
             // Failure must not bounce an authenticated worker into setup.
-            void configurationService.sync(signedIn.value.shopId).catch(() => undefined);
+            void refreshShopMenu(signedIn.value.shopId);
           }
           return signedIn;
         } catch (cause) {
