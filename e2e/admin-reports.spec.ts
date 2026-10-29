@@ -180,7 +180,9 @@ test('saved report views send one authorized CSRF-protected versioned command', 
   );
 });
 
-test('R2 failed Save View keeps modal and name until the server confirms persistence', async ({ page }) => {
+test('R2 failed Save View keeps modal and name until the server confirms persistence', async ({
+  page,
+}) => {
   await mockReports(page);
   await page.route('**/api/admin/reports**', async (route) => {
     if (route.request().method() !== 'POST') {
@@ -208,7 +210,9 @@ test('R2 failed Save View keeps modal and name until the server confirms persist
   await expect(dialog.getByRole('alert')).toContainText('Unable to save');
 });
 
-test('R2 failed Set Target keeps target dialog open and preserves date window', async ({ page }) => {
+test('R2 failed Set Target keeps target dialog open and preserves date window', async ({
+  page,
+}) => {
   await mockReports(page);
   await page.route('**/api/admin/reports**', async (route) => {
     if (route.request().method() !== 'POST') {
