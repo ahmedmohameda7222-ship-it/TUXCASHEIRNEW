@@ -87,7 +87,13 @@ jobs:
               lint+=("$file")
             fi
           done
-          if (( ${#format[@]} )); then npx prettier --check "${format[@]}"; fi
+          if (( ${#format[@]} )); then
+            if ! npx prettier --check "${format[@]}"; then
+              npx prettier --write "${format[@]}"
+              git diff --color=never -- "${format[@]}"
+              exit 1
+            fi
+          fi
           if (( ${#lint[@]} )); then npx eslint "${lint[@]}" --max-warnings 0; fi
 
   unit:
