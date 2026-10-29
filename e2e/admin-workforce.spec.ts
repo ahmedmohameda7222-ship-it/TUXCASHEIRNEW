@@ -1665,3 +1665,20 @@ test('S2 initial shift is included in Add employee before Operations-ready save'
     plannedBreakMinutes: 30,
   });
 });
+
+test('S2 Add employee must not close when provision succeeded but Operations link is still missing', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const commands = await mockWorkforce(page);
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Add employee' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add employee' });
+  await sheet.getByLabel('Name').fill('Unlinked New Staff');
+  await advanceStaffOnboardingToReview(page);
+  await sheet.getByRole('button', { name: 'Save employee & enable Operations' }).click();
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole('alert')).toContainText('Operations access is not confirmed');
+  expect(commands.filter((command) => command.type === 'employee.create')).toHaveLength(1);
+  expect(commands.filter((command) => command.type === 'employee.provision-worker')).toHaveLength(1);
+});
