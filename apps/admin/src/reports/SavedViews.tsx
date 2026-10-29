@@ -165,7 +165,7 @@ export function SavedViews({
                     id: view.id,
                     expectedVersion: view.version,
                   }).catch(() => undefined);
-                }
+                }}
               >
                 Delete
               </button>
