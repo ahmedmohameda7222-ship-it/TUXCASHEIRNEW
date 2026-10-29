@@ -83,6 +83,22 @@ describe('R1 approved Report-First layout', () => {
     expect(markup.indexOf('Order source')).toBeGreaterThan(markup.indexOf('<details'));
   });
 
+  it('offers every authorized shop instead of limiting Owner to only the first shop', () => {
+    const markup = renderToStaticMarkup(
+      <ReportFilters
+        value={{ ...filters, shopIds: ['shop-one'] }}
+        onChange={() => undefined}
+        onExpand={() => undefined}
+        canCompareShops
+        allShopIds={['shop-one', 'shop-two']}
+        shopNames={{ 'shop-one': 'Maadi', 'shop-two': 'Zamalek' }}
+        options={{}}
+      />,
+    );
+    expect(markup).toContain('value="shop-two"');
+    expect(markup).toContain('Zamalek');
+  });
+
   it('offers fast Cairo date presets and an explicit reset without losing report selection', () => {
     const markup = renderPicker('refunds');
     expect(markup).toContain('Today');
