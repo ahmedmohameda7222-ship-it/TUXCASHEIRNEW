@@ -77,6 +77,46 @@ function splitWrapped(text: string, width: number, size: number, font: PDFFont):
   return lines.length ? lines : ['-'];
 }
 
+function dailyActivityLines(
+  rows: readonly ExportFact[],
+  fromDate: string,
+  toDate: string,
+): string[] {
+  const from = Date.parse(fromDate + 'T00:00:00.000Z');
+  const to = Date.parse(toDate + 'T00:00:00.000Z');
+  const day = 86400000;
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from > to || (to - from) / day > 30) {
+    return ['Activity over time: unavailable for date ranges longer than 31 days'];
+  }
+  const counts = new Map<string, number>();
+  for (let date = from; date <= to; date += day) {
+    counts.set(new Date(date).toISOString().slice(0, 10), 0);
+  }
+  const cairo = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Cairo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  for (const row of rows) {
+    const instant = new Date(row.occurredAt);
+    if (!Number.isFinite(instant.getTime())) {
+      throw new Error('report_export_query_failed');
+    }
+    const parts = cairo.formatToParts(instant);
+    const get = (kind: string) => parts.find((part) => part.type === kind)?.value ?? '';
+    const date = get('year') + '-' + get('month') + '-' + get('day');
+    if (counts.has(date)) counts.set(date, counts.get(date)! + 1);
+  }
+  const max = Math.max(1, ...counts.values());
+  const lines = ['Activity over time (source events; Africa/Cairo):'];
+  for (const [date, count] of counts) {
+    const bar = '#'.repeat(Math.round((count / max) * 25));
+    lines.push(`${date} | ${bar} (${count})`);
+  }
+  return lines;
+}
+
 /** Render a true, paginated PDF from complete server-authorized report data only. */
 export async function renderUnicodeAuthorizedReportPdf(
   data: AuthorizedExport,
@@ -198,6 +238,9 @@ export async function renderUnicodeAuthorizedReportPdf(
       );
     }
     if (section.summary.coverageNote) paragraph(section.summary.coverageNote, 8);
+    dailyActivityLines(section.rows, data.fromDate, data.toDate).forEach((line) =>
+      paragraph(line, 8),
+    );
     y -= 10;
     paragraph(`Source records - ${section.rows.length} matching rows`, 10, ink);
     if (section.rows.length === 0) {
