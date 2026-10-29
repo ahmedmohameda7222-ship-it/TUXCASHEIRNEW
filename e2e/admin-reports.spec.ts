@@ -337,16 +337,16 @@ test('R4 current and all-authorized exports download real PDF responses with cor
       status: 200,
       contentType: 'application/pdf',
       headers: { 'content-disposition': 'attachment; filename="tux-report.pdf"' },
-      body: '%PDF-1.4\\n1 0 obj\\n<<>>\\nendobj\\n%%EOF',
+      body: '%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF',
     });
   });
   await page.goto('/reports');
   const first = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download report PDF' }).click();
-  expect((await first).suggestedFilename()).toMatch(/tux-reports-current-.*\\.pdf/);
+  expect((await first).suggestedFilename()).toMatch(/tux-reports-current-.*\.pdf/);
   const second = page.waitForEvent('download');
   await page.getByRole('button', { name: 'All 22 reports (1 PDF)' }).click();
-  expect((await second).suggestedFilename()).toMatch(/tux-reports-all-authorized-.*\\.pdf/);
+  expect((await second).suggestedFilename()).toMatch(/tux-reports-all-authorized-.*\.pdf/);
   expect(payloads).toHaveLength(2);
   expect(payloads[0]).toMatchObject({
     view: 'pdf-export',
