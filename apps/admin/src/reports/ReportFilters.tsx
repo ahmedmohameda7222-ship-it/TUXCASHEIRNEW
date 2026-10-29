@@ -195,7 +195,7 @@ export function ReportFilters({
           </select>
         </label>
       </nav>
-      <div className="tux-report-filters" aria-label="Report filters">
+      <section className="tux-report-filters" aria-label="Report filters">
         <div className="tux-report-presets" role="group" aria-label="Date presets">
           {([1, 7, 30] as const).map((days) => (
             <button
@@ -339,7 +339,7 @@ export function ReportFilters({
         >
           Reset
         </button>
-      </div>
+      </section>
     </section>
   );
 }
