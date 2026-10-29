@@ -46,6 +46,7 @@ export function ReportFilters({
   onChange,
   canCompareShops,
   allShopIds,
+  shopNames = {},
   options,
   onExpand,
 }: {
@@ -53,6 +54,7 @@ export function ReportFilters({
   onChange(next: ReportQueryFilters): void;
   canCompareShops: boolean;
   allShopIds: readonly string[];
+  shopNames?: Readonly<Record<string, string>>;
   options: Readonly<Record<string, readonly { id: string; label: string }[]>>;
   onExpand(): void;
 }) {
@@ -186,7 +188,7 @@ export function ReportFilters({
             </button>
           ))}
         </div>
-        <label>
+        <label className="tux-report-date-start">
           From
           <input
             type="date"
@@ -194,7 +196,7 @@ export function ReportFilters({
             onChange={(event) => set('fromDate', event.target.value)}
           />
         </label>
-        <label>
+        <label className="tux-report-date-end">
           To
           <input
             type="date"
@@ -202,69 +204,76 @@ export function ReportFilters({
             onChange={(event) => set('toDate', event.target.value)}
           />
         </label>
-        <label>
-          Order source
-          <select
-            value={value.source ?? 'ALL'}
-            onChange={(event) =>
-              set(
-                'source',
-                event.target.value === 'ALL' ? null : (event.target.value as 'POS' | 'ONLINE'),
-              )
-            }
-          >
-            <option value="ALL">All sources</option>
-            <option value="POS">POS</option>
-            <option value="ONLINE">Online</option>
-          </select>
-        </label>
-        {canCompareShops && allShopIds.length > 1 ? (
-          <label>
-            Shops
-            <select
-              value={value.shopIds.length === allShopIds.length ? 'ALL' : 'SELECTED'}
-              onChange={(event) =>
-                set('shopIds', event.target.value === 'ALL' ? allShopIds : [allShopIds[0]!])
-              }
-            >
-              <option value="ALL">All authorized shops</option>
-              <option value="SELECTED">First shop</option>
-            </select>
-          </label>
-        ) : null}
+        <div className="tux-report-shop">
+          {canCompareShops && allShopIds.length > 1 ? (
+            <label>
+              <span className="tux-report-visually-hidden">Shops</span>
+              <select
+                aria-label="Shops"
+                value={value.shopIds.length === allShopIds.length ? 'ALL' : 'SELECTED'}
+                onChange={(event) =>
+                  set('shopIds', event.target.value === 'ALL' ? allShopIds : [allShopIds[0]!])
+                }
+              >
+                <option value="ALL">All authorized shops</option>
+                <option value="SELECTED">{shopNames[allShopIds[0]!] ?? 'First shop'}</option>
+              </select>
+            </label>
+          ) : (
+            <span className="tux-report-shop__name">
+              {shopNames[value.shopIds[0] ?? ''] ?? 'Current shop'}
+            </span>
+          )}
+        </div>
         <label className="tux-report-filters__check">
           <input
             type="checkbox"
             checked={value.comparePrevious}
             onChange={(event) => set('comparePrevious', event.target.checked)}
+            aria-label="Compare previous period"
           />
-          Compare previous period
+          Compare
         </label>
-        {value.comparePrevious ? (
-          <label>
-            Comparison range
-            <select
-              value={value.comparisonRange ?? 'previous'}
-              onChange={(event) =>
-                set('comparisonRange', event.target.value as 'previous' | 'week' | 'month' | 'year')
-              }
-            >
-              <option value="previous">Previous equivalent period</option>
-              <option value="week">Previous week</option>
-              <option value="month">Previous calendar month</option>
-              <option value="year">Previous calendar year</option>
-            </select>
-          </label>
-        ) : null}
-        {extraFields.length > 0 || statuses.length > 0 ? (
-          <details
+        <details
             className="tux-report-context"
             onToggle={(event) => {
               if (event.currentTarget.open) onExpand();
             }}
           >
-            <summary>More filters</summary>
+            <summary>Filters</summary>
             <div className="tux-report-context__fields">
+              <label>
+                Order source
+                <select
+                  value={value.source ?? 'ALL'}
+                  onChange={(event) =>
+                    set(
+                      'source',
+                      event.target.value === 'ALL' ? null : (event.target.value as 'POS' | 'ONLINE'),
+                    )
+                  }
+                >
+                  <option value="ALL">All sources</option>
+                  <option value="POS">POS</option>
+                  <option value="ONLINE">Online</option>
+                </select>
+              </label>
+              {value.comparePrevious ? (
+                <label>
+                  Comparison range
+                  <select
+                    value={value.comparisonRange ?? 'previous'}
+                    onChange={(event) =>
+                      set('comparisonRange', event.target.value as 'previous' | 'week' | 'month' | 'year')
+                    }
+                  >
+                    <option value="previous">Previous equivalent period</option>
+                    <option value="week">Previous week</option>
+                    <option value="month">Previous calendar month</option>
+                    <option value="year">Previous calendar year</option>
+                  </select>
+                </label>
+              ) : null}
               {extraFields
                 .filter((field) => (options[field.optionsKey] ?? []).length > 0)
                 .map((field) => (
@@ -300,8 +309,7 @@ export function ReportFilters({
                 </label>
               ) : null}
             </div>
-          </details>
-        ) : null}
+        </details>
         <button
           type="button"
           className="admin-secondary-button tux-report-reset"
