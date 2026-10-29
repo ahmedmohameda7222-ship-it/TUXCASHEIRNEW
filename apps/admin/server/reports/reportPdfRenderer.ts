@@ -45,7 +45,10 @@ function fontForText(text: string, latin: PDFFont, arabic: PDFFont): PDFFont {
 function splitWrapped(text: string, width: number, size: number, font: PDFFont): string[] {
   const lines: string[] = [];
   let current = '';
-  const source = String(text).replace(/[\r\n\t]+/g, ' ').trim() || '-';
+  const source =
+    String(text)
+      .replace(/[\r\n\t]+/g, ' ')
+      .trim() || '-';
   for (const word of source.split(/\s+/)) {
     const next = current ? `${current} ${word}` : word;
     if (font.widthOfTextAtSize(next, size) <= width) {
@@ -77,17 +80,13 @@ export async function renderReportPdf(data: ReportExportData): Promise<Buffer> {
   const [latin, arabic] = await Promise.all([
     pdf.embedFont(
       readFileSync(
-        require.resolve(
-          '@fontsource/noto-sans-arabic/files/noto-sans-arabic-latin-400-normal.woff',
-        ),
+        require.resolve('@fontsource/noto-sans-arabic/files/noto-sans-arabic-latin-400-normal.woff'),
       ),
       { subset: true },
     ),
     pdf.embedFont(
       readFileSync(
-        require.resolve(
-          '@fontsource/noto-sans-arabic/files/noto-sans-arabic-arabic-400-normal.woff',
-        ),
+        require.resolve('@fontsource/noto-sans-arabic/files/noto-sans-arabic-arabic-400-normal.woff'),
       ),
       { subset: true },
     ),
@@ -164,10 +163,7 @@ export async function renderReportPdf(data: ReportExportData): Promise<Buffer> {
       `Period (Cairo calendar): ${data.fromDate} to ${data.toDate} | Shops: ${data.shopIds.length}`,
       9,
     );
-    paragraph(
-      `Source: ${data.source ?? 'All'} | Scope: ${data.shopIds.join(', ')}`,
-      8,
-    );
+    paragraph(`Source: ${data.source ?? 'All'} | Scope: ${data.shopIds.join(', ')}`, 8);
     if (data.kind === 'current' && Object.keys(data.context).length) {
       paragraph(`Filters: ${JSON.stringify(data.context)}`, 8);
     }
@@ -212,9 +208,13 @@ export async function renderReportPdf(data: ReportExportData): Promise<Buffer> {
     drawLine(`Page ${index + 1} / ${pages.length}`, PAGE_WIDTH - 115, 29, 8, muted);
   }
   const recordCount = data.sections.reduce((sum, section) => sum + section.rows.length, 0);
-  pdf.setTitle(`TUX Reports - ${data.kind === 'current' ? heading(data.sections[0]!.area) : 'All Authorized Reports'}`);
+  pdf.setTitle(
+    `TUX Reports - ${data.kind === 'current' ? heading(data.sections[0]!.area) : 'All Authorized Reports'}`,
+  );
   pdf.setAuthor('TUX Admin');
-  pdf.setSubject(`${recordCount} source records, ${data.sections.length} authorized sections of ${data.totalCanonicalAreas} canonical reports`);
+  pdf.setSubject(
+    `${recordCount} source records, ${data.sections.length} authorized sections of ${data.totalCanonicalAreas} canonical reports`,
+  );
   pdf.setCreationDate(new Date());
   return Buffer.from(await pdf.save());
 }

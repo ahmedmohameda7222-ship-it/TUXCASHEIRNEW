@@ -279,7 +279,9 @@ for (const width of [390, 1440]) {
   });
 }
 
-test('R4 report PDF actions forward authorized filters, CSRF and return download', async ({ page }) => {
+test('R4 report PDF actions forward authorized filters, CSRF and return download', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockReports(page);
   const exports: Array<Record<string, unknown>> = [];
@@ -326,7 +328,9 @@ test('R4 report PDF actions forward authorized filters, CSRF and return download
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test('R4 PDF controls stay disabled for a report period beyond the export safety budget', async ({ page }) => {
+test('R4 PDF controls stay disabled for a report period beyond the export safety budget', async ({
+  page,
+}) => {
   await mockReports(page);
   await page.goto('/reports');
   await page.getByLabel('From', { exact: true }).fill('2026-01-01');

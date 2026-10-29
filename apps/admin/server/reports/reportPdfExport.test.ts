@@ -169,5 +169,4 @@ describe('Reports complete authorized reader', () => {
       periodEnd: '2026-10-21',
     });
   });
-
 });

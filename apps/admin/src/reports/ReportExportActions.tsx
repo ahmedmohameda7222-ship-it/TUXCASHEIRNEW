@@ -48,9 +48,10 @@ export function ReportExportActions({
           fromDate: filters.fromDate,
           toDate: filters.toDate,
           source: kind === 'current' ? filters.source : null,
-          compare: kind === 'current' && filters.comparePrevious
-            ? (filters.comparisonRange ?? 'previous')
-            : null,
+          compare:
+            kind === 'current' && filters.comparePrevious
+              ? (filters.comparisonRange ?? 'previous')
+              : null,
           context: kind === 'current' ? (filters.context ?? {}) : {},
         }),
       });
@@ -115,11 +116,15 @@ export function ReportExportActions({
       </small>
       {!validRange ? (
         <p role="status" className="tux-report-caveat">
-          PDF export needs a valid date range of up to 90 calendar days. The interactive report
-          can still display longer ranges.
+          PDF export needs a valid date range of up to 90 calendar days. The interactive report can
+          still display longer ranges.
         </p>
       ) : null}
-      {error ? <p role="alert" className="admin-inline-error">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="admin-inline-error">
+          {error}
+        </p>
+      ) : null}
     </section>
   );
 }

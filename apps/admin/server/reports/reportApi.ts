@@ -110,7 +110,10 @@ const reportPdfCommandSchema = z
         promotionId: uuid.optional(),
         supplierId: uuid.optional(),
         deliveryZoneId: uuid.optional(),
-        status: z.string().regex(/^[A-Z_]{2,40}$/).optional(),
+        status: z
+          .string()
+          .regex(/^[A-Z_]{2,40}$/)
+          .optional(),
       })
       .strict(),
   })
@@ -119,8 +122,8 @@ const reportPdfCommandSchema = z
 function respondError(response: AdminResponse, error: unknown, request: AdminRequest) {
   if (error instanceof ReportExportError) {
     sendJson(response, error.code === 'report_export_too_large' ? 413 : 400, { error: error.code });
-  }
-  else if (error instanceof AdminAuthError) sendJson(response, error.status, { error: error.code });
+  } else if (error instanceof AdminAuthError)
+    sendJson(response, error.status, { error: error.code });
   else if (error instanceof AdminAuthorizationError) sendJson(response, 403, { error: error.code });
   else if (error instanceof z.ZodError)
     sendJson(response, 400, { error: 'report_request_invalid' });
@@ -463,8 +466,7 @@ export async function handleReportsRequest(
         source: input.source,
         context: input.context,
         compare: input.compare,
-        query: (args) =>
-          client.rpc<Record<string, unknown>>('admin_finance_report_query_v2', args),
+        query: (args) => client.rpc<Record<string, unknown>>('admin_finance_report_query_v2', args),
       });
       const pdf = await renderReportPdf(report);
       if (pdf.byteLength > 8 * 1024 * 1024) {
@@ -474,7 +476,10 @@ export async function handleReportsRequest(
       const fileArea = input.kind === 'current' ? input.area : 'all-authorized';
       response.statusCode = 200;
       response.setHeader('content-type', 'application/pdf');
-      response.setHeader('content-disposition', `attachment; filename="tux-${fileArea}-${input.fromDate}-${input.toDate}.pdf"`);
+      response.setHeader(
+        'content-disposition',
+        `attachment; filename="tux-${fileArea}-${input.fromDate}-${input.toDate}.pdf"`,
+      );
       response.setHeader('cache-control', 'private, no-store');
       response.setHeader('x-content-type-options', 'nosniff');
       response.setHeader('content-length', String(pdf.byteLength));
