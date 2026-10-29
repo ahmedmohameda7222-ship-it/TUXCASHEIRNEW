@@ -256,3 +256,23 @@ test('Reports blocks an inverted date range instead of sending a misleading quer
     ),
   ).toBe(false);
 });
+
+for (const width of [390, 1440]) {
+  test(`R1 report-first quick picker and date shortcuts at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await mockReports(page);
+    await page.goto('/reports');
+    await expect(page.getByRole('heading', { name: 'Choose a report' })).toBeVisible();
+    const quick = page.getByRole('navigation', { name: 'Quick reports' });
+    await quick.getByRole('button', { name: 'Inventory' }).click();
+    await expect(page.getByLabel('Report area')).toHaveValue('inventory-consumption');
+    await quick.getByRole('button', { name: 'Sales' }).click();
+    await expect(page.getByLabel('Report area')).toHaveValue('sales');
+    await page.getByLabel('To', { exact: true }).fill('2026-10-29');
+    await page.getByRole('button', { name: 'Last 7 days' }).click();
+    await expect(page.getByLabel('From', { exact: true })).toHaveValue('2026-10-23');
+    await quick.locator('summary', { hasText: 'All reports' }).click();
+    await expect(quick.getByRole('button', { name: 'Staff attendance' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
