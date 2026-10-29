@@ -501,7 +501,7 @@ psql(
 psql(
   [
     '-c',
-    \`begin;
+    `begin;
        do $employee_login$
        declare
          b uuid := 'da000000-0000-4000-8000-000000000001';
@@ -569,7 +569,7 @@ psql(
          end if;
        end
        $employee_login$;
-       rollback;\`,
+       rollback;`,
   ],
   'Employee PIN sign-in and cross-shop isolation regression',
 );
