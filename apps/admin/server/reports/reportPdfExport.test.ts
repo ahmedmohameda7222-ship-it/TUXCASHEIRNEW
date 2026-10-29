@@ -57,6 +57,33 @@ describe('R3 canonical full-record export collector', () => {
     expect(result.sections[0]?.summary.totalAmountMinor).toBe(14760);
   });
 
+  it('R5 reads the full 1,001 authorized records over 11 bounded RPC batches', async () => {
+    const total = 1001;
+    const offsets: number[] = [];
+    const result = await collectAuthorizedReportExport(request, principal, async (args) => {
+      offsets.push(args.offset);
+      const size = Math.min(100, total - args.offset);
+      return {
+        ok: true,
+        summary: {
+          eventCount: total, orderCount: 1, totalAmountMinor: -2500,
+          totalQuantity: total, incompleteCostEvents: 0, coverageNote: null,
+        },
+        rows: Array.from({ length: size }, (_, index) => ({
+          id: 'event-' + (args.offset + index + 1),
+          shopId: shop, occurredAt: '2026-10-29T09:00:00.000Z',
+          label: 'Refund', sourceKind: 'refund', amountMinor: -2500,
+          quantity: 1, costMissing: false,
+        })),
+        nextOffset: args.offset + size < total ? args.offset + size : null,
+      };
+    });
+    expect(offsets).toHaveLength(11);
+    expect(result.sections[0]?.rows).toHaveLength(total);
+    expect(result.sections[0]?.rows.at(-1)?.id).toBe('event-1001');
+    expect(result.sections[0]?.summary.totalAmountMinor).toBe(-2500);
+  });
+
   it('omits finance and staff sections when only reports.view is granted', async () => {
     const seen: string[] = [];
     const result = await collectAuthorizedReportExport(
