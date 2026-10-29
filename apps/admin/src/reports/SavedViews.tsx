@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { InlineError } from '../components/feedback/AdminStates';
 import { AdminDialog } from '../components/overlay/AdminDialog';
@@ -15,6 +15,8 @@ import type {
 
 export function SavedViews({
   shopId,
+  saveOpenRequest,
+  targetOpenRequest,
   views,
   targets,
   filters,
@@ -25,6 +27,8 @@ export function SavedViews({
   onApply,
 }: {
   shopId: string;
+  saveOpenRequest: number;
+  targetOpenRequest: number;
   views: readonly SavedReportViewRow[];
   targets: readonly ReportTargetRow[];
   filters: ReportFilters;
@@ -42,6 +46,25 @@ export function SavedViews({
   const [targetStart, setTargetStart] = useState(filters.fromDate);
   const [targetEnd, setTargetEnd] = useState(filters.toDate);
   const [localError, setLocalError] = useState<string | null>(null);
+  const previousSaveRequest = useRef(saveOpenRequest);
+  const previousTargetRequest = useRef(targetOpenRequest);
+
+  useEffect(() => {
+    if (previousSaveRequest.current === saveOpenRequest) return;
+    previousSaveRequest.current = saveOpenRequest;
+    setLocalError(null);
+    setShowSave(true);
+  }, [saveOpenRequest]);
+
+  useEffect(() => {
+    if (previousTargetRequest.current === targetOpenRequest) return;
+    previousTargetRequest.current = targetOpenRequest;
+    if (!canSetTargets) return;
+    setTargetStart(filters.fromDate);
+    setTargetEnd(filters.toDate);
+    setLocalError(null);
+    setShowTarget(true);
+  }, [targetOpenRequest, canSetTargets, filters.fromDate, filters.toDate]);
 
   async function saveView() {
     if (!name.trim()) {
@@ -119,27 +142,8 @@ export function SavedViews({
 
   return (
     <section className="tux-reports-config" aria-label="Saved reports and targets">
-      <div className="tux-reports-config__actions">
-        <button className="admin-secondary-button" type="button" onClick={() => setShowSave(true)}>
-          Save this report view
-        </button>
-        {canSetTargets ? (
-          <button
-            className="admin-secondary-button"
-            type="button"
-            onClick={() => {
-              setTargetStart(filters.fromDate);
-              setTargetEnd(filters.toDate);
-              setLocalError(null);
-              setShowTarget(true);
-            }}
-          >
-            Set target
-          </button>
-        ) : null}
-      </div>
       {error ? <InlineError>Unable to update report settings. Please retry.</InlineError> : null}
-      <h2>Saved views</h2>
+      <h2 id="tux-reports-saved-views">Saved views</h2>
       {views.length === 0 ? (
         <p>No saved report views yet.</p>
       ) : (
