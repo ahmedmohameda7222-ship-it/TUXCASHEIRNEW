@@ -75,6 +75,7 @@ const exportRequestSchema = z.object({
   source: z.enum(['POS', 'ONLINE']).nullable(),
   context: exportContextSchema,
   comparePrevious: z.boolean().default(false),
+  comparisonRange: z.enum(['previous', 'week', 'month', 'year']).optional(),
 }).strict();
 
 const commandSchema = z.discriminatedUnion('type', [
@@ -458,10 +459,6 @@ export async function handleReportsRequest(
         sendJson(response, 400, { error: 'report_shop_scope_invalid' });
         return;
       }
-      if (input.comparePrevious) {
-        sendJson(response, 422, { error: 'report_export_comparison_not_ready' });
-        return;
-      }
       const exported = await collectAuthorizedReportExport(input, principal, async (args) => {
         const result = await client.rpc<Record<string, unknown>>('admin_finance_report_query_v2', {
           p_actor_employee_id: principal.employeeId,
@@ -477,7 +474,7 @@ export async function handleReportsRequest(
         if (result['ok'] !== true) {
           throw new Error('report_export_query_failed');
         }
-        return result as ExportQueryResponse;
+        return result as unknown as ExportQueryResponse;
       });
       const shopRows = await client.select<Array<{ id: string; name: string }>>(
         'shops',
