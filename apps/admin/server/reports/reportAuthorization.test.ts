@@ -101,6 +101,7 @@ describe('Plan 7 report domain permissions', () => {
       AdminAuthorizationError,
     );
   });
+
   it('rejects restricted customer and employee filters nested in a saved view payload', () => {
     expect(() =>
       requireReportContextPermissions(staff, { context: { customerId: 'secret-customer' } }, shopId),
@@ -110,7 +111,7 @@ describe('Plan 7 report domain permissions', () => {
     ).toThrow(AdminAuthorizationError);
   });
 
-it('does not expose saved views with inaccessible report domains or filter scopes', () => {
+  it('does not expose saved views with inaccessible report domains or filter scopes', () => {
     const safe = {
       id: 'safe',
       shopId,

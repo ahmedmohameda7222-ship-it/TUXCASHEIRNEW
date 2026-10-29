@@ -85,10 +85,9 @@ export function requireReportContextPermissions(
   ) {
     throw new AdminAuthorizationError('permission_forbidden');
   }
-  for (const candidate of [
-    context,
-    ...(nested ? [nested as Readonly<Record<string, unknown>>] : []),
-  ]) {
+  const candidates: Readonly<Record<string, unknown>>[] = [context];
+  if (nested) candidates.push(nested as Readonly<Record<string, unknown>>);
+  for (const candidate of candidates) {
     for (const [key, permission] of Object.entries(CONTEXT_PERMISSIONS)) {
       if (candidate[key] !== undefined && candidate[key] !== null && candidate[key] !== '') {
         requirePermission(principal, permission, shopId);
@@ -96,7 +95,6 @@ export function requireReportContextPermissions(
     }
   }
 }
-
 
 /** Hide saved views with stale grants, restricted filter contexts or foreign-shop scopes. */
 export function filterAuthorizedReportSavedViews(
