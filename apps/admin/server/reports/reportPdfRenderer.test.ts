@@ -81,6 +81,17 @@ describe('R4 multi-page canonical report PDF', () => {
     expect(lines.join('')).toContain('X'.repeat(90));
   });
 
+  it('repeats the report section heading on each overflowed PDF page', () => {
+    const pdf = renderAuthorizedReportPdf(sampleExport(120), {
+      generatedAt: '2026-10-29T10:00:00.000Z',
+      shopNames: {},
+    }).toString('latin1');
+    const pages = Number(pdf.match(/\/Type \/Pages \/Count (\d+)/)?.[1] ?? 0);
+    const headings = pdf.match(/TUX Admin - Refunds and returns/g) ?? [];
+    expect(pages).toBeGreaterThan(1);
+    expect(headings).toHaveLength(pages);
+  });
+
   it('fails closed for non-encodable record text rather than silently corrupting names', () => {
     const report = sampleExport(1);
     report.sections[0]!.rows[0]!.label = 'مبيعات';
