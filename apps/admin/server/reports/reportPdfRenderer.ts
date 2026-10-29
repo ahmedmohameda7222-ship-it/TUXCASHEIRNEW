@@ -76,12 +76,7 @@ function dailyActivityLines(
   const from = Date.parse(fromDate + 'T00:00:00.000Z');
   const to = Date.parse(toDate + 'T00:00:00.000Z');
   const day = 86400000;
-  if (
-    !Number.isFinite(from) ||
-    !Number.isFinite(to) ||
-    from > to ||
-    (to - from) / day > 30
-  ) {
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from > to || (to - from) / day > 30) {
     return ['Activity over time: unavailable for date ranges longer than 31 days'];
   }
   const counts = new Map<string, number>();
