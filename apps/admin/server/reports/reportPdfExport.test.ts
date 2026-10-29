@@ -267,16 +267,18 @@ describe('R3 canonical full-record export collector', () => {
           incompleteCostEvents: 0,
           coverageNote: null,
         },
-        rows: [{
-          id: 'record-1',
-          shopId: shop,
-          occurredAt: '2026-10-29T09:00:00.000Z',
-          label: 'Payment',
-          sourceKind: 'payment',
-          amountMinor: Number.NaN,
-          quantity: 1,
-          costMissing: false,
-        }],
+        rows: [
+          {
+            id: 'record-1',
+            shopId: shop,
+            occurredAt: '2026-10-29T09:00:00.000Z',
+            label: 'Payment',
+            sourceKind: 'payment',
+            amountMinor: Number.NaN,
+            quantity: 1,
+            costMissing: false,
+          },
+        ],
         nextOffset: null,
       })),
     ).rejects.toThrow('report_export_source_invalid');
