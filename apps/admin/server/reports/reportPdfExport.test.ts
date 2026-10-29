@@ -81,9 +81,10 @@ describe('Reports complete authorized reader', () => {
         { length: Math.min(args.p_page_limit, Math.max(0, count - args.p_offset)) },
         (_, index) => ({ ...fact(args.p_offset + index), costMissing: false }),
       ),
-      nextOffset: args.p_offset + args.p_page_limit < count
-        ? args.p_offset + args.p_page_limit
-        : null,
+      nextOffset:
+        args.p_offset + args.p_page_limit < count
+          ? args.p_offset + args.p_page_limit
+          : null,
     }));
     const result = await collectAuthorizedReportExport({
       kind: 'current',
