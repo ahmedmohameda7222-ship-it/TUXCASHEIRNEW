@@ -68,6 +68,39 @@ describe('Reports complete authorized reader', () => {
     expect(query).toHaveBeenCalledTimes(2);
   });
 
+  it('retrieves 1,200 source records across 12 backend pages without dropping the last record', async () => {
+    const count = 1200;
+    const query = vi.fn(async (args: { p_offset: number; p_page_limit: number }) => ({
+      ok: true as const,
+      summary: {
+        ...summary(count),
+        incompleteCostEvents: 0,
+        coverageNote: null,
+      },
+      rows: Array.from(
+        { length: Math.min(args.p_page_limit, Math.max(0, count - args.p_offset)) },
+        (_, index) => ({ ...fact(args.p_offset + index), costMissing: false }),
+      ),
+      nextOffset: args.p_offset + args.p_page_limit < count
+        ? args.p_offset + args.p_page_limit
+        : null,
+    }));
+    const result = await collectAuthorizedReportExport({
+      kind: 'current',
+      area: 'sales',
+      principal: staff,
+      shopIds: [shopId],
+      fromDate: '2026-10-01',
+      toDate: '2026-10-29',
+      source: null,
+      context: {},
+      query,
+    });
+    expect(result.sections[0]?.rows).toHaveLength(count);
+    expect(result.sections[0]?.rows.at(-1)?.id).toBe('report-1199');
+    expect(query).toHaveBeenCalledTimes(12);
+  });
+
   it('full export uses canonical 22-domain order but never queries unauthorized areas', async () => {
     const queried: string[] = [];
     const query = vi.fn(
