@@ -282,6 +282,29 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         if (document.visibilityState === 'visible') refreshSessionLease();
       };
 
+      const refreshShopMenu = async (shopId: ShopId): Promise<void> => {
+        try {
+          const refreshed = await configurationService.sync(shopId);
+          if (
+            (refreshed.status === 'APPLIED' ||
+              (refreshed.status === 'UP_TO_DATE' && refreshed.version !== null)) &&
+            activeSyncShopId === shopId
+          ) {
+            window.dispatchEvent(
+              new CustomEvent('tux:operations-menu-ready', { detail: { shopId } }),
+            );
+          }
+          if (
+            refreshed.status === 'INVALID_REMOTE_CONFIGURATION' ||
+            refreshed.status === 'LOCAL_PERSISTENCE_ERROR'
+          ) {
+            console.warn('[Operations] Menu data refresh failed:', refreshed.status);
+          }
+        } catch {
+          // Login remains valid; the next automatic refresh can recover menu data.
+        }
+      };
+
       const startRemoteRuntime = (shopId: ShopId): void => {
         // A browser can change branches after signing out. Never leave Shop A's
         // outbox, inventory or configuration polls active under Shop B's cookie.
@@ -294,7 +317,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
             rewardClaims: rewardAuthority,
           });
           configurationTimer = window.setInterval(
-            () => void configurationService.sync(shopId),
+            () => void refreshShopMenu(shopId),
             5 * 60 * 1000,
           );
           const heartbeat = async (): Promise<void> => {
@@ -343,6 +366,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           window.addEventListener('online', refreshSessionLease);
           document.addEventListener('visibilitychange', refreshVisibleSessionLease);
           activeSyncShopId = shopId;
+          void refreshShopMenu(shopId);
         }
         if (!preferenceRetryStarted) {
           preferencesRetry.start();
@@ -378,7 +402,6 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       try {
         const remoteSession = await remoteGateway.currentSession();
         if (remoteSession !== null) {
-          await configurationService.sync(remoteSession.shopId);
           recoveredShopId = remoteSession.shopId;
         }
       } catch {
@@ -392,6 +415,9 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         pinVerifier,
         runtime,
         coordinator,
+        // Browser credentials and branch selection are authenticated by the
+        // remote bootstrap authority. Catalog hydration is NOT a login gate.
+        { requireActivatedConfiguration: false },
       );
       // Do not start background syncing the previously selected shop on a signed-out
       // browser. The next PIN login may choose a different branch.
@@ -645,28 +671,6 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         try {
           const bootstrap = await remoteGateway.bootstrap(pin, shopId);
           if (activeSyncShopId !== bootstrap.shopId) stopRemoteRuntime();
-          const configuration = await configurationService.sync(bootstrap.shopId);
-          if (
-            configuration.status === 'REMOTE_UNAVAILABLE' ||
-            (configuration.status === 'UP_TO_DATE' && configuration.version === null)
-          ) {
-            return err({
-              code: 'REMOTE_SYNC_ERROR',
-              message: 'PIN accepted, but the Operations configuration is unavailable.',
-            });
-          }
-          if (
-            configuration.status === 'INVALID_REMOTE_CONFIGURATION' ||
-            configuration.status === 'LOCAL_PERSISTENCE_ERROR'
-          ) {
-            return err({
-              code:
-                configuration.status === 'LOCAL_PERSISTENCE_ERROR'
-                  ? 'LOCAL_PERSISTENCE_ERROR'
-                  : 'REMOTE_SYNC_ERROR',
-              message: 'Could not install the Operations configuration on this browser.',
-            });
-          }
           await selectBrowserShop(database, readModel, bootstrap.shop, bootstrap.worker);
           await checkDayBeforeLogin(bootstrap.shopId);
           const signedIn = await session.submitPin(pin);

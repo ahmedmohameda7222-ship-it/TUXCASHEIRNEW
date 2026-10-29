@@ -95,6 +95,49 @@ async function expectReloadRemainsUnactivated(
   await readModel.close();
 }
 
+describe('browser server-authorized PIN flow without manual configuration installation', () => {
+  it('opens an authorized local session without a configuration snapshot', async () => {
+    const { database, databasePath } = await fixture();
+    const readModel = new SqliteOperatorSessionReadModel(databasePath);
+    const service = new OperationsSessionService(
+      database,
+      readModel,
+      new FixturePinVerifier(),
+      {
+        now: () => instant('2026-09-01T12:00:00.000Z'),
+        createUuid: () => randomUUID(),
+      },
+      { requireActivatedConfiguration: false },
+    );
+    const result = await service.submitPin('1234');
+    expect(result.ok && result.value.status).toBe('ACTIVE');
+    const recovered = await service.getState();
+    expect(recovered.ok && recovered.value.status).toBe('ACTIVE');
+    await readModel.close();
+    await database.close();
+  });
+
+  it('rejects incorrect PIN even without a configuration snapshot', async () => {
+    const { database, databasePath } = await fixture();
+    const readModel = new SqliteOperatorSessionReadModel(databasePath);
+    const service = new OperationsSessionService(
+      database,
+      readModel,
+      new FixturePinVerifier(),
+      {
+        now: () => instant('2026-09-01T12:00:00.000Z'),
+        createUuid: () => randomUUID(),
+      },
+      { requireActivatedConfiguration: false },
+    );
+    const result = await service.submitPin('9999');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('PIN_AUTH_ERROR');
+    await readModel.close();
+    await database.close();
+  });
+});
+
 describe('durable Operations bootstrap activation boundary', () => {
   it('does not activate identity after initial configuration is remotely unavailable', async () => {
     const { database, databasePath } = await fixture();

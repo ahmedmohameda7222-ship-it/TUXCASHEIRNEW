@@ -382,6 +382,7 @@ export function OrdersWorkspace({
   menuEditIdentityRef.current = { shopId: session.shopId, workerId: session.operator.id };
 
   const [workspace, setWorkspace] = useState<OrdersWorkspaceData | null>(null);
+  const [menuRefreshGeneration, setMenuRefreshGeneration] = useState(0);
   const [draft, setDraft] = useState<OrderDraft | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -664,6 +665,17 @@ export function OrdersWorkspace({
   }
 
   useEffect(() => {
+    const onMenuReady = (event: Event) => {
+      const detail = (event as CustomEvent<{ shopId: string }>).detail;
+      if (detail?.shopId === session.shopId && workspace === null) {
+        setMenuRefreshGeneration((value) => value + 1);
+      }
+    };
+    window.addEventListener('tux:operations-menu-ready', onMenuReady);
+    return () => window.removeEventListener('tux:operations-menu-ready', onMenuReady);
+  }, [session.shopId, workspace]);
+
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setGlobalError(null);
@@ -694,7 +706,7 @@ export function OrdersWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [client, draftScopeId, session.businessDayId, session.operator.id]);
+  }, [client, draftScopeId, session.businessDayId, session.operator.id, menuRefreshGeneration]);
 
   useEffect(() => {
     if (workspace === null || draft === null || prefillIntent == null) return;
@@ -1580,7 +1592,14 @@ export function OrdersWorkspace({
     return (
       <main className="orders-unavailable">
         <h1>Orders unavailable</h1>
-        <p>{globalError ?? 'The local Orders workspace could not be loaded.'}</p>
+        <p>{globalError ?? 'The Orders workspace is not ready.'}</p>
+        <button
+          type="button"
+          className="primary-action"
+          onClick={() => setMenuRefreshGeneration((value) => value + 1)}
+        >
+          Retry menu
+        </button>
       </main>
     );
   }

@@ -22,8 +22,9 @@ export class CoordinatedOperationsSessionService extends OperationsSessionServic
     pinVerifier: PinVerifier,
     runtime: SessionRuntime,
     coordinator: ApplicationCommandCoordinator,
+    options: { readonly requireActivatedConfiguration?: boolean } = {},
   ) {
-    super(database, readModel, pinVerifier, runtime);
+    super(database, readModel, pinVerifier, runtime, options);
     this.#coordinator = coordinator;
   }
 

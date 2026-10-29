@@ -1120,7 +1120,7 @@ export class OperationsOrdersService {
     if (state.configuration === null) {
       return err({
         code: 'CONFLICT_ERROR',
-        message: 'A valid local menu configuration is required before taking orders.',
+        message: 'Menu data is syncing. Orders will be available automatically when ready.',
       });
     }
     const session = await this.#readModel.getOpenWorkerSession(state.day.id);
