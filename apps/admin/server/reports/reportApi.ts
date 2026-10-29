@@ -23,7 +23,7 @@ import {
 import { maskDashboardMetrics } from './dashboardAuthorization.js';
 import { enrichReportDrilldowns } from './reportDrilldowns.js';
 import { collectAuthorizedReportExport, type ExportQueryResponse } from './reportPdfExport.js';
-import { renderAuthorizedReportPdfDocument } from './reportPdfRenderer.js';
+import { renderAuthorizedReportPdf } from './reportPdfRenderer.js';
 
 const uuid = z.string().uuid();
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -505,8 +505,7 @@ export async function handleReportsRequest(
         }),
       );
       const shopNames = Object.fromEntries(shopRows.map((shop) => [shop.id, shop.name]));
-      const pdf = await renderAuthorizedReportPdfDocument(exported, {
-        kind: input.kind,
+      const pdf = renderAuthorizedReportPdf(exported, {
         generatedAt: new Date().toISOString(),
         shopNames,
       });

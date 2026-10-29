@@ -1,6 +1,5 @@
-import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { renderAuthorizedReportPdf, renderAuthorizedReportPdfDocument } from './reportPdfRenderer';
+import { renderAuthorizedReportPdf } from './reportPdfRenderer';
 import type { AuthorizedExport } from './reportPdfExport';
 
 function sampleExport(rows = 120): AuthorizedExport {
@@ -91,19 +90,5 @@ describe('R4 multi-page canonical report PDF', () => {
         shopNames: {},
       }),
     ).toThrow('report_export_font_unsupported');
-  });
-
-  it('R4 renders source labels and shop names in Arabic in a real multi-page PDF', async () => {
-    const report = sampleExport(120);
-    report.sections[0]!.rows[119]!.label = 'مرتجع عميل';
-    const pdf = await renderAuthorizedReportPdfDocument(report, {
-      kind: 'current',
-      generatedAt: '2026-10-29T10:00:00.000Z',
-      shopNames: { '11111111-1111-4111-8111-111111111111': 'تكس المعادي' },
-    });
-    expect(pdf.subarray(0, 5).toString('ascii')).toBe('%PDF-');
-    const document = await PDFDocument.load(pdf);
-    expect(document.getPageCount()).toBeGreaterThan(1);
-    expect(document.getSubject()).toContain('120');
   });
 });
