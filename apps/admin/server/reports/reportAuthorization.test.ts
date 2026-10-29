@@ -5,6 +5,7 @@ import { AdminAuthorizationError } from '../authorization.js';
 import {
   canReadReportFilterOption,
   filterAuthorizedReportTargets,
+  filterAuthorizedReportSavedViews,
   requireReportArea,
   requireReportContextPermissions,
 } from './reportAuthorization.js';
@@ -109,4 +110,25 @@ describe('Plan 7 report domain permissions', () => {
     ).toThrow(AdminAuthorizationError);
   });
 
+it('does not expose saved views with inaccessible report domains or filter scopes', () => {
+    const safe = {
+      id: 'safe',
+      shopId,
+      reportArea: 'sales',
+      filters: { shopIds: [shopId], context: {} },
+    };
+    expect(
+      filterAuthorizedReportSavedViews(
+        staff,
+        [
+          safe,
+          { ...safe, id: 'customer', filters: { context: { customerId: 'private' } } },
+          { ...safe, id: 'finance', reportArea: 'profit' },
+          { ...safe, id: 'foreign', shopId: 'other-shop' },
+          { ...safe, id: 'foreign-filter', filters: { shopIds: ['other-shop'] } },
+        ],
+        shopId,
+      ),
+    ).toEqual([safe]);
+  });
 });

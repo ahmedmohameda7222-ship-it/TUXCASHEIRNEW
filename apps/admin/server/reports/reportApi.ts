@@ -15,10 +15,10 @@ import { AdminSupabaseClient, AdminSupabaseError } from '../supabaseAdmin.js';
 import { adminRequestOperation } from '../observability.js';
 import {
   filterAuthorizedReportTargets,
+  filterAuthorizedReportSavedViews,
   canReadReportFilterOption,
   requireReportArea,
   requireReportContextPermissions,
-  REPORT_AREA_PERMISSION as reportDomainPermissions,
 } from './reportAuthorization.js';
 import { maskDashboardMetrics } from './dashboardAuthorization.js';
 import { enrichReportDrilldowns } from './reportDrilldowns.js';
@@ -194,18 +194,7 @@ export async function handleReportsRequest(
         sendJson(response, 200, {
           ...data,
           targets: filterAuthorizedReportTargets(principal, data['targets']),
-          savedViews: savedViews.filter((view) => {
-            if (!view || typeof view !== 'object') return false;
-            const area = (view as Record<string, unknown>)['reportArea'];
-            return (
-              typeof area === 'string' &&
-              // Never return a saved finance/customer/staff filter to someone who lost access.
-              area in reportDomainPermissions &&
-              principal.permissions.includes(
-                reportDomainPermissions[area as keyof typeof reportDomainPermissions],
-              )
-            );
-          }),
+          savedViews: filterAuthorizedReportSavedViews(principal, savedViews, shopId),
         });
         return;
       }
@@ -536,6 +525,19 @@ export async function handleReportsRequest(
     if (command.type === 'report.view.save') {
       requireReportArea(principal, command.reportArea, command.shopId);
       requireReportContextPermissions(principal, command.filters, command.shopId);
+      const savedScope = command.filters['shopIds'];
+      if (savedScope !== undefined) {
+        if (!Array.isArray(savedScope) || savedScope.length === 0) {
+          throw new AdminAuthorizationError('shop_forbidden');
+        }
+        for (const selectedShop of savedScope) {
+          if (typeof selectedShop !== 'string') {
+            throw new AdminAuthorizationError('shop_forbidden');
+          }
+          requireReportArea(principal, command.reportArea, selectedShop);
+          requireReportContextPermissions(principal, command.filters, selectedShop);
+        }
+      }
     }
     const action =
       command.type === 'report.view.save'
