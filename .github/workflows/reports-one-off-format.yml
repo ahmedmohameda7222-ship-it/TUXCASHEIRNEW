@@ -1,4 +1,4 @@
-name: Reports one-time format
+name: Reports one-time format and lock dependency
 on:
   push:
     branches:
@@ -23,9 +23,16 @@ jobs:
       - run: npm ci --ignore-scripts
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Install pinned PDF renderer dependencies and update lockfile
+        run: |
+          npm install --ignore-scripts --save-exact -w @tux/admin \
+            pdf-lib@1.17.1 @pdf-lib/fontkit@1.1.1 @fontsource/noto-sans-arabic@5.3.0
+          find node_modules/@fontsource/noto-sans-arabic/files -maxdepth 1 -name '*400-normal.woff' | head -20
       - run: |
           npx prettier --write \
             apps/admin/src/reports/ReportFilters.tsx \
+            apps/admin/src/reports/ReportsPage.tsx \
+            apps/admin/src/reports/reportAreaTransition.ts \
             apps/admin/src/reports/ReportTopics.test.ts \
             apps/admin/src/reports/reportDateRange.ts \
             apps/admin/src/reports/reportDateRange.test.ts \
@@ -35,10 +42,10 @@ jobs:
             e2e/admin-reports.spec.ts
       - name: Commit formatted exact Reports files
         run: |
-          if ! git diff --quiet -- apps/admin/src/reports apps/admin/server/reports e2e/admin-reports.spec.ts; then
+          if ! git diff --quiet -- apps/admin/src/reports apps/admin/server/reports e2e/admin-reports.spec.ts apps/admin/package.json package-lock.json; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add apps/admin/src/reports apps/admin/server/reports e2e/admin-reports.spec.ts
-            git commit -m "style(reports): apply repository Prettier"
+            git add apps/admin/src/reports apps/admin/server/reports e2e/admin-reports.spec.ts apps/admin/package.json package-lock.json
+            git commit -m "build(reports): pin PDF renderer, Unicode font and format Reports"
             git push
           fi
