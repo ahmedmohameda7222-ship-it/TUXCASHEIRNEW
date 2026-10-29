@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link } from 'wouter';
 import type { ReportDrilldown } from '@tux/admin-contracts';
 
@@ -48,6 +49,7 @@ export function ReportView({
   loading,
   error,
   retry,
+  exportActions,
 }: {
   data: ReportResponse | undefined;
   filters: ReportFilters;
@@ -55,6 +57,7 @@ export function ReportView({
   loading: boolean;
   error: boolean;
   retry(): void;
+  exportActions?: ReactNode;
 }) {
   if (loading)
     return <LoadingState title="Building report" description="Reading canonical data…" />;
@@ -76,7 +79,8 @@ export function ReportView({
   return (
     <section className="tux-report-view" aria-label="Report results">
       <header className="tux-report-view__intro">
-        <h2>{REPORT_LABELS[data.area]}</h2>
+        <div className="tux-report-view__title">
+          <h2>{REPORT_LABELS[data.area]}</h2>
         <p>
           {filters.fromDate} – {filters.toDate} · {filters.shopIds.length}{' '}
           {filters.shopIds.length === 1 ? 'shop' : 'shops'} ·{' '}
@@ -86,6 +90,8 @@ export function ReportView({
               ? 'Online only'
               : 'All sources'}
         </p>
+        </div>
+        {exportActions}
       </header>
       <div className="tux-report-metrics">
         <div>
