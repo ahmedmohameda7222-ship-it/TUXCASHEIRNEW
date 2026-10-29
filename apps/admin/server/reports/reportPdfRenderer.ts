@@ -73,6 +73,13 @@ export function renderAuthorizedReportPdf(exportData: AuthorizedExport, options:
     addLine('Generated UTC: ' + options.generatedAt);
     addLine('-------------------------------------------------------------------');
     summarize(section.summary).forEach(addLine);
+    if (section.comparison) {
+      addLine(
+        'Comparison period: ' + section.comparison.periodStart + ' to ' + section.comparison.periodEnd,
+      );
+      addLine('Previous period amount: ' + money(section.comparison.summary.totalAmountMinor));
+      addLine('Previous period source events: ' + section.comparison.summary.eventCount);
+    }
     addLine('-------------------------------------------------------------------');
     addLine('All ' + section.rows.length + ' matching authorized source records:');
     if (section.rows.length === 0) addLine('No matching source events in this period.');
