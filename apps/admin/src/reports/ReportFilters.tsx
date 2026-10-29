@@ -270,7 +270,10 @@ export function ReportFilters({
                 <select
                   value={value.comparisonRange ?? 'previous'}
                   onChange={(event) =>
-                    set('comparisonRange', event.target.value as 'previous' | 'week' | 'month' | 'year')
+                    set(
+                      'comparisonRange',
+                      event.target.value as 'previous' | 'week' | 'month' | 'year',
+                    )
                   }
                 >
                   <option value="previous">Previous equivalent period</option>
