@@ -1,4 +1,4 @@
-import { REPORT_LABELS } from '../../src/reports/ReportFilters.js';
+import { REPORT_LABELS } from '../../src/reports/reportLabels.js';
 import type { AuthorizedExport, ExportFact, ExportSummary } from './reportPdfExport.js';
 
 type PdfOptions = {
@@ -94,18 +94,18 @@ export function renderAuthorizedReportPdf(exportData: AuthorizedExport, options:
       'BT /F1 9 Tf 36 ' + (797 - 13 * index) + ' Td (' + escapePdf(line) + ') Tj ET',
     );
     commands.push('BT /F1 9 Tf 36 27 Td (Page ' + (pageIndex + 1) + ' / ' + pages.length + ') Tj ET');
-    const stream = commands.join('\\n') + '\\n';
-    const streamId = put('<< /Length ' + Buffer.byteLength(stream, 'latin1') + ' >>\\nstream\\n' + stream + 'endstream');
+    const stream = commands.join('\n') + '\n';
+    const streamId = put('<< /Length ' + Buffer.byteLength(stream, 'latin1') + ' >>\nstream\n' + stream + 'endstream');
     pageIds.push(put('<< /Type /Page /Parent ' + pagesId + ' 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ' + fontId + ' 0 R >> >> /Contents ' + streamId + ' 0 R >>'));
   });
   objects[pagesId - 1] = Buffer.from('<< /Type /Pages /Count ' + pageIds.length + ' /Kids [' + pageIds.map((id) => id + ' 0 R').join(' ') + '] >>', 'ascii');
   const catalogId = put('<< /Type /Catalog /Pages ' + pagesId + ' 0 R >>');
-  const chunks: Buffer[] = [Buffer.from('%PDF-1.4\\n%binary\\n', 'latin1')];
+  const chunks: Buffer[] = [Buffer.from('%PDF-1.4\n%binary\n', 'latin1')];
   const offsets: number[] = [];
   let position = chunks[0]!.length;
   objects.forEach((object, i) => {
     offsets.push(position);
-    const bytes = Buffer.concat([Buffer.from((i + 1) + ' 0 obj\\n'), object, Buffer.from('\\nendobj\\n')]);
+    const bytes = Buffer.concat([Buffer.from((i + 1) + ' 0 obj\n'), object, Buffer.from('\nendobj\n')]);
     chunks.push(bytes);
     position += bytes.length;
   });
@@ -114,7 +114,7 @@ export function renderAuthorizedReportPdf(exportData: AuthorizedExport, options:
     ...offsets.map((at) => String(at).padStart(10, '0') + ' 00000 n '),
     'trailer', '<< /Size ' + (objects.length + 1) + ' /Root ' + catalogId + ' 0 R >>',
     'startxref', String(position), '%%EOF', '',
-  ].join('\\n');
+  ].join('\n');
   chunks.push(Buffer.from(xref, 'ascii'));
   const result = Buffer.concat(chunks);
   if (result.byteLength > MAX_PDF_BYTES) throw new Error('report_export_too_large');
