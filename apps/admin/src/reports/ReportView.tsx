@@ -5,6 +5,7 @@ import { EmptyState, ErrorState, LoadingState } from '../components/feedback/Adm
 import { formatEgp } from '../finance/money';
 
 import type { ReportFilters, ReportResponse } from './useReports';
+import { REPORT_LABELS } from './reportLabels';
 
 function amountLabel(amount: number | null): string {
   return amount === null ? 'Cost data incomplete' : formatEgp(amount);
@@ -71,6 +72,14 @@ export function ReportView({
   const summary = data.summary;
   return (
     <section className="tux-report-view" aria-label="Report results">
+      <header className="tux-report-view__intro">
+        <h2>{REPORT_LABELS[data.area]}</h2>
+        <p>
+          {filters.fromDate} – {filters.toDate} · {filters.shopIds.length}{' '}
+          {filters.shopIds.length === 1 ? 'shop' : 'shops'} ·{' '}
+          {filters.source === 'POS' ? 'POS only' : filters.source === 'ONLINE' ? 'Online only' : 'All sources'}
+        </p>
+      </header>
       <div className="tux-report-metrics">
         <div>
           <small>Recorded amount</small>
@@ -101,6 +110,10 @@ export function ReportView({
         />
       ) : (
         <div className="tux-report-results">
+          <header className="tux-report-results__heading">
+            <h3>Source activity</h3>
+            <small>{summary.eventCount.toLocaleString('en-EG')} matching records</small>
+          </header>
           <ul className="tux-report-mobile-entries" aria-label="Report entries">
             {data.rows.map((fact) => {
               const href = reportDrilldownHref(fact.drilldown);
