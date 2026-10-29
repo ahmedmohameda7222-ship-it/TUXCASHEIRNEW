@@ -1,0 +1,35 @@
+name: Staff Operations one-time format
+on:
+  push:
+    branches:
+      - fix/staff-operations-ready-authoritative-20261029
+    paths:
+      - .github/workflows/staff-operations-format-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npx prettier --write apps/admin/src/staff/StaffPage.tsx e2e/admin-workforce.spec.ts
+      - name: Commit formatted files on the isolated branch
+        run: |
+          if ! git diff --quiet -- apps/admin/src/staff/StaffPage.tsx e2e/admin-workforce.spec.ts; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add apps/admin/src/staff/StaffPage.tsx e2e/admin-workforce.spec.ts
+            git commit -m "style(staff): apply repository Prettier"
+            git push
+          fi
