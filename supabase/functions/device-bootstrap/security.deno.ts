@@ -146,7 +146,15 @@ Deno.test('device-bootstrap requires cryptographic Vercel provenance before rate
           { status: 200, headers: { 'content-type': 'application/json' } },
         );
       }
-      if (url.pathname.endsWith('/rest/v1/workers') && request.method === 'GET') {
+      if (url.pathname.endsWith('/rest/v1/business_shops') && request.method === 'GET') {
+        return new Response(JSON.stringify([{ business_id: '30000000-0000-4000-8000-000000000001' }]), {
+          status: 200, headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (
+        url.pathname.endsWith('/rest/v1/employee_shop_assignments') &&
+        request.method === 'GET'
+      ) {
         return new Response(JSON.stringify([]), {
           status: 200, headers: { 'content-type': 'application/json' },
         });
@@ -295,8 +303,17 @@ Deno.test('device-bootstrap requires cryptographic Vercel provenance before rate
       }
       const shops = calls.filter((call) => call.pathname.endsWith('/rest/v1/shops'));
       if (shops.length !== 1) throw new Error('selected shop was not queried exactly once');
+      const businesses = calls.filter((call) => call.pathname.endsWith('/rest/v1/business_shops'));
+      const assignments = calls.filter((call) =>
+        call.pathname.endsWith('/rest/v1/employee_shop_assignments')
+      );
       const workers = calls.filter((call) => call.pathname.endsWith('/rest/v1/workers'));
-      if (workers.length !== 1) throw new Error('worker lookup was not shop-scoped');
+      if (businesses.length !== 1 || assignments.length !== 1) {
+        throw new Error('employee PIN login did not scope the business and assigned shop');
+      }
+      if (workers.length !== 0) {
+        throw new Error('login still looked up legacy workers before verifying employee assignment');
+      }
     });
 
     await test.step('stale signed requests are rejected before Supabase', async () => {

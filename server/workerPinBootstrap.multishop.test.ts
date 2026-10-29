@@ -84,6 +84,17 @@ describe('shop-explicit first-browser bootstrap', () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
+  it('reports a server-authorized PIN collision without asking to connect a device', async () => {
+    vi.stubGlobal('window', {
+      location: { hostname: 'ops.example', origin: 'https://ops.example' },
+      localStorage: { getItem: () => DEVICE, setItem: vi.fn() },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 409 })));
+    await expect(new VercelBrowserRemoteGateway().bootstrap('1234', SHOP_A)).rejects.toThrow(
+      'This PIN is already assigned to another worker in this shop.',
+    );
+  });
+
   it('sends the shop selected by the operator from the browser', async () => {
     vi.stubGlobal('window', {
       location: { hostname: 'ops.example', origin: 'https://ops.example' },

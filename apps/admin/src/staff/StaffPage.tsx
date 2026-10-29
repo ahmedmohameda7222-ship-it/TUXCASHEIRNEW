@@ -109,7 +109,6 @@ export function StaffPage() {
     readPendingOnboarding(search, shopId),
   );
   const [assignedShopIds, setAssignedShopIds] = useState<string[]>([]);
-  const [provisionedShopIds, setProvisionedShopIds] = useState<string[]>([]);
   const [employeePinApplied, setEmployeePinApplied] = useState(false);
   const [compensationConfigured, setCompensationConfigured] = useState(false);
   const [newEmployeePin, setNewEmployeePin] = useState('');
@@ -199,7 +198,7 @@ export function StaffPage() {
     const displayName = newEmployeeName.trim();
     if (!displayName || onboardingBusy || !shopId) return;
     if (!canProvisionWorker) {
-      setOnboardingError('An Owner or Admin must provision Operations access during creation.');
+      setOnboardingError('An Owner or Admin must authorize the employee PIN.');
       return;
     }
     if (!/^\d{4,12}$/.test(newEmployeePin) || newEmployeePin !== confirmEmployeePin) {
@@ -207,7 +206,7 @@ export function StaffPage() {
       return;
     }
     if (!/^\d{4,12}$/.test(setupAdminPin)) {
-      setOnboardingError('Enter your Admin PIN to activate Operations access.');
+      setOnboardingError('Enter your Admin PIN to authorize the new employee PIN.');
       return;
     }
     setOnboardingBusy(true);
@@ -289,27 +288,6 @@ export function StaffPage() {
           throw new Error('Employee PIN is pending approval; Operations access is not ready.');
         }
         setEmployeePinApplied(true);
-      }
-      const provisioned = new Set(provisionedShopIds);
-      for (const assignedShopId of onboardingShopIds) {
-        if (provisioned.has(assignedShopId)) continue;
-        const result = await staff.command.mutateAsync({
-          type: 'employee.provision-worker',
-          employeeId,
-          shopId: assignedShopId,
-        });
-        if (
-          !result.ok ||
-          isPendingApprovalResult(result) ||
-          !result.workerId ||
-          result.shopId !== assignedShopId
-        ) {
-          throw new Error(
-            'Operations worker identity not confirmed for every assigned shop. Retry setup.',
-          );
-        }
-        provisioned.add(assignedShopId);
-        setProvisionedShopIds([...provisioned]);
       }
       // Verify every requested elevated access change against the server's authoritative
       // employee version. Pending second-person approvals must not complete the creation flow.
@@ -406,7 +384,6 @@ export function StaffPage() {
       setOnboardingStep('identity');
       setCreatedEmployeeId(null);
       setAssignedShopIds([]);
-      setProvisionedShopIds([]);
       setEmployeePinApplied(false);
       setCompensationConfigured(false);
       setNewEmployeePin('');
@@ -464,13 +441,11 @@ export function StaffPage() {
           throw new Error('Admin PIN must be 4–12 digits');
         }
         if (!canProvisionWorker) {
-          throw new Error(
-            'Owner or Admin access is required for immediate Operations provisioning',
-          );
+          throw new Error('Owner or Admin authorization is required to set an employee PIN');
         }
         setOnboardingStep('review');
       } catch (error) {
-        setOnboardingError(readableError(error) ?? 'Invalid employment or Operations setup');
+        setOnboardingError(readableError(error) ?? 'Invalid employee or PIN details');
       }
     } else {
       void createEmployee();
@@ -507,11 +482,6 @@ export function StaffPage() {
                   .map((assignment) => assignment.shopId);
                 setOnboardingShopIds([...new Set([shopId, ...linked])]);
                 setAssignedShopIds(linked.filter((id) => id !== shopId));
-                setProvisionedShopIds(
-                  pending.operationsIdentities
-                    .filter((identity) => identity.kind === 'LINKED' && identity.workerActive)
-                    .map((identity) => identity.shopId),
-                );
                 setCompensationConfigured(pending.compensation.length > 0);
                 setNewEmployeeRate('');
                 setNewEmployeeEffectiveFrom('');
@@ -682,12 +652,12 @@ export function StaffPage() {
                     <span className="admin-staff-status-chip" data-active={employee.active}>
                       {employee.active ? 'Active' : 'Suspended'}
                     </span>
-                    {employee.operationsSetupRequiredShopIds.includes(shopId) ? (
+                    {!employee.pinConfigured && employee.active ? (
                       <span
                         className="admin-staff-row__setup"
-                        title="Operations setup is still required in assigned shops"
+                        title="Employee PIN is required for sign in"
                       >
-                        Setup needed
+                        PIN required
                       </span>
                     ) : null}
                   </span>
@@ -746,7 +716,7 @@ export function StaffPage() {
           open={createOpen}
           variant="sheet"
           title="Add employee"
-          description="Set up the profile, authorized shops, employee Operations PIN and pay in one flow. Save only after worker access is confirmed."
+          description="Add the employee, assign shops and set their PIN. They can sign in on any browser after approval."
           onOpenChange={(open) => {
             if (!onboardingBusy && !staff.command.isPending) setCreateOpen(open);
           }}

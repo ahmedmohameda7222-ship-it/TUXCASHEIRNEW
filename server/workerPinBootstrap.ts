@@ -202,8 +202,12 @@ export async function bootstrapDeviceWithWorkerPin(
       sendJson(response, 429, { error: 'too_many_pin_attempts' });
       return;
     }
+    if (upstream.status === 409) {
+      sendJson(response, 409, { error: 'employee_pin_conflict' });
+      return;
+    }
     sendJson(response, upstream.status >= 500 ? 503 : 502, {
-      error: 'device_bootstrap_failed',
+      error: 'employee_sign_in_unavailable',
     });
     return;
   }

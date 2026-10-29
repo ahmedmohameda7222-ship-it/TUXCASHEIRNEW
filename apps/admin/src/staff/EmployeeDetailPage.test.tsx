@@ -64,6 +64,15 @@ function render(
 }
 
 describe('EmployeeDetailPage', () => {
+  it('requires only shop assignment and a staff PIN, not Operations setup or worker linking', () => {
+    const html = render(employee(), true, [], 'permissions', true);
+    expect(html).toContain('Operations access');
+    expect(html).toContain('employee PIN');
+    expect(html).not.toContain('Operations setup required');
+    expect(html).not.toContain('Complete Operations setup');
+    expect(html).not.toContain('Provision and link Operations worker');
+  });
+
   it('keeps Profile focused and moves access work into its own tab', () => {
     const html = render(employee());
     expect(html).toContain('Mona Ali');
@@ -157,7 +166,7 @@ describe('EmployeeDetailPage', () => {
     expect(html).toContain('Access &amp; Permissions');
     expect(html).not.toContain('Complete Operations setup');
   });
-  it('reports readiness for the selected shop without hiding other-shop setup gaps', () => {
+  it('reports PIN readiness without manual worker setup', () => {
     const html = render(
       employee({
         assignments: [
@@ -181,17 +190,15 @@ describe('EmployeeDetailPage', () => {
       'permissions',
       true,
     );
-    expect(html).toContain('Operations ready');
-    expect(html).toContain('Other shop');
+    expect(html).toContain('Operations access');
     expect(html).not.toContain('Operations setup needed');
+    expect(html).toContain('PIN required');
   });
 
-  it('exposes first-worker provisioning only to authorized administrators when no eligible worker exists', () => {
-    const enabled = render(employee(), true, [], 'permissions', true);
-    expect(enabled).toContain('Provision and link Operations worker');
-    expect(enabled).toContain('reset it first');
-    const manager = render(employee(), true, [], 'permissions', false);
-    expect(manager).not.toContain('Provision and link Operations worker');
+  it('shows staff PIN readiness without provisioning a worker', () => {
+    const html = render(employee({ pinConfigured: false }), true, [], 'permissions', true);
+    expect(html).toContain('Employee PIN not set');
+    expect(html).not.toContain('Provision and link Operations worker');
   });
 
   it('displays the URL-selected Attendance and Pay tab for an exact employee', () => {

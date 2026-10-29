@@ -10,17 +10,15 @@ import type { AdminSummaryMetric } from '../components/layout/AdminMetricStrip';
  * a single employee detail when no authoritative shop-wide count exists.
  */
 export function staffSummaryMetrics(
-  employees: readonly Pick<EmployeeSummary, 'active' | 'operationsSetupRequiredShopIds'>[],
-  selectedShopId: string,
+  employees: readonly Pick<EmployeeSummary, 'active' | 'pinConfigured'>[],
+  _selectedShopId: string,
   complete: boolean,
   pendingLeaveCount: number | null = null,
 ): readonly AdminSummaryMetric[] {
   const total = complete ? employees.length : null;
   const active = complete ? employees.filter((employee) => employee.active).length : null;
-  const unconfigured = complete
-    ? employees.filter((employee) =>
-        employee.operationsSetupRequiredShopIds.includes(selectedShopId),
-      ).length
+  const withoutPin = complete
+    ? employees.filter((employee) => employee.active && !employee.pinConfigured).length
     : null;
 
   return [
@@ -28,9 +26,9 @@ export function staffSummaryMetrics(
     { id: 'active', label: 'Active staff', value: active },
     {
       id: 'readiness',
-      label: 'Setup required',
-      value: unconfigured,
-      tone: unconfigured !== null && unconfigured > 0 ? 'warning' : 'default',
+      label: 'PIN required',
+      value: withoutPin,
+      tone: withoutPin !== null && withoutPin > 0 ? 'warning' : 'default',
     },
     { id: 'leave', label: 'Pending leave', value: pendingLeaveCount },
   ];

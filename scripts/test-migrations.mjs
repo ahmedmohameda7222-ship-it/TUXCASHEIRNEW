@@ -496,4 +496,80 @@ psql(
   'Post-migration invariant assertions',
 );
 
+// The Operations login path is employee + assigned shop + PIN; the worker row
+// is a server-generated compatibility identity, never an Admin setup step.
+psql(
+  [
+    '-c',
+    `begin;
+       do $employee_login$
+       declare
+         b uuid := 'da000000-0000-4000-8000-000000000001';
+         s uuid := 'da000000-0000-4000-8000-000000000002';
+         other_shop uuid := 'da000000-0000-4000-8000-000000000003';
+         e uuid := 'da000000-0000-4000-8000-000000000004';
+         e2 uuid := 'da000000-0000-4000-8000-000000000005';
+         r jsonb;
+         worker uuid;
+       begin
+         if to_regprocedure(
+           'public.ensure_employee_operations_worker_login_v1(uuid,uuid)'
+         ) is null
+            or has_function_privilege(
+              'anon', 'public.ensure_employee_operations_worker_login_v1(uuid,uuid)', 'EXECUTE'
+            )
+            or has_function_privilege(
+              'authenticated', 'public.ensure_employee_operations_worker_login_v1(uuid,uuid)', 'EXECUTE'
+            )
+            or not has_function_privilege(
+              'service_role', 'public.ensure_employee_operations_worker_login_v1(uuid,uuid)', 'EXECUTE'
+            ) then
+           raise exception 'Operations login RPC must be service-role-only';
+         end if;
+
+         insert into public.businesses(id,name) values (b,'Employee PIN Login Test');
+         insert into public.shops(id,name,active,lifecycle_state)
+         values(s,'Authorized',true,'ACTIVE'),(other_shop,'Unassigned',true,'ACTIVE');
+         insert into public.business_shops(business_id,shop_id)
+         values (b,s),(b,other_shop);
+         insert into public.business_employees(
+           id,business_id,display_name,role,pin_lookup_hash,pin_hash,active
+         ) values
+           (e,b,'Assigned employee','STAFF',repeat('a',64),
+            'pbkdf2-sha256' || chr(36) || '210000' || chr(36) || repeat('a',32) || chr(36) || repeat('a',64),true),
+           (e2,b,'No PIN','STAFF',null,null,true);
+         insert into public.employee_shop_assignments(business_id,employee_id,shop_id)
+         values(b,e,s),(b,e2,s);
+
+         r := public.ensure_employee_operations_worker_login_v1(e,other_shop);
+         if r->>'code' <> 'employee_login_denied' then
+           raise exception 'Unassigned shop accepted employee PIN: %',r;
+         end if;
+         r := public.ensure_employee_operations_worker_login_v1(e2,s);
+         if r->>'code' <> 'employee_login_denied' then
+           raise exception 'Employee without PIN accepted: %',r;
+         end if;
+         r := public.ensure_employee_operations_worker_login_v1(e,s);
+         if r->>'ok' <> 'true' then
+           raise exception 'Assigned employee cannot automatically sign in: %',r;
+         end if;
+         worker := (r->>'workerId')::uuid;
+         r := public.ensure_employee_operations_worker_login_v1(e,s);
+         if r->>'workerId' <> worker::text
+            or (select count(*) from public.employee_worker_links
+                where employee_id=e and shop_id=s and active) <> 1 then
+           raise exception 'Repeated login duplicated internal worker identity';
+         end if;
+         update public.business_employees set active=false where id=e;
+         r := public.ensure_employee_operations_worker_login_v1(e,s);
+         if r->>'code' <> 'employee_login_denied' then
+           raise exception 'Suspended staff accepted by Operations';
+         end if;
+       end
+       $employee_login$;
+       rollback;`,
+  ],
+  'Employee PIN sign-in and cross-shop isolation regression',
+);
+
 process.stdout.write(`Migration smoke passed: ${migrations.join(' -> ')}\n`);

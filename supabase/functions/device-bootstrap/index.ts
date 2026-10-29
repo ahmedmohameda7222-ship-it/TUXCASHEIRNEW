@@ -152,7 +152,7 @@ async function verifyPin(pin: string, storedHash: string): Promise<boolean> {
   );
   const derived = new Uint8Array(
     await crypto.subtle.deriveBits(
-      { name: 'PBKDF2', hash: 'SHA-256', iterations, salt },
+      { name: 'PBKDF2', hash: 'SHA-256', iterations, salt: new Uint8Array(salt) },
       key,
       DERIVED_KEY_BYTES * 8,
     ),
@@ -334,32 +334,95 @@ Deno.serve(async (request) => {
     shop = shops[0] as { id: string; name: string; active: boolean };
   }
 
-  const { data: workers, error: workerError } = await service
-    .from('workers')
-    .select('id,shop_id,display_name,pin_hash,active')
+  // The Admin employee PIN + assigned shop are the only sign-in requirements.
+  // Do not require separately linked/provisioned Operations workers.
+  const { data: businessShops, error: businessError } = await service
+    .from('business_shops')
+    .select('business_id')
     .eq('shop_id', shop.id)
+    .limit(2);
+  if (businessError || !Array.isArray(businessShops) || businessShops.length !== 1) {
+    return jsonResponse(503, { error: 'employee_directory_unavailable' });
+  }
+  const businessId = String(businessShops[0]?.business_id ?? '');
+  const { data: assigned, error: assignmentError } = await service
+    .from('employee_shop_assignments')
+    .select('employee_id')
+    .eq('business_id', businessId)
+    .eq('shop_id', shop.id)
+    .limit(501);
+  if (assignmentError || !Array.isArray(assigned) || assigned.length > 500) {
+    return jsonResponse(503, { error: 'employee_directory_unavailable' });
+  }
+  const employeeIds = assigned.map((row) => String(row.employee_id));
+  if (employeeIds.length === 0) return jsonResponse(401, { error: 'invalid_pin' });
+  const { data: employees, error: employeeError } = await service
+    .from('business_employees')
+    .select('id,business_id,display_name,active,pin_hash,pin_lookup_hash')
+    .eq('business_id', businessId)
     .eq('active', true)
-    .order('created_at', { ascending: true });
-  if (workerError) {
-    console.error('worker PIN bootstrap worker lookup failed', workerError);
-    return jsonResponse(500, { error: 'worker_lookup_failed' });
+    .in('id', employeeIds)
+    .limit(501);
+  if (employeeError || !Array.isArray(employees) || employees.length > 500) {
+    return jsonResponse(503, { error: 'employee_directory_unavailable' });
   }
 
-  let matchedWorker:
-    | { id: string; shop_id: string; display_name: string; pin_hash: string; active: boolean }
-    | null = null;
-  for (const candidate of workers ?? []) {
-    const worker = candidate as {
-      id: string;
-      shop_id: string;
-      display_name: string;
-      pin_hash: string;
-      active: boolean;
-    };
-    const matches = await verifyPin(pin, worker.pin_hash);
-    if (matches && matchedWorker === null) matchedWorker = worker;
+  let matchedEmployee: { id: string; display_name: string } | null = null;
+  let duplicatePin = false;
+  for (const candidate of employees) {
+    if (typeof candidate.pin_hash !== 'string') continue;
+    const matches = await verifyPin(pin, candidate.pin_hash);
+    if (!matches) continue;
+    if (matchedEmployee !== null) duplicatePin = true;
+    else matchedEmployee = { id: candidate.id, display_name: candidate.display_name };
   }
-  if (matchedWorker === null) return jsonResponse(401, { error: 'invalid_pin' });
+  if (matchedEmployee === null || duplicatePin) {
+    return jsonResponse(401, { error: 'invalid_pin' });
+  }
+
+  // Service-role-only atomic RPC verifies the active shop assignment again,
+  // reuses an existing active linked worker or creates a compatibility worker.
+  // No manager setup/worker-link/device enrollment action is required.
+  const { data: identity, error: identityError } = await service.rpc(
+    'ensure_employee_operations_worker_login_v1',
+    { p_employee_id: matchedEmployee.id, p_shop_id: shop.id },
+  );
+  if (identityError || !identity || identity.ok !== true || typeof identity.workerId !== 'string') {
+    if (identity?.code === 'pin_already_in_use') {
+      return jsonResponse(409, { error: 'employee_pin_conflict' });
+    }
+    if (
+      identity?.code === 'worker_access_suspended' ||
+      identity?.code === 'employee_login_denied'
+    ) {
+      return jsonResponse(401, { error: 'invalid_pin' });
+    }
+    console.error('employee PIN identity resolution failed', identityError?.message);
+    return jsonResponse(503, { error: 'employee_identity_unavailable' });
+  }
+  const { data: worker, error: workerError } = await service
+    .from('workers')
+    .select('id,shop_id,display_name,pin_hash,active')
+    .eq('id', identity.workerId)
+    .eq('shop_id', shop.id)
+    .eq('active', true)
+    .maybeSingle();
+  if (
+    workerError ||
+    !worker ||
+    worker.shop_id !== shop.id ||
+    worker.active !== true ||
+    typeof worker.pin_hash !== 'string'
+  ) {
+    return jsonResponse(503, { error: 'employee_identity_unavailable' });
+  }
+  const matchedWorker = worker as {
+    id: string;
+    shop_id: string;
+    display_name: string;
+    pin_hash: string;
+    active: boolean;
+  };
 
   await clearRateLimit(service, trustedBody.rateLimitKey);
 

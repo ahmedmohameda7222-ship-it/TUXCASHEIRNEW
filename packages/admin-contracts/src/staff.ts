@@ -165,6 +165,7 @@ export type EmployeeSummary = {
   readonly phone: string | null;
   readonly role: AdminRole;
   readonly active: boolean;
+  readonly pinConfigured?: boolean;
   readonly shopIds: readonly string[];
   readonly operationsSetupRequiredShopIds: readonly string[];
 };
@@ -184,6 +185,7 @@ export type EmployeeDetail = {
   readonly customDeniedPermissions?: readonly AdminPermission[];
   readonly assignments: readonly EmployeeShopAssignment[];
   readonly operationsIdentities: readonly LinkedOperationsIdentityState[];
+  readonly pinConfigured?: boolean;
   readonly compensation: readonly EmployeeCompensation[];
   readonly shifts: readonly EmployeeShift[];
   readonly attendanceEvents: readonly AttendanceEvent[];

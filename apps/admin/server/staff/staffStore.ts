@@ -48,6 +48,8 @@ type EmployeeRow = {
   active: boolean;
   profile_version: number | string;
   credential_version: number | string;
+  pin_hash: string | null;
+  pin_lookup_hash: string | null;
 };
 
 type AssignmentRow = {
@@ -433,7 +435,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
                 'business_employees',
                 new URLSearchParams({
                   select:
-                    'id,business_id,display_name,phone,hire_date,notes,role,active,profile_version,credential_version',
+                    'id,business_id,display_name,phone,hire_date,notes,role,active,profile_version,credential_version,pin_hash,pin_lookup_hash',
                   business_id: `eq.${businessId}`,
                   id: inFilter(ids),
                   order: 'display_name.asc,id.asc',
@@ -512,6 +514,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
           phone: employee.phone,
           role: requireRole(employee.role),
           active: employee.active,
+          pinConfigured: Boolean(employee.pin_hash && employee.pin_lookup_hash),
           shopIds,
           operationsSetupRequiredShopIds: shopIds.filter(
             (assignedShopId) => !healthyLinkedKeys.has(`${employee.id}:${assignedShopId}`),
@@ -588,7 +591,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
         'business_employees',
         new URLSearchParams({
           select:
-            'id,business_id,display_name,phone,hire_date,notes,role,active,profile_version,credential_version',
+            'id,business_id,display_name,phone,hire_date,notes,role,active,profile_version,credential_version,pin_hash,pin_lookup_hash',
           business_id: `eq.${businessId}`,
           id: `eq.${employeeId}`,
           limit: '1',
@@ -777,6 +780,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
         notes: employee.notes,
         role: requireRole(employee.role),
         active: employee.active,
+        pinConfigured: Boolean(employee.pin_hash && employee.pin_lookup_hash),
         profileVersion: safeInteger(employee.profile_version),
         credentialVersion: safeInteger(employee.credential_version),
         customPermissions,
