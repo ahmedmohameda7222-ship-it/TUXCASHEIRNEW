@@ -109,9 +109,9 @@ export class OperationsSessionService {
           return ok(configurationState('This device is not assigned to exactly one active shop.'));
         }
         if (
-        this.#requireActivatedConfiguration &&
-        !(await this.#hasActivatedConfiguration(shop.id))
-      ) {
+          this.#requireActivatedConfiguration &&
+          !(await this.#hasActivatedConfiguration(shop.id))
+        ) {
           return ok(
             configurationState('This device does not have an activated Operations configuration.'),
           );
@@ -396,9 +396,9 @@ export class OperationsSessionService {
         return ok(configurationState('This device is not assigned to exactly one active shop.'));
       }
       if (
-          this.#requireActivatedConfiguration &&
-          !(await this.#hasActivatedConfiguration(shop.id))
-        ) {
+        this.#requireActivatedConfiguration &&
+        !(await this.#hasActivatedConfiguration(shop.id))
+      ) {
         return ok(
           configurationState('This device does not have an activated Operations configuration.'),
         );

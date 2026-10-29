@@ -130,9 +130,7 @@ test('a verified PIN opens Operations even when the server menu payload is inval
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(
-        requested ? { version: 1, bundle: { invalid: true } } : { version: 1 },
-      ),
+      body: JSON.stringify(requested ? { version: 1, bundle: { invalid: true } } : { version: 1 }),
     });
   });
   await page.route('**/api/operations-session-exit', (route) =>
