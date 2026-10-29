@@ -95,6 +95,12 @@ export function renderAuthorizedReportPdf(
     );
     addLine('Period (Africa/Cairo): ' + exportData.fromDate + ' to ' + exportData.toDate);
     addLine('Shop scope: ' + scope);
+    if (exportData.appliedFilters) {
+      addLine('Source filter: ' + (exportData.appliedFilters.source ?? 'All sources'));
+      for (const [key, value] of Object.entries(exportData.appliedFilters.context)) {
+        addLine('Context filter - ' + key + ': ' + value);
+      }
+    }
     addLine('Generated UTC: ' + options.generatedAt);
     addLine('-------------------------------------------------------------------');
     summarize(section.summary).forEach(addLine);
