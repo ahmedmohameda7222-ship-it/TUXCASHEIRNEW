@@ -179,7 +179,9 @@ export function ReportsPage() {
           canSetTargets={principal.permissions.includes('settings.manage')}
           pending={reports.command.isPending}
           error={reports.command.error}
-          onCommand={(draft) => reports.command.mutate(draft)}
+          onCommand={async (draft) => {
+            await reports.command.mutateAsync(draft);
+          }}
           onApply={applySavedView}
         />
       ) : null}
