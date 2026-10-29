@@ -256,3 +256,86 @@ test('Reports blocks an inverted date range instead of sending a misleading quer
     ),
   ).toBe(false);
 });
+
+for (const width of [390, 1440]) {
+  test(`R1 report-first quick picker and date shortcuts at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await mockReports(page);
+    await page.goto('/reports');
+    await expect(page.getByRole('heading', { name: 'Choose a report' })).toBeVisible();
+    const quick = page.getByRole('navigation', { name: 'Quick reports' });
+    await quick.getByRole('button', { name: 'Inventory' }).click();
+    await expect(page.getByLabel('Report area')).toHaveValue('inventory-consumption');
+    await quick.getByRole('button', { name: 'Sales' }).click();
+    await expect(page.getByLabel('Report area')).toHaveValue('sales');
+    await page.getByLabel('To', { exact: true }).fill('2026-10-29');
+    await page.getByRole('button', { name: 'Last 7 days' }).click();
+    await expect(page.getByLabel('From', { exact: true })).toHaveValue('2026-10-23');
+    await quick.locator('summary', { hasText: 'All reports' }).click();
+    await expect(quick.getByRole('button', { name: 'Staff attendance' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  });
+}
+
+test('R4 report PDF actions forward authorized filters, CSRF and return download', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockReports(page);
+  const exports: Array<Record<string, unknown>> = [];
+  await page.route('**/api/admin/reports', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'POST' || request.postDataJSON()?.type !== 'report.pdf.export') {
+      await route.fallback();
+      return;
+    }
+    expect(request.headers()['x-tux-admin-csrf']).toBe(csrfToken);
+    exports.push(request.postDataJSON() as Record<string, unknown>);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/pdf',
+      headers: { 'content-disposition': 'attachment; filename="tux-sales.pdf"' },
+      body: '%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF',
+    });
+  });
+  await page.goto('/reports');
+  await page.getByLabel('From', { exact: true }).fill('2026-10-01');
+  await page.getByLabel('To', { exact: true }).fill('2026-10-29');
+  const current = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download report PDF' }).click();
+  const currentDownload = await current;
+  expect(currentDownload.suggestedFilename()).toContain('tux-sales');
+  expect(exports[0]).toMatchObject({
+    type: 'report.pdf.export',
+    kind: 'current',
+    shopId,
+    shopIds: [shopId],
+    area: 'sales',
+    fromDate: '2026-10-01',
+    toDate: '2026-10-29',
+  });
+  const all = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'All 22 reports (1 PDF)' }).click();
+  const allDownload = await all;
+  expect(allDownload.suggestedFilename()).toContain('all-authorized');
+  expect(exports[1]).toMatchObject({
+    kind: 'all-authorized',
+    source: null,
+    context: {},
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('R4 PDF controls stay disabled for a report period beyond the export safety budget', async ({
+  page,
+}) => {
+  await mockReports(page);
+  await page.goto('/reports');
+  await page.getByLabel('From', { exact: true }).fill('2026-01-01');
+  await page.getByLabel('To', { exact: true }).fill('2026-10-29');
+  await expect(page.getByRole('button', { name: 'Download report PDF' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'All 22 reports (1 PDF)' })).toBeDisabled();
+  await expect(page.getByText('PDF export needs a valid date range')).toBeVisible();
+});

@@ -13,3 +13,18 @@ export function validReportDateRange(from: string, to: string): boolean {
   const endMs = exactIsoDate(to);
   return startMs !== null && endMs !== null && startMs <= endMs && endMs - startMs <= 730 * DAY_MS;
 }
+
+/** Inclusive date shortcut anchored on the selected Cairo calendar end date. */
+export function reportPresetRange(
+  toDate: string,
+  days: number,
+): { fromDate: string; toDate: string } {
+  const end = exactIsoDate(toDate);
+  if (end === null || ![1, 7, 30].includes(days)) {
+    throw new Error('report_preset_invalid');
+  }
+  return {
+    fromDate: new Date(end - (days - 1) * DAY_MS).toISOString().slice(0, 10),
+    toDate,
+  };
+}

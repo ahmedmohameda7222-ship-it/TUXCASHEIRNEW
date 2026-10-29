@@ -22,6 +22,8 @@ import {
 } from './reportAuthorization.js';
 import { maskDashboardMetrics } from './dashboardAuthorization.js';
 import { enrichReportDrilldowns } from './reportDrilldowns.js';
+import { collectAuthorizedReportExport, ReportExportError } from './reportPdfExport.js';
+import { renderReportPdf } from './reportPdfRenderer.js';
 
 const uuid = z.string().uuid();
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -85,8 +87,43 @@ const commandSchema = z.discriminatedUnion('type', [
     })
     .strict(),
 ]);
+const reportPdfCommandSchema = z
+  .object({
+    type: z.literal('report.pdf.export'),
+    kind: z.enum(['current', 'all-authorized']),
+    shopId: uuid,
+    shopIds: z.array(uuid).min(1).max(50),
+    area,
+    fromDate: isoDate,
+    toDate: isoDate,
+    source: z.enum(['POS', 'ONLINE']).nullable(),
+    compare: z.enum(['previous', 'week', 'month', 'year']).nullable(),
+    context: z
+      .object({
+        orderTypeId: uuid.optional(),
+        paymentMethodId: uuid.optional(),
+        workerId: uuid.optional(),
+        employeeId: uuid.optional(),
+        customerId: uuid.optional(),
+        productId: uuid.optional(),
+        categoryId: uuid.optional(),
+        promotionId: uuid.optional(),
+        supplierId: uuid.optional(),
+        deliveryZoneId: uuid.optional(),
+        status: z
+          .string()
+          .regex(/^[A-Z_]{2,40}$/)
+          .optional(),
+      })
+      .strict(),
+  })
+  .strict();
+
 function respondError(response: AdminResponse, error: unknown, request: AdminRequest) {
-  if (error instanceof AdminAuthError) sendJson(response, error.status, { error: error.code });
+  if (error instanceof ReportExportError) {
+    sendJson(response, error.code === 'report_export_too_large' ? 413 : 400, { error: error.code });
+  } else if (error instanceof AdminAuthError)
+    sendJson(response, error.status, { error: error.code });
   else if (error instanceof AdminAuthorizationError) sendJson(response, 403, { error: error.code });
   else if (error instanceof z.ZodError)
     sendJson(response, 400, { error: 'report_request_invalid' });
@@ -414,8 +451,42 @@ export async function handleReportsRequest(
       return;
     }
     if (!requireSameOrigin(request, response)) return;
-    const command = commandSchema.parse(await readJsonObject(request));
+    const body = await readJsonObject(request);
     requireSessionCsrf(context, firstHeader(request.headers['x-tux-admin-csrf']).trim());
+    if (body['type'] === 'report.pdf.export') {
+      const input = reportPdfCommandSchema.parse(body);
+      requirePermission(principal, 'reports.view', input.shopId);
+      const report = await collectAuthorizedReportExport({
+        kind: input.kind,
+        area: input.area,
+        principal,
+        shopIds: input.shopIds,
+        fromDate: input.fromDate,
+        toDate: input.toDate,
+        source: input.source,
+        context: input.context,
+        compare: input.compare,
+        query: (args) => client.rpc<Record<string, unknown>>('admin_finance_report_query_v2', args),
+      });
+      const pdf = await renderReportPdf(report);
+      if (pdf.byteLength > 8 * 1024 * 1024) {
+        sendJson(response, 413, { error: 'report_export_too_large' });
+        return;
+      }
+      const fileArea = input.kind === 'current' ? input.area : 'all-authorized';
+      response.statusCode = 200;
+      response.setHeader('content-type', 'application/pdf');
+      response.setHeader(
+        'content-disposition',
+        `attachment; filename="tux-${fileArea}-${input.fromDate}-${input.toDate}.pdf"`,
+      );
+      response.setHeader('cache-control', 'private, no-store');
+      response.setHeader('x-content-type-options', 'nosniff');
+      response.setHeader('content-length', String(pdf.byteLength));
+      response.end(pdf);
+      return;
+    }
+    const command = commandSchema.parse(body);
     requirePermission(
       principal,
       command.type === 'report.target.set' ? 'settings.manage' : 'reports.view',

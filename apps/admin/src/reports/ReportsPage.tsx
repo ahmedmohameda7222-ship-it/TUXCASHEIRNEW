@@ -8,7 +8,9 @@ import { OwnerSummaryCard } from '../dashboard/OwnerSummaryCard';
 import { useShopScope } from '../shops/ShopScopeProvider';
 
 import { REPORT_LABELS, ReportFilters } from './ReportFilters';
+import { ReportExportActions } from './ReportExportActions';
 import { validReportDateRange } from './reportDateRange';
+import { compatibleReportContext } from './reportAreaTransition';
 import { scopeReportFilters } from './reportScope';
 import { ReportView } from './ReportView';
 import { SavedViews } from './SavedViews';
@@ -99,16 +101,19 @@ export function ReportsPage() {
         view.filters['comparisonRange'] === 'year'
           ? view.filters['comparisonRange']
           : 'previous',
-      context: Object.fromEntries(
-        Object.entries(
-          view.filters['context'] &&
-            typeof view.filters['context'] === 'object' &&
-            !Array.isArray(view.filters['context'])
-            ? (view.filters['context'] as Record<string, unknown>)
-            : {},
-        ).filter(
-          (entry): entry is [string, string] =>
-            typeof entry[1] === 'string' && /^(?:[0-9a-f-]{36}|[A-Z_]{2,40})$/i.test(entry[1]),
+      context: compatibleReportContext(
+        area as AdminReportArea,
+        Object.fromEntries(
+          Object.entries(
+            view.filters['context'] &&
+              typeof view.filters['context'] === 'object' &&
+              !Array.isArray(view.filters['context'])
+              ? (view.filters['context'] as Record<string, unknown>)
+              : {},
+          ).filter(
+            (entry): entry is [string, string] =>
+              typeof entry[1] === 'string' && /^(?:[0-9a-f-]{36}|[A-Z_]{2,40})$/i.test(entry[1]),
+          ),
         ),
       ),
       offset: 0,
@@ -134,6 +139,7 @@ export function ReportsPage() {
           Select a valid From/To date range in ascending order, no longer than 730 days.
         </p>
       ) : null}
+      <ReportExportActions shopId={shopId} filters={scopedFilters} />
       <ReportView
         data={reports.reportQuery.data}
         filters={scopedFilters}
