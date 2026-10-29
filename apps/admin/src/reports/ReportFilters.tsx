@@ -1,33 +1,11 @@
 import type { AdminReportArea } from '@tux/admin-contracts';
+import { REPORT_LABELS } from './reportLabels';
 
 import { chooseReportArea } from './reportAreaTransition';
 import { cairoReportToday, reportDatePreset } from './reportDateRange';
 import type { ReportContext, ReportFilters as ReportQueryFilters } from './useReports';
 
-export const REPORT_LABELS: Readonly<Record<AdminReportArea, string>> = {
-  sales: 'Sales',
-  profit: 'Estimated profit and COGS',
-  products: 'Product performance',
-  'inventory-consumption': 'Inventory consumption',
-  waste: 'Waste',
-  'theoretical-variance': 'Inventory variance events',
-  'margin-variance': 'Recorded cost movements',
-  purchasing: 'Purchasing',
-  customers: 'Customers',
-  payments: 'Payments',
-  expenses: 'Expenses',
-  staff: 'Staff and attendance',
-  delivery: 'Delivery',
-  refunds: 'Refunds and returns',
-  tax: 'Tax and service charges',
-  'end-day': 'Financial Z history',
-  'bank-cash': 'Bank and cash movements',
-  'shop-comparison': 'Shop comparison',
-  loyalty: 'Customer loyalty activity',
-  promotions: 'Promotion usage',
-  segments: 'Customer segments',
-  attendance: 'Staff attendance',
-};
+export { REPORT_LABELS } from './reportLabels';
 export const REPORT_TOPICS = [
   {
     label: 'Sales & customers',
