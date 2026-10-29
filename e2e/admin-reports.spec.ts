@@ -180,6 +180,34 @@ test('saved report views send one authorized CSRF-protected versioned command', 
   );
 });
 
+test('R2 failed Save View keeps modal and name until the server confirms persistence', async ({ page }) => {
+  await mockReports(page);
+  await page.route('**/api/admin/reports**', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const payload = route.request().postDataJSON() as { type?: string };
+    if (payload.type !== 'report.view.save') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'report_version_conflict' }),
+    });
+  });
+  await page.goto('/reports');
+  await page.getByRole('button', { name: 'Save this report view' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Save report view' });
+  await dialog.getByLabel('View name').fill('Weekly owner review');
+  await dialog.getByRole('button', { name: 'Save view' }).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('View name')).toHaveValue('Weekly owner review');
+  await expect(dialog.getByRole('alert')).toContainText('Unable to save');
+});
+
 test('phone report presentation', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockReports(page);
