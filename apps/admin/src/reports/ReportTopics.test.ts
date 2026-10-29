@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ReportFilters } from './ReportFilters';
+import { ReportFilters as ReportFiltersView } from './ReportFilters';
 import { ADMIN_REPORT_AREAS } from '@tux/admin-contracts';
 import { describe, expect, it } from 'vitest';
 import { REPORT_LABELS, REPORT_TOPICS } from './ReportFilters';
@@ -53,7 +53,7 @@ describe('selected report-first contract', () => {
 describe('approved report-first picker', () => {
   it('renders quick report choices before the 22-area report select', () => {
     const html = renderToStaticMarkup(
-      createElement(ReportFilters, {
+      createElement(ReportFiltersView, {
         value: {
           area: 'sales',
           fromDate: '2026-10-22',
