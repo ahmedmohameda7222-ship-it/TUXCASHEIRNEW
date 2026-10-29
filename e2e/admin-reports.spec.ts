@@ -127,6 +127,7 @@ test('reports preserve source filtering and period comparison on server-side req
   await page.goto('/reports');
   await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
   await expect(page.getByRole('table')).toBeVisible();
+  await page.getByText('Filters', { exact: true }).click();
   await page.getByLabel('Order source').selectOption('POS');
   await expect.poll(() => queries.some((query) => query.get('source') === 'POS')).toBe(true);
   await page.getByLabel('Compare previous period').check();
@@ -143,7 +144,7 @@ test('reports preserve source filtering and period comparison on server-side req
 test('contextual payment-method filter and comparison presets reach server', async ({ page }) => {
   const { queries } = await mockReports(page);
   await page.goto('/reports');
-  await page.getByText('More filters').click();
+  await page.getByText('Filters', { exact: true }).click();
   await page.getByLabel('Payment method').selectOption('66666666-6666-4666-8666-666666666666');
   await expect
     .poll(() =>
