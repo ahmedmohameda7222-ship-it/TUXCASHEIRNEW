@@ -17,7 +17,7 @@ export function validReportDateRange(from: string, to: string): boolean {
 /** Inclusive date shortcut anchored on the selected Cairo calendar end date. */
 export function reportPresetRange(
   toDate: string,
-  days: 1 | 7 | 30,
+  days: number,
 ): { fromDate: string; toDate: string } {
   const end = exactIsoDate(toDate);
   if (end === null || ![1, 7, 30].includes(days)) {
