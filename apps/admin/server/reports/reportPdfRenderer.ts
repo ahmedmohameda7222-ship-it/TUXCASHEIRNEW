@@ -81,7 +81,9 @@ function dailyActivityLines(
     !Number.isFinite(to) ||
     from > to ||
     (to - from) / day > 30
-  ) return ['Activity over time: unavailable for date ranges longer than 31 days'];
+  ) {
+    return ['Activity over time: unavailable for date ranges longer than 31 days'];
+  }
   const counts = new Map<string, number>();
   for (let date = from; date <= to; date += day) {
     counts.set(new Date(date).toISOString().slice(0, 10), 0);
@@ -94,19 +96,21 @@ function dailyActivityLines(
   });
   for (const row of rows) {
     const instant = new Date(row.occurredAt);
-    if (!Number.isFinite(instant.getTime())) throw new Error('report_export_query_failed');
+    if (!Number.isFinite(instant.getTime())) {
+      throw new Error('report_export_query_failed');
+    }
     const parts = cairo.formatToParts(instant);
     const get = (kind: string) => parts.find((part) => part.type === kind)?.value ?? '';
     const date = get('year') + '-' + get('month') + '-' + get('day');
     if (counts.has(date)) counts.set(date, counts.get(date)! + 1);
   }
   const max = Math.max(1, ...counts.values());
-  return [
-    'Activity over time (source events; Africa/Cairo):',
-    ...[...counts].map(([date, count]) =>
-      date + ' | ' + '#'.repeat(Math.round((count / max) * 25)) + ' (' + count + ')',
-    ),
-  ];
+  const lines = ['Activity over time (source events; Africa/Cairo):'];
+  for (const [date, count] of counts) {
+    const bar = '#'.repeat(Math.round((count / max) * 25));
+    lines.push(`${date} | ${bar} (${count})`);
+  }
+  return lines;
 }
 
 /** Portable text PDF built only from pre-authorized, fully paginated report data. */
