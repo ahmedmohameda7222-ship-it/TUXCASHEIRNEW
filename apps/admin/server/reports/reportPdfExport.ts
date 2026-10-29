@@ -31,7 +31,7 @@ export type ExportQueryArgs = {
   toDate: string;
   source: 'POS' | 'ONLINE' | null;
   context: Readonly<Record<string, string>>;
-  pageSize: 100;
+  pageSize: 100 | 1;
   offset: number;
 };
 export type ExportQueryResponse = {
@@ -48,11 +48,18 @@ export type ReportPdfExportInput = {
   toDate: string;
   source: 'POS' | 'ONLINE' | null;
   context: Readonly<Record<string, string>>;
+  comparePrevious?: boolean;
+  comparisonRange?: 'previous' | 'week' | 'month' | 'year';
 };
 export type ExportSection = {
   area: AdminReportArea;
   rows: ExportFact[];
   summary: ExportSummary;
+  comparison?: {
+    periodStart: string;
+    periodEnd: string;
+    summary: ExportSummary;
+  };
 };
 export type AuthorizedExport = {
   sections: ExportSection[];
@@ -61,6 +68,30 @@ export type AuthorizedExport = {
   toDate: string;
   requestedAreaCount: number;
 };
+
+function previousWindow(
+  fromDate: string,
+  toDate: string,
+  range: 'previous' | 'week' | 'month' | 'year',
+): { fromDate: string; toDate: string } {
+  const start = Date.parse(fromDate + 'T00:00:00.000Z');
+  const end = Date.parse(toDate + 'T00:00:00.000Z');
+  const day = 86400000;
+  const dateLabel = (time: number) => new Date(time).toISOString().slice(0, 10);
+  let previousFrom = start - (Math.round((end - start) / day) + 1) * day;
+  let previousTo = start - day;
+  if (range === 'week') previousFrom = start - 7 * day;
+  else if (range === 'month') {
+    const date = new Date(start);
+    previousFrom = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - 1, 1);
+    previousTo = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1) - day;
+  } else if (range === 'year') {
+    const y = new Date(start).getUTCFullYear() - 1;
+    previousFrom = Date.UTC(y, 0, 1);
+    previousTo = Date.UTC(y, 11, 31);
+  }
+  return { fromDate: dateLabel(previousFrom), toDate: dateLabel(previousTo) };
+}
 
 export const REPORT_EXPORT_MAX_ROWS_PER_AREA = 1500;
 export const REPORT_EXPORT_MAX_TOTAL_ROWS = 5000;
@@ -170,8 +201,32 @@ export async function collectAuthorizedReportExport(
     if (!summary || rows.length !== summary.eventCount) {
       throw new Error('report_export_count_mismatch');
     }
+    let comparison: ExportSection['comparison'];
+    if (input.kind === 'current' && input.comparePrevious) {
+      const previous = previousWindow(
+        input.fromDate,
+        input.toDate,
+        input.comparisonRange ?? 'previous',
+      );
+      const result = await query({
+        area,
+        shopIds: input.shopIds,
+        fromDate: previous.fromDate,
+        toDate: previous.toDate,
+        context,
+        source,
+        pageSize: 1,
+        offset: 0,
+      });
+      if (!result.ok || !result.summary) throw new Error('report_export_query_failed');
+      comparison = {
+        periodStart: previous.fromDate,
+        periodEnd: previous.toDate,
+        summary: result.summary,
+      };
+    }
     totalRows += rows.length;
-    sections.push({ area, rows, summary });
+    sections.push({ area, rows, summary, ...(comparison ? { comparison } : {}) });
   }
   if (sections.length === 0) {
     throw new AdminAuthorizationError('permission_forbidden');
