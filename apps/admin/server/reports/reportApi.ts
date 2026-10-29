@@ -22,6 +22,8 @@ import {
 } from './reportAuthorization.js';
 import { maskDashboardMetrics } from './dashboardAuthorization.js';
 import { enrichReportDrilldowns } from './reportDrilldowns.js';
+import { collectAuthorizedReportExport, type ExportQueryResponse } from './reportPdfExport.js';
+import { renderAuthorizedReportPdf } from './reportPdfRenderer.js';
 
 const uuid = z.string().uuid();
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -49,6 +51,32 @@ const area = z.enum([
   'segments',
   'attendance',
 ]);
+const exportContextSchema = z.object({
+  orderTypeId: uuid.optional(),
+  paymentMethodId: uuid.optional(),
+  workerId: uuid.optional(),
+  employeeId: uuid.optional(),
+  customerId: uuid.optional(),
+  productId: uuid.optional(),
+  categoryId: uuid.optional(),
+  promotionId: uuid.optional(),
+  supplierId: uuid.optional(),
+  deliveryZoneId: uuid.optional(),
+  status: z.string().regex(/^[A-Z_]{2,40}$/).optional(),
+}).strict();
+const exportRequestSchema = z.object({
+  view: z.literal('pdf-export'),
+  kind: z.enum(['current', 'all-authorized']),
+  shopId: uuid,
+  shopIds: z.array(uuid).min(1).max(50),
+  area,
+  fromDate: isoDate,
+  toDate: isoDate,
+  source: z.enum(['POS', 'ONLINE']).nullable(),
+  context: exportContextSchema,
+  comparePrevious: z.boolean().default(false),
+}).strict();
+
 const commandSchema = z.discriminatedUnion('type', [
   z
     .object({
@@ -90,6 +118,13 @@ function respondError(response: AdminResponse, error: unknown, request: AdminReq
   else if (error instanceof AdminAuthorizationError) sendJson(response, 403, { error: error.code });
   else if (error instanceof z.ZodError)
     sendJson(response, 400, { error: 'report_request_invalid' });
+  else if (error instanceof Error && error.message.startsWith('report_export_')) {
+    const status = error.message === 'report_export_too_large' ? 413 : 422;
+    sendJson(response, status, { error: error.message });
+  }
+  else if (error instanceof Error && error.message === 'report_range_invalid') {
+    sendJson(response, 400, { error: 'report_range_invalid' });
+  }
   else if (error instanceof AdminSupabaseError) {
     console.error('Report database failure', {
       resource: 'reports',
@@ -414,7 +449,61 @@ export async function handleReportsRequest(
       return;
     }
     if (!requireSameOrigin(request, response)) return;
-    const command = commandSchema.parse(await readJsonObject(request));
+    const body = await readJsonObject(request);
+    if (body['view'] === 'pdf-export') {
+      const input = exportRequestSchema.parse(body);
+      requireSessionCsrf(context, firstHeader(request.headers['x-tux-admin-csrf']).trim());
+      requirePermission(principal, 'reports.view', input.shopId);
+      if (!input.shopIds.includes(input.shopId)) {
+        sendJson(response, 400, { error: 'report_shop_scope_invalid' });
+        return;
+      }
+      if (input.comparePrevious) {
+        sendJson(response, 422, { error: 'report_export_comparison_not_ready' });
+        return;
+      }
+      const exported = await collectAuthorizedReportExport(input, principal, async (args) => {
+        const result = await client.rpc<Record<string, unknown>>('admin_finance_report_query_v2', {
+          p_actor_employee_id: principal.employeeId,
+          p_shop_ids: args.shopIds,
+          p_area: args.area,
+          p_start_date: args.fromDate,
+          p_end_date: args.toDate,
+          p_page_limit: args.pageSize,
+          p_offset: args.offset,
+          p_source: args.source,
+          p_context: args.context,
+        });
+        if (result['ok'] !== true) {
+          throw new Error('report_export_query_failed');
+        }
+        return result as ExportQueryResponse;
+      });
+      const shopRows = await client.select<Array<{ id: string; name: string }>>(
+        'shops',
+        new URLSearchParams({
+          select: 'id,name',
+          id: `in.(${input.shopIds.join(',')})`,
+          limit: '50',
+        }),
+      );
+      const shopNames = Object.fromEntries(shopRows.map((shop) => [shop.id, shop.name]));
+      const pdf = renderAuthorizedReportPdf(exported, {
+        generatedAt: new Date().toISOString(),
+        shopNames,
+      });
+      response.statusCode = 200;
+      response.setHeader('content-type', 'application/pdf');
+      response.setHeader(
+        'content-disposition',
+        `attachment; filename="tux-reports-${input.kind}-${input.fromDate}-${input.toDate}.pdf"`,
+      );
+      response.setHeader('cache-control', 'private, no-store');
+      response.setHeader('x-content-type-options', 'nosniff');
+      response.end(pdf);
+      return;
+    }
+    const command = commandSchema.parse(body);
     requireSessionCsrf(context, firstHeader(request.headers['x-tux-admin-csrf']).trim());
     requirePermission(
       principal,
