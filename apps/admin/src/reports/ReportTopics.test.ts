@@ -50,7 +50,6 @@ describe('selected report-first contract', () => {
   });
 });
 
-
 describe('approved report-first picker', () => {
   it('renders quick report choices before the 22-area report select', () => {
     const html = renderToStaticMarkup(
@@ -76,6 +75,6 @@ describe('approved report-first picker', () => {
     expect(html).toContain('All reports');
     expect(html).toContain('Last 7 days');
     expect(html.indexOf('Choose a report')).toBeLessThan(html.indexOf('Report area'));
-    expect(html.match(/<option value="/g)).toHaveLength(23);
+    expect(html.match(/<option value="/g)).toHaveLength(25);
   });
 });
