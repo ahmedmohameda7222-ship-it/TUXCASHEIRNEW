@@ -1546,14 +1546,16 @@ test('S2 Add employee applies requested role and permission before reporting sav
             role,
             profileVersion,
             operationsIdentities: workerLinked
-              ? [{
-                  kind: 'LINKED',
-                  shopId,
-                  workerId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-                  workerName: 'Ready Access',
-                  workerActive: true,
-                  credentialVersion: 1,
-                }]
+              ? [
+                  {
+                    kind: 'LINKED',
+                    shopId,
+                    workerId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+                    workerName: 'Ready Access',
+                    workerActive: true,
+                    credentialVersion: 1,
+                  },
+                ]
               : [{ kind: 'SETUP_REQUIRED', shopId }],
             customDeniedPermissions: denied ? ['orders.view'] : [],
           },
@@ -1640,14 +1642,16 @@ test('S2 Add employee holds access-pending approval open without granting unveri
             ...employee(),
             id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             operationsIdentities: workerLinked
-              ? [{
-                  kind: 'LINKED',
-                  shopId,
-                  workerId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-                  workerName: 'Pending Role',
-                  workerActive: true,
-                  credentialVersion: 1,
-                }]
+              ? [
+                  {
+                    kind: 'LINKED',
+                    shopId,
+                    workerId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+                    workerName: 'Pending Role',
+                    workerActive: true,
+                    credentialVersion: 1,
+                  },
+                ]
               : [{ kind: 'SETUP_REQUIRED', shopId }],
           },
         }),
@@ -1757,5 +1761,7 @@ test('S2 Add employee must not close when provision succeeded but Operations lin
   await expect(sheet).toBeVisible();
   await expect(sheet.getByRole('alert')).toContainText('Operations access is not confirmed');
   expect(commands.filter((command) => command.type === 'employee.create')).toHaveLength(1);
-  expect(commands.filter((command) => command.type === 'employee.provision-worker')).toHaveLength(1);
+  expect(commands.filter((command) => command.type === 'employee.provision-worker')).toHaveLength(
+    1,
+  );
 });
