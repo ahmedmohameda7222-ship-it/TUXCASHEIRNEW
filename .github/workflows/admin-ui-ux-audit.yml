@@ -1,0 +1,79 @@
+name: TUX Admin UI UX Playwright evidence (read-only fixtures)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/admin-ui-ux-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-ui-ux-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    name: Admin 23-suite responsive and interaction evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      TUX_ADMIN_EIGHT_TABS_CAPTURE: '1'
+      P04_P07_TARGETED_CAPTURE: '1'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Playwright Chromium and system libraries
+        run: npx playwright install --with-deps chromium
+      - name: Verify Playwright MCP package
+        run: npx --yes @playwright/mcp@latest --version
+      - name: Build Admin from checked-out commit
+        run: npm run build:admin
+      - name: Enable full-page screenshots for every Playwright test
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('playwright.admin.config.ts')
+          source = p.read_text()
+          before = "screenshot: 'only-on-failure'"
+          if before not in source:
+              raise SystemExit('Expected Playwright screenshot setting was not found')
+          p.write_text(source.replace(before, "screenshot: 'on'"))
+          PY
+      - name: Run complete Admin Playwright suite
+        run: npx playwright test --config playwright.admin.config.ts
+      - name: Create screenshot inventory and audit metadata
+        if: always()
+        run: |
+          mkdir -p artifacts/admin-ui-ux-audit
+          {
+            echo "Revision: ${GITHUB_SHA}"
+            echo "Screenshot evidence uses synthetic mock-auth fixtures; it is not a real Owner session."
+            echo "Do not treat visual captures as permission to change business logic or production data."
+            echo
+            echo "Screenshot paths:"
+            find artifacts test-results -name '*.png' -type f 2>/dev/null | sort || true
+          } > artifacts/admin-ui-ux-audit/screenshot-index.txt
+          echo "Total PNG captures: $(find artifacts test-results -name '*.png' -type f 2>/dev/null | wc -l)" >> artifacts/admin-ui-ux-audit/screenshot-index.txt
+      - name: Upload all screenshot evidence and test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tux-admin-ui-ux-visual-evidence
+          path: |
+            artifacts/admin-ui-ux-audit
+            artifacts/p04-p07
+            artifacts/p04-p07-targeted
+            test-results
+            playwright-report-admin
+          if-no-files-found: warn
+          retention-days: 30
